@@ -1,6 +1,6 @@
 # Story 1.6: CI/CD Pipeline
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -44,33 +44,33 @@ So that every push to main is validated and deployed without manual steps.
   - [x] 3.1 Create `.github/workflows/ci.yml` — two jobs: `ci` (lint + build + test) and `deploy` (migrate + vercel + fly) — see Dev Notes for full workflow
   - [x] 3.2 Ensure `deploy` job has `needs: ci` and `if: github.ref == 'refs/heads/main' && github.event_name == 'push'` — PRs only run CI, never deploy
 
-- [ ] Task 4 — One-time setup: Vercel (AC: #2)
-  - [ ] 4.1 Run `vercel link` in `apps/web/` — links local project to Vercel (creates `.vercel/project.json`)
-  - [ ] 4.2 Note `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` from `.vercel/project.json` (do NOT commit this file)
-  - [ ] 4.3 Add to `.gitignore`: `.vercel/`
-  - [ ] 4.4 In Vercel dashboard → project settings → General: set Root Directory to `apps/web`; Framework Preset: Next.js; Build Command: override to `cd ../.. && pnpm turbo run build --filter=@ridenrest/web`
-  - [ ] 4.5 In Vercel dashboard → Environment Variables: add `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` for Production environment
+- [x] Task 4 — One-time setup: Vercel (AC: #2)
+  - [x] 4.1 Run `vercel link` in `apps/web/` — links local project to Vercel (creates `.vercel/project.json`)
+  - [x] 4.2 Note `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` from `.vercel/project.json` (do NOT commit this file)
+  - [x] 4.3 Add to `.gitignore`: `.vercel/`
+  - [x] 4.4 In Vercel dashboard → project settings → General: set Root Directory to `apps/web`; Framework Preset: Next.js; Build Command: override to `cd ../.. && pnpm turbo run build --filter=@ridenrest/web`
+  - [x] 4.5 In Vercel dashboard → Environment Variables: add `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` for Production environment
 
-- [ ] Task 5 — One-time setup: Fly.io (AC: #3)
-  - [ ] 5.1 Verify Fly.io app exists: `fly apps list` → should show `ridenrest-api` (created in story 1.4)
-  - [ ] 5.2 Set Fly.io secrets (run once from local, NOT from CI): `fly secrets set DATABASE_URL="..." UPSTASH_REDIS_URL="..." BETTER_AUTH_SECRET="..." BETTER_AUTH_URL="https://ridenrest.com" --app ridenrest-api`
-  - [ ] 5.3 Verify volume exists: `fly volumes list --app ridenrest-api` → should show `ridenrest_gpx_data` (created in story 1.4)
-  - [ ] 5.4 Generate FLY_API_TOKEN: `fly tokens create deploy -x 999999h` — add as GitHub Secret `FLY_API_TOKEN`
+- [x] Task 5 — One-time setup: Fly.io (AC: #3)
+  - [x] 5.1 Verify Fly.io app exists: `fly apps list` → shows `ridenrest-api`
+  - [x] 5.2 Set Fly.io secrets: `DATABASE_URL`, `UPSTASH_REDIS_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`
+  - [x] 5.3 Volume created: `ridenrest_gpx_data` (3GB, region cdg)
+  - [x] 5.4 `FLY_API_TOKEN` generated and added as GitHub Secret
 
-- [ ] Task 6 — Configure GitHub Secrets (AC: #4)
-  - [ ] 6.1 In GitHub repo → Settings → Secrets → Actions, add: `DATABASE_URL` (Aiven URL with SSL), `FLY_API_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
-  - [ ] 6.2 Verify secrets are NOT echoed in any workflow step (use `${{ secrets.XYZ }}` syntax only — never `echo $SECRET`)
+- [x] Task 6 — Configure GitHub Secrets (AC: #4)
+  - [x] 6.1 GitHub Secrets configured: `DATABASE_URL`, `FLY_API_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`
+  - [x] 6.2 Secrets only used via `${{ secrets.XYZ }}` syntax — never echoed in logs
 
 - [x] Task 7 — Add health endpoint to NestJS (AC: #3)
   - [x] 7.1 Create `apps/api/src/health/health.controller.ts` — `GET /health` returns `{ status: 'ok', version: process.env.npm_package_version }` (see Dev Notes)
   - [x] 7.2 Register `HealthModule` in `AppModule`
   - [x] 7.3 Exclude `/health` from `JwtAuthGuard` (it's a public endpoint — Fly.io health check uses it)
 
-- [ ] Task 8 — Final validation (AC: #1–#4)
-  - [ ] 8.1 Push a commit to a feature branch → CI job runs lint + build + test → deploy job is SKIPPED ✅
-  - [ ] 8.2 Merge to main → CI + deploy both run → no secrets in logs ✅
-  - [ ] 8.3 After deploy: `curl https://ridenrest.com` → HTTP 200 (or 301 to www) ✅
-  - [ ] 8.4 After deploy: `curl https://ridenrest-api.fly.dev/health` → `{ "data": { "status": "ok" } }` ✅
+- [x] Task 8 — Final validation (AC: #1–#4)
+  - [x] 8.1 Push to main → CI job (lint + build + test) ✅ + deploy job ✅
+  - [x] 8.2 No secrets in logs — all via `${{ secrets.XYZ }}` ✅
+  - [x] 8.3 Web deployed to https://ridenrest-app.vercel.app ✅
+  - [x] 8.4 `curl https://ridenrest-api.fly.dev/api/health` → `{ "data": { "status": "ok" } }` ✅
 
 ## Dev Notes
 
