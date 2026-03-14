@@ -9,7 +9,12 @@ const { mockGetSession, mockTransaction, mockRevalidatePath, mockRedirect } =
   }))
 
 vi.mock('next/cache', () => ({ revalidatePath: mockRevalidatePath }))
-vi.mock('next/navigation', () => ({ redirect: mockRedirect }))
+// Next.js redirect() throws a special error — simulate that behavior
+vi.mock('next/navigation', () => ({
+  redirect: mockRedirect.mockImplementation((url: string) => {
+    throw Object.assign(new Error('NEXT_REDIRECT'), { digest: `NEXT_REDIRECT;replace;${url};` })
+  }),
+}))
 vi.mock('next/headers', () => ({ headers: vi.fn().mockResolvedValue({}) }))
 vi.mock('@/lib/auth/auth', () => ({
   auth: { api: { getSession: mockGetSession } },
@@ -29,7 +34,7 @@ describe('disconnectStrava', () => {
   it('redirects to /login when not authenticated', async () => {
     mockGetSession.mockResolvedValue(null)
     const { disconnectStrava } = await import('./actions')
-    await disconnectStrava()
+    await expect(disconnectStrava()).rejects.toThrow('NEXT_REDIRECT')
     expect(mockRedirect).toHaveBeenCalledWith('/login')
   })
 

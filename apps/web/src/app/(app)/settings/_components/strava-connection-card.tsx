@@ -21,6 +21,8 @@ export function StravaConnectionCard({ isConnected }: StravaConnectionCardProps)
         providerId: 'strava',
         callbackURL: '/settings',
       })
+    } catch {
+      // Errors are non-fatal — button re-enables via finally
     } finally {
       // Reset in case redirect doesn't happen (error or unexpected resolution)
       setIsPending(false)
