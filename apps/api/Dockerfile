@@ -27,7 +27,10 @@ WORKDIR /app
 # Copy pruned package.json files + lockfile (cached layer if unchanged)
 COPY --from=pruner /app/out/json/ .
 COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile
+# --no-frozen-lockfile: turbo prune generates an incomplete lockfile for peer deps
+# (known issue with pnpm v9+ and turbo prune). Resolution is still deterministic
+# because the pruned package.json files pin exact versions.
+RUN pnpm install --no-frozen-lockfile
 
 # ──────────────────────────────────────────
 # Stage 4: builder — compile NestJS with webpack
