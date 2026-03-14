@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockGetSession, mockTransaction, mockDelete, mockUpdate, mockRevalidatePath, mockRedirect } =
+const { mockGetSession, mockTransaction, mockRevalidatePath, mockRedirect } =
   vi.hoisted(() => ({
     mockGetSession: vi.fn(),
     mockTransaction: vi.fn(),
-    mockDelete: vi.fn(),
-    mockUpdate: vi.fn(),
     mockRevalidatePath: vi.fn(),
     mockRedirect: vi.fn(),
   }))

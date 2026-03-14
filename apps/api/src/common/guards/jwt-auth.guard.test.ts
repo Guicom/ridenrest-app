@@ -21,6 +21,7 @@ function signJwt(payload: object, secret: string, expiresInSeconds = 900): strin
 // Mock jose to avoid ESM loading failure, but use real HS256 logic internally
 // This ensures the guard's algorithm constraint and claim validation are actually tested
 jest.mock('jose', () => ({
+  // eslint-disable-next-line @typescript-eslint/require-await
   jwtVerify: async (
     token: string,
     key: Uint8Array,
