@@ -1,0 +1,12 @@
+{
+  "extends": "@ridenrest/typescript-config/nestjs",
+  "compilerOptions": {
+    "target": "ES2023",
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "isolatedModules": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "exclude": ["node_modules", "dist", "test", "**/*spec.ts", "**/*.test.ts"]
+}

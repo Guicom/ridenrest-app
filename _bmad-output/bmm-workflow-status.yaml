@@ -1,0 +1,79 @@
+# BMM Workflow Status
+# Tracks completion of all product development workflows
+
+project_name: ridenrest-app
+last_updated: '2026-03-01'
+
+workflows:
+  product-brief:
+    status: completed
+    output_file: '_bmad-output/planning-artifacts/product-brief-ridenrest-app-2026-03-01.md'
+    completed_at: '2026-03-01'
+    steps_completed: [1, 2, 3, 4, 5]
+
+  prd:
+    status: completed
+    output_file: '_bmad-output/planning-artifacts/prd.md'
+    completed_at: '2026-03-01'
+    steps_completed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+  architecture:
+    status: completed
+    output_file: '_bmad-output/planning-artifacts/architecture.md'
+    completed_at: '2026-03-01'
+    steps_completed: [1, 2, 3, 4, 5, 6, 7, 8]
+
+  generate-project-context:
+    status: completed
+    output_file: '_bmad-output/project-context.md'
+    completed_at: '2026-03-01'
+    steps_completed: [1, 2, 3]
+
+  ux-design:
+    status: completed
+    output_file: '_bmad-output/planning-artifacts/ux-design-specification.md'
+    completed_at: '2026-03-02'
+    steps_completed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    supporting_files:
+      - '_bmad-output/planning-artifacts/ux-design-directions.html'
+
+  epics-and-stories:
+    status: completed
+    output_file: '_bmad-output/planning-artifacts/epics.md'
+    completed_at: '2026-03-02'
+    steps_completed: [1, 2, 3, 4]
+
+  sprint-planning:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/sprint-status.yaml'
+    completed_at: '2026-03-12'
+
+  create-story-1-1:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/1-1-monorepo-setup-developer-environment.md'
+    completed_at: '2026-03-14'
+
+  create-story-1-2:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/1-2-database-schema-aiven-configuration.md'
+    completed_at: '2026-03-14'
+
+  create-story-1-3:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/1-3-shared-business-logic-packages.md'
+    completed_at: '2026-03-14'
+
+  create-story-1-4:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/1-4-nestjs-api-foundation.md'
+    completed_at: '2026-03-14'
+
+  create-story-1-5:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/1-5-nextjs-web-foundation.md'
+    completed_at: '2026-03-14'
+
+  create-story-1-6:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/1-6-ci-cd-pipeline.md'
+    completed_at: '2026-03-14'

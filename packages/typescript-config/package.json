@@ -1,0 +1,16 @@
+{
+  "name": "@ridenrest/typescript-config",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "exports": {
+    "./base": "./base.json",
+    "./nextjs": "./nextjs.json",
+    "./nestjs": "./nestjs.json"
+  },
+  "files": [
+    "base.json",
+    "nextjs.json",
+    "nestjs.json"
+  ]
+}

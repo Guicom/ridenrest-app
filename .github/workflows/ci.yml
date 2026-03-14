@@ -1,0 +1,106 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PNPM_VERSION: '10.32.1'
+  NODE_VERSION: '22'
+
+jobs:
+  # ─────────────────────────────────────────────────────
+  # Job 1: CI — Lint + Build + Test (ALL pushes + PRs)
+  # ─────────────────────────────────────────────────────
+  ci:
+    name: Lint, Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # Turborepo needs git history for diff-based caching
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm turbo run lint --filter='*'
+
+      - name: Build
+        run: pnpm turbo run build --filter='*'
+
+      - name: Test
+        run: pnpm turbo run test --filter='*'
+
+  # ─────────────────────────────────────────────────────
+  # Job 2: Deploy — Migrate + Vercel + Fly.io
+  # Only runs on push to main (not PRs) after CI passes
+  # ─────────────────────────────────────────────────────
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── DB Migrations ──────────────────────────────────
+      - name: Run DB migrations
+        working-directory: packages/database
+        run: NODE_TLS_REJECT_UNAUTHORIZED=0 npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # ── Deploy Web → Vercel ───────────────────────────
+      - name: Deploy Web to Vercel
+        run: |
+          pnpm add -g vercel@latest
+          vercel --prod --token=${{ secrets.VERCEL_TOKEN }} \
+            --yes \
+            --cwd apps/web
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # ── Deploy API → Fly.io ───────────────────────────
+      - name: Deploy API to Fly.io
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Fly deploy
+        run: flyctl deploy --app ridenrest-api --remote-only
+        # --remote-only: Docker build runs on Fly.io's builder (no Docker daemon needed in CI)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

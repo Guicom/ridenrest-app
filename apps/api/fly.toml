@@ -1,0 +1,19 @@
+app = "ridenrest-api"
+primary_region = "cdg"  # Paris — closest to target users (Spain/France bikepacking)
+
+[build]
+
+[http_service]
+  internal_port = 3010
+  force_https = true
+  auto_stop_machines = false  # Always-on required (no cold starts for API)
+  auto_start_machines = true
+
+[[mounts]]
+  source = "ridenrest_gpx_data"
+  destination = "/data/gpx"
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

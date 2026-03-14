@@ -1,0 +1,16 @@
+node_modules
+.git
+.gitignore
+**/.env
+**/.env.local
+**/.env.*.local
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/node_modules
+.github
+_bmad-output
+# Exclude web app from API Docker context (turbo prune handles this, but belt+suspenders)
+apps/web
+# Keep: apps/api/, packages/, turbo.json, package.json, pnpm-lock.yaml, pnpm-workspace.yaml

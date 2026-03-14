@@ -1,0 +1,1209 @@
+---
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories', 'step-04-final-validation']
+inputDocuments:
+  - '_bmad-output/planning-artifacts/prd.md'
+  - '_bmad-output/planning-artifacts/architecture.md'
+---
+
+# ridenrest-app - Epic Breakdown
+
+## Overview
+
+This document provides the complete epic and story breakdown for ridenrest-app, decomposing the requirements from the PRD and Architecture requirements into implementable stories.
+
+## Requirements Inventory
+
+### Functional Requirements
+
+FR-001: L'utilisateur peut créer un compte avec email et mot de passe
+FR-002: L'utilisateur peut s'authentifier via Google OAuth (1 clic)
+FR-003: L'utilisateur peut connecter son compte Strava pour importer des activités GPX
+FR-004: L'utilisateur peut se déconnecter de l'application
+FR-005: L'utilisateur peut supprimer son compte — toutes ses données sont effacées (RGPD)
+FR-006: L'application maintient la session utilisateur entre les visites (persistent session)
+FR-007: L'utilisateur peut réinitialiser son mot de passe par email
+FR-010: L'utilisateur peut créer une aventure nommée
+FR-011: L'utilisateur peut ajouter un ou plusieurs fichiers GPX à une aventure sous forme de segments ordonnés
+FR-012: L'utilisateur peut réordonner les segments d'une aventure par glisser-déposer
+FR-013: L'utilisateur peut supprimer un segment d'une aventure
+FR-014: L'utilisateur peut remplacer un segment par un nouveau fichier GPX
+FR-015: L'application calcule et affiche la distance totale de l'aventure et les distances cumulatives par segment
+FR-016: L'utilisateur peut importer une activité directement depuis son compte Strava en tant que segment
+FR-017: L'utilisateur peut renommer une aventure ou un segment individuel
+FR-018: L'utilisateur peut supprimer une aventure entière avec confirmation
+FR-019: L'application informe l'utilisateur par notification quand le parsing d'un segment GPX est terminé
+FR-020: L'application affiche la trace GPX sur une carte interactive (MapLibre GL JS)
+FR-021: L'utilisateur peut basculer entre le thème carte sombre et clair
+FR-022: Après analyse de densité, la trace est colorisée par tronçon (vert/orange/rouge) selon la disponibilité d'hébergements
+FR-023: L'utilisateur peut activer/désactiver chaque calque POI indépendamment (🏨 Hébergements / 🍽️ Restauration / 🛒 Alimentation / 🚲 Vélo)
+FR-024: Les POIs sont affichés sous forme de pins sur la carte dans le viewport courant
+FR-025: L'utilisateur peut taper sur un pin pour afficher la fiche détail du POI
+FR-026: L'application centre automatiquement la carte sur la trace de l'aventure sélectionnée
+FR-027: Une légende de la colorisation de trace est accessible depuis la carte
+FR-030: L'utilisateur peut définir une plage kilométrique (km A → km B) pour rechercher des POIs — amplitude maximale de 30 km pour limiter les appels Overpass API
+FR-031: L'application retourne les POIs situés dans un corridor géospatial autour du segment sélectionné (ST_Buffer sur le segment limité)
+FR-032: Chaque fiche POI affiche : nom, type, distance depuis la trace (m), kilométrage sur la trace
+FR-033: Chaque fiche hébergement affiche un lien deep-link paramétré vers Hotels.com et/ou Booking.com
+FR-034: L'utilisateur peut filtrer les POIs affichés par catégorie directement sur la carte
+FR-035: L'utilisateur peut déclencher une analyse de densité asynchrone sur une aventure
+FR-036: L'application affiche l'attribution OpenStreetMap sur la carte à tout moment
+FR-040: L'utilisateur peut activer le mode Live — un consentement explicite de géolocalisation est demandé avant activation
+FR-041: En mode Live, l'application détecte la position GPS de l'utilisateur en temps réel
+FR-042: En mode Live, l'utilisateur choisit via un slider une distance cible (ex. 30 km) — les POIs affichés sont ceux situés autour du point projeté à `currentKm + distance_cible` sur la trace
+FR-043: En mode Live, l'utilisateur configure un rayon de recherche autour du point cible (0 à 5 km, max 10 km) — seuls les POIs dans ce rayon sont affichés
+FR-044: Les résultats se mettent à jour automatiquement à mesure que la position GPS évolue (nouveau `currentKm` recalculé)
+FR-045: En cas de connexion instable, les POIs partiellement chargés sont affichés avec un message d'état clair
+FR-050: En mode Planification, l'utilisateur peut saisir une heure de départ et une allure estimée
+FR-051: L'application affiche les prévisions météo calées sur l'heure d'arrivée estimée à chaque point kilométrique (pace-adjusted)
+FR-052: En mode Live, la météo est calculée en fonction de la position GPS et de l'allure déclarée
+FR-053: Les données météo proviennent de WeatherAPI.com (température, vent, précipitations, icône météo)
+FR-054: Les prévisions météo sont automatiquement rafraîchies toutes les heures
+FR-055: Fallback : si aucune allure n'est saisie, la météo affichée correspond à l'heure actuelle au point
+FR-060: Les liens de réservation sont des deep links paramétrés vers Hotels.com et Booking.com
+FR-061: Les liens affiliés sont identifiés visuellement comme tels dans l'interface (transparence utilisateur)
+FR-062: L'application trace les clics sur les liens de réservation à des fins d'analytics
+FR-063: L'attribution "Powered by Strava" est visible quand des données d'activité Strava sont affichées
+FR-070: L'application peut être installée sur l'écran d'accueil via le mécanisme PWA natif
+FR-071: La trace GPX et les derniers POIs chargés restent consultables en mode offline partiel
+FR-072: L'application envoie une notification push (opt-in) quand une analyse de densité est terminée
+FR-073: Les fonctionnalités nécessitant le réseau sont désactivées offline avec un message explicite
+FR-080: En mode Planification, chaque fiche POI affiche le dénivelé positif cumulé (D+) entre le fromKm courant et la position du POI sur la trace
+FR-081: En mode Planification, chaque fiche POI affiche le temps estimé pour atteindre le POI depuis le fromKm, calculé selon l'allure saisie (fallback : 15 km/h si non saisie)
+FR-082: En mode Live, chaque POI dans la liste affiche le D+ et le temps estimé depuis la position GPS courante jusqu'au point cible sur la trace
+
+### NonFunctional Requirements
+
+NFR-001: First Contentful Paint < 1.5s (Lighthouse mobile, 4G simulé)
+NFR-002: Largest Contentful Paint < 2.5s (Lighthouse mobile, 4G simulé)
+NFR-003: Cumulative Layout Shift < 0.1 (Lighthouse, pages marketing)
+NFR-004: Bundle JS initial (gzippé) < 200 KB (next build + analyzer)
+NFR-005: Parsing GPX serveur < 10s pour fichiers jusqu'à 50 000 points
+NFR-006: Chargement carte + trace < 3s (mobile 4G, post-import GPX)
+NFR-007: Latence mode Live (GPS → POIs) ≤ 2s avec indicateur visible
+NFR-008: Score PWA Lighthouse ≥ 85 (audit mobile)
+NFR-010: Toutes les communications HTTP sécurisées en HTTPS (TLS 1.3+)
+NFR-011: Tokens d'authentification stockés de manière sécurisée (httpOnly cookies Better Auth)
+NFR-012: Données de géolocalisation non persistées côté serveur (RGPD — usage session uniquement)
+NFR-013: Consentement explicite requis avant toute activation de la géolocalisation
+NFR-014: API keys et secrets en variables d'environnement, jamais exposés côté client
+NFR-015: Rate limiting activé sur les endpoints API NestJS (protection contre abus et DDoS)
+NFR-016: Politique de confidentialité publiée et accessible avant le premier usage (RGPD)
+NFR-020: Architecture API stateless pour permettre le scaling horizontal (Fly.io)
+NFR-021: Résultats Overpass API mis en cache (Redis Upstash, TTL 24h)
+NFR-022: Jobs d'analyse de densité exécutés de manière asynchrone (file d'attente BullMQ)
+NFR-023: L'application supporte des pics de trafic lors des événements ultra-distance (16-100 utilisateurs simultanés MVP)
+NFR-030: Disponibilité cible ≥ 99% (~7h d'arrêt max par mois) — critique pendant les événements actifs
+NFR-031: Dégradation gracieuse : si Overpass API est indisponible, message clair + possibilité de réessayer
+NFR-032: Zéro crash silencieux en mode Live : toute erreur réseau produit un feedback utilisateur visible
+NFR-033: Données d'aventure non perdues suite à une erreur de parsing — erreur reportée, données précédentes conservées
+NFR-040: Respecter les rate limits Overpass API — throttling automatique, requêtes par segment
+NFR-041: Respecter les rate limits Strava API (100 req/15 min, 1 000 req/jour) — alertes à 80%
+NFR-042: Respecter les quotas WeatherAPI.com (1M calls/mois) — dashboard de consommation interne
+NFR-043: Respecter les Conditions d'utilisation Strava API : ne pas stocker les données d'activité au-delà de l'import
+NFR-044: Attribution OpenStreetMap ("© OpenStreetMap contributors") visible dans l'interface carte à tout moment
+NFR-045: Liens affiliés respectent les CGU des programmes partenaires (Expedia, Hotels.com) — format URLs non modifié
+
+### Additional Requirements
+
+**Architecture — Starter & Infrastructure Setup:**
+- Starter template: `pnpm create turbo@latest ridenrest-app --package-manager pnpm` → forme la base d'Epic 1, Story 1.1
+- Monorepo Turborepo 2.6.1 avec apps/web (Next.js 15), apps/api (NestJS 11), packages/database, packages/gpx, packages/shared, packages/ui
+- GitHub Actions CI/CD pipeline: pnpm install → turbo lint → turbo build (cache) → deploy Vercel (web) + Fly.io (api)
+
+**Architecture — Data Layer:**
+- Drizzle ORM (schémas dans packages/database/) avec drizzle-kit pour migrations
+- Tables cibles: profiles, adventures, adventure_segments, accommodations_cache, weather_cache, coverage_gaps
+- Upstash Redis dual-role: cache API externe + backend BullMQ jobs
+
+**Architecture — Authentication:**
+- Better Auth (email/password + Google OAuth + Strava OAuth), open source, sessions stockées dans PostgreSQL (Aiven)
+- Better Auth middleware pour session Next.js App Router (`lib/auth/auth.ts`, `lib/auth/client.ts`, `lib/auth/server.ts`)
+- JwtAuthGuard NestJS custom: vérifier JWT Better Auth sur chaque endpoint protégé (`BETTER_AUTH_SECRET`)
+
+**Architecture — API Patterns:**
+- NestJS feature modules (adventures, segments, pois, density, weather, strava, common)
+- Repository pattern: toutes les queries Drizzle dans {feature}.repository.ts
+- ResponseInterceptor global: jamais de JSON brut depuis un controller
+- HttpExceptionFilter global: pas de try/catch dans les controllers
+- ValidationPipe global + class-validator pour les DTOs
+
+**Architecture — Frontend Patterns:**
+- TanStack Query v5 pour le server state (query keys: ['resource', id?, 'sub?'])
+- Zustand v5 pour le client state (useMapStore, useLiveStore, useUIStore)
+- shadcn/ui + Tailwind CSS v4 pour les composants UI
+- Vercel deploy: Node.js full runtime, SSG pour `(marketing)/`, CSR pour `(app)/` — aucun adapter Edge requis
+
+**Architecture — Real-time & Async:**
+- BullMQ v5 queues: 'gpx-processing' + 'density-analysis'
+- Job status: TanStack Query polling (`refetchInterval` conditionnel sur `parse_status` / `density_status`)
+- GPS/geolocation: client-side uniquement via watchPosition() — RGPD compliance
+
+**Architecture — Packages GPX:**
+- packages/gpx: Haversine (distances), RDP simplification (50k→2k points), corridor search algorithm
+- packages/shared: Zod schemas partagés, types Adventure/Segment/POI, constantes
+
+### FR Coverage Map
+
+FR-001: Epic 2 — Email/password account creation
+FR-002: Epic 2 — Google OAuth sign-in
+FR-003: Epic 2 — Strava OAuth connection for GPX import
+FR-004: Epic 2 — Sign out
+FR-005: Epic 2 — Account deletion with full data cascade (RGPD)
+FR-006: Epic 2 — Persistent session between visits
+FR-007: Epic 2 — Password reset by email
+FR-010: Epic 3 — Create named adventure
+FR-011: Epic 3 — Add ordered GPX segments to adventure
+FR-012: Epic 3 — Drag-and-drop segment reordering
+FR-013: Epic 3 — Delete a segment
+FR-014: Epic 3 — Replace a segment with new GPX file
+FR-015: Epic 3 — Compute and display total + cumulative distances
+FR-016: Epic 3 — Import Strava activity as segment
+FR-017: Epic 3 — Rename adventure or segment
+FR-018: Epic 3 — Delete entire adventure with confirmation
+FR-019: Epic 3 — Notify user when GPX segment parsing completes
+FR-020: Epic 4 — Display GPX trace on interactive map (MapLibre)
+FR-021: Epic 4 — Toggle dark/light map theme
+FR-022: Epic 5 — Colorize trace by density tronçon (green/orange/red)
+FR-023: Epic 4 — Toggle each POI layer independently (🏨🍽️🛒🚲)
+FR-024: Epic 4 — Display POI pins on map in current viewport
+FR-025: Epic 4 — Tap pin to show POI detail sheet
+FR-026: Epic 4 — Auto-center map on adventure trace
+FR-027: Epic 5 — Legend for density colorization accessible from map
+FR-030: Epic 4 — Define km range (A→B) for POI corridor search
+FR-031: Epic 4 — Return POIs within geospatial corridor (PostGIS ST_Buffer)
+FR-032: Epic 4 — POI card: name, type, distance from trace (m), km on trace
+FR-033: Epic 4 — Accommodation card: deep link to Hotels.com + Booking.com
+FR-034: Epic 4 — Filter displayed POIs by category on map
+FR-035: Epic 5 — Trigger async density analysis on adventure
+FR-036: Epic 4 — OSM attribution always visible on map
+FR-040: Epic 7 — Activate Live mode with explicit geolocation consent
+FR-041: Epic 7 — Detect real-time GPS position in Live mode
+FR-042: Epic 7 — Slider sets target distance ahead (e.g. 30 km) — POIs shown around that projected point on trace
+FR-043: Epic 7 — Configurable search radius around target point (0–5 km, max 10 km)
+FR-044: Epic 7 — Auto-update results as GPS position evolves (new currentKm)
+FR-045: Epic 7 — Show partial POIs with status message on unstable connection
+FR-050: Epic 6 — Enter departure time and speed in Planning mode
+FR-051: Epic 6 — Show pace-adjusted weather forecast at each km marker
+FR-052: Epic 6 — Live mode weather based on GPS position and speed
+FR-053: Epic 6 — Weather data from WeatherAPI.com (temp, wind, rain, icon)
+FR-054: Epic 6 — Auto-refresh weather forecasts every hour
+FR-055: Epic 6 — Fallback: show current-time weather if no speed entered
+FR-060: Epic 4 — Booking deep links to Hotels.com and Booking.com
+FR-061: Epic 4 — Affiliate links visually identified in UI (transparency)
+FR-062: Epic 4 — Track booking link clicks for analytics
+FR-063: Epic 4 — "Powered by Strava" attribution when Strava data is shown
+FR-070: Epic 8 — PWA install via native mechanism (Add to Home Screen)
+FR-071: Epic 8 — Last loaded GPX trace + POIs readable offline
+FR-072: Epic 8 — Push notification (opt-in) when density analysis completes
+FR-073: Epic 8 — Network-required features disabled offline with explicit message
+FR-080: Epic 4 — POI card shows D+ from fromKm to POI position (Planning mode)
+FR-081: Epic 4 — POI card shows ETA from fromKm to POI based on entered speed (Planning mode)
+FR-082: Epic 7 — Live mode POI list shows D+ and ETA from current GPS position to POI
+
+## Epic List
+
+### Epic 1: Foundation & Developer Environment
+Établir le monorepo Turborepo, les packages partagés, la base de données PostgreSQL (Aiven), et le pipeline CI/CD. Aucune feature utilisateur directe — mais tout le reste en dépend.
+**FRs couverts :** Aucun FR direct (Architecture requirements)
+**NFRs couverts :** NFR-010, NFR-014, NFR-015, NFR-020
+
+### Epic 2: User Authentication & Account Management
+Un utilisateur peut créer un compte (email ou Google OAuth), connecter Strava, maintenir sa session, réinitialiser son mot de passe et supprimer son compte avec effacement complet de ses données (RGPD).
+**FRs couverts :** FR-001, FR-002, FR-003, FR-004, FR-005, FR-006, FR-007
+**NFRs couverts :** NFR-011, NFR-016
+
+### Epic 3: Adventures & GPX Management
+Un utilisateur peut créer une aventure multi-segments GPX, réordonner les segments par drag-and-drop, importer depuis Strava, renommer, supprimer, et être notifié par polling TanStack Query quand le parsing asynchrone est terminé.
+**FRs couverts :** FR-010, FR-011, FR-012, FR-013, FR-014, FR-015, FR-016, FR-017, FR-018, FR-019
+**NFRs couverts :** NFR-005, NFR-033
+
+### Epic 4: Interactive Map & POI Planning Mode
+Un utilisateur peut visualiser sa trace GPX sur une carte MapLibre (dark/light), définir une plage kilométrique, déclencher une recherche corridor PostGIS, consulter les fiches POI avec leur distance, D+ et temps estimé depuis la trace, et cliquer vers Hotels.com / Booking.com.
+**FRs couverts :** FR-020, FR-021, FR-023, FR-024, FR-025, FR-026, FR-036, FR-030, FR-031, FR-032, FR-033, FR-034, FR-060, FR-061, FR-062, FR-063, FR-080, FR-081
+**NFRs couverts :** NFR-006, NFR-021, NFR-040, NFR-041, NFR-044, NFR-045
+
+### Epic 5: Density Analysis & Visual Intelligence
+Un utilisateur peut déclencher une analyse de densité asynchrone (BullMQ) et voir sa trace colorisée par tronçon (vert/orange/rouge) pour identifier immédiatement les zones critiques sans hébergements.
+**FRs couverts :** FR-022, FR-027, FR-035
+**NFRs couverts :** NFR-022, NFR-023
+
+### Epic 6: Weather Integration
+Un utilisateur peut consulter les prévisions météo calées sur son heure de passage estimée à chaque point kilométrique de la trace (pace-adjusted), en mode Planification (heure départ + allure) et en mode Live.
+**FRs couverts :** FR-050, FR-051, FR-052, FR-053, FR-054, FR-055
+**NFRs couverts :** NFR-042
+
+### Epic 7: Live / Adventure Mode
+Un utilisateur en mobilité peut activer le mode Live (consentement géolocalisation RGPD), saisir son allure, et voir en temps réel les POIs sur les prochains X km avec leur D+ et temps estimé — mise à jour automatique et gestion gracieuse des connexions instables.
+**FRs couverts :** FR-040, FR-041, FR-042, FR-043, FR-044, FR-045, FR-082
+**NFRs couverts :** NFR-007, NFR-012, NFR-013, NFR-032
+
+### Epic 8: PWA & Offline Capability
+Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa dernière trace + POIs en mode offline partiel, et recevoir une notification push (opt-in) quand une analyse de densité est terminée.
+**FRs couverts :** FR-070, FR-071, FR-072, FR-073
+**NFRs couverts :** NFR-001, NFR-002, NFR-003, NFR-004, NFR-008
+
+---
+
+## Epic 1: Foundation & Developer Environment
+
+Infrastructure monorepo, packages partagés, CI/CD — aucune feature utilisateur directe mais tout en dépend.
+
+### Story 1.1: Monorepo Setup & Developer Environment
+
+As a **developer**,
+I want the monorepo initialized with Turborepo, apps/web (Next.js 15), apps/api (NestJS 11), and shared packages scaffolded,
+So that all development can happen in a unified environment with a single `turbo dev` command.
+
+**Acceptance Criteria:**
+
+**Given** the repo is cloned and `pnpm install` runs from the root,
+**When** installation completes,
+**Then** all workspace packages resolve via `workspace:*` protocol without errors.
+
+**Given** `turbo dev` is run,
+**When** both apps start,
+**Then** apps/web is accessible on localhost:3000 and apps/api on localhost:3001 without errors.
+
+**Given** packages/typescript-config exists with strict mode enabled,
+**When** any app extends it in its tsconfig.json,
+**Then** TypeScript strict checks are enforced across all workspaces.
+
+**Given** packages/eslint-config is configured,
+**When** `turbo lint` runs,
+**Then** ESLint passes with zero errors across all apps and packages.
+
+---
+
+### Story 1.2: Database Schema & Aiven Configuration
+
+As a **developer**,
+I want Drizzle ORM schemas defined in packages/database and migrations applied to Aiven PostgreSQL,
+So that the database schema is the single source of truth shared across both apps.
+
+**Acceptance Criteria:**
+
+**Given** packages/database is set up with Drizzle schemas (including Better Auth tables),
+**When** `pnpm db:migrate` runs,
+**Then** tables `profiles`, `adventures`, `adventure_segments`, `accommodations_cache`, `weather_cache`, `coverage_gaps` (+ Better Auth tables `user`, `session`, `account`, `verification`) are created in Aiven without errors.
+
+**Given** PostGIS is enabled in Aiven PostgreSQL,
+**When** adventure_segments is created,
+**Then** the `geom` column accepts LINESTRING geometries (ST_Buffer, ST_DWithin queries pass).
+
+**Given** packages/database exports inferred types,
+**When** apps/api imports `Adventure` from `@ridenrest/database`,
+**Then** TypeScript compiles without `any` types — all column types are correctly inferred.
+
+**Given** Upstash Redis credentials are configured in apps/api/.env,
+**When** the Redis provider starts,
+**Then** a test ping returns PONG without errors.
+
+---
+
+### Story 1.3: Shared Business Logic Packages
+
+As a **developer**,
+I want packages/gpx (Haversine, RDP, corridor) and packages/shared (types, Zod schemas, constants) ready,
+So that GPX computation and shared types are available to both apps without duplication.
+
+**Acceptance Criteria:**
+
+**Given** packages/gpx is set up,
+**When** `haversine(pointA, pointB)` is called with two lat/lng objects,
+**Then** it returns the correct distance in km (±0.1% of expected value).
+
+**Given** packages/gpx is set up,
+**When** `rdpSimplify(points, 0.0001)` is called on a 50k-point array,
+**Then** it returns ≤ 2000 points preserving the overall shape.
+
+**Given** packages/shared exports an `Adventure` type and Zod schemas,
+**When** both apps/web and apps/api import from `@ridenrest/shared`,
+**Then** TypeScript compiles without errors and Zod validation works correctly.
+
+**Given** packages/shared/constants exports `MAX_GPX_POINTS` and `CORRIDOR_WIDTH_M`,
+**When** either app imports these constants,
+**Then** they are correctly typed as `number` and hold the expected values.
+
+---
+
+### Story 1.4: NestJS API Foundation
+
+As a **developer**,
+I want the NestJS API configured with the common module (JwtAuthGuard, ResponseInterceptor, HttpExceptionFilter, ValidationPipe), BullMQ, and Swagger,
+So that all future feature modules follow consistent, enforced patterns from day one.
+
+**Acceptance Criteria:**
+
+**Given** the API is running,
+**When** any controller returns raw data (e.g., `return adventure`),
+**Then** ResponseInterceptor wraps it as `{ "data": { ... } }` automatically.
+
+**Given** a request reaches a protected endpoint without a valid Bearer token,
+**When** JwtAuthGuard evaluates the request,
+**Then** it returns HTTP 401 with `{ "error": { "code": "UNAUTHORIZED", "message": "..." } }`.
+
+**Given** a service throws `NotFoundException`,
+**When** HttpExceptionFilter catches it,
+**Then** the response is `{ "error": { "code": "NOT_FOUND", "message": "..." } }` with HTTP 404.
+
+**Given** `@nestjs/bullmq` is configured with Upstash Redis,
+**When** a job is enqueued in the `gpx-processing` queue,
+**Then** it is persisted and a BullMQ processor can consume it.
+
+**Given** Swagger is configured with `@nestjs/swagger`,
+**When** `GET /api` is visited,
+**Then** the OpenAPI documentation page loads listing all available endpoints.
+
+**Given** the NestJS API is deployed on Fly.io,
+**When** the `fly.toml` is configured,
+**Then** the VM uses `memory = '512mb'`, `cpu_kind = 'shared'`, `cpus = 1` — the free tier 256MB MUST NOT be used (OOM risk with NestJS + BullMQ at ~230MB idle).
+
+**Given** Upstash Redis is connected,
+**When** daily command usage reaches 7500 cmds/day (75% of 10k quota),
+**Then** an email alert is triggered via Upstash dashboard configuration — the team is notified before quota exhaustion.
+
+---
+
+### Story 1.5: Next.js Web Foundation
+
+As a **developer**,
+I want the Next.js app configured with Better Auth, TanStack Query, Zustand stores, and shadcn/ui,
+So that all future feature pages can follow consistent patterns from day one.
+
+**Acceptance Criteria:**
+
+**Given** the web app is running,
+**When** a visitor requests the landing page (`/`),
+**Then** the `(marketing)/` route group renders a static HTML page (SSG) without auth requirement.
+
+**Given** Better Auth middleware is configured in `middleware.ts`,
+**When** an unauthenticated user attempts to access an `(app)/` route,
+**Then** they are redirected to the login page.
+
+**Given** TanStack Query QueryClientProvider wraps the `(app)/` layout,
+**When** a `useQuery` hook is used in any child component,
+**Then** it correctly fetches, caches, and returns data without additional setup.
+
+**Given** Zustand stores are set up (useMapStore, useLiveStore, useUIStore),
+**When** `useMapStore.getState().setActiveLayer('accommodations')` is called,
+**Then** the store state updates and subscribed components re-render.
+
+**Given** shadcn/ui components are copied into `src/components/ui/` and Tailwind CSS v4 is configured,
+**When** a `<Button>` component renders in dark mode,
+**Then** it applies the correct dark theme classes without manual style overrides.
+
+---
+
+### Story 1.6: CI/CD Pipeline
+
+As a **developer**,
+I want GitHub Actions configured to lint, build, and deploy both apps automatically,
+So that every push to main is validated and deployed without manual steps.
+
+**Acceptance Criteria:**
+
+**Given** a commit is pushed to the `main` branch,
+**When** the CI pipeline triggers,
+**Then** `turbo lint` and `turbo build` complete successfully using Turborepo's build cache.
+
+**Given** the build succeeds,
+**When** Vercel receives the Next.js build output,
+**Then** the web app is deployed and the landing page returns HTTP 200.
+
+**Given** the build succeeds,
+**When** Fly.io receives the NestJS Docker build,
+**Then** the API is deployed and `GET /health` returns HTTP 200.
+
+**Given** secrets are stored as GitHub Secrets (AIVEN_DATABASE_URL, BETTER_AUTH_SECRET, UPSTASH_REDIS_URL, etc.),
+**When** the pipeline runs,
+**Then** no secret values appear in pipeline logs.
+
+---
+
+## Epic 2: User Authentication & Account Management
+
+Un utilisateur peut créer un compte, se connecter (email, Google OAuth, Strava OAuth), maintenir sa session, et supprimer son compte avec effacement complet (RGPD).
+
+### Story 2.1: Email/Password Registration & Login
+
+As a **new user**,
+I want to create an account with my email and password and stay logged in between visits,
+So that I can access my adventures on any device without re-authenticating each time.
+
+**Acceptance Criteria:**
+
+**Given** a user submits a valid email and password on the registration form,
+**When** the Better Auth registration call completes,
+**Then** the account is created, a session is established, and the user is redirected to `(app)/adventures`.
+
+**Given** a user submits an email that is already registered,
+**When** registration is attempted,
+**Then** an error message "Un compte existe déjà avec cet email" is displayed without clearing the form.
+
+**Given** a registered user submits correct credentials on the login form,
+**When** authentication succeeds,
+**Then** a persistent session is stored (via Better Auth session cookie) and the user is redirected to `(app)/adventures`.
+
+**Given** a logged-in user closes and reopens the browser,
+**When** they navigate to the app,
+**Then** they remain authenticated without being prompted to log in again (FR-006).
+
+**Given** a user submits incorrect credentials,
+**When** the login attempt fails,
+**Then** an error "Email ou mot de passe incorrect" is displayed and no session is created.
+
+---
+
+### Story 2.2: Google OAuth Sign-In
+
+As a **user**,
+I want to sign in with my Google account in one click,
+So that I can access the app without creating a separate password.
+
+**Acceptance Criteria:**
+
+**Given** a user clicks "Continuer avec Google" on the login/register page,
+**When** they complete the Google OAuth flow,
+**Then** they are redirected back to the app with a valid session and land on `(app)/adventures`.
+
+**Given** a user signs in with Google for the first time,
+**When** the OAuth callback completes,
+**Then** a `profiles` record is created with their Google display name and email.
+
+**Given** a user who previously registered with email signs in with Google using the same email,
+**When** the OAuth flow completes,
+**Then** their existing account is linked and they access the same data (no duplicate account).
+
+**Given** a user cancels the Google OAuth popup,
+**When** they return to the app,
+**Then** they remain on the login page with no error state and no session is created.
+
+---
+
+### Story 2.3: Strava OAuth Connection
+
+As a **cyclist user**,
+I want to connect my Strava account,
+So that I can import my Strava activities as GPX segments in my adventures.
+
+**Acceptance Criteria:**
+
+**Given** a logged-in user visits Settings and clicks "Connecter Strava",
+**When** they complete the Strava OAuth flow,
+**Then** their Strava access token is stored securely server-side and the Settings page shows "Strava connecté".
+
+**Given** a user has Strava connected,
+**When** they click "Déconnecter Strava" in Settings,
+**Then** the stored Strava tokens are deleted and the UI shows "Strava non connecté".
+
+**Given** a user without Strava connected attempts to access the Strava import feature,
+**When** they reach the import flow,
+**Then** they are prompted to connect Strava first with a direct link to the OAuth flow.
+
+**Given** the Strava OAuth callback is received,
+**When** it is processed by the API auth callback route,
+**Then** the `profiles` record is updated with `strava_connected: true` and the token is stored securely.
+
+---
+
+### Story 2.4: Password Reset & Account Management
+
+As a **user**,
+I want to reset my password by email, sign out, and delete my account if needed,
+So that I have full control over my credentials and data (RGPD compliance).
+
+**Acceptance Criteria:**
+
+**Given** a user clicks "Mot de passe oublié" and submits their email,
+**When** the request is sent to Better Auth,
+**Then** a password reset email is sent via **Resend** (`noreply@ridenrest.com`) et une confirmation est affichée (FR-007).
+
+**Given** a user clicks the reset link in the email,
+**When** they submit a new valid password,
+**Then** their password is updated and they are redirected to the login page with a success message.
+
+**Given** a logged-in user clicks "Se déconnecter",
+**When** the sign-out action completes,
+**Then** the session is cleared, all cookies removed, and the user is redirected to the landing page (FR-004).
+
+**Given** a user clicks "Supprimer mon compte" in Settings and confirms,
+**When** the deletion request is processed,
+**Then** all their data is deleted in cascade (adventures, segments, accommodations_cache, profiles) and they are redirected to the landing page (FR-005).
+
+**Given** a user attempts to delete their account,
+**When** the confirmation dialog is shown,
+**Then** they must type their email to confirm — the delete button remains disabled until the email matches.
+
+---
+
+## Epic 3: Adventures & GPX Management
+
+Un utilisateur peut créer une aventure multi-segments GPX, réordonner, importer depuis Strava, et être notifié quand le parsing async est terminé.
+
+### Story 3.1: Create Adventure & Upload First GPX Segment
+
+As a **cyclist user**,
+I want to create a named adventure and upload a GPX file as my first segment,
+So that my route appears in the app and I can start planning around it.
+
+**Acceptance Criteria:**
+
+**Given** a logged-in user submits a name on the "Nouvelle aventure" form,
+**When** the creation request completes,
+**Then** an adventure record is created in DB, the user is redirected to the adventure detail page, and the adventure appears in their list (FR-010).
+
+**Given** a user uploads a valid GPX file on the adventure detail page,
+**When** the file is received by `POST /segments` (multipart) and saved on Fly.io volume (`/data/gpx/{segmentId}.gpx`),
+**Then** a segment record is created with `parse_status: 'pending'` et un job `parse-segment` BullMQ est enqueued avec `{ segmentId, filePath }` (FR-011).
+
+**Given** the BullMQ processor parses the GPX file successfully (≤ 50 000 points, < 10s),
+**When** parsing completes,
+**Then** the segment's `geom` (LINESTRING), `waypoints` (JSONB), `distance_km`, and `parse_status: 'success'` are saved — and the original GPX file remains on Fly.io volume (NFR-005, NFR-033).
+
+**Given** the GPX file is malformed or unparseable,
+**When** the processor fails,
+**Then** `parse_status: 'error'` and an `error_message` are saved — the adventure record and any previous valid segments are untouched (NFR-033).
+
+**Given** the GPX file contains `<ele>` elevation tags on trackpoints,
+**When** the processor parses the file,
+**Then** each waypoint in the `waypoints` JSONB is stored as `{ dist_km, lat, lng, ele }` — enabling D+ computation on any sub-segment without re-parsing.
+
+**Given** the GPX file has no `<ele>` tags,
+**When** the processor completes,
+**Then** waypoints are stored without `ele` field and D+ displays as "N/A" in the POI cards — no error thrown.
+
+**Given** a user uploads a GPX file larger than the accepted limit (50 MB),
+**When** the upload is attempted,
+**Then** an error "Fichier trop volumineux (max 50 MB)" is displayed before upload starts.
+
+---
+
+### Story 3.2: Parse Status Polling & Notification
+
+As a **cyclist user**,
+I want to be notified when my GPX segment finishes parsing,
+So that I know when the map and distance calculations are ready without refreshing the page.
+
+**Acceptance Criteria:**
+
+**Given** a segment is in `parse_status: 'pending'` and the user is on the adventure detail page,
+**When** TanStack Query polls every 3s (`refetchInterval: 3000` activé si au moins un segment est `'pending'`),
+**Then** dès que le BullMQ processor met `parse_status: 'success'` en DB, la prochaine requête de polling retourne le statut mis à jour — sans rechargement de page (FR-019).
+
+**Given** TanStack Query polls and detects `parse_status: 'success'`,
+**When** the updated data arrives,
+**Then** the segment card updates from a loading skeleton to show distance_km and an "Afficher sur la carte" button — without page reload.
+
+**Given** TanStack Query polls and detects `parse_status: 'error'`,
+**When** the updated data arrives,
+**Then** the segment card shows an error state with message "Parsing échoué — vérifiez le format du fichier GPX" and a retry upload button.
+
+**Given** all segments have `parse_status` of `'success'` or `'error'` (none are `'pending'`),
+**When** TanStack Query receives the updated data,
+**Then** `refetchInterval` returns `false` — le polling s'arrête, aucune requête supplémentaire n'est émise.
+
+**Given** the user navigates away during parsing and returns later,
+**When** the adventure detail page loads,
+**Then** the current `parse_status` from DB is correctly reflected (no infinite loading state).
+
+---
+
+### Story 3.3: Multi-Segment Management (Reorder, Delete, Replace)
+
+As a **cyclist user**,
+I want to reorder, delete, and replace GPX segments in my adventure,
+So that I can adjust my route incrementally as my plans evolve.
+
+**Acceptance Criteria:**
+
+**Given** an adventure has multiple segments and a user drags a segment to a new position,
+**When** the reorder mutation completes,
+**Then** `order_index` values are updated for all affected segments, `cumulative_start_km` is recomputed for the full adventure, and the new order is reflected in the UI (FR-012, FR-015).
+
+**Given** a user clicks "Supprimer" on a segment and confirms,
+**When** the delete request completes,
+**Then** the segment record and its associated GPX file on Fly.io volume are deleted, cumulative distances are recomputed, and the segment disappears from the list (FR-013, FR-015).
+
+**Given** a user clicks "Remplacer" on a segment and uploads a new GPX file,
+**When** the new file is uploaded,
+**Then** the old GPX file is deleted from Fly.io volume, the new segment job is enqueued with `parse_status: 'pending'`, and the UI shows a loading state for that segment (FR-014).
+
+**Given** a user deletes the last segment of an adventure,
+**When** deletion completes,
+**Then** the adventure record remains (total_distance_km: 0) and an "Ajouter un segment" prompt is shown.
+
+**Given** the reorder operation encounters a network error,
+**When** the mutation fails,
+**Then** the optimistic UI update is rolled back and the original order is restored with an error toast.
+
+---
+
+### Story 3.4: Adventure & Segment Rename and Delete
+
+As a **cyclist user**,
+I want to rename my adventure and individual segments, and delete an entire adventure,
+So that I can keep my adventures organized and remove ones I no longer need.
+
+**Acceptance Criteria:**
+
+**Given** a user taps the adventure title and submits a new name,
+**When** the update request completes,
+**Then** the adventure name is updated in DB and reflected in the UI immediately (FR-017).
+
+**Given** a user taps a segment name and submits a new name,
+**When** the update request completes,
+**Then** the segment name is updated in DB and reflected in the segment card (FR-017).
+
+**Given** a user clicks "Supprimer l'aventure" and confirms by typing the adventure name,
+**When** the deletion request completes,
+**Then** the adventure, all its segments, associated GPX files on Fly.io volume, and cached POI/weather data are deleted — the user is redirected to the adventures list (FR-018).
+
+**Given** a user attempts to delete an adventure without confirming,
+**When** the delete button is clicked,
+**Then** the confirmation dialog appears requiring the adventure name to be typed before proceeding.
+
+---
+
+### Story 3.5: Strava Activity Import as Segment
+
+As a **cyclist user with Strava connected**,
+I want to import a Strava activity directly as a GPX segment,
+So that I can use my existing Strava routes without manually exporting and re-uploading GPX files.
+
+**Acceptance Criteria:**
+
+**Given** a user with Strava connected clicks "Importer depuis Strava",
+**When** the Strava activities list loads,
+**Then** their recent activities are listed (name, date, distance) — fetched via Strava API and cached for 1h to respect rate limits (NFR-041).
+
+**Given** a user selects a Strava activity to import,
+**When** the API fetches the activity's GPX stream from Strava,
+**Then** the GPX data is converted to a file, saved on Fly.io volume (`/data/gpx/{segmentId}.gpx`) via `POST /segments` multipart, and a `parse-segment` BullMQ job is enqueued — the Strava activity data is not persisted beyond this import (NFR-043).
+
+**Given** the import and parsing succeed,
+**When** the segment is ready,
+**Then** the segment card shows the Strava activity name and distance, and a "Powered by Strava" attribution is visible (FR-063).
+
+**Given** the Strava API rate limit is near (80% of 100 req/15 min),
+**When** the next import is requested,
+**Then** a throttle guard delays the request and logs a warning — no 429 error is returned to the user (NFR-041).
+
+**Given** the Strava daily limit is near (800 of 1000 req/day, 80%),
+**When** an import is attempted,
+**Then** the API returns HTTP 429 with a user-friendly message ("Limite Strava atteinte pour aujourd'hui, réessaie demain") and logs a warning.
+
+**Given** a user without Strava connected attempts to access this feature,
+**When** they click "Importer depuis Strava",
+**Then** they are redirected to the Strava OAuth flow (Story 2.3).
+
+---
+
+## Epic 4: Interactive Map & POI Planning Mode
+
+Visualiser la trace GPX sur une carte, rechercher des POIs par corridor kilométrique, consulter les fiches POI et cliquer vers les plateformes de réservation.
+
+### Story 4.1: GPX Trace Display on Interactive Map
+
+As a **cyclist user**,
+I want to see my adventure's GPX trace on an interactive map,
+So that I have a visual overview of my entire route before starting to plan POIs.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `(app)/map/[adventureId]`,
+**When** the page loads,
+**Then** the MapLibre GL JS map renders with the adventure's trace as a polyline, centered and fitted to the trace bounds — in under 3s on mobile 4G (FR-020, FR-026, NFR-006).
+
+**Given** the map is rendered,
+**When** it is visible,
+**Then** the OSM attribution "© OpenStreetMap contributors" is always visible in the map corner — non-dismissable (FR-036, NFR-044).
+
+**Given** a user taps the dark/light toggle,
+**When** the theme switches,
+**Then** the MapLibre style updates to the corresponding OpenFreeMap tile set without reloading the page (FR-021).
+
+**Given** an adventure has multiple segments,
+**When** the map loads,
+**Then** all segments are rendered as a continuous trace with a visual distinction at segment joins.
+
+**Given** a segment has `parse_status: 'pending'` or `'error'`,
+**When** the map page loads,
+**Then** only successfully parsed segments are displayed — a banner indicates "X segment(s) en cours de traitement".
+
+---
+
+### Story 4.2: POI Layer Toggles & Pin Display
+
+As a **cyclist user**,
+I want to toggle POI categories on and off on the map,
+So that I can focus on the type of amenity I'm looking for without visual clutter.
+
+**Acceptance Criteria:**
+
+**Given** the map is displayed,
+**When** a user taps a category toggle (🏨 Hébergements / 🍽️ Restauration / 🛒 Alimentation / 🚲 Vélo),
+**Then** the corresponding POI pins appear on or disappear from the map within the current viewport (FR-023).
+
+**Given** a category is toggled on and POIs exist in the viewport,
+**When** the pins render,
+**Then** each pin displays the correct category icon and is tappable with a minimum touch target of 48×48px (FR-024).
+
+**Given** multiple categories are toggled on simultaneously,
+**When** pins overlap at the current zoom level,
+**Then** a cluster indicator shows the count — tapping it zooms in to separate the pins.
+
+**Given** no POIs have been loaded yet for a toggled-on category,
+**When** the toggle is activated,
+**Then** a `<Skeleton />` loading state appears in the POI panel while the corridor search is triggered.
+
+---
+
+### Story 4.3: Corridor Search — POI Discovery by km Range
+
+As a **cyclist user**,
+I want to define a km range along my route and find all POIs within a corridor around that segment,
+So that I can discover accommodations and amenities specifically relevant to that stretch of my adventure.
+
+**Acceptance Criteria:**
+
+**Given** a user adjusts the km range slider (fromKm → toKm) on the map,
+**When** they release the slider,
+**Then** the selected segment of the trace is highlighted on the map and a `GET /pois?segmentId=&fromKm=&toKm=` request is triggered (FR-030).
+
+**Given** the user attempts to set a range exceeding 30 km (toKm - fromKm > 30),
+**When** the slider is adjusted,
+**Then** the range is capped at 30 km maximum — the UI shows a tooltip "Plage maximale : 30 km" and the toKm is auto-adjusted to `fromKm + 30` (FR-030).
+
+**Given** the API receives the request,
+**When** processing the corridor search,
+**Then** PostGIS `ST_Buffer` generates a corridor polygon and `ST_DWithin` queries `accommodations_cache` — returning POIs within the corridor (FR-031).
+
+**Given** the Overpass API is called to populate `accommodations_cache` for the corridor,
+**When** results are returned,
+**Then** they are cached in Upstash Redis with TTL 24h — identical corridor requests within 24h serve from cache without calling Overpass again (NFR-021, NFR-040).
+
+**Given** the corridor search returns results,
+**When** results render,
+**Then** POI pins appear on the map within the highlighted corridor and a scrollable list shows the POIs sorted by distance from trace (FR-031).
+
+**Given** Overpass API is unavailable,
+**When** the corridor search is attempted,
+**Then** a `<StatusBanner message="Recherche indisponible — réessayer dans quelques instants" />` is shown and the user can retry — no crash (NFR-031).
+
+---
+
+### Story 4.4: POI Detail Sheet & Booking Deep Links
+
+As a **cyclist user**,
+I want to tap a POI pin and see its details with a direct booking link,
+So that I can evaluate an accommodation and open it in Hotels.com or Booking.com in one tap.
+
+**Acceptance Criteria:**
+
+**Given** a user taps a POI pin on the map,
+**When** the detail sheet opens,
+**Then** it displays: name, type, distance from trace (m), kilométrage on the trace, D+ from fromKm to POI (m), estimated time from fromKm to POI, and OSM tags (phone, website if available) (FR-032, FR-080, FR-081).
+
+**Given** the POI is an accommodation (hotel, hostel, camping, refuge),
+**When** the detail sheet renders,
+**Then** it shows a "Rechercher sur Hotels.com" button and a "Rechercher sur Booking.com" button — both are deep-link URLs parameterized with the POI name and coordinates (FR-033, FR-060).
+
+**Given** a user taps a booking deep link,
+**When** the link is opened,
+**Then** it opens in a new browser tab with the correct search pre-filled — and the click is tracked for analytics (FR-062).
+
+**Given** the affiliate links are displayed,
+**When** they render in the UI,
+**Then** a small label "Lien partenaire" is visible next to each booking button (FR-061, NFR-045).
+
+**Given** a user taps the booking link,
+**When** the URL is constructed,
+**Then** the affiliate URL format is not modified — query params match the program requirements exactly (NFR-045).
+
+**Given** the POI card renders with elevation data available,
+**When** the D+ and ETA are computed,
+**Then** D+ is calculated via `computeElevationGain(waypoints, fromKm, poi.km_on_trace)` from packages/gpx, and ETA uses `(poi.km_on_trace - fromKm) / speed * 60` (minutes) — displayed as "↑ 320 m · ~42 min" (FR-080, FR-081).
+
+**Given** the user has not entered a speed,
+**When** the ETA renders,
+**Then** it is computed with a fallback of 15 km/h and displayed with an italicized "~" prefix to signal estimation.
+
+---
+
+### Story 4.5: POI Category Filter on Map
+
+As a **cyclist user**,
+I want to filter the displayed POIs by category directly from the map view,
+So that I can switch focus between accommodations, food, supplies, and bike shops without re-running a search.
+
+**Acceptance Criteria:**
+
+**Given** POIs from multiple categories are loaded in the corridor,
+**When** a user taps a category filter chip on the map overlay,
+**Then** only POIs of the selected category are shown — other category pins are hidden instantly without an API call (FR-034).
+
+**Given** a user selects "Hébergements only" filter,
+**When** the filter applies,
+**Then** the POI list panel scrolls to top and shows only accommodation POIs, sorted by distance from trace.
+
+**Given** a user removes all category filters,
+**When** no filter is active,
+**Then** all loaded POI categories are visible simultaneously on the map.
+
+**Given** a user switches between filter states rapidly,
+**When** filters change,
+**Then** the map updates are debounced (100ms) to avoid rendering flicker.
+
+---
+
+## Epic 5: Density Analysis & Visual Intelligence
+
+Un utilisateur peut déclencher une analyse de densité asynchrone et voir sa trace colorisée (vert/orange/rouge) pour identifier immédiatement les zones critiques.
+
+### Story 5.1: Trigger Density Analysis & Async Job Processing
+
+As a **cyclist user**,
+I want to trigger a density analysis on my adventure,
+So that the system computes accommodation availability along my entire route without blocking my session.
+
+**Acceptance Criteria:**
+
+**Given** a user clicks "Analyser la densité" on the adventure detail or map page,
+**When** the request is sent to the API,
+**Then** an `analyze-density` BullMQ job is enqueued with `{ adventureId, segmentIds[] }` and the button changes to "Analyse en cours…" (FR-035, NFR-022).
+
+**Given** the density job is processing,
+**When** the user navigates away or closes the tab,
+**Then** the job continues processing server-side — the result will be available when they return.
+
+**Given** the `analyze-density` processor runs,
+**When** it processes each segment,
+**Then** it queries Overpass API per corridor segment (not the full trace at once), caches results in Redis (TTL 24h), and computes a density score (green/orange/red) per 10km tronçon (NFR-040).
+
+**Given** the density job completes for all segments,
+**When** results are saved to `coverage_gaps`,
+**Then** `density_status: 'success'` est mis à jour sur l'adventure en DB — TanStack Query polling (refetchInterval 3s sur `density_status`) le détecte côté client.
+
+**Given** the density job fails (e.g., Overpass unavailable),
+**When** the processor catches the error,
+**Then** BullMQ retries up to 3 times with exponential backoff — after 3 failures, `density_status: 'error'` est mis en DB and the adventure remains usable without density data.
+
+---
+
+### Story 5.2: Colorized Trace & Density Legend
+
+As a **cyclist user**,
+I want to see my trace colorized by accommodation density after analysis completes,
+So that I can immediately identify critical zones (red) and plan around them without further interaction.
+
+**Acceptance Criteria:**
+
+**Given** TanStack Query polling détecte `density_status: 'success'` sur l'adventure,
+**When** the map is open,
+**Then** the trace re-renders with color segments: green (≥2 accommodations/10km), orange (1), red (0) — without page reload (FR-022).
+
+**Given** the user is not on the map page when the event arrives,
+**When** they navigate to the map,
+**Then** the colorized trace loads from `coverage_gaps` in DB — the Realtime event is not required to see the colors.
+
+**Given** the colorized trace is displayed,
+**When** a user taps the legend icon on the map,
+**Then** a panel opens showing: 🟢 Bonne disponibilité / 🟠 Disponibilité limitée / 🔴 Zone critique — with the color-to-density mapping explained (FR-027).
+
+**Given** the colorized trace is displayed,
+**When** a user taps a red tronçon on the map,
+**Then** the km range slider auto-sets to that tronçon's fromKm/toKm and a corridor search is triggered automatically.
+
+**Given** a user's device has a color accessibility constraint (e.g., daltonism),
+**When** the density legend opens,
+**Then** it includes a textual severity label alongside each color: "Critique (0 hébergement)", "Limité (1)", "Bon (2+)".
+
+---
+
+## Epic 6: Weather Integration
+
+Un utilisateur peut consulter les prévisions météo calées sur son heure de passage estimée à chaque point kilométrique (pace-adjusted), en mode Planification et Live.
+
+### Story 6.1: Pace-Adjusted Weather Forecast (Planning Mode)
+
+As a **cyclist user**,
+I want to enter my departure time and estimated speed to see weather forecasts adjusted to when I'll actually be at each point on my route,
+So that I know what conditions to expect at each km marker based on my real pace — not the current weather.
+
+**Acceptance Criteria:**
+
+**Given** a user opens the weather panel on the map page,
+**When** they enter a departure time (time picker) and an estimated speed in km/h,
+**Then** the API computes the estimated arrival time at each waypoint using `departure_time + (cumulative_km / speed)` and fetches the corresponding hourly forecast from WeatherAPI.com (FR-050, FR-051).
+
+**Given** the API requests weather data for each km waypoint,
+**When** WeatherAPI.com returns forecasts,
+**Then** results are cached in Upstash Redis keyed by `{lat}:{lng}:{date}:{hour}` with TTL 1h — subsequent requests for the same waypoint/hour serve from cache (NFR-042).
+
+**Given** weather data is returned for the route,
+**When** the weather strip renders on the map,
+**Then** it displays at regular km intervals: temperature (°C), wind speed (km/h), precipitation probability (%), and a weather icon — all corresponding to the estimated arrival time (FR-053).
+
+**Given** a user changes their departure time or speed,
+**When** they submit the new values,
+**Then** the arrival time estimates are recomputed and the weather strip updates — cache hit rate is maintained (same waypoint data reused if the hour is the same).
+
+**Given** the route exceeds WeatherAPI.com's forecast horizon (typically 14 days),
+**When** waypoints beyond the horizon are requested,
+**Then** those waypoints display "Prévisions non disponibles" — the visible waypoints still show correct data.
+
+---
+
+### Story 6.2: Weather Fallback & Auto-Refresh
+
+As a **cyclist user**,
+I want weather data to refresh automatically and fall back gracefully when no pace is configured,
+So that the weather strip always shows the most relevant available data without manual intervention.
+
+**Acceptance Criteria:**
+
+**Given** a user has not entered a departure time or speed,
+**When** the weather strip renders,
+**Then** it displays the current-time forecast at each km waypoint — no empty state, no blocking error (FR-055).
+
+**Given** weather data is currently cached,
+**When** the cache TTL expires (1h),
+**Then** the next request for that waypoint automatically fetches fresh data from WeatherAPI.com and updates the cache (FR-054).
+
+**Given** the user has the map page open,
+**When** 1 hour elapses since last weather fetch,
+**Then** weather data auto-refreshes in the background via TanStack Query's `refetchInterval: 3600000` — a subtle loading indicator shows during the refresh without clearing existing data.
+
+**Given** WeatherAPI.com is unavailable,
+**When** the weather fetch fails,
+**Then** the previously cached data remains displayed with a "Données météo mises à jour il y a Xh" label — no crash, no empty state.
+
+**Given** monthly WeatherAPI.com usage reaches 80% of the 1M call quota,
+**When** the monitoring check runs,
+**Then** an internal alert is logged (console warning + DB log entry) — no user-facing impact (NFR-042).
+
+---
+
+### Story 6.3: Live Mode Weather (GPS-Based)
+
+As a **cyclist user in Live mode**,
+I want to see weather forecasts based on my current GPS position and pace,
+So that I know what conditions are ahead of me right now on the road.
+
+**Acceptance Criteria:**
+
+**Given** a user has activated Live mode (GPS active) and entered their speed,
+**When** the weather panel is opened in Live mode,
+**Then** weather is fetched for waypoints ahead of the current GPS position, using pace-adjusted computation (FR-052).
+
+**Given** the GPS position updates as the user moves,
+**When** the position crosses a km waypoint threshold,
+**Then** the weather strip shifts forward — past waypoints are dropped, upcoming waypoints are fetched if not already cached.
+
+**Given** a user in Live mode has not entered a speed,
+**When** the weather panel renders,
+**Then** current-time weather at the nearest upcoming waypoints is displayed — the same fallback as Planning mode (FR-055).
+
+**Given** GPS is unavailable in Live mode (signal lost),
+**When** the weather panel is open,
+**Then** the last known position is used for weather display with a "Position GPS indisponible" status indicator.
+
+---
+
+## Epic 7: Live / Adventure Mode
+
+Un utilisateur en mobilité peut activer le mode Live (consentement RGPD), saisir son allure, et voir en temps réel les POIs sur les prochains X km, avec mise à jour automatique et gestion gracieuse des connexions instables.
+
+### Story 7.1: Geolocation Consent & Live Mode Activation
+
+As a **cyclist user on the road**,
+I want to activate Live mode with an explicit consent step,
+So that I understand what GPS data is used for before sharing my location — and the app complies with RGPD.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `(app)/live/[adventureId]` for the first time,
+**When** the page loads,
+**Then** a `<GeolocationConsent />` modal appears explaining that GPS data is used locally only, never stored server-side — with "Activer" and "Annuler" buttons (FR-040, NFR-013).
+
+**Given** the user taps "Activer",
+**When** the browser permission prompt appears,
+**Then** `navigator.geolocation.watchPosition({ enableHighAccuracy: true })` is called and the Live map view activates (FR-040, FR-041).
+
+**Given** the user denies browser geolocation permission,
+**When** the denial is detected,
+**Then** a message "Géolocalisation refusée — activez-la dans les paramètres de votre navigateur" is shown and the Live mode remains inactive — no crash (NFR-032).
+
+**Given** Live mode is active,
+**When** the user navigates away from the Live page,
+**Then** `watchPosition` is stopped immediately via `clearWatch()` — no background GPS tracking continues (NFR-012).
+
+**Given** a returning user who previously granted permission visits the Live page,
+**When** the page loads,
+**Then** the consent modal does not re-appear — Live mode activates directly with the stored consent flag.
+
+---
+
+### Story 7.2: Real-Time POI Discovery by Target Distance & Configurable Radius
+
+As a **cyclist user in Live mode**,
+I want to set a target distance ahead (e.g. "dans 30 km") and a search radius, so the app shows me accommodations available at that specific stopping point — not everything along the way,
+So that I can quickly find where to sleep tonight without being overwhelmed by results spread over dozens of kilometres.
+
+**Acceptance Criteria:**
+
+**Given** Live mode is active and a GPS position is acquired,
+**When** the user adjusts the "distance cible" slider (e.g. 30 km),
+**Then** the app computes `targetKm = currentKm + 30`, projects that point on the trace, and a `GET /pois?segmentId=&targetKm=30&radius=3` request is triggered — GPS coordinates are NOT sent to the server (FR-042, NFR-012).
+
+**Given** the API receives the request with `targetKm` and `radius`,
+**When** processing the search,
+**Then** it projects the point at `targetKm` on the trace LINESTRING, runs `ST_DWithin(geom, target_point, radius_m)` on `accommodations_cache` — returning only POIs within the radius around that specific point (FR-042, FR-043).
+
+**Given** a user adjusts the "rayon" slider (0 to 5 km, hard cap 10 km),
+**When** the value changes,
+**Then** `useLiveStore.setRadius(value)` updates the Zustand store and a new POI search is triggered with the updated radius — limiting Overpass API surface area (FR-043).
+
+**Given** the GPS position updates as the user moves,
+**When** the new `currentKm` changes by ≥ 500m from the last trigger,
+**Then** a new POI search fires automatically with the same slider values — `targetKm` recomputes as `newCurrentKm + distance_cible` (FR-044).
+
+**Given** a POI search returns results,
+**When** the response arrives,
+**Then** results display within ≤ 2s, with a visible loading indicator during fetch — showing only POIs near the target point, not along the entire preceding corridor (NFR-007).
+
+**Given** a user enters their speed (km/h) in the speed input field (shared with the weather panel, Story 6.3),
+**When** the value is set,
+**Then** `useLiveStore.setSpeed(value)` updates the Zustand store and all ETA calculations update immediately.
+
+**Given** Live mode POI results are displayed,
+**When** the POI list renders,
+**Then** each item shows: name, distance from target point (m), D+ from `currentKm` to `targetKm`, and ETA at current speed — formatted as "↑ 420 m D+ · ~2h10" (FR-082).
+
+**Given** the GPS position updates and `currentKm` changes,
+**When** the POI list refreshes,
+**Then** D+ and ETA values recalculate client-side from the updated `currentKm` using already-loaded waypoints JSONB — no additional API call needed.
+
+---
+
+### Story 7.3: Graceful Degradation on Unstable Connection
+
+As a **cyclist user in Live mode on a poor mobile connection**,
+I want partial results and clear status feedback when the network is degraded,
+So that I can still find a place to stop even when the app can't load everything perfectly.
+
+**Acceptance Criteria:**
+
+**Given** a POI search request times out or returns a network error in Live mode,
+**When** the error is caught by TanStack Query,
+**Then** any POIs already loaded remain visible on the map — no results are cleared on error (FR-045, NFR-032).
+
+**Given** a network error occurs during a Live mode POI search,
+**When** the error state is active,
+**Then** a `<StatusBanner message="Connexion instable. X hébergements trouvés." />` is displayed — the count reflects the last successful result (FR-045).
+
+**Given** a POI search partially succeeds (some categories loaded, others failed),
+**When** the partial response is received,
+**Then** the successfully loaded POIs are displayed with a "Résultats partiels" indicator — the user can manually retry the failed categories.
+
+**Given** the connection is restored after a network outage,
+**When** TanStack Query detects connectivity,
+**Then** a fresh POI search is automatically retried — the `<StatusBanner />` disappears on success.
+
+**Given** the app is in Live mode and the device goes completely offline,
+**When** offline state is detected,
+**Then** the last GPS position is shown on the map and a "Mode hors ligne — données non disponibles" banner is displayed — no crash occurs (NFR-032).
+
+---
+
+## Epic 8: PWA & Offline Capability
+
+Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa dernière trace + POIs en mode offline partiel, et recevoir une notification push quand une analyse de densité est terminée.
+
+### Story 8.1: PWA Manifest & App Install
+
+As a **cyclist user on mobile**,
+I want to install Ride'n'Rest on my home screen like a native app,
+So that I can launch it instantly without going through the browser — especially useful on the road.
+
+**Acceptance Criteria:**
+
+**Given** a user visits the app on Chrome Android,
+**When** the browser detects the Web App Manifest and Service Worker are present,
+**Then** an "Ajouter à l'écran d'accueil" install prompt is shown by the browser (FR-070).
+
+**Given** a user visits the app on iOS Safari,
+**When** they use "Partager → Ajouter à l'écran d'accueil",
+**Then** the app launches in `display: standalone` mode — browser chrome is hidden and `env(safe-area-inset-*)` safe areas are correctly applied.
+
+**Given** the Web App Manifest is configured,
+**When** it is validated by Lighthouse,
+**Then** it includes: `display: standalone`, `theme_color: #1a1a2e`, `background_color`, maskable icon 512×512, standard icon 192×192, and `orientation: portrait`.
+
+**Given** the app is installed and launched from the home screen,
+**When** it opens,
+**Then** the landing page loads and the PWA Lighthouse score is ≥ 85 on mobile (NFR-008).
+
+**Given** the app is audited with Lighthouse on mobile 4G simulated,
+**When** the audit runs,
+**Then** FCP < 1.5s, LCP < 2.5s, CLS < 0.1, and initial JS bundle (gzipped) < 200 KB (NFR-001→004).
+
+---
+
+### Story 8.2: Service Worker & Partial Offline Support
+
+As a **cyclist user with intermittent connectivity**,
+I want my last loaded trace and POIs to remain accessible when I lose signal,
+So that I can still consult the map and POI cards I already loaded — even without network.
+
+**Acceptance Criteria:**
+
+**Given** the Service Worker is registered (via `next-pwa` or custom SW),
+**When** static assets (JS, CSS, fonts) are requested,
+**Then** they are served from cache-first — no network request needed after initial load.
+
+**Given** MapLibre tiles were previously loaded,
+**When** the user goes offline and pans to an already-visited area,
+**Then** tiles are served from the Service Worker cache (stale-while-revalidate, 7-day TTL) — the map remains navigable (FR-071).
+
+**Given** a user previously loaded a trace and POIs for an adventure,
+**When** they open that adventure's map page offline,
+**Then** the GPX trace and last-loaded POI set are served from the Service Worker cache (network-first with offline fallback) — the map is readable (FR-071).
+
+**Given** a user attempts an action requiring network (trigger density analysis, load new POIs) while offline,
+**When** the action is requested,
+**Then** the feature is visually disabled with a tooltip "Fonctionnalité disponible en ligne" — no error thrown (FR-073).
+
+**Given** the app transitions from offline to online,
+**When** connectivity is restored,
+**Then** previously disabled features re-enable automatically and stale cached data is refreshed in the background.
+
+---
+
+### Story 8.3: Push Notifications for Density Analysis
+
+As a **cyclist user**,
+I want to receive a push notification when my density analysis is complete,
+So that I can trigger the analysis, close the app, and be notified when the colorized map is ready — without keeping the tab open.
+
+**Acceptance Criteria:**
+
+**Given** a user triggers their first density analysis,
+**When** the analysis job is enqueued,
+**Then** a push notification permission prompt appears after the analysis starts — not at onboarding (FR-072).
+
+**Given** the user grants push notification permission,
+**When** le BullMQ job complète et `density_status: 'success'` est sauvegardé en DB,
+**Then** a push notification is sent with title "Analyse terminée 🗺️" and body "Votre trace [adventure name] est prête — zones critiques identifiées."
+
+**Given** the user denies push notification permission,
+**When** the analysis completes,
+**Then** an in-app notification is shown via TanStack Query polling (au prochain rechargement du composant) — no silent failure (FR-072).
+
+**Given** the user receives the push notification while the app is in background,
+**When** they tap the notification,
+**Then** the app opens directly on the map page of the relevant adventure with the colorized trace already visible.
+
+**Given** push notifications are not supported by the browser (e.g., iOS Safari < 16.4),
+**When** the analysis completes,
+**Then** the in-app notification (via polling au prochain focus de l'app) is the only channel used — no error is thrown for missing push support.
