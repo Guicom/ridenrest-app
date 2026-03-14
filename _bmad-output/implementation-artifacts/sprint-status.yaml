@@ -59,7 +59,7 @@ development_status:
   2-1-email-password-registration-login: done
   2-2-google-oauth-sign-in: done
   2-3-strava-oauth-connection: done
-  2-4-password-reset-account-management: backlog
+  2-4-password-reset-account-management: done
   epic-2-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

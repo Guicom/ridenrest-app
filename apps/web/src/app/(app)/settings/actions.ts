@@ -7,6 +7,28 @@ import { auth } from '@/lib/auth/auth'
 import { authDb, profiles, account } from '@ridenrest/database'
 import { eq, and } from 'drizzle-orm'
 
+export async function deleteAccount(confirmedEmail: string): Promise<{ error?: string } | void> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+
+  // Server-side confirmation: verify the typed email matches the actual account email
+  if (confirmedEmail !== session.user.email) {
+    return { error: 'Email de confirmation incorrect.' }
+  }
+
+  try {
+    await auth.api.deleteUser({
+      headers: await headers(),
+      body: {},
+    })
+  } catch (err) {
+    console.error('[settings] deleteAccount failed:', err)
+    return { error: 'Une erreur est survenue. Contactez le support.' }
+  }
+
+  redirect('/')
+}
+
 export async function disconnectStrava(): Promise<{ success: boolean; error?: string }> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect('/login')

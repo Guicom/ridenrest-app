@@ -5,11 +5,12 @@ import { Resend } from 'resend'
 import { authDb, profiles } from '@ridenrest/database'
 import { eq } from 'drizzle-orm'
 
-// Lazy instantiation — Resend throws if API key is missing, so don't instantiate at module load
+// Lazy singleton — Resend throws if API key is missing, so don't instantiate at module load
 // (sendOnSignUp: false for MVP, so this function is never called until domain is verified)
+let _resend: Resend | undefined
 function getResend(): Resend {
   if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY environment variable is required')
-  return new Resend(process.env.RESEND_API_KEY)
+  return (_resend ??= new Resend(process.env.RESEND_API_KEY))
 }
 
 export const auth = betterAuth({
@@ -23,6 +24,12 @@ export const auth = betterAuth({
   account: {
     accountLinking: {
       allowDifferentEmails: true,
+    },
+  },
+
+  user: {
+    deleteUser: {
+      enabled: true,
     },
   },
 
@@ -79,6 +86,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
+    sendResetPassword: async ({ user, url }) => {
+      await getResend().emails.send({
+        from: 'onboarding@resend.dev', // TODO: changer en "Ride'n'Rest <noreply@ridenrest.com>" après vérification domaine
+        to: user.email,
+        subject: "Réinitialisation de votre mot de passe — Ride'n'Rest",
+        html: `<p>Bonjour,</p><p><a href="${url}">Réinitialiser mon mot de passe</a></p><p>Ce lien expire dans 1 heure.</p>`,
+      })
+    },
   },
 
   // Email verification — MVP: sendOnSignUp: false (no Resend domain configured yet)
