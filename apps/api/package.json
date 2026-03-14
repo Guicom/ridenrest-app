@@ -32,6 +32,7 @@
     "class-validator": "^0.15.1",
     "drizzle-orm": "^0.45.1",
     "ioredis": "^5.10.0",
+    "jose": "^6.2.1",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
@@ -69,7 +70,9 @@
     ],
     "rootDir": "src",
     "testRegex": ".*\\.(test|spec)\\.ts$",
-    "testPathIgnorePatterns": ["<rootDir>/.*\\.smoke\\.test\\.ts$"],
+    "testPathIgnorePatterns": [
+      "<rootDir>/.*\\.smoke\\.test\\.ts$"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

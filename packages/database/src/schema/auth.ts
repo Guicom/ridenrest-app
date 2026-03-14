@@ -45,3 +45,11 @@ export const verification = pgTable('verification', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().$onUpdateFn(() => new Date()),
 })
+
+// Required by Better Auth jwt plugin (stores JWK key pairs)
+export const jwks = pgTable('jwks', {
+  id: text('id').primaryKey(),
+  publicKey: text('public_key').notNull(),
+  privateKey: text('private_key').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})

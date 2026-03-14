@@ -77,3 +77,8 @@ workflows:
     status: completed
     output_file: '_bmad-output/implementation-artifacts/1-6-ci-cd-pipeline.md'
     completed_at: '2026-03-14'
+
+  create-story-2-1:
+    status: completed
+    output_file: '_bmad-output/implementation-artifacts/2-1-email-password-registration-login.md'
+    completed_at: '2026-03-14'
