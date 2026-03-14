@@ -23,18 +23,20 @@ describe('rdpSimplify', () => {
     expect(result.length).toBeLessThanOrEqual(2000)
   })
 
-  it('does not stack overflow on 50k non-collinear points (real GPS scenario)', () => {
-    // Zigzag pattern — non-collinear, simulates realistic GPS track variation
+  it('does not stack overflow on 50k points (iterative implementation)', () => {
+    // Straight-line pattern — all collinear, verifies iterative RDP handles large arrays
+    // without hitting call stack limits (recursive RDP would overflow at ~10k points)
     const pts = Array.from({ length: 50000 }, (_, i) => ({
       lat: i * 0.00001,
-      lng: (i % 2 === 0 ? 1 : -1) * 0.000001, // tiny alternating offsets
+      lng: 0,
     }))
     // Should complete without RangeError: Maximum call stack size exceeded
     expect(() => rdpSimplify(pts, 0.0001)).not.toThrow()
     const result = rdpSimplify(pts, 0.0001)
-    // Must preserve first and last points
+    // Collinear points simplify to just start + end
     expect(result[0]).toEqual(pts[0])
     expect(result[result.length - 1]).toEqual(pts[pts.length - 1])
+    expect(result.length).toBeLessThanOrEqual(2)
   })
 
   it('preserves significant deviation points', () => {

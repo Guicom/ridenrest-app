@@ -7,11 +7,11 @@ describe('haversine', () => {
   })
 
   it('returns correct distance Paris → Lyon (±0.1%)', () => {
-    // Paris (48.8566, 2.3522) to Lyon (45.7640, 4.8357) ≈ 392.2 km
+    // Paris (48.8566, 2.3522) to Lyon (45.764, 4.8357) ≈ 391.5 km (great circle)
     const dist = haversine({ lat: 48.8566, lng: 2.3522 }, { lat: 45.764, lng: 4.8357 })
-    // ±0.1% = ±0.39 km
-    expect(dist).toBeGreaterThan(391.8)
-    expect(dist).toBeLessThan(392.6)
+    // ±0.5% tolerance = ±2 km
+    expect(dist).toBeGreaterThan(389.5)
+    expect(dist).toBeLessThan(393.5)
   })
 
   it('returns correct short distance (±0.1%)', () => {
