@@ -34,7 +34,7 @@ describe('JwtAuthGuard', () => {
     expect(guard.canActivate(mockContext('Bearer valid-token-here'))).toBe(true)
   })
 
-  it('returns true for /health path without Authorization header (public endpoint)', () => {
-    expect(guard.canActivate(mockContext(undefined, '/health'))).toBe(true)
+  it('returns true for /api/health path without Authorization header (public endpoint)', () => {
+    expect(guard.canActivate(mockContext(undefined, '/api/health'))).toBe(true)
   })
 })

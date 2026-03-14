@@ -7,7 +7,7 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>()
 
     // Public paths — skip auth (story 2.1 will replace with @Public() decorator)
-    if (request.path === '/health') return true
+    if (request.path === '/api/health') return true
 
     const authHeader = request.headers['authorization']
 
