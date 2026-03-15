@@ -11,7 +11,7 @@ jest.mock('jose', () => ({
 }))
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const jose = require('jose') as { jwtVerify: jest.Mock; createRemoteJWKSet: jest.Mock }
+const jose = require('jose') as unknown as { jwtVerify: jest.Mock; createRemoteJWKSet: jest.Mock }
 
 const makeContext = (authHeader?: string): ExecutionContext =>
   ({
