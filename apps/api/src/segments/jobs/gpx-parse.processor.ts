@@ -1,11 +1,16 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq'
 import type { Job } from 'bullmq'
 import * as fs from 'node:fs/promises'
-import { parseGpx, computeCumulativeDistances, computeElevationGain, computeBoundingBox } from '@ridenrest/gpx'
+import {
+  parseGpx,
+  computeCumulativeDistances,
+  computeElevationGain,
+  computeBoundingBox,
+  rdpSimplify,
+} from '@ridenrest/gpx'
+import { MAX_GPX_POINTS, RDP_EPSILON } from '@ridenrest/shared'
 import { SegmentsRepository } from '../segments.repository.js'
 import { SegmentsService } from '../segments.service.js'
-import { db, adventureSegments } from '@ridenrest/database'
-import { eq } from 'drizzle-orm'
 
 interface ParseSegmentJob {
   segmentId: string
@@ -23,32 +28,29 @@ export class GpxParseProcessor extends WorkerHost {
 
   async process(job: Job<ParseSegmentJob>): Promise<void> {
     const { segmentId, storageUrl } = job.data
-    let adventureId: string | null = null
+
+    // 1. Verify segment still exists and get its adventureId
+    const adventureId = await this.segmentsRepo.findAdventureIdBySegmentId(segmentId)
+    if (!adventureId) {
+      // Segment deleted before job ran — silently complete
+      return
+    }
 
     try {
-      // 1. Get adventure ID for recompute (needed even on error)
-      const [segRow] = await db
-        .select({ adventureId: adventureSegments.adventureId })
-        .from(adventureSegments)
-        .where(eq(adventureSegments.id, segmentId))
+      // 2. Mark as processing so UI shows "Analyse en cours..."
+      await this.segmentsRepo.setProcessingStatus(segmentId)
 
-      if (!segRow) {
-        // Segment deleted before job ran — silently complete
-        return
-      }
-      adventureId = segRow.adventureId
-
-      // 2. Read GPX file
+      // 3. Read GPX file
       const gpxBuffer = await fs.readFile(storageUrl)
       const gpxXml = gpxBuffer.toString('utf-8')
 
-      // 3. Parse track points
+      // 4. Parse track points
       const rawPoints = parseGpx(gpxXml)
       if (rawPoints.length === 0) {
         throw new Error('GPX file contains no track points')
       }
 
-      // 4. Compute waypoints with cumulative distances
+      // 5. Compute waypoints (full resolution for distance/elevation accuracy)
       const kmWaypoints = computeCumulativeDistances(rawPoints)
       const distanceKm = kmWaypoints[kmWaypoints.length - 1]?.km ?? 0
 
@@ -60,14 +62,14 @@ export class GpxParseProcessor extends WorkerHost {
         ...(wp.elevM !== undefined ? { ele: wp.elevM } : {}),
       }))
 
-      // 5. Compute elevation gain
+      // 6. Compute elevation gain and bounding box
       const elevationGainM = computeElevationGain(rawPoints)
-
-      // 6. Compute bounding box
       const boundingBox = computeBoundingBox(rawPoints)
 
-      // 7. Build WKT LINESTRING for PostGIS (longitude first, then latitude — EPSG:4326)
-      const linestring = `LINESTRING(${rawPoints.map((p) => `${p.lng} ${p.lat}`).join(', ')})`
+      // 7. Build WKT LINESTRING — apply RDP simplification if needed to keep geometry lean
+      const geometryPoints =
+        rawPoints.length > MAX_GPX_POINTS ? rdpSimplify(rawPoints, RDP_EPSILON) : rawPoints
+      const linestring = `LINESTRING(${geometryPoints.map((p) => `${p.lng} ${p.lat}`).join(', ')})`
 
       // 8. Update segment in DB
       await this.segmentsRepo.updateAfterParse(segmentId, {
@@ -84,7 +86,8 @@ export class GpxParseProcessor extends WorkerHost {
     } catch (err) {
       console.error(`[GpxParseProcessor] Failed to parse segment ${segmentId}:`, err)
       await this.segmentsRepo.updateParseError(segmentId)
-      // Do NOT re-throw — job marked as failed by BullMQ after maxAttempts
+      // Re-throw so BullMQ can retry the job (auto-retry up to max attempts)
+      throw err
     }
   }
 }

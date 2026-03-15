@@ -1,6 +1,6 @@
 # Story 3.1: Create Adventure & Upload First GPX Segment
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -86,7 +86,7 @@ So that my route appears in the app and I can start planning around it.
   - [x] 8.3 Create `apps/web/src/app/(app)/adventures/[id]/_components/gpx-upload-form.tsx` — client-side file size validation (10 MB), multipart upload, progress state
   - [x] 8.4 Create `apps/web/src/app/(app)/adventures/[id]/_components/segment-card.tsx` — shows segment info, parse status indicator (pending/processing/done/error)
 
-- [ ] Task 9 — Final validation (AC: #1–#7) — **Manual integration testing required**
+- [ ] Task 9 — Final validation (AC: #1–#7) — **Manual integration testing required** *(validate `processing` status now visible during parse)*
   - [ ] 9.1 Create adventure "Test Transcantabrique" → redirected to `/adventures/:id` ✅
   - [ ] 9.2 Adventure appears in `/adventures` list ✅
   - [ ] 9.3 Upload valid GPX → segment created with parseStatus: 'pending' in UI ✅
@@ -95,6 +95,12 @@ So that my route appears in the app and I can start planning around it.
   - [ ] 9.6 Upload GPX > 10 MB → "Fichier trop volumineux (max 10 MB)" shown before any network request ✅
   - [ ] 9.7 DB: `adventure_segments` row has `geom` (LINESTRING), `waypoints` (JSONB), `distance_km` set after parse ✅
   - [ ] 9.8 `GET /api/adventures/:adventureId/segments` returns segments for that adventure only (auth enforced) ✅
+
+### Review Follow-ups (AI) — LOW severity, addresser ultérieurement
+
+- [ ] [AI-Review][LOW] `adventure-list.tsx` — Ajouter `onError` sur `createMutation` pour afficher un feedback en cas d'erreur réseau/serveur lors de la création d'aventure [`apps/web/src/app/(app)/adventures/_components/adventure-list.tsx:1127`]
+- [ ] [AI-Review][LOW] `adventures.repository.ts` — Consolider les deux import statements séparés depuis `@ridenrest/database` en un seul [`apps/api/src/adventures/adventures.repository.ts:2-3`]
+- [ ] [AI-Review][LOW] `api-client.ts` — Déplacer `import type { AdventureResponse, AdventureSegmentResponse }` en haut du fichier (ESLint `import/first`) [`apps/web/src/lib/api-client.ts:66`]
 
 ---
 
@@ -1627,8 +1633,13 @@ apps/web/src/
 - **`@ridenrest/shared` sub-path imports**: The shared package only exports from root `.`. All imports use `@ridenrest/shared` directly (not `@ridenrest/shared/types` or `@ridenrest/shared/schemas`).
 - **QueryProvider**: Already in `apps/web/src/app/(app)/layout.tsx` from story 1.5 — no changes needed.
 - **`@types/multer`**: Installed as devDependency. `FileInterceptor('file')` without storage option defaults to memoryStorage, file arrives as `file.buffer`.
-- **GpxParseProcessor**: Catches errors, calls `updateParseError`, does NOT re-throw — BullMQ handles retries via job config.
-- **All tests pass**: 31 API tests + 41 web tests, 0 regressions. TypeScript clean (`tsc --noEmit`) for both apps.
+- **GpxParseProcessor [FIXED by code-review]**: Now re-throws after `updateParseError` so BullMQ retry mechanism works correctly.
+- **GpxParseProcessor [FIXED by code-review]**: DB query moved to `SegmentsRepository.findAdventureIdBySegmentId()` — no more direct `db.select()` in processor.
+- **GpxParseProcessor [FIXED by code-review]**: Sets `parseStatus = 'processing'` at job start via `SegmentsRepository.setProcessingStatus()`.
+- **GpxParseProcessor [FIXED by code-review]**: Applies `rdpSimplify` when `rawPoints.length > MAX_GPX_POINTS` before building WKT LINESTRING.
+- **SegmentsRepository [FIXED by code-review]**: `updateCumulativeDistances()` now uses `Promise.all` instead of sequential loop — eliminates N+1 DB writes.
+- **SegmentsService [FIXED by code-review]**: Orphaned file cleanup — if DB insert fails after file write, `fs.unlink` is called.
+- **Processor tests [FIXED by code-review]**: Real behavioral tests replacing placeholder — covers valid GPX, GPX without ele, malformed GPX, deleted segment, RDP simplification.
 
 ### Completion Notes
 

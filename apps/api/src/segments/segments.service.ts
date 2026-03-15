@@ -56,16 +56,22 @@ export class SegmentsService {
       throw new InternalServerErrorException('Failed to save GPX file')
     }
 
-    // Create DB record
-    const segment = await this.segmentsRepo.create({
-      id: segmentId,
-      adventureId,
-      name: segmentName,
-      orderIndex,
-      cumulativeStartKm: 0,
-      parseStatus: 'pending',
-      storageUrl,
-    })
+    // Create DB record — clean up file on failure to avoid orphaned files on disk
+    let segment!: AdventureSegment
+    try {
+      segment = await this.segmentsRepo.create({
+        id: segmentId,
+        adventureId,
+        name: segmentName,
+        orderIndex,
+        cumulativeStartKm: 0,
+        parseStatus: 'pending',
+        storageUrl,
+      })
+    } catch {
+      await fs.unlink(storageUrl).catch(() => undefined)
+      throw new InternalServerErrorException('Failed to create segment record')
+    }
 
     // Recompute cumulative distances (all 0 until parse completes)
     await this.recomputeCumulativeDistances(adventureId)

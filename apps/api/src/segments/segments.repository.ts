@@ -34,6 +34,14 @@ export class SegmentsRepository {
     return row?.segment ?? null
   }
 
+  async findAdventureIdBySegmentId(segmentId: string): Promise<string | null> {
+    const [row] = await db
+      .select({ adventureId: adventureSegments.adventureId })
+      .from(adventureSegments)
+      .where(eq(adventureSegments.id, segmentId))
+    return row?.adventureId ?? null
+  }
+
   async countByAdventureId(adventureId: string): Promise<number> {
     const [row] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -74,14 +82,24 @@ export class SegmentsRepository {
       .where(eq(adventureSegments.id, segmentId))
   }
 
+  async setProcessingStatus(segmentId: string): Promise<void> {
+    await db
+      .update(adventureSegments)
+      .set({ parseStatus: 'processing', updatedAt: new Date() })
+      .where(eq(adventureSegments.id, segmentId))
+  }
+
   async updateCumulativeDistances(
     updates: Array<{ id: string; cumulativeStartKm: number }>,
   ): Promise<void> {
-    for (const { id, cumulativeStartKm } of updates) {
-      await db
-        .update(adventureSegments)
-        .set({ cumulativeStartKm, updatedAt: new Date() })
-        .where(eq(adventureSegments.id, id))
-    }
+    if (updates.length === 0) return
+    await Promise.all(
+      updates.map(({ id, cumulativeStartKm }) =>
+        db
+          .update(adventureSegments)
+          .set({ cumulativeStartKm, updatedAt: new Date() })
+          .where(eq(adventureSegments.id, id)),
+      ),
+    )
   }
 }
