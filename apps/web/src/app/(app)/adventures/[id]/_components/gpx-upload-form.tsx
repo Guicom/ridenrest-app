@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button'
 
 interface Props {
   adventureId: string
+  onSuccess?: () => void
 }
 
-export function GpxUploadForm({ adventureId }: Props) {
+export function GpxUploadForm({ adventureId, onSuccess }: Props) {
   const queryClient = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [fileError, setFileError] = useState<string | null>(null)
@@ -23,6 +24,7 @@ export function GpxUploadForm({ adventureId }: Props) {
       queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
       setSelectedFile(null)
       if (inputRef.current) inputRef.current.value = ''
+      onSuccess?.()
     },
   })
 

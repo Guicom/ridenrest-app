@@ -1,56 +1,70 @@
-import type { AdventureSegmentResponse, ParseStatus } from '@ridenrest/shared'
+'use client'
+import { AlertCircle, MapPin } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
-const STATUS_LABELS: Record<ParseStatus, string> = {
-  pending: 'En attente...',
-  processing: 'Analyse en cours...',
-  done: 'Analysé',
-  error: "Erreur d'analyse",
-}
-
-const STATUS_COLORS: Record<ParseStatus, string> = {
-  pending: 'text-muted-foreground',
-  processing: 'text-blue-600',
-  done: 'text-green-600',
-  error: 'text-destructive',
-}
-
-interface Props {
+export interface SegmentCardProps {
   segment: AdventureSegmentResponse
+  onRetry: () => void
 }
 
-export function SegmentCard({ segment }: Props) {
-  return (
-    <div className="border rounded-lg p-3 flex items-center justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <p className="font-medium truncate">{segment.name}</p>
+export function SegmentCard({ segment, onRetry }: SegmentCardProps) {
+  const { parseStatus, name, distanceKm, elevationGainM } = segment
+
+  if (parseStatus === 'pending' || parseStatus === 'processing') {
+    return (
+      <div className="rounded-lg border p-4 space-y-2">
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-3 w-1/3" />
         <p className="text-xs text-muted-foreground">
-          {segment.cumulativeStartKm > 0
-            ? `Début à ${segment.cumulativeStartKm.toFixed(1)} km`
-            : 'Début'}
+          {parseStatus === 'pending' ? "En attente d'analyse..." : 'Analyse en cours...'}
         </p>
       </div>
+    )
+  }
 
-      <div className="text-right flex-shrink-0 space-y-0.5">
-        {segment.parseStatus === 'done' ? (
-          <>
-            <p className="text-sm font-medium">
-              {segment.distanceKm.toFixed(1)} km
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {segment.elevationGainM != null
-                ? `D+ ${Math.round(segment.elevationGainM)} m`
-                : 'D+ N/A'}
-            </p>
-          </>
-        ) : (
-          <p className={`text-xs ${STATUS_COLORS[segment.parseStatus]}`}>
-            {STATUS_LABELS[segment.parseStatus]}
-            {segment.parseStatus === 'pending' || segment.parseStatus === 'processing' ? (
-              <span className="animate-pulse"> ●</span>
-            ) : null}
-          </p>
-        )}
+  if (parseStatus === 'error') {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-2">
+        <div className="flex items-center gap-2 text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">{name ?? 'Segment sans nom'}</span>
+        </div>
+        <p className="text-xs text-destructive">
+          Parsing échoué — vérifiez le format du fichier GPX
+        </p>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Réessayer
+        </Button>
       </div>
+    )
+  }
+
+  // parseStatus === 'done'
+  const distanceLabel = distanceKm != null ? `${distanceKm.toFixed(1)} km` : '— km'
+  const elevationLabel = elevationGainM != null ? `${Math.round(elevationGainM)}m D+` : 'N/A'
+
+  return (
+    <div className="rounded-lg border p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{name ?? 'Segment sans nom'}</span>
+        <Badge variant="secondary">Analysé</Badge>
+      </div>
+      <div className="flex gap-4 text-xs text-muted-foreground">
+        <span>{distanceLabel}</span>
+        <span>{elevationLabel}</span>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        title="Disponible dans la version carte"
+      >
+        <MapPin className="h-3 w-3 mr-1" />
+        Afficher sur la carte
+      </Button>
     </div>
   )
 }

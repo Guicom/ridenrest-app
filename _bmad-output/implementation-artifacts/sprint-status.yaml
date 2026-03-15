@@ -67,7 +67,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-3: in-progress
   3-1-create-adventure-upload-first-gpx-segment: done
-  3-2-parse-status-polling-notification: backlog
+  3-2-parse-status-polling-notification: done
   3-3-multi-segment-management-reorder-delete-replace: backlog
   3-4-adventure-segment-rename-and-delete: backlog
   3-5-strava-activity-import-as-segment: backlog
