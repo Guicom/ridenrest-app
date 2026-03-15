@@ -63,7 +63,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ── Adventures ───────────────────────────────────────────────────────────────
 
-import type { AdventureResponse, AdventureSegmentResponse } from '@ridenrest/shared'
+import type { AdventureResponse, AdventureSegmentResponse, AdventureMapResponse, MapSegmentData, MapWaypoint } from '@ridenrest/shared'
 
 export async function createAdventure(name: string): Promise<AdventureResponse> {
   return apiFetch<AdventureResponse>('/api/adventures', {
@@ -139,6 +139,35 @@ export async function renameSegment(
 export async function deleteAdventure(adventureId: string): Promise<void> {
   await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}`, {
     method: 'DELETE',
+  })
+}
+
+export async function getAdventureMapData(adventureId: string): Promise<AdventureMapResponse> {
+  return apiFetch<AdventureMapResponse>(`/api/adventures/${adventureId}/map`)
+}
+
+export type { AdventureMapResponse, MapSegmentData, MapWaypoint }
+
+// ── Strava ────────────────────────────────────────────────────────────────────
+
+export interface StravaRouteItem {
+  id: string          // Strava route ID (numeric as string)
+  name: string
+  distanceKm: number
+  elevationGainM: number | null
+}
+
+export async function listStravaRoutes(): Promise<StravaRouteItem[]> {
+  return apiFetch<StravaRouteItem[]>('/api/strava/routes')
+}
+
+export async function importStravaRoute(
+  stravaRouteId: string,
+  adventureId: string,
+): Promise<AdventureSegmentResponse> {
+  return apiFetch<AdventureSegmentResponse>(`/api/strava/routes/${stravaRouteId}/import`, {
+    method: 'POST',
+    body: JSON.stringify({ adventureId }),
   })
 }
 
