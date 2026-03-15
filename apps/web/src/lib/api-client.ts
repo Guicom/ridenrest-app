@@ -148,6 +148,31 @@ export async function getAdventureMapData(adventureId: string): Promise<Adventur
 
 export type { AdventureMapResponse, MapSegmentData, MapWaypoint }
 
+// ── POIs ──────────────────────────────────────────────────────────────────────
+
+import type { Poi, PoiCategory } from '@ridenrest/shared'
+
+export interface GetPoisParams {
+  segmentId: string
+  fromKm: number
+  toKm: number
+  categories?: PoiCategory[]
+}
+
+export async function getPois(params: GetPoisParams): Promise<Poi[]> {
+  const searchParams = new URLSearchParams({
+    segmentId: params.segmentId,
+    fromKm: String(params.fromKm),
+    toKm: String(params.toKm),
+  })
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => searchParams.append('categories', c))
+  }
+  return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
+}
+
+export type { Poi, PoiCategory }
+
 // ── Strava ────────────────────────────────────────────────────────────────────
 
 export interface StravaRouteItem {

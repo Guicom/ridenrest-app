@@ -10,11 +10,30 @@ vi.mock('@/lib/api-client', () => ({
   getAdventureMapData: vi.fn(),
 }))
 
+// Mock usePois hook
+vi.mock('@/hooks/use-pois', () => ({
+  usePois: () => ({
+    poisByLayer: { accommodations: [], restaurants: [], supplies: [], bike: [] },
+    isPending: false,
+    hasError: false,
+  }),
+}))
+
+// Mock map store
+vi.mock('@/stores/map.store', () => ({
+  useMapStore: () => ({ visibleLayers: new Set(), toggleLayer: vi.fn() }),
+}))
+
 // Mock MapCanvas to avoid WebGL in tests
 vi.mock('./map-canvas', () => ({
   MapCanvas: ({ segments }: { segments: unknown[] }) => (
     <div data-testid="map-canvas" data-segments={segments.length} />
   ),
+}))
+
+// Mock LayerToggles
+vi.mock('./layer-toggles', () => ({
+  LayerToggles: () => <div data-testid="layer-toggles" />,
 }))
 
 // Mock StatusBanner

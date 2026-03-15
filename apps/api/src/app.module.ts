@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module.js'
 import { AdventuresModule } from './adventures/adventures.module.js'
 import { SegmentsModule } from './segments/segments.module.js'
 import { StravaModule } from './strava/strava.module.js'
+import { PoisModule } from './pois/pois.module.js'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
 
 @Module({
@@ -20,6 +21,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
     AdventuresModule,
     SegmentsModule,
     StravaModule,
+    PoisModule,
   ],
   controllers: [AppController],
   providers: [

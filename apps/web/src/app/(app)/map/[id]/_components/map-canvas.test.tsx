@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, act, waitFor } from '@testing-library/react'
 import { MapCanvas } from './map-canvas'
 import type { MapSegmentData } from '@/lib/api-client'
+import type { Poi, MapLayer } from '@ridenrest/shared'
 
 afterEach(cleanup)
 
@@ -32,13 +33,25 @@ vi.mock('next-themes', () => ({
 
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({ setViewport: vi.fn() }),
+  useMapStore: () => ({ setViewport: vi.fn(), visibleLayers: new Set() }),
+}))
+
+// Mock usePoiLayers
+vi.mock('@/hooks/use-poi-layers', () => ({
+  usePoiLayers: vi.fn(),
 }))
 
 // Mock OsmAttribution
 vi.mock('@/components/shared/osm-attribution', () => ({
   OsmAttribution: () => <div data-testid="osm-attribution" />,
 }))
+
+const emptyPoisByLayer: Record<MapLayer, Poi[]> = {
+  accommodations: [],
+  restaurants: [],
+  supplies: [],
+  bike: [],
+}
 
 function makeSegment(parseStatus = 'done'): MapSegmentData {
   return {
@@ -65,12 +78,12 @@ describe('MapCanvas', () => {
   })
 
   it('renders OsmAttribution', () => {
-    render(<MapCanvas segments={[makeSegment()]} adventureName="Test" />)
+    render(<MapCanvas segments={[makeSegment()]} adventureName="Test" poisByLayer={emptyPoisByLayer} />)
     expect(screen.getByTestId('osm-attribution')).toBeDefined()
   })
 
   it('renders map container with aria-label and role', () => {
-    render(<MapCanvas segments={[]} adventureName="Transcantabrique" />)
+    render(<MapCanvas segments={[]} adventureName="Transcantabrique" poisByLayer={emptyPoisByLayer} />)
     const mapDiv = document.querySelector('[role="application"]')
     expect(mapDiv).not.toBeNull()
     expect(mapDiv?.getAttribute('aria-label')).toContain('Transcantabrique')
@@ -83,7 +96,7 @@ describe('MapCanvas', () => {
       if (event === 'load') loadCallback = cb
     })
 
-    render(<MapCanvas segments={[makeSegment()]} adventureName="Test" />)
+    render(<MapCanvas segments={[makeSegment()]} adventureName="Test" poisByLayer={emptyPoisByLayer} />)
 
     // Wait for dynamic import to resolve and map.on to be called
     await waitFor(() => {
@@ -99,5 +112,30 @@ describe('MapCanvas', () => {
       [[1.0, 43.0], [1.5, 43.5]],
       expect.objectContaining({ padding: 40, maxZoom: 14, animate: false }),
     )
+  })
+
+  it('does not call addSource for POI sources when no layers are visible', async () => {
+    // visibleLayers is empty (mocked above) — usePoiLayers is mocked so no addSource calls
+    // Verify: addSource is only called for trace sources, not POI sources
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+    mockMapInstance.isStyleLoaded.mockReturnValue(true)
+
+    render(
+      <MapCanvas segments={[makeSegment()]} adventureName="Test" poisByLayer={emptyPoisByLayer} />,
+    )
+
+    await waitFor(() => {
+      expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function))
+    })
+
+    await act(async () => { loadCallback?.() })
+
+    // Only trace sources should be added, no pois-* sources
+    const addSourceCalls = mockMapInstance.addSource.mock.calls as [string, unknown][]
+    const poiSourceCalls = addSourceCalls.filter(([id]) => id.startsWith('pois-'))
+    expect(poiSourceCalls).toHaveLength(0)
   })
 })

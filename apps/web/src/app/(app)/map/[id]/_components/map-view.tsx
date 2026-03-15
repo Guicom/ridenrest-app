@@ -2,8 +2,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAdventureMapData } from '@/lib/api-client'
 import { MapCanvas } from './map-canvas'
+import { LayerToggles } from './layer-toggles'
 import { StatusBanner } from '@/components/shared/status-banner'
 import { Skeleton } from '@/components/ui/skeleton'
+import { usePois } from '@/hooks/use-pois'
 import type { AdventureMapResponse } from '@/lib/api-client'
 
 interface MapViewProps {
@@ -25,6 +27,10 @@ export function MapView({ adventureId }: MapViewProps) {
     },
   })
 
+  // usePois must be called unconditionally (Rules of Hooks) — pass empty array before data loads
+  const readySegments = data?.segments.filter((s) => s.parseStatus === 'done') ?? []
+  const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
+
   if (isPending) return <Skeleton className="h-full w-full" />
 
   if (error) {
@@ -38,8 +44,6 @@ export function MapView({ adventureId }: MapViewProps) {
   ).length
 
   const errorCount = data.segments.filter((s) => s.parseStatus === 'error').length
-
-  const readySegments = data.segments.filter((s) => s.parseStatus === 'done')
 
   return (
     <div className="relative h-full w-full">
@@ -60,7 +64,17 @@ export function MapView({ adventureId }: MapViewProps) {
       <MapCanvas
         segments={readySegments}
         adventureName={data.adventureName}
+        poisByLayer={poisByLayer}
       />
+      {/* Layer toggles — fixed to bottom of map */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+        <LayerToggles isPending={poisPending} />
+      </div>
+      {poisError && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
+          <StatusBanner message="Recherche POI indisponible — réessayer dans quelques instants." />
+        </div>
+      )}
     </div>
   )
 }

@@ -1,9 +1,11 @@
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useMapStore } from '@/stores/map.store'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
+import { usePoiLayers } from '@/hooks/use-poi-layers'
 import type { MapSegmentData } from '@/lib/api-client'
+import type { Poi, MapLayer } from '@ridenrest/shared'
 import type maplibregl from 'maplibre-gl'
 
 // OpenFreeMap tile styles — MIT, commercial ok, OSM attribution required
@@ -19,13 +21,17 @@ const SEGMENT_JOIN_COLOR = '#6B7280'
 interface MapCanvasProps {
   segments: MapSegmentData[]
   adventureName: string
+  poisByLayer: Record<MapLayer, Poi[]>
 }
 
-export function MapCanvas({ segments, adventureName }: MapCanvasProps) {
+export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const [styleVersion, setStyleVersion] = useState(0)
   const { resolvedTheme } = useTheme()
   const { setViewport } = useMapStore()
+
+  usePoiLayers(mapRef, poisByLayer, styleVersion)
 
   // Init MapLibre map
   useEffect(() => {
@@ -84,6 +90,7 @@ export function MapCanvas({ segments, adventureName }: MapCanvasProps) {
     // will reconcile any delta if segments changed between theme switch and style.load
     map.once('style.load', () => {
       addTraceLayers(map, segments)
+      setStyleVersion((v) => v + 1)  // Triggers usePoiLayers re-run after theme change
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTheme])

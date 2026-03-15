@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import type { MapLayer } from '@ridenrest/shared'
 
-export type MapLayer = 'accommodations' | 'restaurants' | 'supplies' | 'bike'
+export type { MapLayer }
 
 interface MapState {
   // Layer visibility
