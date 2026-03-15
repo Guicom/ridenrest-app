@@ -55,7 +55,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 2: User Authentication & Account Management
   # ─────────────────────────────────────────────────────────────
-  epic-2: in-progress
+  epic-2: done
   2-1-email-password-registration-login: done
   2-2-google-oauth-sign-in: done
   2-3-strava-oauth-connection: done
@@ -65,8 +65,8 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 3: Adventures & GPX Management
   # ─────────────────────────────────────────────────────────────
-  epic-3: backlog
-  3-1-create-adventure-upload-first-gpx-segment: backlog
+  epic-3: in-progress
+  3-1-create-adventure-upload-first-gpx-segment: done
   3-2-parse-status-polling-notification: backlog
   3-3-multi-segment-management-reorder-delete-replace: backlog
   3-4-adventure-segment-rename-and-delete: backlog

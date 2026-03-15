@@ -5,21 +5,19 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
-import { jwtVerify } from 'jose'
+import { jwtVerify, createRemoteJWKSet } from 'jose'
 import type { Request } from 'express'
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js'
 import type { CurrentUserPayload } from '../decorators/current-user.decorator.js'
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  private readonly secret: Uint8Array
+  private readonly jwks: ReturnType<typeof createRemoteJWKSet>
 
   constructor(private reflector: Reflector) {
-    if (!process.env.BETTER_AUTH_SECRET) {
-      throw new Error('BETTER_AUTH_SECRET environment variable is required')
-    }
-    // Encode once at startup instead of on every request
-    this.secret = new TextEncoder().encode(process.env.BETTER_AUTH_SECRET)
+    const betterAuthUrl = process.env.BETTER_AUTH_URL ?? 'http://localhost:3011'
+    // Better Auth JWT plugin exposes its public keys at /api/auth/jwks
+    this.jwks = createRemoteJWKSet(new URL(`${betterAuthUrl}/api/auth/jwks`))
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -43,8 +41,8 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      // Verify JWT with BETTER_AUTH_SECRET — HS256 only (explicit algorithm constraint)
-      const { payload } = await jwtVerify(token, this.secret, { algorithms: ['HS256'] })
+      // Verify JWT using Better Auth's JWKS endpoint (EdDSA asymmetric keys)
+      const { payload } = await jwtVerify(token, this.jwks)
 
       // Populate req.user — available via @CurrentUser() in controllers
       request.user = {

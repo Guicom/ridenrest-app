@@ -6,6 +6,8 @@ import { AppService } from './app.service.js'
 import { RedisProvider } from './common/providers/redis.provider.js'
 import { QueuesModule } from './queues/queues.module.js'
 import { HealthModule } from './health/health.module.js'
+import { AdventuresModule } from './adventures/adventures.module.js'
+import { SegmentsModule } from './segments/segments.module.js'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
 
 @Module({
@@ -13,6 +15,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
     ConfigModule.forRoot({ isGlobal: true }),
     QueuesModule,
     HealthModule,
+    AdventuresModule,
+    SegmentsModule,
   ],
   controllers: [AppController],
   providers: [

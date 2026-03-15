@@ -9,12 +9,14 @@ import * as weatherCacheSchema from './schema/weather-cache'
 import * as coverageGapsSchema from './schema/coverage-gaps'
 
 // SSL: Aiven uses a custom CA. Set DATABASE_CA_CERT (base64-encoded Aiven CA cert) in production
-// for full TLS verification. Without it, rejectUnauthorized: false is used as fallback —
+// for full TLS verification. Without it, NODE_TLS_REJECT_UNAUTHORIZED=0 is set as fallback —
 // acceptable for MVP but replace with CA cert before public launch.
-// Note: NODE_TLS_REJECT_UNAUTHORIZED=0 in db:migrate scripts is the same workaround for drizzle-kit.
 const sslConfig = process.env.DATABASE_CA_CERT
   ? { rejectUnauthorized: true, ca: Buffer.from(process.env.DATABASE_CA_CERT, 'base64').toString() }
-  : { rejectUnauthorized: false }
+  : (() => {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+      return { rejectUnauthorized: false }
+    })()
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

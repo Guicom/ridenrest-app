@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { NestFactory } from '@nestjs/core'
 import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
@@ -7,6 +8,12 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
+
+  // CORS — allow requests from Next.js web app (cross-origin in local dev and production)
+  app.enableCors({
+    origin: process.env.WEB_URL ?? 'http://localhost:3011',
+    credentials: true,
+  })
 
   // Global middleware
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }))

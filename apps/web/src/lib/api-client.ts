@@ -1,5 +1,6 @@
+import { authClient } from '@/lib/auth/client'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3010'
-const AUTH_URL = process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? 'http://localhost:3011'
 
 class ApiError extends Error {
   constructor(
@@ -12,36 +13,20 @@ class ApiError extends Error {
   }
 }
 
-// In-memory token cache — avoids an extra HTTP round-trip on every API call
-let tokenCache: { value: string; expiresAt: number } | null = null
-
 export function invalidateAuthTokenCache(): void {
-  tokenCache = null
+  // No-op — authClient.getToken() handles caching internally
 }
 
-// Fetch JWT access token from Better Auth /api/auth/token endpoint (jwt plugin)
-// Cached for 13 minutes (token valid 15min, 2min safety buffer)
+// Use Better Auth jwtClient plugin to get JWT — handles session cookie + caching
 async function getAuthToken(): Promise<string | null> {
-  const now = Date.now()
-  if (tokenCache && tokenCache.expiresAt > now) {
-    return tokenCache.value
-  }
   try {
-    const res = await fetch(`${AUTH_URL}/api/auth/token`, {
-      credentials: 'include', // Send session cookie to get JWT
-    })
-    if (!res.ok) {
-      tokenCache = null
-      return null
-    }
-    const data = (await res.json()) as { token?: string }
-    const token = data?.token ?? null
-    if (token) {
-      tokenCache = { value: token, expiresAt: now + 13 * 60 * 1000 }
-    }
-    return token
+    const result = await authClient.token()
+    // Better Auth jwtClient returns either { data: { token } } or { data: tokenString }
+    const data = result?.data
+    if (typeof data === 'string') return data
+    if (data && typeof data === 'object' && 'token' in data) return (data as { token: string }).token
+    return null
   } catch {
-    tokenCache = null
     return null
   }
 }
@@ -62,8 +47,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     if (res.status === 401) {
-      // Clear cached token — it's expired; Next.js middleware will redirect to /login
-      tokenCache = null
+      // Token expired — next call to getAuthToken() will fetch a fresh one
     }
     const body = await res.json().catch(() => ({}))
     throw new ApiError(
@@ -75,6 +59,47 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   const body = await res.json()
   return body.data as T // Unwrap ResponseInterceptor { data: ... }
+}
+
+// ── Adventures ───────────────────────────────────────────────────────────────
+
+import type { AdventureResponse, AdventureSegmentResponse } from '@ridenrest/shared'
+
+export async function createAdventure(name: string): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>('/api/adventures', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function listAdventures(): Promise<AdventureResponse[]> {
+  return apiFetch<AdventureResponse[]>('/api/adventures')
+}
+
+export async function getAdventure(id: string): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${id}`)
+}
+
+// ── Segments ──────────────────────────────────────────────────────────────────
+
+export async function listSegments(adventureId: string): Promise<AdventureSegmentResponse[]> {
+  return apiFetch<AdventureSegmentResponse[]>(`/api/adventures/${adventureId}/segments`)
+}
+
+export async function createSegment(
+  adventureId: string,
+  file: File,
+  name?: string,
+): Promise<AdventureSegmentResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (name) formData.append('name', name)
+
+  return apiFetch<AdventureSegmentResponse>(`/api/adventures/${adventureId}/segments`, {
+    method: 'POST',
+    body: formData,
+    // Do NOT set Content-Type — browser sets it with multipart boundary
+  })
 }
 
 export const apiClient = {
