@@ -1,5 +1,5 @@
 // Tests for StravaService
-import { NotFoundException, HttpException } from '@nestjs/common'
+import { NotFoundException } from '@nestjs/common'
 import { StravaService } from './strava.service.js'
 import type { SegmentsService } from '../segments/segments.service.js'
 import type { AdventuresService } from '../adventures/adventures.service.js'
@@ -30,28 +30,29 @@ const mockRedisClient = {
   expire: jest.fn(),
 }
 
-const mockRedisProvider: jest.Mocked<Partial<RedisProvider>> = {
+const mockRedisProvider = {
   getClient: jest.fn().mockReturnValue(mockRedisClient),
-}
+} as unknown as RedisProvider
 
-const mockSegmentsService: jest.Mocked<Partial<SegmentsService>> = {
+const mockSegmentsService = {
   createSegment: jest.fn(),
-}
+} as unknown as SegmentsService
 
-const mockAdventuresService: jest.Mocked<Partial<AdventuresService>> = {
+const mockAdventuresService = {
   verifyOwnership: jest.fn(),
-}
+} as unknown as AdventuresService
 
 const service = new StravaService(
-  mockSegmentsService as unknown as SegmentsService,
-  mockAdventuresService as unknown as AdventuresService,
-  mockRedisProvider as unknown as RedisProvider,
+  mockSegmentsService,
+  mockAdventuresService,
+  mockRedisProvider,
 )
 
 // Helper to set up DB mock chain for account queries
 function mockDbSelectAccount(result: object[]) {
-  const { db } = jest.requireMock('@ridenrest/database')
-  db.select.mockReturnValueOnce({
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const { db } = jest.requireMock('@ridenrest/database') as { db: Record<string, jest.Mock> }
+  db['select'].mockReturnValueOnce({
     from: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(result),
     }),
@@ -60,7 +61,7 @@ function mockDbSelectAccount(result: object[]) {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  mockRedisProvider.getClient!.mockReturnValue(mockRedisClient)
+  ;(mockRedisProvider.getClient as jest.Mock).mockReturnValue(mockRedisClient)
 })
 
 describe('listRoutes', () => {
@@ -108,7 +109,7 @@ describe('listRoutes — cache MISS', () => {
     const stravaRoutes = [{ id: 100, name: 'Route Test', distance: 50000, elevation_gain: 800 }]
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      text: async () => JSON.stringify(stravaRoutes),
+      text: () => Promise.resolve(JSON.stringify(stravaRoutes)),
     } as unknown as Response)
 
     const result = await service.listRoutes('user-1')
@@ -125,7 +126,7 @@ describe('listRoutes — cache MISS', () => {
 
 describe('importRoute', () => {
   it('3.4 — calls verifyOwnership, fetches GPX, calls createSegment, returns segment with source: strava', async () => {
-    mockAdventuresService.verifyOwnership!.mockResolvedValue(undefined)
+    ;(mockAdventuresService.verifyOwnership as jest.Mock).mockResolvedValue(undefined)
     mockRedisClient.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(1)
     mockRedisClient.expire.mockResolvedValue(1)
 
@@ -143,7 +144,7 @@ describe('importRoute', () => {
     const gpxBuffer = Buffer.from('<gpx/>')
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      arrayBuffer: async () => gpxBuffer.buffer,
+      arrayBuffer: () => Promise.resolve(gpxBuffer.buffer),
     } as unknown as Response)
 
     const expectedSegment = {
@@ -153,7 +154,7 @@ describe('importRoute', () => {
       source: 'strava',
       parseStatus: 'pending',
     }
-    mockSegmentsService.createSegment!.mockResolvedValue(expectedSegment as never)
+    ;(mockSegmentsService.createSegment as jest.Mock).mockResolvedValue(expectedSegment)
 
     const result = await service.importRoute('user-1', '456', 'adv-1')
 
@@ -229,7 +230,7 @@ describe('getValidAccessToken', () => {
 
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      text: async () => JSON.stringify([]),
+      text: () => Promise.resolve(JSON.stringify([])),
     } as unknown as Response)
 
     await service.listRoutes('user-1')
@@ -251,8 +252,9 @@ describe('getValidAccessToken', () => {
     mockDbSelectAccount([expiredAccount])
     mockDbSelectAccount([{ accountId: '999' }])  // getAthleteId
 
-    const { db } = jest.requireMock('@ridenrest/database')
-    db.update.mockReturnValue({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const { db } = jest.requireMock('@ridenrest/database') as { db: Record<string, jest.Mock> }
+    db['update'].mockReturnValue({
       set: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
       }),
@@ -267,11 +269,11 @@ describe('getValidAccessToken', () => {
     global.fetch = jest.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => refreshResponse,
+        json: () => Promise.resolve(refreshResponse),
       } as unknown as Response)
       .mockResolvedValueOnce({
         ok: true,
-        text: async () => JSON.stringify([]),
+        text: () => Promise.resolve(JSON.stringify([])),
       } as unknown as Response)
 
     await service.listRoutes('user-1')
