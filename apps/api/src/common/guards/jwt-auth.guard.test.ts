@@ -36,9 +36,9 @@ describe('JwtAuthGuard', () => {
   })
 
   it('calls createRemoteJWKSet with the JWKS endpoint on instantiation', () => {
-    expect(jose.createRemoteJWKSet).toHaveBeenCalledWith(
-      expect.objectContaining({ href: expect.stringContaining('/api/auth/jwks') }),
-    )
+    expect(jose.createRemoteJWKSet).toHaveBeenCalledTimes(1)
+    const url = (jose.createRemoteJWKSet.mock.calls[0] as [URL])[0]
+    expect(url.href).toContain('/api/auth/jwks')
   })
 
   it('allows @Public() routes without token', async () => {
