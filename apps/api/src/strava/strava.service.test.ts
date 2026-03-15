@@ -6,19 +6,16 @@ import type { AdventuresService } from '../adventures/adventures.service.js'
 import type { RedisProvider } from '../common/providers/redis.provider.js'
 
 // Mock @ridenrest/database
-// Variables prefixed with 'mock' can be referenced inside jest.mock() factory (Jest hoisting rule)
-const mockDb = {
-  select: jest.fn(),
-  update: jest.fn(),
-  from: jest.fn(),
-  where: jest.fn(),
-  set: jest.fn(),
-}
+// Must use var (not const/let) so Jest hoisting doesn't cause TDZ:
+// jest.mock() factories are hoisted before const/let initializations.
+// The factory assigns mockDb so it's ready before any test code runs.
+// eslint-disable-next-line no-var
+var mockDb: { select: jest.Mock; update: jest.Mock; from: jest.Mock; where: jest.Mock; set: jest.Mock }
 
-jest.mock('@ridenrest/database', () => ({
-  db: mockDb,
-  account: {},
-}))
+jest.mock('@ridenrest/database', () => {
+  mockDb = { select: jest.fn(), update: jest.fn(), from: jest.fn(), where: jest.fn(), set: jest.fn() }
+  return { db: mockDb, account: {} }
+})
 
 // Mock drizzle-orm
 jest.mock('drizzle-orm', () => ({
