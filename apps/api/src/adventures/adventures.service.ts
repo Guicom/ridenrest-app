@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import * as fs from 'node:fs/promises'
 import { AdventuresRepository } from './adventures.repository.js'
-import type { AdventureResponse } from '@ridenrest/shared'
+import type { AdventureResponse, AdventureMapResponse } from '@ridenrest/shared'
 import type { Adventure } from '@ridenrest/database'
 
 @Injectable()
@@ -36,6 +36,12 @@ export class AdventuresService {
   async renameAdventure(id: string, userId: string, name: string): Promise<AdventureResponse> {
     await this.verifyOwnership(id, userId)
     return this.toResponse(await this.adventuresRepo.updateName(id, name))
+  }
+
+  async getMapData(adventureId: string, userId: string): Promise<AdventureMapResponse> {
+    const data = await this.adventuresRepo.getAdventureMapData(adventureId, userId)
+    if (!data) throw new NotFoundException('Adventure not found')
+    return data
   }
 
   async deleteAdventure(id: string, userId: string): Promise<{ deleted: boolean }> {

@@ -29,6 +29,7 @@ import {
   renameSegment,
   deleteAdventure,
 } from '@/lib/api-client'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -43,21 +44,24 @@ import {
 } from '@/components/ui/alert-dialog'
 import { GpxUploadForm } from './gpx-upload-form'
 import { SortableSegmentCard } from './sortable-segment-card'
+import { StravaImportModal } from './strava-import-modal'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 interface Props {
   adventureId: string
+  stravaConnected?: boolean
 }
 
 export const shouldPoll = (segments: Pick<AdventureSegmentResponse, 'parseStatus'>[]) =>
   segments.some((s) => s.parseStatus === 'pending' || s.parseStatus === 'processing')
 
-export function AdventureDetail({ adventureId }: Props) {
+export function AdventureDetail({ adventureId, stravaConnected = false }: Props) {
   const queryClient = useQueryClient()
   const router = useRouter()
   const prevSegmentsRef = useRef<AdventureSegmentResponse[] | undefined>(undefined)
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [replacingSegmentId, setReplacingSegmentId] = useState<string | null>(null)
+  const [stravaImportOpen, setStravaImportOpen] = useState(false)
   const [isRenamingAdventure, setIsRenamingAdventure] = useState(false)
   const [adventureNameInput, setAdventureNameInput] = useState('')
   const [deleteAdventureDialogOpen, setDeleteAdventureDialogOpen] = useState(false)
@@ -292,6 +296,11 @@ export function AdventureDetail({ adventureId }: Props) {
             ? `${adventure.totalDistanceKm.toFixed(1)} km total`
             : 'Distance à calculer'}
         </p>
+        {segments.some((s) => s.parseStatus === 'done') && (
+          <Link href={`/map/${adventureId}`}>
+            <Button variant="outline" size="sm">Voir la carte</Button>
+          </Link>
+        )}
       </div>
 
       <AlertDialog open={deleteAdventureDialogOpen} onOpenChange={setDeleteAdventureDialogOpen}>
@@ -325,10 +334,17 @@ export function AdventureDetail({ adventureId }: Props) {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Segments</h2>
-          {segments.length > 0 && !showUploadForm && (
-            <Button variant="outline" size="sm" onClick={() => setShowUploadForm(true)}>
-              + Ajouter un segment
-            </Button>
+          {!showUploadForm && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setStravaImportOpen(true)}>
+                Importer depuis Strava
+              </Button>
+              {segments.length > 0 && (
+                <Button variant="outline" size="sm" onClick={() => setShowUploadForm(true)}>
+                  + Ajouter un segment
+                </Button>
+              )}
+            </div>
           )}
         </div>
         {segments.length === 0 ? (
@@ -364,6 +380,13 @@ export function AdventureDetail({ adventureId }: Props) {
           />
         </section>
       )}
+
+      <StravaImportModal
+        adventureId={adventureId}
+        open={stravaImportOpen}
+        onOpenChange={setStravaImportOpen}
+        stravaConnected={stravaConnected}
+      />
     </main>
   )
 }

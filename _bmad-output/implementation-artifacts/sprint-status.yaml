@@ -70,14 +70,14 @@ development_status:
   3-2-parse-status-polling-notification: done
   3-3-multi-segment-management-reorder-delete-replace: done
   3-4-adventure-segment-rename-and-delete: done
-  3-5-strava-activity-import-as-segment: backlog
+  3-5-strava-activity-import-as-segment: done
   epic-3-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
   # Epic 4: Interactive Map & POI Planning Mode
   # ─────────────────────────────────────────────────────────────
-  epic-4: backlog
-  4-1-gpx-trace-display-on-interactive-map: backlog
+  epic-4: in-progress
+  4-1-gpx-trace-display-on-interactive-map: done
   4-2-poi-layer-toggles-pin-display: backlog
   4-3-corridor-search-poi-discovery-by-km-range: backlog
   4-4-poi-detail-sheet-booking-deep-links: backlog

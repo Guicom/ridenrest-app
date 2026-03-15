@@ -79,6 +79,7 @@ const makeSeg = (overrides: Partial<AdventureSegmentResponse> = {}): AdventureSe
   elevationGainM: null,
   orderIndex: 0,
   cumulativeStartKm: 0,
+  source: null,
   boundingBox: null,
   createdAt: '2026-03-15T00:00:00.000Z',
   updatedAt: '2026-03-15T00:00:00.000Z',

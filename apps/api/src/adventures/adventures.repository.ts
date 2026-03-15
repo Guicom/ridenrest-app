@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common'
 import { db } from '@ridenrest/database'
 import { adventures, adventureSegments } from '@ridenrest/database'
 import type { Adventure, NewAdventure } from '@ridenrest/database'
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, asc } from 'drizzle-orm'
+import type { AdventureMapResponse, MapWaypoint, MapSegmentData } from '@ridenrest/shared'
 
 @Injectable()
 export class AdventuresRepository {
@@ -53,5 +54,35 @@ export class AdventuresRepository {
       .from(adventureSegments)
       .where(eq(adventureSegments.adventureId, adventureId))
     return rows.filter((r) => r.storageUrl).map((r) => r.storageUrl!)
+  }
+
+  async getAdventureMapData(adventureId: string, userId: string): Promise<AdventureMapResponse | null> {
+    const [adventure] = await db
+      .select()
+      .from(adventures)
+      .where(and(eq(adventures.id, adventureId), eq(adventures.userId, userId)))
+    if (!adventure) return null
+
+    const segments = await db
+      .select()
+      .from(adventureSegments)
+      .where(eq(adventureSegments.adventureId, adventureId))
+      .orderBy(asc(adventureSegments.orderIndex))
+
+    return {
+      adventureId: adventure.id,
+      adventureName: adventure.name,
+      totalDistanceKm: adventure.totalDistanceKm,
+      segments: segments.map((s) => ({
+        id: s.id,
+        name: s.name,
+        orderIndex: s.orderIndex,
+        cumulativeStartKm: s.cumulativeStartKm,
+        distanceKm: s.distanceKm,
+        parseStatus: s.parseStatus as MapSegmentData['parseStatus'],
+        waypoints: s.waypoints as MapWaypoint[] | null,
+        boundingBox: s.boundingBox as MapSegmentData['boundingBox'],
+      })),
+    }
   }
 }

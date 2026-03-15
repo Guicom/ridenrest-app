@@ -1,5 +1,5 @@
 // Types
-export type { AdventureResponse, AdventureSegmentResponse, AdventureStatus, ParseStatus } from './types/adventure.types'
+export type { AdventureResponse, AdventureSegmentResponse, AdventureStatus, ParseStatus, MapWaypoint, MapSegmentData, AdventureMapResponse } from './types/adventure.types'
 export type { Poi, PoiCategory } from './types/poi.types'
 export type { WeatherForecast, WeatherPoint } from './types/weather.types'
 export type { UserProfile, Tier, UnitPref, Currency } from './types/user.types'

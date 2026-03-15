@@ -26,6 +26,15 @@ export class AdventuresController {
     return this.adventuresService.listAdventures(user.id)
   }
 
+  @Get(':id/map')
+  @ApiOperation({ summary: 'Get map data (segments with waypoints) for an adventure' })
+  async getMapData(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.adventuresService.getMapData(id, user.id)
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a single adventure by id' })
   async findOne(
