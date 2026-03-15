@@ -30,16 +30,20 @@ const mockRedisClient = {
   expire: jest.fn(),
 }
 
+const mockGetClient = jest.fn().mockReturnValue(mockRedisClient)
+const mockCreateSegment = jest.fn()
+const mockVerifyOwnership = jest.fn()
+
 const mockRedisProvider = {
-  getClient: jest.fn().mockReturnValue(mockRedisClient),
+  getClient: mockGetClient,
 } as unknown as RedisProvider
 
 const mockSegmentsService = {
-  createSegment: jest.fn(),
+  createSegment: mockCreateSegment,
 } as unknown as SegmentsService
 
 const mockAdventuresService = {
-  verifyOwnership: jest.fn(),
+  verifyOwnership: mockVerifyOwnership,
 } as unknown as AdventuresService
 
 const service = new StravaService(
@@ -61,7 +65,7 @@ function mockDbSelectAccount(result: object[]) {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  ;(mockRedisProvider.getClient as jest.Mock).mockReturnValue(mockRedisClient)
+  mockGetClient.mockReturnValue(mockRedisClient)
 })
 
 describe('listRoutes', () => {
@@ -126,7 +130,7 @@ describe('listRoutes — cache MISS', () => {
 
 describe('importRoute', () => {
   it('3.4 — calls verifyOwnership, fetches GPX, calls createSegment, returns segment with source: strava', async () => {
-    ;(mockAdventuresService.verifyOwnership as jest.Mock).mockResolvedValue(undefined)
+    mockVerifyOwnership.mockResolvedValue(undefined)
     mockRedisClient.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(1)
     mockRedisClient.expire.mockResolvedValue(1)
 
@@ -154,12 +158,12 @@ describe('importRoute', () => {
       source: 'strava',
       parseStatus: 'pending',
     }
-    ;(mockSegmentsService.createSegment as jest.Mock).mockResolvedValue(expectedSegment)
+    mockCreateSegment.mockResolvedValue(expectedSegment)
 
     const result = await service.importRoute('user-1', '456', 'adv-1')
 
-    expect(mockAdventuresService.verifyOwnership).toHaveBeenCalledWith('adv-1', 'user-1')
-    expect(mockSegmentsService.createSegment).toHaveBeenCalledWith(
+    expect(mockVerifyOwnership).toHaveBeenCalledWith('adv-1', 'user-1')
+    expect(mockCreateSegment).toHaveBeenCalledWith(
       'adv-1', 'user-1',
       expect.objectContaining({ originalname: 'Transcantabrique.gpx', mimetype: 'application/gpx+xml' }),
       'Transcantabrique',
@@ -186,9 +190,7 @@ describe('checkAndIncrementRateLimit (via listRoutes)', () => {
     // 15min counter at 100 (at limit — should block per AC #4)
     mockRedisClient.incr.mockResolvedValueOnce(100)
 
-    await expect(service.listRoutes('user-1')).rejects.toThrow(
-      expect.objectContaining({ status: 429 }),
-    )
+    await expect(service.listRoutes('user-1')).rejects.toMatchObject({ status: 429 })
   })
 
   it('3.6 — throws 429 when daily counter >= 1000', async () => {
@@ -204,9 +206,7 @@ describe('checkAndIncrementRateLimit (via listRoutes)', () => {
     mockRedisClient.incr.mockResolvedValueOnce(1).mockResolvedValueOnce(1000)
     mockRedisClient.expire.mockResolvedValue(1)
 
-    await expect(service.listRoutes('user-1')).rejects.toThrow(
-      expect.objectContaining({ status: 429 }),
-    )
+    await expect(service.listRoutes('user-1')).rejects.toMatchObject({ status: 429 })
   })
 })
 
