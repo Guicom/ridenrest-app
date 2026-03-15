@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach, vi, waitFor } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { render, screen, cleanup, act, waitFor } from '@testing-library/react'
 import { MapCanvas } from './map-canvas'
 import type { MapSegmentData } from '@/lib/api-client'
 
