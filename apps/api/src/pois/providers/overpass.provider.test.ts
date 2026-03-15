@@ -28,7 +28,7 @@ describe('OverpassProvider', () => {
   it('builds correct bbox format in query (minLat,minLng,maxLat,maxLng)', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ elements: [] }),
+      json: () => Promise.resolve({ elements: [] }),
     })
 
     await provider.queryPois(bbox, ['hotel'])
@@ -46,7 +46,7 @@ describe('OverpassProvider', () => {
   it('includes both node and way queries for each category', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ elements: [] }),
+      json: () => Promise.resolve({ elements: [] }),
     })
 
     await provider.queryPois(bbox, ['restaurant'])
@@ -63,7 +63,7 @@ describe('OverpassProvider', () => {
     ]
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ elements: mockElements }),
+      json: () => Promise.resolve({ elements: mockElements }),
     })
 
     const result = await provider.queryPois(bbox, ['hotel'])

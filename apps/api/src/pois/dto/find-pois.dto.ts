@@ -20,7 +20,7 @@ export class FindPoisDto {
   toKm!: number
 
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: unknown }): unknown[] => (Array.isArray(value) ? (value as unknown[]) : [value]))
   @IsArray()
   @IsIn(POI_CATEGORIES, { each: true })
   categories?: PoiCategory[]
