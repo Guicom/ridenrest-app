@@ -7,7 +7,15 @@ jest.mock('@ridenrest/shared', () => ({
 
 import * as fsMock from 'node:fs/promises'
 import * as gpxMock from '@ridenrest/gpx'
+import type { Job } from 'bullmq'
 import { GpxParseProcessor } from './gpx-parse.processor.js'
+import type { SegmentsRepository } from '../segments.repository.js'
+import type { SegmentsService } from '../segments.service.js'
+
+interface ParseSegmentJobData {
+  segmentId: string
+  storageUrl: string
+}
 
 const mockSegmentsRepo = {
   findAdventureIdBySegmentId: jest.fn(),
@@ -20,9 +28,10 @@ const mockSegmentsService = {
   recomputeCumulativeDistances: jest.fn(),
 }
 
-const makeJob = (data: Record<string, unknown> = {}): any => ({
-  data: { segmentId: 'seg-1', storageUrl: '/data/gpx/seg-1.gpx', ...data },
-})
+const makeJob = (data: Partial<ParseSegmentJobData> = {}): Job<ParseSegmentJobData> =>
+  ({
+    data: { segmentId: 'seg-1', storageUrl: '/data/gpx/seg-1.gpx', ...data },
+  }) as unknown as Job<ParseSegmentJobData>
 
 const makeRawPoints = (withEle = true) => [
   { lat: 43.0, lng: -3.0, ...(withEle ? { elevM: 100 } : {}) },
@@ -40,30 +49,29 @@ describe('GpxParseProcessor', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     processor = new GpxParseProcessor(
-      mockSegmentsRepo as any,
-      mockSegmentsService as any,
+      mockSegmentsRepo as unknown as SegmentsRepository,
+      mockSegmentsService as unknown as SegmentsService,
     )
-    // Default happy-path mocks
     mockSegmentsRepo.findAdventureIdBySegmentId.mockResolvedValue('adv-1')
     mockSegmentsRepo.setProcessingStatus.mockResolvedValue(undefined)
     mockSegmentsRepo.updateAfterParse.mockResolvedValue(undefined)
     mockSegmentsRepo.updateParseError.mockResolvedValue(undefined)
     mockSegmentsService.recomputeCumulativeDistances.mockResolvedValue(undefined)
-    jest.mocked(fsMock.readFile).mockResolvedValue(Buffer.from('<gpx>valid</gpx>') as any)
-    jest.mocked(gpxMock.computeElevationGain).mockReturnValue(100)
-    jest.mocked(gpxMock.computeBoundingBox).mockReturnValue({
+    ;(fsMock.readFile as jest.Mock).mockResolvedValue(Buffer.from('<gpx>valid</gpx>'))
+    ;(gpxMock.computeElevationGain as jest.Mock).mockReturnValue(100)
+    ;(gpxMock.computeBoundingBox as jest.Mock).mockReturnValue({
       minLat: 43.0,
       maxLat: 43.1,
       minLng: -3.1,
       maxLng: -3.0,
     })
-    jest.mocked(gpxMock.rdpSimplify).mockImplementation((pts) => pts)
+    ;(gpxMock.rdpSimplify as jest.Mock).mockImplementation((pts: unknown) => pts)
   })
 
   describe('valid GPX with elevation data', () => {
     beforeEach(() => {
-      jest.mocked(gpxMock.parseGpx).mockReturnValue(makeRawPoints(true))
-      jest.mocked(gpxMock.computeCumulativeDistances).mockReturnValue(makeKmWaypoints(true))
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue(makeRawPoints(true))
+      ;(gpxMock.computeCumulativeDistances as jest.Mock).mockReturnValue(makeKmWaypoints(true))
     })
 
     it('sets processing status, updates segment as done, and recomputes distances', async () => {
@@ -85,45 +93,63 @@ describe('GpxParseProcessor', () => {
     it('stores waypoints with ele field when elevation data is present (AC #5)', async () => {
       await processor.process(makeJob())
 
-      const [, data] = mockSegmentsRepo.updateAfterParse.mock.calls[0]
-      expect(data.waypoints[0]).toEqual({ dist_km: 0, lat: 43.0, lng: -3.0, ele: 100 })
-      expect(data.waypoints[1]).toEqual({ dist_km: 12.5, lat: 43.1, lng: -3.1, ele: 200 })
+      expect(mockSegmentsRepo.updateAfterParse).toHaveBeenCalledWith(
+        'seg-1',
+        expect.objectContaining({
+          waypoints: [
+            { dist_km: 0, lat: 43.0, lng: -3.0, ele: 100 },
+            { dist_km: 12.5, lat: 43.1, lng: -3.1, ele: 200 },
+          ],
+        }),
+      )
     })
 
     it('builds WKT LINESTRING with lng lat order for PostGIS', async () => {
       await processor.process(makeJob())
 
-      const [, data] = mockSegmentsRepo.updateAfterParse.mock.calls[0]
-      expect(data.geomWkt).toBe('LINESTRING(-3 43, -3.1 43.1)')
+      expect(mockSegmentsRepo.updateAfterParse).toHaveBeenCalledWith(
+        'seg-1',
+        expect.objectContaining({
+          geomWkt: 'LINESTRING(-3 43, -3.1 43.1)',
+        }),
+      )
     })
   })
 
   describe('valid GPX without elevation data (AC #6)', () => {
     beforeEach(() => {
-      jest.mocked(gpxMock.parseGpx).mockReturnValue(makeRawPoints(false))
-      jest.mocked(gpxMock.computeCumulativeDistances).mockReturnValue(makeKmWaypoints(false))
-      jest.mocked(gpxMock.computeElevationGain).mockReturnValue(0)
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue(makeRawPoints(false))
+      ;(gpxMock.computeCumulativeDistances as jest.Mock).mockReturnValue(makeKmWaypoints(false))
+      ;(gpxMock.computeElevationGain as jest.Mock).mockReturnValue(0)
     })
 
     it('stores waypoints without ele field', async () => {
       await processor.process(makeJob())
 
-      const [, data] = mockSegmentsRepo.updateAfterParse.mock.calls[0]
-      expect(data.waypoints[0]).toEqual({ dist_km: 0, lat: 43.0, lng: -3.0 })
-      expect('ele' in data.waypoints[0]).toBe(false)
+      expect(mockSegmentsRepo.updateAfterParse).toHaveBeenCalledWith(
+        'seg-1',
+        expect.objectContaining({
+          waypoints: [
+            { dist_km: 0, lat: 43.0, lng: -3.0 },
+            { dist_km: 12.5, lat: 43.1, lng: -3.1 },
+          ],
+        }),
+      )
     })
 
     it('sets elevationGainM to null when no elevation gain', async () => {
       await processor.process(makeJob())
 
-      const [, data] = mockSegmentsRepo.updateAfterParse.mock.calls[0]
-      expect(data.elevationGainM).toBeNull()
+      expect(mockSegmentsRepo.updateAfterParse).toHaveBeenCalledWith(
+        'seg-1',
+        expect.objectContaining({ elevationGainM: null }),
+      )
     })
   })
 
   describe('malformed GPX (no track points) — AC #4', () => {
     beforeEach(() => {
-      jest.mocked(gpxMock.parseGpx).mockReturnValue([])
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue([])
     })
 
     it('calls updateParseError and re-throws to allow BullMQ retry', async () => {
@@ -152,24 +178,29 @@ describe('GpxParseProcessor', () => {
   describe('RDP simplification', () => {
     it('applies rdpSimplify when rawPoints exceed MAX_GPX_POINTS', async () => {
       const manyPoints = Array.from({ length: 2001 }, (_, i) => ({ lat: i * 0.001, lng: -3.0 }))
-      const simplifiedPoints = [{ lat: 0, lng: -3.0 }, { lat: 2.0, lng: -3.0 }]
-      jest.mocked(gpxMock.parseGpx).mockReturnValue(manyPoints)
-      jest.mocked(gpxMock.computeCumulativeDistances).mockReturnValue([
+      const simplifiedPoints = [
+        { lat: 0, lng: -3.0 },
+        { lat: 2.0, lng: -3.0 },
+      ]
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue(manyPoints)
+      ;(gpxMock.computeCumulativeDistances as jest.Mock).mockReturnValue([
         { km: 0, lat: 0, lng: -3.0 },
         { km: 222.0, lat: 2.0, lng: -3.0 },
       ])
-      jest.mocked(gpxMock.rdpSimplify).mockReturnValue(simplifiedPoints)
+      ;(gpxMock.rdpSimplify as jest.Mock).mockReturnValue(simplifiedPoints)
 
       await processor.process(makeJob())
 
       expect(gpxMock.rdpSimplify).toHaveBeenCalledWith(manyPoints, 0.0001)
-      const [, data] = mockSegmentsRepo.updateAfterParse.mock.calls[0]
-      expect(data.geomWkt).toBe('LINESTRING(-3 0, -3 2)')
+      expect(mockSegmentsRepo.updateAfterParse).toHaveBeenCalledWith(
+        'seg-1',
+        expect.objectContaining({ geomWkt: 'LINESTRING(-3 0, -3 2)' }),
+      )
     })
 
     it('skips rdpSimplify when rawPoints are within MAX_GPX_POINTS', async () => {
-      jest.mocked(gpxMock.parseGpx).mockReturnValue(makeRawPoints())
-      jest.mocked(gpxMock.computeCumulativeDistances).mockReturnValue(makeKmWaypoints())
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue(makeRawPoints())
+      ;(gpxMock.computeCumulativeDistances as jest.Mock).mockReturnValue(makeKmWaypoints())
 
       await processor.process(makeJob())
 
