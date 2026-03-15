@@ -46,7 +46,7 @@ export const auth = betterAuth({
           clientSecret: process.env.STRAVA_CLIENT_SECRET!,
           authorizationUrl: 'https://www.strava.com/oauth/authorize',
           tokenUrl: 'https://www.strava.com/oauth/token',
-          scopes: ['read', 'read_all'],
+          scopes: ['read,read_all'],  // Strava requires comma-separated scopes (not space)
           // Custom getUserInfo — Strava /athlete returns no email
           getUserInfo: async (tokens) => {
             const res = await fetch('https://www.strava.com/api/v3/athlete', {

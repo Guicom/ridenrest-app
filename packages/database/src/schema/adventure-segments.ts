@@ -19,6 +19,7 @@ export const adventureSegments = pgTable('adventure_segments', {
   distanceKm: real('distance_km').notNull().default(0),
   elevationGainM: real('elevation_gain_m'),
   storageUrl: text('storage_url'),
+  source: text('source'),  // null = manual upload, 'strava' = Strava route import
   parseStatus: parseStatusEnum('parse_status').notNull().default('pending'),
   geom: geometry('geom'),
   waypoints: jsonb('waypoints'),

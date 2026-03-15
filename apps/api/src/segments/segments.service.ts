@@ -29,6 +29,7 @@ export class SegmentsService {
     userId: string,
     file: Express.Multer.File,
     name?: string,
+    source?: string,
   ): Promise<AdventureSegmentResponse> {
     // Verify adventure ownership
     await this.adventuresService.verifyOwnership(adventureId, userId)
@@ -68,6 +69,7 @@ export class SegmentsService {
         cumulativeStartKm: 0,
         parseStatus: 'pending',
         storageUrl,
+        source: source ?? null,
       })
     } catch {
       await fs.unlink(storageUrl).catch(() => undefined)
@@ -165,6 +167,7 @@ export class SegmentsService {
       distanceKm: s.distanceKm,
       elevationGainM: s.elevationGainM ?? null,
       parseStatus: s.parseStatus,
+      source: s.source ?? null,
       boundingBox: (s.boundingBox as AdventureSegmentResponse['boundingBox']) ?? null,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
