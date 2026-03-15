@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import type { Queue } from 'bullmq'
@@ -88,12 +89,54 @@ export class SegmentsService {
     return rows.map((s) => this.toResponse(s))
   }
 
+  async reorderSegments(
+    adventureId: string,
+    userId: string,
+    orderedIds: string[],
+  ): Promise<AdventureSegmentResponse[]> {
+    await this.adventuresService.verifyOwnership(adventureId, userId)
+
+    const existing = await this.segmentsRepo.findAllByAdventureId(adventureId)
+    const existingIds = new Set(existing.map((s) => s.id))
+
+    if (
+      orderedIds.length !== existing.length ||
+      new Set(orderedIds).size !== orderedIds.length ||
+      orderedIds.some((id) => !existingIds.has(id))
+    ) {
+      throw new BadRequestException('orderedIds must match exactly all segment IDs for this adventure')
+    }
+
+    const updates = orderedIds.map((id, index) => ({ id, orderIndex: index }))
+    await this.segmentsRepo.updateOrderIndexes(updates)
+    await this.recomputeCumulativeDistances(adventureId)
+
+    return this.listSegments(adventureId, userId)
+  }
+
+  async deleteSegment(
+    adventureId: string,
+    segmentId: string,
+    userId: string,
+  ): Promise<{ deleted: boolean }> {
+    const segment = await this.segmentsRepo.findByIdAndUserId(segmentId, userId)
+    if (!segment || segment.adventureId !== adventureId) throw new NotFoundException('Segment not found')
+
+    await this.segmentsRepo.delete(segmentId)
+    if (segment.storageUrl) {
+      await fs.unlink(segment.storageUrl).catch(() => undefined)
+    }
+    await this.recomputeCumulativeDistances(adventureId)
+
+    return { deleted: true }
+  }
+
   async recomputeCumulativeDistances(adventureId: string): Promise<void> {
     const segments = await this.segmentsRepo.findAllByAdventureId(adventureId)
     let cumulative = 0
     const updates = segments.map((seg) => {
       const result = { id: seg.id, cumulativeStartKm: cumulative }
-      cumulative += seg.distanceKm
+      cumulative += seg.distanceKm ?? 0
       return result
     })
     await this.segmentsRepo.updateCumulativeDistances(updates)

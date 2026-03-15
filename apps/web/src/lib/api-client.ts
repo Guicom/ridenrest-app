@@ -102,6 +102,22 @@ export async function createSegment(
   })
 }
 
+export async function reorderSegments(
+  adventureId: string,
+  orderedIds: string[],
+): Promise<AdventureSegmentResponse[]> {
+  return apiFetch<AdventureSegmentResponse[]>(`/api/adventures/${adventureId}/segments/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ orderedIds }),
+  })
+}
+
+export async function deleteSegment(adventureId: string, segmentId: string): Promise<void> {
+  await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}/segments/${segmentId}`, {
+    method: 'DELETE',
+  })
+}
+
 export const apiClient = {
   get: <T>(path: string, init?: RequestInit) =>
     apiFetch<T>(path, { ...init, method: 'GET' }),

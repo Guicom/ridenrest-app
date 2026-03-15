@@ -89,6 +89,22 @@ export class SegmentsRepository {
       .where(eq(adventureSegments.id, segmentId))
   }
 
+  async updateOrderIndexes(updates: Array<{ id: string; orderIndex: number }>): Promise<void> {
+    if (updates.length === 0) return
+    await Promise.all(
+      updates.map(({ id, orderIndex }) =>
+        db
+          .update(adventureSegments)
+          .set({ orderIndex, updatedAt: new Date() })
+          .where(eq(adventureSegments.id, id)),
+      ),
+    )
+  }
+
+  async delete(segmentId: string): Promise<void> {
+    await db.delete(adventureSegments).where(eq(adventureSegments.id, segmentId))
+  }
+
   async updateCumulativeDistances(
     updates: Array<{ id: string; cumulativeStartKm: number }>,
   ): Promise<void> {

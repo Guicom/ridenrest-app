@@ -1,17 +1,38 @@
 'use client'
-import { AlertCircle, MapPin } from 'lucide-react'
+import { useState } from 'react'
+import { AlertCircle, MapPin, MoreHorizontal } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 export interface SegmentCardProps {
   segment: AdventureSegmentResponse
   onRetry: () => void
+  onDelete?: () => void
+  onReplace?: () => void
+  isDeleting?: boolean
 }
 
-export function SegmentCard({ segment, onRetry }: SegmentCardProps) {
+export function SegmentCard({ segment, onRetry, onDelete, onReplace, isDeleting }: SegmentCardProps) {
   const { parseStatus, name, distanceKm, elevationGainM } = segment
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   if (parseStatus === 'pending' || parseStatus === 'processing') {
     return (
@@ -35,9 +56,16 @@ export function SegmentCard({ segment, onRetry }: SegmentCardProps) {
         <p className="text-xs text-destructive">
           Parsing échoué — vérifiez le format du fichier GPX
         </p>
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          Réessayer
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Réessayer
+          </Button>
+          {onDelete && (
+            <Button variant="outline" size="sm" onClick={onDelete} disabled={isDeleting}>
+              Supprimer
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
@@ -50,7 +78,55 @@ export function SegmentCard({ segment, onRetry }: SegmentCardProps) {
     <div className="rounded-lg border p-4 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{name ?? 'Segment sans nom'}</span>
-        <Badge variant="secondary">Analysé</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">Analysé</Badge>
+          {(onDelete || onReplace) && (
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  aria-label="Options du segment"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onReplace && (
+                    <DropdownMenuItem onClick={onReplace}>
+                      Remplacer
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <DropdownMenuItem onClick={() => setShowDeleteDialog(true)}>
+                      Supprimer
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {onDelete && (
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Supprimer &ldquo;{name ?? 'ce segment'}&rdquo; ?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Cette action est irréversible. Le fichier GPX sera définitivement supprimé.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={onDelete}
+                        disabled={isDeleting}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isDeleting ? 'Suppression...' : 'Supprimer'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </>
+          )}
+        </div>
       </div>
       <div className="flex gap-4 text-xs text-muted-foreground">
         <span>{distanceLabel}</span>

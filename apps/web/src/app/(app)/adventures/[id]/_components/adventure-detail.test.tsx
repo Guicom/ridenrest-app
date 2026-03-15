@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, act, screen, waitFor, cleanup } from '@testing-library/react'
+import { render, act, screen, waitFor, cleanup, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as apiClient from '@/lib/api-client'
 import { AdventureDetail } from './adventure-detail'
@@ -13,10 +13,54 @@ const { toastSuccess, toastError } = vi.hoisted(() => ({
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
 vi.mock('@/lib/api-client')
 vi.mock('./gpx-upload-form', () => ({ GpxUploadForm: () => null }))
+vi.mock('./sortable-segment-card', () => ({
+  SortableSegmentCard: ({ segment }: { segment: { id: string } }) => (
+    <div data-testid={`seg-${segment.id}`} />
+  ),
+}))
+// Keep segment-card mock for direct uses
 vi.mock('./segment-card', () => ({
   SegmentCard: ({ segment }: { segment: { id: string } }) => (
     <div data-testid={`seg-${segment.id}`} />
   ),
+}))
+// Mock dnd-kit — expose a simulate-drag-end button to trigger onDragEnd in tests
+vi.mock('@dnd-kit/core', () => ({
+  DndContext: ({
+    children,
+    onDragEnd,
+  }: {
+    children: React.ReactNode
+    onDragEnd?: (e: { active: { id: string }; over: { id: string } | null }) => void
+  }) => (
+    <>
+      {children}
+      <button
+        data-testid="simulate-drag-end"
+        onClick={() =>
+          onDragEnd?.({ active: { id: 'seg-1' }, over: { id: 'seg-2' } })
+        }
+      >
+        Simulate Reorder
+      </button>
+    </>
+  ),
+  closestCenter: vi.fn(),
+  KeyboardSensor: vi.fn(),
+  PointerSensor: vi.fn(),
+  useSensor: vi.fn(),
+  useSensors: vi.fn(() => []),
+}))
+vi.mock('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  sortableKeyboardCoordinates: vi.fn(),
+  verticalListSortingStrategy: vi.fn(),
+  arrayMove: vi.fn((arr: unknown[], from: number, to: number) => {
+    const result = [...arr]
+    const [item] = result.splice(from, 1)
+    result.splice(to, 0, item)
+    return result
+  }),
 }))
 
 afterEach(() => {
@@ -29,7 +73,7 @@ const makeSeg = (overrides: Partial<AdventureSegmentResponse> = {}): AdventureSe
   adventureId: 'adv-1',
   name: 'Étape 1',
   parseStatus: 'pending',
-  distanceKm: null,
+  distanceKm: 0,
   elevationGainM: null,
   orderIndex: 0,
   cumulativeStartKm: 0,
@@ -121,6 +165,35 @@ describe('AdventureDetail — parse status transition detection', () => {
 
     expect(toastSuccess).not.toHaveBeenCalled()
     expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it('optimistic reorder is rolled back and shows error toast when mutation fails', async () => {
+    const seg1 = makeSeg({ id: 'seg-1', parseStatus: 'done', distanceKm: 10, orderIndex: 0 })
+    const seg2 = makeSeg({ id: 'seg-2', parseStatus: 'done', distanceKm: 20, orderIndex: 1 })
+
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([seg1, seg2])
+    vi.spyOn(apiClient, 'reorderSegments').mockRejectedValue(new Error('Network error'))
+
+    renderDetail()
+
+    // Wait for both segments to be rendered
+    await waitFor(() => {
+      expect(screen.getByTestId('seg-seg-1')).toBeInTheDocument()
+      expect(screen.getByTestId('seg-seg-2')).toBeInTheDocument()
+    })
+
+    // Trigger drag end via the mock button (simulates dragging seg-1 over seg-2)
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('simulate-drag-end'))
+    })
+
+    // reorderSegments should have been called
+    expect(apiClient.reorderSegments).toHaveBeenCalled()
+
+    // After rejection, error toast should be shown
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith('Erreur lors du réordonnancement'),
+    )
   })
 
   it('fires toast for new segment that arrives already done (fast processing)', async () => {

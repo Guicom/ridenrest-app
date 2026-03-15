@@ -64,4 +64,61 @@ describe('SegmentCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /réessayer/i }))
     expect(onRetry).toHaveBeenCalledOnce()
   })
+
+  it('does not render action menu in pending/processing state', () => {
+    const { container: c1 } = render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'pending' })} onRetry={vi.fn()} onDelete={vi.fn()} onReplace={vi.fn()} />,
+    )
+    expect(c1.querySelector('[aria-label="Options du segment"]')).toBeNull()
+    cleanup()
+
+    const { container: c2 } = render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'processing' })} onRetry={vi.fn()} onDelete={vi.fn()} onReplace={vi.fn()} />,
+    )
+    expect(c2.querySelector('[aria-label="Options du segment"]')).toBeNull()
+  })
+
+  it('calls onDelete when Supprimer clicked in error state', () => {
+    const onDelete = vi.fn()
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'error' })} onRetry={vi.fn()} onDelete={onDelete} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /supprimer/i }))
+    expect(onDelete).toHaveBeenCalledOnce()
+  })
+
+  it('calls onReplace when Remplacer clicked in done state', () => {
+    const onReplace = vi.fn()
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} onDelete={vi.fn()} onReplace={onReplace} />,
+    )
+    // Open the dropdown menu
+    fireEvent.click(screen.getByRole('button', { name: /options du segment/i }))
+    fireEvent.click(screen.getByText('Remplacer'))
+    expect(onReplace).toHaveBeenCalledOnce()
+  })
+
+  it('calls onDelete after confirming deletion dialog in done state', () => {
+    const onDelete = vi.fn()
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} onDelete={onDelete} onReplace={vi.fn()} />,
+    )
+    // Open dropdown → click Supprimer → AlertDialog opens
+    fireEvent.click(screen.getByRole('button', { name: /options du segment/i }))
+    fireEvent.click(screen.getByText('Supprimer'))
+    // Confirm in dialog
+    fireEvent.click(screen.getByRole('button', { name: /^supprimer$/i }))
+    expect(onDelete).toHaveBeenCalledOnce()
+  })
+
+  it('does NOT call onDelete when dialog is cancelled in done state', () => {
+    const onDelete = vi.fn()
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} onDelete={onDelete} onReplace={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /options du segment/i }))
+    fireEvent.click(screen.getByText('Supprimer'))
+    fireEvent.click(screen.getByRole('button', { name: /annuler/i }))
+    expect(onDelete).not.toHaveBeenCalled()
+  })
 })

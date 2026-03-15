@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Param,
   Body,
   UseInterceptors,
@@ -12,6 +14,7 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger'
 import { SegmentsService } from './segments.service.js'
 import { CreateSegmentDto } from './dto/create-segment.dto.js'
+import { ReorderSegmentsDto } from './dto/reorder-segments.dto.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator.js'
 
@@ -42,6 +45,26 @@ export class SegmentsController {
   ) {
     if (!file) throw new BadRequestException('GPX file is required')
     return this.segmentsService.createSegment(adventureId, user.id, file, dto.name)
+  }
+
+  @Patch('reorder')
+  @ApiOperation({ summary: 'Reorder segments for an adventure' })
+  async reorder(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('adventureId') adventureId: string,
+    @Body() dto: ReorderSegmentsDto,
+  ) {
+    return this.segmentsService.reorderSegments(adventureId, user.id, dto.orderedIds)
+  }
+
+  @Delete(':segmentId')
+  @ApiOperation({ summary: 'Delete a segment and its GPX file' })
+  async remove(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('adventureId') adventureId: string,
+    @Param('segmentId') segmentId: string,
+  ) {
+    return this.segmentsService.deleteSegment(adventureId, segmentId, user.id)
   }
 
   @Get()
