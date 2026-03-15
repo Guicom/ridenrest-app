@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { AlertCircle, MapPin, MoreHorizontal } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -27,12 +27,16 @@ export interface SegmentCardProps {
   onRetry: () => void
   onDelete?: () => void
   onReplace?: () => void
+  onRename?: (name: string) => void
   isDeleting?: boolean
 }
 
-export function SegmentCard({ segment, onRetry, onDelete, onReplace, isDeleting }: SegmentCardProps) {
+export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, isDeleting }: SegmentCardProps) {
   const { parseStatus, name, distanceKm, elevationGainM } = segment
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const renameSubmittedRef = useRef(false)
 
   if (parseStatus === 'pending' || parseStatus === 'processing') {
     return (
@@ -77,10 +81,34 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, isDeleting 
   return (
     <div className="rounded-lg border p-4 space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{name ?? 'Segment sans nom'}</span>
+        {isRenaming ? (
+          <input
+            className="font-medium text-sm bg-transparent border-b border-primary outline-none"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && nameInput.trim()) {
+                renameSubmittedRef.current = true
+                onRename?.(nameInput.trim())
+                setIsRenaming(false)
+              }
+              if (e.key === 'Escape') setIsRenaming(false)
+            }}
+            onBlur={() => {
+              if (!renameSubmittedRef.current && nameInput.trim() && nameInput.trim() !== segment.name) {
+                onRename?.(nameInput.trim())
+              }
+              renameSubmittedRef.current = false
+              setIsRenaming(false)
+            }}
+            autoFocus
+          />
+        ) : (
+          <p className="font-medium text-sm">{name ?? 'Segment sans nom'}</p>
+        )}
         <div className="flex items-center gap-2">
           <Badge variant="secondary">Analysé</Badge>
-          {(onDelete || onReplace) && (
+          {(onDelete || onReplace || onRename) && (
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -90,6 +118,16 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, isDeleting 
                   <MoreHorizontal className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {onRename && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setNameInput(segment.name ?? '')
+                        setIsRenaming(true)
+                      }}
+                    >
+                      Renommer
+                    </DropdownMenuItem>
+                  )}
                   {onReplace && (
                     <DropdownMenuItem onClick={onReplace}>
                       Remplacer

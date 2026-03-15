@@ -5,6 +5,8 @@ import * as apiClient from '@/lib/api-client'
 import { AdventureDetail } from './adventure-detail'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+
 const { toastSuccess, toastError } = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -216,5 +218,73 @@ describe('AdventureDetail — parse status transition detection', () => {
     await waitFor(() =>
       expect(toastSuccess).toHaveBeenCalledWith('Segment "Étape 2" analysé avec succès !'),
     )
+  })
+})
+
+describe('AdventureDetail — adventure rename', () => {
+  it('clicking the adventure title enters rename mode (shows input)', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByTitle('Cliquer pour renommer'))
+    expect(screen.getByDisplayValue('Tour test')).toBeInTheDocument()
+  })
+
+  it('pressing Escape cancels rename and restores title display', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByTitle('Cliquer pour renommer'))
+    const input = screen.getByDisplayValue('Tour test')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByDisplayValue('Tour test')).toBeNull()
+    expect(screen.getByText('Tour test')).toBeInTheDocument()
+  })
+
+  it('successful rename mutation invalidates queries and shows success toast', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    vi.spyOn(apiClient, 'renameAdventure').mockResolvedValue({
+      id: 'adv-1',
+      name: 'Nouveau nom',
+      totalDistanceKm: 0,
+    } as Awaited<ReturnType<typeof apiClient.renameAdventure>>)
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByTitle('Cliquer pour renommer'))
+    const input = screen.getByDisplayValue('Tour test')
+    fireEvent.change(input, { target: { value: 'Nouveau nom' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(apiClient.renameAdventure).toHaveBeenCalledWith('adv-1', 'Nouveau nom'))
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Aventure renommée'))
+  })
+})
+
+describe('AdventureDetail — delete adventure', () => {
+  it('dialog appears when trash button is clicked', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByTitle("Supprimer l'aventure"))
+    expect(screen.getByText(/supprimer définitivement/i)).toBeInTheDocument()
+  })
+
+  it('confirm button is disabled until adventure name is typed correctly', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByTitle("Supprimer l'aventure"))
+
+    const confirmBtn = screen.getByRole('button', { name: /supprimer définitivement/i })
+    expect(confirmBtn).toBeDisabled()
+
+    const input = screen.getByPlaceholderText('Tour test')
+    fireEvent.change(input, { target: { value: 'Tour test' } })
+    expect(confirmBtn).not.toBeDisabled()
   })
 })

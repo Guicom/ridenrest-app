@@ -21,6 +21,7 @@ const mockSegmentsRepo = {
   updateCumulativeDistances: jest.fn(),
   updateOrderIndexes: jest.fn(),
   delete: jest.fn(),
+  updateName: jest.fn(),
 }
 
 const mockAdventuresService = {
@@ -149,6 +150,37 @@ describe('deleteSegment', () => {
       service.deleteSegment('adv-OTHER', 'seg-1', 'user-1'),
     ).rejects.toThrow('Segment not found')
     expect(mockSegmentsRepo.delete).not.toHaveBeenCalled()
+  })
+})
+
+describe('renameSegment', () => {
+  it('calls findByIdAndUserId and updateName, returns updated AdventureSegmentResponse', async () => {
+    const seg = makeSegment('seg-1', 100, 0)
+    mockSegmentsRepo.findByIdAndUserId.mockResolvedValue(seg)
+    mockSegmentsRepo.updateName.mockResolvedValue({ ...seg, name: 'New Name' })
+
+    const result = await service.renameSegment('adv-1', 'seg-1', 'user-1', 'New Name')
+
+    expect(mockSegmentsRepo.findByIdAndUserId).toHaveBeenCalledWith('seg-1', 'user-1')
+    expect(mockSegmentsRepo.updateName).toHaveBeenCalledWith('seg-1', 'New Name')
+    expect(result.name).toBe('New Name')
+  })
+
+  it('throws NotFoundException when segment not found', async () => {
+    mockSegmentsRepo.findByIdAndUserId.mockResolvedValue(null)
+
+    await expect(service.renameSegment('adv-1', 'seg-1', 'user-1', 'New Name')).rejects.toThrow('Segment not found')
+    expect(mockSegmentsRepo.updateName).not.toHaveBeenCalled()
+  })
+
+  it('throws BadRequestException when adventureId does not match segment.adventureId', async () => {
+    const seg = makeSegment('seg-1', 100, 0) // adventureId: 'adv-1'
+    mockSegmentsRepo.findByIdAndUserId.mockResolvedValue(seg)
+
+    await expect(
+      service.renameSegment('adv-OTHER', 'seg-1', 'user-1', 'New Name'),
+    ).rejects.toThrow('Segment does not belong to this adventure')
+    expect(mockSegmentsRepo.updateName).not.toHaveBeenCalled()
   })
 })
 

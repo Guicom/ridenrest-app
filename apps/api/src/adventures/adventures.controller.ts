@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { AdventuresService } from './adventures.service.js'
 import { CreateAdventureDto } from './dto/create-adventure.dto.js'
+import { RenameAdventureDto } from './dto/rename-adventure.dto.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator.js'
 
@@ -32,5 +33,24 @@ export class AdventuresController {
     @Param('id') id: string,
   ) {
     return this.adventuresService.getAdventure(id, user.id)
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Rename an adventure' })
+  async rename(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+    @Body() dto: RenameAdventureDto,
+  ) {
+    return this.adventuresService.renameAdventure(id, user.id, dto.name)
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete an adventure and all its segments' })
+  async remove(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id') id: string,
+  ) {
+    return this.adventuresService.deleteAdventure(id, user.id)
   }
 }

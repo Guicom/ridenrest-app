@@ -131,6 +131,18 @@ export class SegmentsService {
     return { deleted: true }
   }
 
+  async renameSegment(
+    adventureId: string,
+    segmentId: string,
+    userId: string,
+    name: string,
+  ): Promise<AdventureSegmentResponse> {
+    const segment = await this.segmentsRepo.findByIdAndUserId(segmentId, userId)
+    if (!segment) throw new NotFoundException('Segment not found')
+    if (segment.adventureId !== adventureId) throw new BadRequestException('Segment does not belong to this adventure')
+    return this.toResponse(await this.segmentsRepo.updateName(segmentId, name))
+  }
+
   async recomputeCumulativeDistances(adventureId: string): Promise<void> {
     const segments = await this.segmentsRepo.findAllByAdventureId(adventureId)
     let cumulative = 0

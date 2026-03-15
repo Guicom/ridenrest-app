@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger'
 import { SegmentsService } from './segments.service.js'
 import { CreateSegmentDto } from './dto/create-segment.dto.js'
 import { ReorderSegmentsDto } from './dto/reorder-segments.dto.js'
+import { RenameSegmentDto } from './dto/rename-segment.dto.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator.js'
 
@@ -55,6 +56,17 @@ export class SegmentsController {
     @Body() dto: ReorderSegmentsDto,
   ) {
     return this.segmentsService.reorderSegments(adventureId, user.id, dto.orderedIds)
+  }
+
+  @Patch(':segmentId')
+  @ApiOperation({ summary: 'Rename a segment' })
+  async rename(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('adventureId') adventureId: string,
+    @Param('segmentId') segmentId: string,
+    @Body() dto: RenameSegmentDto,
+  ) {
+    return this.segmentsService.renameSegment(adventureId, segmentId, user.id, dto.name)
   }
 
   @Delete(':segmentId')

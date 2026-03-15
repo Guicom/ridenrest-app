@@ -118,6 +118,30 @@ export async function deleteSegment(adventureId: string, segmentId: string): Pro
   })
 }
 
+export async function renameAdventure(adventureId: string, name: string): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${adventureId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function renameSegment(
+  adventureId: string,
+  segmentId: string,
+  name: string,
+): Promise<AdventureSegmentResponse> {
+  return apiFetch<AdventureSegmentResponse>(`/api/adventures/${adventureId}/segments/${segmentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function deleteAdventure(adventureId: string): Promise<void> {
+  await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}`, {
+    method: 'DELETE',
+  })
+}
+
 export const apiClient = {
   get: <T>(path: string, init?: RequestInit) =>
     apiFetch<T>(path, { ...init, method: 'GET' }),

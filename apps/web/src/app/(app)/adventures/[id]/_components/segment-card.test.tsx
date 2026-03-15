@@ -121,4 +121,40 @@ describe('SegmentCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /annuler/i }))
     expect(onDelete).not.toHaveBeenCalled()
   })
+
+  it('"Renommer" item in DropdownMenu triggers rename mode (shows inline input)', () => {
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} onRename={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /options du segment/i }))
+    fireEvent.click(screen.getByText('Renommer'))
+    expect(screen.getByDisplayValue('Étape 1')).toBeInTheDocument()
+  })
+
+  it('Enter key submits rename and calls onRename prop', () => {
+    const onRename = vi.fn()
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} onRename={onRename} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /options du segment/i }))
+    fireEvent.click(screen.getByText('Renommer'))
+    const input = screen.getByDisplayValue('Étape 1')
+    fireEvent.change(input, { target: { value: 'Nouveau nom' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onRename).toHaveBeenCalledWith('Nouveau nom')
+  })
+
+  it('Escape cancels rename and restores original display', () => {
+    const onRename = vi.fn()
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} onRename={onRename} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /options du segment/i }))
+    fireEvent.click(screen.getByText('Renommer'))
+    const input = screen.getByDisplayValue('Étape 1')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(onRename).not.toHaveBeenCalled()
+    expect(screen.queryByDisplayValue('Étape 1')).toBeNull()
+    expect(screen.getByText('Étape 1')).toBeInTheDocument()
+  })
 })

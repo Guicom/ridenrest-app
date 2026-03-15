@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import * as fs from 'node:fs/promises'
 import { AdventuresRepository } from './adventures.repository.js'
 import type { AdventureResponse } from '@ridenrest/shared'
 import type { Adventure } from '@ridenrest/database'
@@ -30,6 +31,19 @@ export class AdventuresService {
 
   async updateTotalDistance(id: string, totalDistanceKm: number): Promise<void> {
     await this.adventuresRepo.updateTotalDistance(id, totalDistanceKm)
+  }
+
+  async renameAdventure(id: string, userId: string, name: string): Promise<AdventureResponse> {
+    await this.verifyOwnership(id, userId)
+    return this.toResponse(await this.adventuresRepo.updateName(id, name))
+  }
+
+  async deleteAdventure(id: string, userId: string): Promise<{ deleted: boolean }> {
+    await this.verifyOwnership(id, userId)
+    const storageUrls = await this.adventuresRepo.findSegmentStorageUrlsByAdventureId(id)
+    await this.adventuresRepo.deleteById(id)
+    await Promise.allSettled(storageUrls.map((url) => fs.unlink(url).catch(() => undefined)))
+    return { deleted: true }
   }
 
   private toResponse(a: Adventure): AdventureResponse {

@@ -105,6 +105,15 @@ export class SegmentsRepository {
     await db.delete(adventureSegments).where(eq(adventureSegments.id, segmentId))
   }
 
+  async updateName(segmentId: string, name: string): Promise<AdventureSegment> {
+    const [row] = await db
+      .update(adventureSegments)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(adventureSegments.id, segmentId))
+      .returning()
+    return row as AdventureSegment
+  }
+
   async updateCumulativeDistances(
     updates: Array<{ id: string; cumulativeStartKm: number }>,
   ): Promise<void> {

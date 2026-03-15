@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { db } from '@ridenrest/database'
-import { adventures } from '@ridenrest/database'
+import { adventures, adventureSegments } from '@ridenrest/database'
 import type { Adventure, NewAdventure } from '@ridenrest/database'
 import { eq, and, desc } from 'drizzle-orm'
 
@@ -32,5 +32,26 @@ export class AdventuresRepository {
       .update(adventures)
       .set({ totalDistanceKm, updatedAt: new Date() })
       .where(eq(adventures.id, id))
+  }
+
+  async updateName(id: string, name: string): Promise<Adventure> {
+    const [row] = await db
+      .update(adventures)
+      .set({ name, updatedAt: new Date() })
+      .where(eq(adventures.id, id))
+      .returning()
+    return row as Adventure
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await db.delete(adventures).where(eq(adventures.id, id))
+  }
+
+  async findSegmentStorageUrlsByAdventureId(adventureId: string): Promise<string[]> {
+    const rows = await db
+      .select({ storageUrl: adventureSegments.storageUrl })
+      .from(adventureSegments)
+      .where(eq(adventureSegments.adventureId, adventureId))
+    return rows.filter((r) => r.storageUrl).map((r) => r.storageUrl!)
   }
 }

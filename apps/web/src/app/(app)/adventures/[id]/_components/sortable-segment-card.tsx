@@ -9,10 +9,11 @@ interface SortableSegmentCardProps {
   segment: AdventureSegmentResponse
   onDelete: () => void
   onReplace: () => void
+  onRename?: (name: string) => void
   isDeleting?: boolean
 }
 
-export function SortableSegmentCard({ segment, onDelete, onReplace, isDeleting }: SortableSegmentCardProps) {
+export function SortableSegmentCard({ segment, onDelete, onReplace, onRename, isDeleting }: SortableSegmentCardProps) {
   const {
     attributes,
     listeners,
@@ -39,7 +40,7 @@ export function SortableSegmentCard({ segment, onDelete, onReplace, isDeleting }
         <GripVertical className="h-4 w-4" />
       </button>
       <div className="flex-1">
-        <SegmentCard segment={segment} onDelete={onDelete} onReplace={onReplace} onRetry={onReplace} isDeleting={isDeleting} />
+        <SegmentCard segment={segment} onDelete={onDelete} onReplace={onReplace} onRename={onRename} onRetry={onReplace} isDeleting={isDeleting} />
       </div>
     </div>
   )

@@ -1,8 +1,10 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { Trash2 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -18,8 +20,27 @@ import {
   verticalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable'
-import { getAdventure, listSegments, reorderSegments, deleteSegment } from '@/lib/api-client'
+import {
+  getAdventure,
+  listSegments,
+  reorderSegments,
+  deleteSegment,
+  renameAdventure,
+  renameSegment,
+  deleteAdventure,
+} from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { GpxUploadForm } from './gpx-upload-form'
 import { SortableSegmentCard } from './sortable-segment-card'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
@@ -33,9 +54,14 @@ export const shouldPoll = (segments: Pick<AdventureSegmentResponse, 'parseStatus
 
 export function AdventureDetail({ adventureId }: Props) {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const prevSegmentsRef = useRef<AdventureSegmentResponse[] | undefined>(undefined)
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [replacingSegmentId, setReplacingSegmentId] = useState<string | null>(null)
+  const [isRenamingAdventure, setIsRenamingAdventure] = useState(false)
+  const [adventureNameInput, setAdventureNameInput] = useState('')
+  const [deleteAdventureDialogOpen, setDeleteAdventureDialogOpen] = useState(false)
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
 
   const segmentsQueryKey = ['adventures', adventureId, 'segments'] as const
 
@@ -103,6 +129,40 @@ export function AdventureDetail({ adventureId }: Props) {
       }
     },
     onError: () => toast.error('Erreur lors de la suppression'),
+  })
+
+  const renameAdventureMutation = useMutation({
+    mutationFn: (name: string) => renameAdventure(adventureId, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
+      queryClient.invalidateQueries({ queryKey: ['adventures'] })
+      setIsRenamingAdventure(false)
+      toast.success('Aventure renommée')
+    },
+    onError: () => {
+      setIsRenamingAdventure(false)
+      toast.error('Erreur lors du renommage')
+    },
+  })
+
+  const deleteAdventureMutation = useMutation({
+    mutationFn: () => deleteAdventure(adventureId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ['adventures', adventureId] })
+      queryClient.invalidateQueries({ queryKey: ['adventures'] })
+      router.push('/adventures')
+    },
+    onError: () => toast.error("Erreur lors de la suppression de l'aventure"),
+  })
+
+  const renameSegmentMutation = useMutation({
+    mutationFn: ({ segmentId, name }: { segmentId: string; name: string }) =>
+      renameSegment(adventureId, segmentId, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: segmentsQueryKey })
+      toast.success('Segment renommé')
+    },
+    onError: () => toast.error('Erreur lors du renommage du segment'),
   })
 
   function handleDragEnd(event: DragEndEvent) {
@@ -182,13 +242,85 @@ export function AdventureDetail({ adventureId }: Props) {
   return (
     <main className="container mx-auto max-w-4xl p-4 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{adventure.name}</h1>
+        <div className="flex items-center gap-2">
+          {isRenamingAdventure ? (
+            <input
+              className="text-2xl font-bold bg-transparent border-b border-primary outline-none w-full"
+              value={adventureNameInput}
+              onChange={(e) => setAdventureNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && adventureNameInput.trim()) {
+                  renameAdventureMutation.mutate(adventureNameInput.trim())
+                }
+                if (e.key === 'Escape') setIsRenamingAdventure(false)
+              }}
+              onBlur={() => {
+                if (renameAdventureMutation.isPending) return
+                if (adventureNameInput.trim() && adventureNameInput.trim() !== adventure.name) {
+                  renameAdventureMutation.mutate(adventureNameInput.trim())
+                } else {
+                  setIsRenamingAdventure(false)
+                }
+              }}
+              disabled={renameAdventureMutation.isPending}
+              autoFocus
+            />
+          ) : (
+            <h1
+              className="text-2xl font-bold cursor-pointer hover:text-muted-foreground transition-colors"
+              title="Cliquer pour renommer"
+              onClick={() => {
+                setAdventureNameInput(adventure.name)
+                setIsRenamingAdventure(true)
+              }}
+            >
+              {adventure.name}
+            </h1>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-destructive hover:text-destructive"
+            onClick={() => { setDeleteConfirmName(''); setDeleteAdventureDialogOpen(true) }}
+            title="Supprimer l'aventure"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
         <p className="text-muted-foreground text-sm">
           {adventure.totalDistanceKm > 0
             ? `${adventure.totalDistanceKm.toFixed(1)} km total`
             : 'Distance à calculer'}
         </p>
       </div>
+
+      <AlertDialog open={deleteAdventureDialogOpen} onOpenChange={setDeleteAdventureDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer &ldquo;{adventure.name}&rdquo; ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Tous les segments GPX et données associées seront définitivement supprimés.
+              Tapez le nom de l&apos;aventure pour confirmer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={deleteConfirmName}
+            onChange={(e) => setDeleteConfirmName(e.target.value)}
+            placeholder={adventure.name}
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmName('')}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteAdventureMutation.mutate()}
+              disabled={deleteConfirmName !== adventure.name || deleteAdventureMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAdventureMutation.isPending ? 'Suppression...' : 'Supprimer définitivement'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -213,6 +345,7 @@ export function AdventureDetail({ adventureId }: Props) {
                     segment={segment}
                     onDelete={() => handleDelete(segment.id)}
                     onReplace={() => handleReplace(segment.id)}
+                    onRename={(name) => renameSegmentMutation.mutate({ segmentId: segment.id, name })}
                     isDeleting={deleteMutation.isPending && deleteMutation.variables === segment.id}
                   />
                 ))}
