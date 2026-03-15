@@ -6,14 +6,17 @@ import type { AdventuresService } from '../adventures/adventures.service.js'
 import type { RedisProvider } from '../common/providers/redis.provider.js'
 
 // Mock @ridenrest/database
+// Variables prefixed with 'mock' can be referenced inside jest.mock() factory (Jest hoisting rule)
+const mockDb = {
+  select: jest.fn(),
+  update: jest.fn(),
+  from: jest.fn(),
+  where: jest.fn(),
+  set: jest.fn(),
+}
+
 jest.mock('@ridenrest/database', () => ({
-  db: {
-    select: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    from: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    set: jest.fn().mockReturnThis(),
-  },
+  db: mockDb,
   account: {},
 }))
 
@@ -54,9 +57,7 @@ const service = new StravaService(
 
 // Helper to set up DB mock chain for account queries
 function mockDbSelectAccount(result: object[]) {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const { db } = jest.requireMock('@ridenrest/database') as { db: Record<string, jest.Mock> }
-  db['select'].mockReturnValueOnce({
+  mockDb.select.mockReturnValueOnce({
     from: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(result),
     }),
@@ -252,9 +253,7 @@ describe('getValidAccessToken', () => {
     mockDbSelectAccount([expiredAccount])
     mockDbSelectAccount([{ accountId: '999' }])  // getAthleteId
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const { db } = jest.requireMock('@ridenrest/database') as { db: Record<string, jest.Mock> }
-    db['update'].mockReturnValue({
+    mockDb.update.mockReturnValue({
       set: jest.fn().mockReturnValue({
         where: jest.fn().mockResolvedValue(undefined),
       }),
