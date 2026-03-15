@@ -1,4 +1,5 @@
 import { AdventuresService } from './adventures.service.js'
+import type { AdventuresRepository } from './adventures.repository.js'
 import { NotFoundException } from '@nestjs/common'
 
 const mockRepo = {
@@ -8,7 +9,7 @@ const mockRepo = {
   updateTotalDistance: jest.fn(),
 }
 
-const service = new AdventuresService(mockRepo as any)
+const service = new AdventuresService(mockRepo as unknown as AdventuresRepository)
 
 const makeAdventure = (overrides = {}) => ({
   id: 'adv-1',

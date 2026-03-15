@@ -1,5 +1,8 @@
 // Focus: recomputeCumulativeDistances logic
 import { SegmentsService } from './segments.service.js'
+import type { SegmentsRepository } from './segments.repository.js'
+import type { AdventuresService } from '../adventures/adventures.service.js'
+import type { Queue } from 'bullmq'
 
 const mockSegmentsRepo = {
   create: jest.fn(),
@@ -19,9 +22,9 @@ const mockAdventuresService = {
 const mockGpxQueue = { add: jest.fn() }
 
 const service = new SegmentsService(
-  mockSegmentsRepo as any,
-  mockAdventuresService as any,
-  mockGpxQueue as any,
+  mockSegmentsRepo as unknown as SegmentsRepository,
+  mockAdventuresService as unknown as AdventuresService,
+  mockGpxQueue as unknown as Queue,
 )
 
 beforeEach(() => jest.clearAllMocks())

@@ -9,7 +9,7 @@ export function AdventureList() {
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const { data: adventures = [], isPending, error: listError } = useQuery({
+  const { data: adventures = [], isPending } = useQuery({
     queryKey: ['adventures'],
     queryFn: listAdventures,
   })

@@ -9,7 +9,7 @@ import { sql } from 'drizzle-orm'
 export class SegmentsRepository {
   async create(data: NewAdventureSegment): Promise<AdventureSegment> {
     const [row] = await db.insert(adventureSegments).values(data).returning()
-    return row!
+    return row as AdventureSegment
   }
 
   async findAllByAdventureId(adventureId: string): Promise<AdventureSegment[]> {
@@ -57,10 +57,10 @@ export class SegmentsRepository {
       .update(adventureSegments)
       .set({
         geom: sql`ST_GeomFromText(${data.geomWkt}, 4326)`,
-        waypoints: data.waypoints as any,
+        waypoints: data.waypoints as Record<string, unknown>[],
         distanceKm: data.distanceKm,
         elevationGainM: data.elevationGainM,
-        boundingBox: data.boundingBox as any,
+        boundingBox: data.boundingBox as Record<string, unknown>,
         parseStatus: data.parseStatus,
         updatedAt: new Date(),
       })

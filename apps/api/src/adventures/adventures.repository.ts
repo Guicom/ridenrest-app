@@ -8,7 +8,7 @@ import { eq, and, desc } from 'drizzle-orm'
 export class AdventuresRepository {
   async create(data: NewAdventure): Promise<Adventure> {
     const [row] = await db.insert(adventures).values(data).returning()
-    return row!
+    return row as Adventure
   }
 
   async findAllByUserId(userId: string): Promise<Adventure[]> {

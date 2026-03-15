@@ -1,7 +1,6 @@
 import {
   Injectable,
   BadRequestException,
-  NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
@@ -105,7 +104,7 @@ export class SegmentsService {
       distanceKm: s.distanceKm,
       elevationGainM: s.elevationGainM ?? null,
       parseStatus: s.parseStatus,
-      boundingBox: (s.boundingBox as any) ?? null,
+      boundingBox: (s.boundingBox as AdventureSegmentResponse['boundingBox']) ?? null,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }
