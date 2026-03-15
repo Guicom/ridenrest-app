@@ -51,9 +51,6 @@ const mockPoi: Poi = {
   distAlongRouteKm: 0,
 }
 
-// Helper: call findPois with required userId
-const findPois = (dto = baseDto) => service.findPois(dto, userId)
-
 describe('PoisService', () => {
   let service: PoisService
 
@@ -80,17 +77,17 @@ describe('PoisService', () => {
 
   describe('findPois - validation', () => {
     it('throws BadRequestException when toKm <= fromKm', async () => {
-      await expect(findPois({ ...baseDto, fromKm: 30, toKm: 10 }))
+      await expect(service.findPois({ ...baseDto, fromKm: 30, toKm: 10 }, userId))
         .rejects.toThrow(BadRequestException)
     })
 
     it('throws BadRequestException when toKm === fromKm', async () => {
-      await expect(findPois({ ...baseDto, fromKm: 10, toKm: 10 }))
+      await expect(service.findPois({ ...baseDto, fromKm: 10, toKm: 10 }, userId))
         .rejects.toThrow(BadRequestException)
     })
 
     it('throws BadRequestException when range > 30km', async () => {
-      await expect(findPois({ ...baseDto, fromKm: 0, toKm: 31 }))
+      await expect(service.findPois({ ...baseDto, fromKm: 0, toKm: 31 }, userId))
         .rejects.toThrow(BadRequestException)
     })
   })
@@ -100,7 +97,7 @@ describe('PoisService', () => {
       const cachedPois = [mockPoi]
       mockRedisClient.get.mockResolvedValueOnce(JSON.stringify(cachedPois))
 
-      const result = await findPois()
+      const result = await service.findPois(baseDto, userId)
 
       expect(result).toEqual(cachedPois)
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
@@ -116,7 +113,7 @@ describe('PoisService', () => {
     it('returns [] when segment has no waypoints (not yet parsed or wrong owner)', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(null)
 
-      const result = await findPois()
+      const result = await service.findPois(baseDto, userId)
 
       expect(result).toEqual([])
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
@@ -125,7 +122,7 @@ describe('PoisService', () => {
     it('passes userId to getSegmentWaypoints for ownership verification', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(null)
 
-      await findPois()
+      await service.findPois(baseDto, userId)
 
       expect(mockPoisRepository.getSegmentWaypoints).toHaveBeenCalledWith(baseDto.segmentId, userId)
     })
@@ -144,7 +141,7 @@ describe('PoisService', () => {
       mockPoisRepository.insertOverpassPois.mockResolvedValueOnce(undefined)
       mockRedisClient.setex.mockResolvedValueOnce('OK')
 
-      const result = await findPois()
+      const result = await service.findPois(baseDto, userId)
 
       expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
       expect(mockRedisClient.setex).toHaveBeenCalledTimes(1)
@@ -159,7 +156,7 @@ describe('PoisService', () => {
       mockOverpassProvider.queryPois.mockRejectedValueOnce(new Error('Overpass timeout'))
       mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
 
-      const result = await findPois()
+      const result = await service.findPois(baseDto, userId)
 
       expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(baseDto.segmentId, baseDto.categories)
       expect(mockRedisClient.setex).not.toHaveBeenCalled()
