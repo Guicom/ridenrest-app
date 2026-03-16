@@ -33,7 +33,7 @@ export class PoisController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(204)
   @ApiOperation({ summary: 'Track a booking deep link click (analytics)' })
-  async trackBookingClick(@Body() dto: TrackBookingClickDto) {
+  trackBookingClick(@Body() dto: TrackBookingClickDto) {
     this.logger.log(`Booking click: ${dto.platform} for POI ${dto.externalId}`)
     // MVP: log only — extend with analytics service in future
   }

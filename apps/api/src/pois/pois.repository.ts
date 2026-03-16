@@ -171,7 +171,7 @@ export class PoisRepository {
       lng: p.lng,
       distFromTraceM: 0,
       distAlongRouteKm: 0,
-      rawData: p.rawData as Record<string, unknown>,
+      rawData: p.rawData,
       cachedAt: new Date(),
       expiresAt,
     }))

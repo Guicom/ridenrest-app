@@ -201,7 +201,7 @@ export class PoisService {
               details = await this.googlePlacesProvider.getPlaceDetails(placeId)
               this.logger.debug(`[Google prefetch] ${placeId} details fetched: ${details.displayName} at ${details.lat},${details.lng}`)
             } catch (err) {
-              this.logger.warn(`[Google prefetch] Place Details failed for ${placeId}: ${err}`)
+              this.logger.warn(`[Google prefetch] Place Details failed for ${placeId}: ${String(err)}`)
               continue
             }
           }
