@@ -103,6 +103,7 @@ describe('PoisService', () => {
     // Default: successful DB operations
     mockPoisRepository.insertOverpassPois.mockResolvedValue(undefined)
     mockPoisRepository.updatePoiDistances.mockResolvedValue(undefined)
+    mockPoisRepository.findCachedPois.mockResolvedValue([])
     mockRedisClient.setex.mockResolvedValue('OK')
   })
 
@@ -161,6 +162,8 @@ describe('PoisService', () => {
     it('calls Overpass, stores in Redis, and returns results on cache MISS', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+      // After Overpass + PostGIS update, service reads back from DB
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
 
       const result = await service.findPois(baseDto, userId)
 
