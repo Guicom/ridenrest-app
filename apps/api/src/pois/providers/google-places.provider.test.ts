@@ -41,7 +41,7 @@ describe('GooglePlacesProvider', () => {
 
       const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ places: [{ id: 'ChIJN1t' }] }),
+        json: () => Promise.resolve({ places: [{ id: 'ChIJN1t' }] }),
       } as Response)
 
       await providerWithKey.searchPlaceIds(mockBbox, 'lodging', 'lodging')
@@ -50,6 +50,7 @@ describe('GooglePlacesProvider', () => {
         'https://places.googleapis.com/v1/places:searchText',
         expect.objectContaining({
           method: 'POST',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           headers: expect.objectContaining({
             'X-Goog-FieldMask': 'places.id',
           }),
@@ -66,7 +67,7 @@ describe('GooglePlacesProvider', () => {
 
       jest.spyOn(global, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ places: [{ id: 'ChIJN1t' }, { id: 'ChIJP2t' }] }),
+        json: () => Promise.resolve({ places: [{ id: 'ChIJN1t' }, { id: 'ChIJP2t' }] }),
       } as Response)
 
       const result = await providerWithKey.searchPlaceIds(mockBbox, 'lodging', 'lodging')
@@ -104,11 +105,11 @@ describe('GooglePlacesProvider', () => {
       jest.spyOn(global, 'fetch')
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ places: [{ id: 'ChIJN1t' }, { id: 'ChIJP2t' }] }),
+          json: () => Promise.resolve({ places: [{ id: 'ChIJN1t' }, { id: 'ChIJP2t' }] }),
         } as Response)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ places: [{ id: 'ChIJP2t' }, { id: 'ChIJQ3t' }] }),
+          json: () => Promise.resolve({ places: [{ id: 'ChIJP2t' }, { id: 'ChIJQ3t' }] }),
         } as Response)
 
       const result = await providerWithKey.searchLayerPlaceIds(mockBbox, 'accommodations')
@@ -130,7 +131,7 @@ describe('GooglePlacesProvider', () => {
       jest.spyOn(global, 'fetch')
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ places: [{ id: 'ChIJN1t' }] }),
+          json: () => Promise.resolve({ places: [{ id: 'ChIJN1t' }] }),
         } as Response)
         .mockResolvedValueOnce({
           ok: false,
