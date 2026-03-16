@@ -80,8 +80,8 @@ development_status:
   4-1-gpx-trace-display-on-interactive-map: done
   4-2-poi-layer-toggles-pin-display: done
   4-3-corridor-search-poi-discovery-by-km-range: done
-  4-4-poi-detail-sheet-booking-deep-links: ready-for-dev
-  4-5-poi-category-filter-on-map: backlog
+  4-4-poi-detail-sheet-booking-deep-links: done
+  4-5-poi-category-filter-on-map: ready-for-dev
   epic-4-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ export type { Poi, PoiCategory, PoiSearchResponse, MapLayer } from './types/poi.
 export { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from './types/poi.types'
 export type { WeatherForecast, WeatherPoint } from './types/weather.types'
 export type { UserProfile, Tier, UnitPref, Currency } from './types/user.types'
+export type { GooglePlaceDetails } from './types/google-place.types'
 
 // Zod schemas
 export { createAdventureSchema, updateAdventureSchema, reorderSegmentsSchema } from './schemas/adventure.schema'

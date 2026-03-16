@@ -29,7 +29,7 @@ export class PoisRepository {
     return rows.map((r) => ({
       id: r.id,
       externalId: r.externalId,
-      source: r.source as 'overpass' | 'amadeus',
+      source: r.source as 'overpass' | 'amadeus' | 'google',
       category: r.category as Poi['category'],
       name: r.name,
       lat: r.lat,
@@ -103,8 +103,8 @@ export class PoisRepository {
           seg.geom::geography
         ),
         dist_along_route_km = ROUND(
-          ST_LineLocatePoint(seg.geom, ST_ClosestPoint(seg.geom, ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)))
-          * seg.distance_km,
+          (ST_LineLocatePoint(seg.geom, ST_ClosestPoint(seg.geom, ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)))
+          * seg.distance_km)::numeric,
           2
         )
       FROM adventure_segments seg
@@ -113,6 +113,105 @@ export class PoisRepository {
         AND ac.dist_from_trace_m = 0
         AND seg.geom IS NOT NULL
     `)
+  }
+
+  /** Check if a Google POI (by place_id) is already inserted for this segment. */
+  async googlePoiExistsInSegment(placeId: string, segmentId: string): Promise<boolean> {
+    const rows = await db
+      .select({ id: accommodationsCache.id })
+      .from(accommodationsCache)
+      .where(
+        and(
+          eq(accommodationsCache.segmentId, segmentId),
+          eq(accommodationsCache.externalId, placeId),
+          eq(accommodationsCache.source, 'google'),
+        ),
+      )
+      .limit(1)
+    return rows.length > 0
+  }
+
+  /** Check if any POI already exists within radiusM meters of (lat, lng) for the given segment. */
+  async hasNearbyPoi(lat: number, lng: number, radiusM: number, segmentId: string): Promise<boolean> {
+    const result = await db.execute(sql`
+      SELECT 1 FROM accommodations_cache
+      WHERE segment_id = ${segmentId}
+        AND ST_DWithin(
+          ST_SetSRID(ST_MakePoint(accommodations_cache.lng, accommodations_cache.lat), 4326)::geography,
+          ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
+          ${radiusM}
+        )
+      LIMIT 1
+    `)
+    return result.rows.length > 0
+  }
+
+  /** Insert Google Places POIs into accommodations_cache (upsert on conflict). */
+  async insertGooglePois(
+    segmentId: string,
+    places: Array<{
+      placeId: string
+      name: string
+      lat: number
+      lng: number
+      category: string
+      rawData: Record<string, unknown>
+    }>,
+    expiresAt: Date,
+  ): Promise<void> {
+    if (places.length === 0) return
+
+    const values = places.map((p) => ({
+      segmentId,
+      externalId: p.placeId,
+      source: 'google' as const,
+      category: p.category,
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      distFromTraceM: 0,
+      distAlongRouteKm: 0,
+      rawData: p.rawData as Record<string, unknown>,
+      cachedAt: new Date(),
+      expiresAt,
+    }))
+
+    await db
+      .insert(accommodationsCache)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          accommodationsCache.segmentId,
+          accommodationsCache.externalId,
+          accommodationsCache.source,
+        ],
+        set: {
+          name: sql`excluded.name`,
+          lat: sql`excluded.lat`,
+          lng: sql`excluded.lng`,
+          rawData: sql`excluded.raw_data`,
+          cachedAt: sql`excluded.cached_at`,
+          expiresAt: sql`excluded.expires_at`,
+        },
+      })
+  }
+
+  /** Find POI name and coordinates by externalId + segmentId for Google Details lookup. */
+  async findByExternalId(
+    externalId: string,
+    segmentId: string,
+  ): Promise<{ name: string; lat: number; lng: number } | null> {
+    const rows = await db
+      .select({ name: accommodationsCache.name, lat: accommodationsCache.lat, lng: accommodationsCache.lng })
+      .from(accommodationsCache)
+      .where(
+        and(
+          eq(accommodationsCache.externalId, externalId),
+          eq(accommodationsCache.segmentId, segmentId),
+        ),
+      )
+      .limit(1)
+    return rows[0] ?? null
   }
 
   /**

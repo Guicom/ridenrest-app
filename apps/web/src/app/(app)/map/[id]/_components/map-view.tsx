@@ -4,9 +4,11 @@ import { getAdventureMapData } from '@/lib/api-client'
 import { MapCanvas } from './map-canvas'
 import { LayerToggles } from './layer-toggles'
 import { SearchRangeSlider } from './search-range-slider'
+import { PoiDetailSheet } from './poi-detail-sheet'
 import { StatusBanner } from '@/components/shared/status-banner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePois } from '@/hooks/use-pois'
+import { useUIStore } from '@/stores/ui.store'
 import type { AdventureMapResponse } from '@/lib/api-client'
 
 interface MapViewProps {
@@ -32,6 +34,23 @@ export function MapView({ adventureId }: MapViewProps) {
   const readySegments = data?.segments.filter((s) => s.parseStatus === 'done') ?? []
   const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
 
+  const { selectedPoiId } = useUIStore()
+
+  // Find the selected POI from poisByLayer (already in memory — no extra fetch needed)
+  const allPois = Object.values(poisByLayer).flat()
+  const selectedPoi = selectedPoiId
+    ? allPois.find((p) => p.id === selectedPoiId) ?? null
+    : null
+
+  // Find which segment contains the selected POI (for Google Details lookup)
+  const selectedSegmentId = selectedPoi
+    ? readySegments.find((seg) => {
+        const segStart = seg.cumulativeStartKm
+        const segEnd = segStart + seg.distanceKm
+        return selectedPoi.distAlongRouteKm >= segStart && selectedPoi.distAlongRouteKm <= segEnd
+      })?.id ?? null
+    : null
+
   const queryClient = useQueryClient()
 
   // Retry handler — invalidates all POI queries for the current adventure segments
@@ -56,7 +75,7 @@ export function MapView({ adventureId }: MapViewProps) {
   const errorCount = data.segments.filter((s) => s.parseStatus === 'error').length
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative flex h-full w-full">
       {pendingCount > 0 && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
           <StatusBanner
@@ -98,6 +117,12 @@ export function MapView({ adventureId }: MapViewProps) {
           </button>
         </div>
       )}
+
+      <PoiDetailSheet
+        poi={selectedPoi}
+        segments={readySegments}
+        segmentId={selectedSegmentId}
+      />
     </div>
   )
 }

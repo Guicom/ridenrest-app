@@ -1,9 +1,9 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider } from './providers/overpass.provider.js'
-import { GooglePlacesProvider } from './providers/google-places.provider.js'
+import { GooglePlacesProvider, mapGoogleTypesToCategory } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
-import type { Poi } from '@ridenrest/shared'
+import type { Poi, GooglePlaceDetails } from '@ridenrest/shared'
 import { MAX_SEARCH_RANGE_KM, CORRIDOR_WIDTH_M } from '@ridenrest/shared'
 import type { FindPoisDto } from './dto/find-pois.dto.js'
 import type { Redis } from 'ioredis'
@@ -97,18 +97,17 @@ export class PoisService {
       const expiresAt = new Date(Date.now() + CACHE_TTL_SECONDS * 1000)
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
 
-      // 7. Update distances with PostGIS after insert
+      // 7. Update Overpass POI distances with PostGIS
       await this.poisRepository.updatePoiDistances(segmentId)
 
-      // 8. Google Places: fire-and-forget background job — never awaited for main response
-      void this.prefetchGooglePlaceIds(
+      // 8. Google Places: awaited so Google POIs are included in the first response
+      await this.prefetchAndInsertGooglePois(
         { minLat, maxLat, minLng, maxLng },
-        segmentId, fromKm, toKm,
+        segmentId,
         redis,
       ).catch((err) => this.logger.warn('Google Places prefetch failed silently', err))
 
-      // 9. Read back from DB with actual PostGIS-computed distances
-      // (mapping directly from Overpass nodes would return distFromTraceM/distAlongRouteKm=0)
+      // 9. Read back from DB — includes both Overpass + Google POIs with PostGIS distances
       pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
       overpassSucceeded = true
     } catch (error) {
@@ -125,58 +124,157 @@ export class PoisService {
     return pois
   }
 
-  async getGooglePlaceIds(
-    segmentId: string,
-    fromKm: number,
-    toKm: number,
-    layer: string,
-  ): Promise<string[]> {
+  async getPoiGoogleDetails(externalId: string, segmentId: string): Promise<GooglePlaceDetails | null> {
+    if (!this.googlePlacesProvider.isConfigured()) return null
+
     const redis = this.redisProvider.getClient()
-    const cacheKey = `google_place_ids:${segmentId}:${fromKm}:${toKm}:${layer}`
-    const cached = await redis.get(cacheKey)
-    return cached ? (JSON.parse(cached) as string[]) : []
+    const PLACE_ID_TTL = 60 * 60 * 24 * 7   // 7 days
+    const DETAILS_TTL  = 60 * 60 * 24 * 7   // 7 days
+
+    // 1. Look up google_place_id for this POI (may have been pre-cached by story 4.3)
+    const placeIdKey = `google_place_id:${externalId}`
+    let placeId = await redis.get(placeIdKey)
+
+    if (!placeId) {
+      // 2. Not pre-cached — do targeted Text Search (IDs Only) by name + location
+      const poi = await this.poisRepository.findByExternalId(externalId, segmentId)
+      if (!poi) return null
+
+      placeId = await this.googlePlacesProvider.findPlaceId(poi.name, poi.lat, poi.lng)
+      if (!placeId) return null
+
+      await redis.setex(placeIdKey, PLACE_ID_TTL, placeId)
+    }
+
+    // 3. Check if Place Details already cached
+    const detailsKey = `google_place_details:${placeId}`
+    const cachedDetails = await redis.get(detailsKey)
+    if (cachedDetails) {
+      return JSON.parse(cachedDetails) as GooglePlaceDetails
+    }
+
+    // 4. Fetch Place Details Essentials (10k/month free)
+    const details = await this.googlePlacesProvider.getPlaceDetails(placeId)
+
+    // 5. Cache for 7 days
+    await redis.setex(detailsKey, DETAILS_TTL, JSON.stringify(details))
+
+    return details
   }
 
-  private async prefetchGooglePlaceIds(
+  private async prefetchAndInsertGooglePois(
     bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
     segmentId: string,
-    fromKm: number,
-    toKm: number,
     redis: Redis,
   ): Promise<void> {
     if (!this.googlePlacesProvider.isConfigured()) return
 
     const LAYERS = ['accommodations', 'restaurants', 'supplies', 'bike'] as const
+    const expiresAt = new Date(Date.now() + GOOGLE_CACHE_TTL * 1000)
+    let newPoiCount = 0
+
+    this.logger.log(`[Google prefetch] bbox: ${JSON.stringify(bbox)}, segment: ${segmentId}`)
 
     await Promise.allSettled(
       LAYERS.map(async (layer) => {
-        const cacheKey = `google_place_ids:${segmentId}:${fromKm}:${toKm}:${layer}`
-
-        // Skip if already cached
-        const existing = await redis.exists(cacheKey)
-        if (existing) return
-
         const placeIds = await this.googlePlacesProvider.searchLayerPlaceIds(bbox, layer)
-        if (placeIds.length > 0) {
-          await redis.setex(cacheKey, GOOGLE_CACHE_TTL, JSON.stringify(placeIds))
-          this.logger.debug(`Cached ${placeIds.length} Google place_ids for ${layer} in corridor`)
+        this.logger.log(`[Google prefetch] layer=${layer} → ${placeIds.length} place_ids: ${placeIds.join(', ')}`)
+
+        for (const placeId of placeIds) {
+          // Skip if already inserted in DB for this segment
+          const alreadyInDb = await this.poisRepository.googlePoiExistsInSegment(placeId, segmentId)
+          if (alreadyInDb) {
+            this.logger.debug(`[Google prefetch] ${placeId} already in DB for segment — skip`)
+            continue
+          }
+
+          // Fetch Place Details — use Redis cache to avoid redundant API calls
+          const detailsKey = `google_place_details:${placeId}`
+          let details: GooglePlaceDetails
+          const cachedDetails = await redis.get(detailsKey)
+          if (cachedDetails) {
+            details = JSON.parse(cachedDetails) as GooglePlaceDetails
+            this.logger.debug(`[Google prefetch] ${placeId} details from Redis cache`)
+          } else {
+            // Fetch from Google API (uses 10k/month free quota)
+            try {
+              details = await this.googlePlacesProvider.getPlaceDetails(placeId)
+              this.logger.debug(`[Google prefetch] ${placeId} details fetched: ${details.displayName} at ${details.lat},${details.lng}`)
+            } catch (err) {
+              this.logger.warn(`[Google prefetch] Place Details failed for ${placeId}: ${err}`)
+              continue
+            }
+          }
+
+          if (details.lat === null || details.lng === null) {
+            this.logger.warn(`[Google prefetch] ${placeId} has no location — skip`)
+            continue
+          }
+
+          // Dedup: skip if an OSM POI already exists within 100m
+          const hasDuplicate = await this.poisRepository.hasNearbyPoi(
+            details.lat, details.lng, 100, segmentId,
+          )
+
+          // Always cache Place Details in Redis (enrichment for any matching pin, OSM or Google)
+          await redis.setex(detailsKey, GOOGLE_CACHE_TTL, JSON.stringify(details))
+          await redis.setex(`google_place_id:${placeId}`, GOOGLE_CACHE_TTL, placeId)
+
+          if (hasDuplicate) {
+            this.logger.log(`[Google prefetch] ${placeId} (${details.displayName}) deduped — OSM POI within 100m`)
+            continue
+          }
+
+          // Insert new Google-sourced POI into DB
+          const category = mapGoogleTypesToCategory(details.types, layer)
+          await this.poisRepository.insertGooglePois(segmentId, [{
+            placeId,
+            name: details.displayName ?? 'Unknown',
+            lat: details.lat,
+            lng: details.lng,
+            category,
+            rawData: { types: details.types },
+          }], expiresAt)
+
+          this.logger.log(`[Google prefetch] inserted ${details.displayName} (${placeId}) as ${category}`)
+          newPoiCount++
         }
       }),
     )
+
+    if (newPoiCount > 0) {
+      // Update PostGIS distances for newly inserted Google POIs
+      await this.poisRepository.updatePoiDistances(segmentId)
+      this.logger.debug(`Inserted ${newPoiCount} Google POIs for segment ${segmentId}`)
+    }
   }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function resolveCategory(tags: Record<string, string>): string {
-  if (tags.amenity === 'hotel')     return 'hotel'
-  if (tags.amenity === 'hostel')    return 'hostel'
-  if (tags.amenity === 'shelter')   return 'shelter'
-  if (tags.amenity === 'restaurant') return 'restaurant'
-  if (tags.amenity === 'bicycle_repair_station') return 'bike_repair'
-  if (tags.tourism === 'camp_site') return 'camp_site'
-  if (tags.shop === 'supermarket')  return 'supermarket'
-  if (tags.shop === 'convenience')  return 'convenience'
-  if (tags.shop === 'bicycle')      return 'bike_shop'
+  // amenity tags
+  if (tags.amenity === 'hotel')                    return 'hotel'
+  if (tags.amenity === 'hostel')                   return 'hostel'
+  if (tags.amenity === 'shelter')                  return 'shelter'
+  if (tags.amenity === 'restaurant')               return 'restaurant'
+  if (tags.amenity === 'bicycle_repair_station')   return 'bike_repair'
+  // tourism tags — hotel variants
+  if (tags.tourism === 'hotel')                    return 'hotel'
+  if (tags.tourism === 'motel')                    return 'hotel'
+  if (tags.tourism === 'chalet')                   return 'hotel'
+  // tourism tags — hostel/gîte variants
+  if (tags.tourism === 'hostel')                   return 'hostel'
+  if (tags.tourism === 'guest_house')              return 'hostel'
+  // tourism tags — camping variants
+  if (tags.tourism === 'camp_site')                return 'camp_site'
+  if (tags.tourism === 'caravan_site')             return 'camp_site'
+  // tourism tags — shelter variants
+  if (tags.tourism === 'alpine_hut')               return 'shelter'
+  if (tags.tourism === 'wilderness_hut')           return 'shelter'
+  // shop tags
+  if (tags.shop === 'supermarket')                 return 'supermarket'
+  if (tags.shop === 'convenience')                 return 'convenience'
+  if (tags.shop === 'bicycle')                     return 'bike_shop'
   return 'hotel'  // Fallback — shouldn't happen with strict filter
 }

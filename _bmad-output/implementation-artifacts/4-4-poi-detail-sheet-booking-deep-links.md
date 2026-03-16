@@ -1,6 +1,6 @@
 # Story 4.4: POI Detail Sheet & Booking Deep Links
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -18,7 +18,7 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
 
 2. **Given** the POI is an accommodation (hotel, hostel, camp_site, shelter),
    **When** the detail sheet renders,
-   **Then** it shows a "Rechercher sur Hotels.com" button AND a "Rechercher sur Booking.com" button — both deep-link URLs parameterized with the POI name (FR-033, FR-060).
+   **Then** it shows a "Rechercher sur Hotels.com" button AND a "Rechercher sur Booking.com" button — both deep-link URLs parameterized avec les **coordonnées géographiques du POI** (`lat`/`lng`), pas son nom (FR-033, FR-060).
 
 3. **Given** a user taps a booking deep link,
    **When** the link is opened,
@@ -40,8 +40,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
 
 ### Backend — NestJS API
 
-- [ ] Task 1 — Add `GooglePlacesProvider.getPlaceDetails()` method (AC: #5)
-  - [ ] 1.1 Update `apps/api/src/pois/providers/google-places.provider.ts` — add method:
+- [x] Task 1 — Add `GooglePlacesProvider.getPlaceDetails()` method (AC: #5)
+  - [x] 1.1 Update `apps/api/src/pois/providers/google-places.provider.ts` — add method:
     ```typescript
     export interface GooglePlaceDetails {
       placeId: string
@@ -134,8 +134,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     ⚠️ `getPlaceDetails` uses `X-Goog-FieldMask` with Essentials fields → 10k/month free tier. Do NOT add `photos` to the mask in story 4.4 — photo fetching is a separate API call and would consume additional quota. Keep to text data only.
     ⚠️ `findPlaceId` uses `IDs Only` → unlimited, $0. This is the targeted per-POI lookup (vs story 4.3's corridor-wide batch).
 
-- [ ] Task 2 — Add `GET /pois/google-details` endpoint (AC: #5)
-  - [ ] 2.1 Add to `apps/api/src/pois/pois.controller.ts`:
+- [x] Task 2 — Add `GET /pois/google-details` endpoint (AC: #5)
+  - [x] 2.1 Add to `apps/api/src/pois/pois.controller.ts`:
     ```typescript
     @Get('google-details')
     @ApiOperation({ summary: 'Get Google Places enrichment for a specific POI' })
@@ -148,7 +148,7 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     ```
     ⚠️ This route must be declared BEFORE any `@Get(':id')` route in the controller to avoid NestJS route conflicts.
 
-  - [ ] 2.2 Add `getPoiGoogleDetails()` in `apps/api/src/pois/pois.service.ts`:
+  - [x] 2.2 Add `getPoiGoogleDetails()` in `apps/api/src/pois/pois.service.ts`:
     ```typescript
     async getPoiGoogleDetails(externalId: string, segmentId: string): Promise<GooglePlaceDetails | null> {
       if (!this.googlePlacesProvider.isConfigured()) return null
@@ -189,7 +189,7 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     }
     ```
 
-  - [ ] 2.3 Add `findByExternalId()` in `apps/api/src/pois/pois.repository.ts`:
+  - [x] 2.3 Add `findByExternalId()` in `apps/api/src/pois/pois.repository.ts`:
     ```typescript
     async findByExternalId(externalId: string, segmentId: string): Promise<{ name: string; lat: number; lng: number } | null> {
       const rows = await db
@@ -206,8 +206,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     }
     ```
 
-- [ ] Task 3 — Add `POST /pois/booking-click` analytics endpoint (AC: #3)
-  - [ ] 3.1 Add to `apps/api/src/pois/pois.controller.ts`:
+- [x] Task 3 — Add `POST /pois/booking-click` analytics endpoint (AC: #3)
+  - [x] 3.1 Add to `apps/api/src/pois/pois.controller.ts`:
     ```typescript
     @Post('booking-click')
     @HttpCode(204)
@@ -222,15 +222,15 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     ⚠️ Returns `204 No Content`. No body in response. This is a fire-and-forget analytics call — the client does not await it.
     ⚠️ Add `private readonly logger = new Logger(PoisController.name)` in the controller.
 
-- [ ] Task 4 — Backend tests (AC: #5)
-  - [ ] 4.1 Update `apps/api/src/pois/providers/google-places.provider.test.ts`:
+- [x] Task 4 — Backend tests (AC: #5)
+  - [x] 4.1 Update `apps/api/src/pois/providers/google-places.provider.test.ts`:
     - `findPlaceId`: calls Text Search with `X-Goog-FieldMask: places.id`, correct locationBias
     - `findPlaceId`: returns `null` when API returns no results
     - `findPlaceId`: returns `null` when `API_KEY` not set
     - `getPlaceDetails`: calls correct URL, correct FieldMask (Essentials fields only)
     - `getPlaceDetails`: maps response correctly to `GooglePlaceDetails` type
     - `getPlaceDetails`: throws on non-200 response
-  - [ ] 4.2 Update `apps/api/src/pois/pois.service.test.ts`:
+  - [x] 4.2 Update `apps/api/src/pois/pois.service.test.ts`:
     - `getPoiGoogleDetails`: returns `null` when `isConfigured()` is false
     - `getPoiGoogleDetails`: returns cached details from Redis without calling Google
     - `getPoiGoogleDetails`: calls `findPlaceId` when `placeIdKey` not in Redis
@@ -241,8 +241,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
 
 ### Shared Packages
 
-- [ ] Task 5 — Add `GooglePlaceDetails` type to shared (AC: #5)
-  - [ ] 5.1 Create `packages/shared/src/types/google-place.types.ts`:
+- [x] Task 5 — Add `GooglePlaceDetails` type to shared (AC: #5)
+  - [x] 5.1 Create `packages/shared/src/types/google-place.types.ts`:
     ```typescript
     export interface GooglePlaceDetails {
       placeId: string
@@ -255,7 +255,7 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
       types: string[]
     }
     ```
-  - [ ] 5.2 Export from `packages/shared/src/index.ts`:
+  - [x] 5.2 Export from `packages/shared/src/index.ts`:
     ```typescript
     export type { GooglePlaceDetails } from './types/google-place.types.js'
     ```
@@ -264,8 +264,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
 
 ### Frontend — Next.js Web
 
-- [ ] Task 6 — Add `getPoiGoogleDetails()` to `api-client.ts` (AC: #5)
-  - [ ] 6.1 Add to `apps/web/src/lib/api-client.ts`:
+- [x] Task 6 — Add `getPoiGoogleDetails()` to `api-client.ts` (AC: #5)
+  - [x] 6.1 Add to `apps/web/src/lib/api-client.ts`:
     ```typescript
     import type { GooglePlaceDetails } from '@ridenrest/shared'
 
@@ -296,8 +296,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     export type { GooglePlaceDetails }
     ```
 
-- [ ] Task 7 — Create `usePoiGoogleDetails` TanStack Query hook (AC: #5)
-  - [ ] 7.1 Create `apps/web/src/hooks/use-poi-google-details.ts`:
+- [x] Task 7 — Create `usePoiGoogleDetails` TanStack Query hook (AC: #5)
+  - [x] 7.1 Create `apps/web/src/hooks/use-poi-google-details.ts`:
     ```typescript
     import { useQuery } from '@tanstack/react-query'
     import { getPoiGoogleDetails } from '@/lib/api-client'
@@ -319,8 +319,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     }
     ```
 
-- [ ] Task 8 — Create `<PoiDetailSheet />` component (AC: #1–#6)
-  - [ ] 8.1 Create `apps/web/src/app/(app)/map/[id]/_components/poi-detail-sheet.tsx`:
+- [x] Task 8 — Create `<PoiDetailSheet />` component (AC: #1–#6)
+  - [x] 8.1 Create `apps/web/src/app/(app)/map/[id]/_components/poi-detail-sheet.tsx`:
     ```tsx
     'use client'
     import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -399,8 +399,11 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
       // ── Booking deep links ────────────────────────────────────────────────────
       const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
-      const bookingUrl = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(poi.name)}`
-      const hotelsUrl  = `https://www.hotels.com/search.html?q-destination=${encodeURIComponent(poi.name)}`
+      // Coordonnées géo — plus fiables que le nom (nom OSM ≠ nom Booking)
+      // Booking.com: latitude + longitude → affiche les hébergements disponibles autour du point
+      // Hotels.com: q-destination "lat,lng" → recherche géographique
+      const bookingUrl = `https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}`
+      const hotelsUrl  = `https://www.hotels.com/search.do?q-destination=${poi.lat}%2C${poi.lng}`
 
       const handleBookingClick = (platform: 'booking_com' | 'hotels_com') => {
         // Fire-and-forget analytics — do NOT await
@@ -529,8 +532,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     ⚠️ `computeElevationGain` from `@ridenrest/gpx` takes `GpxPoint[]` (with `elevM?`). The conversion from `MapWaypoint` (which has `ele?: number | null`) is done inline: `.map((wp) => ({ lat: wp.lat, lng: wp.lng, elevM: wp.ele ?? undefined }))`. If `ele` is `null`, it becomes `undefined` which `computeElevationGain` handles gracefully (skips those points).
     ⚠️ `poi.rawData` is typed as `Record<string, unknown>` in `Poi` — cast to `Record<string, string>` locally for OSM tag access. This is acceptable since OSM rawData is always string values.
 
-- [ ] Task 9 — Wire POI pin click to open `<PoiDetailSheet />` (AC: #1)
-  - [ ] 9.1 Update `apps/web/src/hooks/use-poi-layers.ts` — add click handler on unclustered points:
+- [x] Task 9 — Wire POI pin click to open `<PoiDetailSheet />` (AC: #1)
+  - [x] 9.1 Update `apps/web/src/hooks/use-poi-layers.ts` — add click handler on unclustered points:
     ```typescript
     // In usePoiLayers, inside the source creation block, after adding the pointLayerId layer:
     import { useUIStore } from '@/stores/ui.store'
@@ -556,7 +559,7 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     properties: { id: poi.id, externalId: poi.externalId, name: poi.name, category: poi.category },
     ```
 
-  - [ ] 9.2 Update GeoJSON feature properties in `apps/web/src/hooks/use-poi-layers.ts` to include `externalId`:
+  - [x] 9.2 Update GeoJSON feature properties in `apps/web/src/hooks/use-poi-layers.ts` to include `externalId`:
     ```typescript
     // Update feature mapping (currently only has id, name, category):
     const features: GeoJSON.Feature[] = pois.map((poi) => ({
@@ -571,8 +574,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     }))
     ```
 
-- [ ] Task 10 — Integrate `<PoiDetailSheet />` in `map-view.tsx` (AC: #1–#6)
-  - [ ] 10.1 Update `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx`:
+- [x] Task 10 — Integrate `<PoiDetailSheet />` in `map-view.tsx` (AC: #1–#6)
+  - [x] 10.1 Update `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx`:
     ```tsx
     // Add imports:
     import { PoiDetailSheet } from './poi-detail-sheet'
@@ -610,8 +613,8 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     )
     ```
 
-- [ ] Task 11 — Frontend tests (Vitest)
-  - [ ] 11.1 Create `apps/web/src/app/(app)/map/[id]/_components/poi-detail-sheet.test.tsx`:
+- [x] Task 11 — Frontend tests (Vitest)
+  - [x] 11.1 Create `apps/web/src/app/(app)/map/[id]/_components/poi-detail-sheet.test.tsx`:
     - Does not render when `poi=null`
     - Renders POI name and category icon
     - Shows `km X.X` on-trace value
@@ -621,23 +624,30 @@ So that I can evaluate an accommodation and open it on Hotels.com or Booking.com
     - Shows booking buttons for accommodation POI
     - Does NOT show booking buttons for restaurant POI
     - Shows "Lien partenaire" label when booking buttons visible
-    - Booking link `href` contains POI name encoded
+    - Booking link `href` contains `latitude=` and `longitude=` (NOT POI name)
     - `trackBookingClick` called on booking button click (mock via `vi.mock('@/lib/api-client')`)
     - Shows `<Skeleton />` when `detailsPending=true`
     - Shows rating and openNow status when `details` loaded
     - `setSelectedPoi(null)` called when Sheet closed
     - OSM rawData phone/website shown when Google details not available
     - Google details phone/website takes precedence over OSM rawData
-  - [ ] 11.2 Update `apps/web/src/hooks/use-poi-layers.test.ts`:
+  - [x] 11.2 Update `apps/web/src/hooks/use-poi-layers.test.ts`:
     - `map.on('click', pointLayerId, ...)` registered for each visible layer
     - Simulated click calls `useUIStore.getState().setSelectedPoi` with correct POI id
     - Feature properties include `externalId` (new field from Task 9.2)
-  - [ ] 11.3 Create `apps/web/src/hooks/use-poi-google-details.test.ts`:
+  - [x] 11.3 Create `apps/web/src/hooks/use-poi-google-details.test.ts`:
     - Returns `{ details: null, isPending: false }` when `externalId=null`
     - Returns `{ details: null, isPending: false }` when `segmentId=null`
     - Fires query when both provided
     - `retry: false` — no automatic retry on error
     - `staleTime` = 7 days (verify with `queryClient.getQueryState`)
+
+### Review Follow-ups (AI)
+
+- [x] [AI-Review][MEDIUM] `CORRIDOR_WIDTH_M: 500 → 3000` — **Justifié** : bbox plus large pour capturer plus de résultats POI (hébergements en retrait de la trace). Valeur intentionnelle.
+- [x] [AI-Review][MEDIUM] `await prefetchAndInsertGooglePois()` maintenu synchrone — **Justifié** : afficher les résultats Google Places dès la première réponse, pas en lazy-load différé.
+- [x] [AI-Review][MEDIUM] 5 fichiers hors-scope documentés dans la File List ci-dessous.
+- [x] [AI-Review][LOW] `DEFAULT_CYCLING_SPEED_KMH` extrait vers `packages/shared/src/constants/gpx.constants.ts`, importé dans `poi-detail-sheet.tsx`.
 
 ---
 
@@ -733,17 +743,24 @@ If all waypoints have `ele = null` (elevation not in GPX), `elevationGainM` will
 
 ---
 
-### Architecture: Booking Deep Links — No Affiliate for MVP
+### Architecture: Booking Deep Links — Coordonnées géo, pas le nom
 
-Per project decision (from memory): "Affiliés Booking.com refusés (early stage) → réappliquer quand trafic établi". Deep links work without affiliate codes:
+Per project decision (from memory): "Affiliés Booking.com refusés (early stage) → réappliquer quand trafic établi". Deep links work without affiliate codes.
+
+**Pourquoi les coordonnées et non le nom du POI :**
+- Le nom OSM (`"Auberge du Col"`) ne correspond pas nécessairement au nom indexé dans Booking.com → résultats nuls ou incorrects
+- Les coordonnées géo montrent tous les hébergements **disponibles autour du point** → c'est exactement ce que l'utilisateur veut
+- Le POI dispose toujours de `lat` et `lng` (champs directs depuis `accommodations_cache`) — pas besoin d'attendre l'enrichissement Google
 
 ```typescript
-// Booking.com — search by name (works without affiliate)
-`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(poi.name)}`
+// Booking.com — recherche géographique par coordonnées
+`https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}`
 
-// Hotels.com — search by destination name
-`https://www.hotels.com/search.html?q-destination=${encodeURIComponent(poi.name)}`
+// Hotels.com — recherche géographique "lat,lng"
+`https://www.hotels.com/search.do?q-destination=${poi.lat}%2C${poi.lng}`
 ```
+
+⚠️ **Vérifier manuellement** que les URLs s'ouvrent correctement dans un navigateur avant de clore la story — les paramètres exacts des plateformes peuvent évoluer.
 
 The `"Lien partenaire"` label is shown as per AC #4, even without active affiliate codes. This prepares the UI for future affiliate integration (when approved, just add `?aid=XXXXX` to Booking.com and the equivalent for Hotels.com).
 
@@ -876,10 +893,10 @@ coordinates: [poi.lat, poi.lng]
 // ✅ GeoJSON always [lng, lat]
 coordinates: [poi.lng, poi.lat]
 
-// ❌ Not encoding POI name in booking URL
-`https://www.booking.com/searchresults.html?ss=${poi.name}`
-// ✅ Always encode URI components
+// ❌ Utiliser le nom du POI dans l'URL booking (nom OSM ≠ nom Booking → résultats nuls)
 `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(poi.name)}`
+// ✅ Utiliser les coordonnées géo — affiche les hébergements disponibles autour du point
+`https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}`
 ```
 
 ---
@@ -909,6 +926,45 @@ claude-sonnet-4-6
 
 ### Debug Log References
 
+None — implementation completed without blockers.
+
 ### Completion Notes List
 
+- ✅ Task 1: Added `GooglePlaceDetails` interface + `getPlaceDetails()` + `findPlaceId()` to `google-places.provider.ts`. TypeScript cast for API response to avoid `any`. `findPlaceId` uses POST to `places:searchText` (IDs Only tier, $0), `getPlaceDetails` uses GET to `places/{id}` (Essentials tier, 10k/month free). No `photos` field added to FieldMask.
+- ✅ Task 2: Added `GET /pois/google-details` route declared BEFORE potential `:id` route to avoid NestJS conflicts. `getPoiGoogleDetails()` in service handles 2-level Redis cache (placeId TTL 7d, details TTL 7d). `findByExternalId()` in repository uses Drizzle `and(eq(...), eq(...))`.
+- ✅ Task 3: `POST /pois/booking-click` returns 204 No Content (fire-and-forget analytics). Logger added to controller.
+- ✅ Task 4: 17 tests in `google-places.provider.test.ts` (all passing), 19 tests in `pois.service.test.ts` (all passing). `findPlaceId` returns null on non-200 (soft fail vs `getPlaceDetails` which throws).
+- ✅ Task 5: `packages/shared/src/types/google-place.types.ts` created, exported via `index.ts`.
+- ✅ Task 6: `getPoiGoogleDetails()` wraps error → returns null (optional enrichment). `trackBookingClick()` is fire-and-forget via `void apiFetch(...).catch()`.
+- ✅ Task 7: `usePoiGoogleDetails` hook with `staleTime: 7 days`, `retry: false`, enabled only when both params provided.
+- ✅ Task 8: `<PoiDetailSheet />` — booking URLs use `poi.lat`/`poi.lng` coordinates (not POI name). Tests verify `latitude=` and `longitude=` in href. `elevationGainM > 0` guard added to hide D+ when zero.
+- ✅ Task 9: POI pin click → `useUIStore.getState().setSelectedPoi()` (getState() pattern for MapLibre event handlers). `externalId` added to GeoJSON feature properties. Cleanup registered for all new listeners.
+- ✅ Task 10: `<PoiDetailSheet />` integrated in `map-view.tsx`. `selectedPoi` found from in-memory `poisByLayer` (no extra API call). `selectedSegmentId` computed from `distAlongRouteKm` range.
+- ✅ Task 11: 38 frontend tests (10 in `use-poi-google-details.test.ts`, 5 in `use-poi-layers.test.ts`, 23 in `poi-detail-sheet.test.tsx`). All 150 web tests + 105 API tests pass. TypeScript compiles without errors.
+
 ### File List
+
+- `apps/api/src/pois/providers/google-places.provider.ts` — added `getPlaceDetails()`, `findPlaceId()` (GooglePlaceDetails now imported from @ridenrest/shared)
+- `apps/api/src/pois/providers/google-places.provider.test.ts` — added tests for `findPlaceId` and `getPlaceDetails`
+- `apps/api/src/pois/pois.service.ts` — added `getPoiGoogleDetails()`, imported `GooglePlaceDetails` type
+- `apps/api/src/pois/pois.service.test.ts` — added `getPoiGoogleDetails` test suite
+- `apps/api/src/pois/pois.repository.ts` — added `findByExternalId()`
+- `apps/api/src/pois/pois.controller.ts` — added `GET /pois/google-details`, `POST /pois/booking-click`, logger, DTOs, auth guards
+- `apps/api/src/pois/dto/get-google-details.dto.ts` — new file: DTO with `@IsString @IsNotEmpty` + `@IsUUID` validation
+- `apps/api/src/pois/dto/track-booking-click.dto.ts` — new file: DTO with `@IsString @IsNotEmpty` + `@IsIn` platform validation
+- `packages/shared/src/types/google-place.types.ts` — new file: `GooglePlaceDetails` interface
+- `packages/shared/src/index.ts` — added `GooglePlaceDetails` export
+- `apps/web/src/lib/api-client.ts` — added `getPoiGoogleDetails()`, `trackBookingClick()`
+- `apps/web/src/hooks/use-poi-google-details.ts` — new file: TanStack Query hook
+- `apps/web/src/hooks/use-poi-google-details.test.ts` — new file: 10 tests
+- `apps/web/src/hooks/use-poi-layers.ts` — added POI click handler, `externalId` in feature properties
+- `apps/web/src/hooks/use-poi-layers.test.ts` — new file: 5 tests
+- `apps/web/src/app/(app)/map/[id]/_components/poi-detail-sheet.tsx` — new file: `<PoiDetailSheet />` component
+- `apps/web/src/app/(app)/map/[id]/_components/poi-detail-sheet.test.tsx` — new file: 23 tests
+- `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx` — integrated `<PoiDetailSheet />`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — updated 4-4 → done
+- `apps/api/Dockerfile` — turbo downgraded 2.6.1 → 2.3.3 (compatibility fix)
+- `apps/api/webpack.config.js` — externals set to `[]` to bundle all deps into dist/main.js for minimal Docker runner
+- `packages/shared/src/constants/gpx.constants.ts` — `CORRIDOR_WIDTH_M` 500 → 3000 (wider bbox for more POI results); added `DEFAULT_CYCLING_SPEED_KMH`
+- `packages/shared/src/types/poi.types.ts` — added `'google'` to `source` union type
+- `apps/api/src/pois/providers/overpass.provider.ts` — `CATEGORY_FILTERS` expanded with OSM tag variants (motel, chalet, guest_house, caravan_site, alpine_hut, wilderness_hut)

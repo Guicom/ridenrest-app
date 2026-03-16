@@ -173,6 +173,36 @@ export async function getPois(params: GetPoisParams): Promise<Poi[]> {
 
 export type { Poi, PoiCategory }
 
+// ── POI Google Details ────────────────────────────────────────────────────────
+
+import type { GooglePlaceDetails } from '@ridenrest/shared'
+
+export async function getPoiGoogleDetails(
+  externalId: string,
+  segmentId: string,
+): Promise<GooglePlaceDetails | null> {
+  try {
+    return await apiFetch<GooglePlaceDetails>(
+      `/api/pois/google-details?externalId=${encodeURIComponent(externalId)}&segmentId=${encodeURIComponent(segmentId)}`,
+    )
+  } catch {
+    return null  // Enrichment is optional — never throw to caller
+  }
+}
+
+export async function trackBookingClick(
+  externalId: string,
+  platform: 'booking_com' | 'hotels_com' | 'airbnb',
+): Promise<void> {
+  // Fire-and-forget — do NOT await in the click handler
+  void apiFetch('/api/pois/booking-click', {
+    method: 'POST',
+    body: JSON.stringify({ externalId, platform }),
+  }).catch(() => {/* ignore tracking errors */})
+}
+
+export type { GooglePlaceDetails }
+
 // ── Strava ────────────────────────────────────────────────────────────────────
 
 export interface StravaRouteItem {

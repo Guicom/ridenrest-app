@@ -6,7 +6,8 @@
 # Stage 1: base — Node.js + package managers
 # ──────────────────────────────────────────
 FROM node:22-alpine AS base
-RUN npm install -g pnpm@10.32.1 turbo@2.6.1
+# RUN npm install -g pnpm@10.32.1 turbo@2.6.1
+RUN npm install -g pnpm@10.32.1 turbo@2.3.3
 
 # ──────────────────────────────────────────
 # Stage 2: pruner — extract only API + its deps

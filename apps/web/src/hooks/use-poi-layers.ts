@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useMapStore } from '@/stores/map.store'
+import { useUIStore } from '@/stores/ui.store'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 import type maplibregl from 'maplibre-gl'
 
@@ -50,7 +51,7 @@ export function usePoiLayers(
       const features: GeoJSON.Feature[] = pois.map((poi) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
-        properties: { id: poi.id, name: poi.name, category: poi.category },
+        properties: { id: poi.id, externalId: poi.externalId, name: poi.name, category: poi.category },
       }))
 
       if (map.getSource(sourceId)) {
@@ -112,30 +113,48 @@ export function usePoiLayers(
           },
         })
 
-        // Cluster click → zoom in (AC #3)
-        const handleClusterClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-          if (!e.features || e.features.length === 0) return
-          const feature = e.features[0]
-          const geometry = feature.geometry as GeoJSON.Point
-          map.flyTo({
-            center: geometry.coordinates as [number, number],
-            zoom: map.getZoom() + 2,
-          })
-        }
-        const handleMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
-        const handleMouseLeave = () => { map.getCanvas().style.cursor = '' }
+      }
 
-        map.on('click', clusterLayerId, handleClusterClick)
-        map.on('mouseenter', clusterLayerId, handleMouseEnter)
-        map.on('mouseleave', clusterLayerId, handleMouseLeave)
-
-        // Register cleanup for these listeners
-        cleanupFns.push(() => {
-          map.off('click', clusterLayerId, handleClusterClick)
-          map.off('mouseenter', clusterLayerId, handleMouseEnter)
-          map.off('mouseleave', clusterLayerId, handleMouseLeave)
+      // Event handlers registered every render (outside if/else) so they
+      // survive source-data updates that re-run the effect without re-creating the source.
+      const handleClusterClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+        if (!e.features || e.features.length === 0) return
+        const feature = e.features[0]
+        const geometry = feature.geometry as GeoJSON.Point
+        map.flyTo({
+          center: geometry.coordinates as [number, number],
+          zoom: map.getZoom() + 2,
         })
       }
+      const handleClusterMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
+      const handleClusterMouseLeave = () => { map.getCanvas().style.cursor = '' }
+
+      map.on('click', clusterLayerId, handleClusterClick)
+      map.on('mouseenter', clusterLayerId, handleClusterMouseEnter)
+      map.on('mouseleave', clusterLayerId, handleClusterMouseLeave)
+
+      // POI pin click → open detail sheet
+      const handlePoiClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+        if (!e.features || e.features.length === 0) return
+        const props = e.features[0].properties as { id: string }
+        useUIStore.getState().setSelectedPoi(props.id)
+        e.preventDefault()
+      }
+      const handlePoiMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
+      const handlePoiMouseLeave = () => { map.getCanvas().style.cursor = '' }
+
+      map.on('click', pointLayerId, handlePoiClick)
+      map.on('mouseenter', pointLayerId, handlePoiMouseEnter)
+      map.on('mouseleave', pointLayerId, handlePoiMouseLeave)
+
+      cleanupFns.push(() => {
+        map.off('click', clusterLayerId, handleClusterClick)
+        map.off('mouseenter', clusterLayerId, handleClusterMouseEnter)
+        map.off('mouseleave', clusterLayerId, handleClusterMouseLeave)
+        map.off('click', pointLayerId, handlePoiClick)
+        map.off('mouseenter', pointLayerId, handlePoiMouseEnter)
+        map.off('mouseleave', pointLayerId, handlePoiMouseLeave)
+      })
     }
 
     return () => {

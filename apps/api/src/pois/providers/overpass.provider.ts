@@ -14,11 +14,12 @@ export interface OverpassResult {
 }
 
 // Overpass QL tag filters mapped to PoiCategory
+// Each category can have multiple OSM tag variants
 const CATEGORY_FILTERS: Record<string, string[]> = {
-  hotel:        ['"amenity"="hotel"'],
-  hostel:       ['"amenity"="hostel"'],
-  camp_site:    ['"tourism"="camp_site"'],
-  shelter:      ['"amenity"="shelter"'],
+  hotel:        ['"amenity"="hotel"', '"tourism"="hotel"', '"tourism"="motel"', '"tourism"="chalet"'],
+  hostel:       ['"amenity"="hostel"', '"tourism"="hostel"', '"tourism"="guest_house"'],
+  camp_site:    ['"tourism"="camp_site"', '"tourism"="caravan_site"'],
+  shelter:      ['"amenity"="shelter"', '"tourism"="alpine_hut"', '"tourism"="wilderness_hut"'],
   restaurant:   ['"amenity"="restaurant"'],
   supermarket:  ['"shop"="supermarket"'],
   convenience:  ['"shop"="convenience"'],

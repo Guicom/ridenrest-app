@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import type { GooglePlaceDetails } from '@ridenrest/shared'
 
 // Google place types mapped to our MapLayer categories
 // Using includedType for accurate category filtering
@@ -15,8 +16,9 @@ export const GOOGLE_PLACE_TYPES: Record<string, string[]> = {
 }
 
 // Deduplicated Google types per MapLayer (for batching queries by layer)
+// Google Places API (New) types — each becomes a separate Text Search query (IDs Only)
 export const LAYER_GOOGLE_TYPES: Record<string, string[]> = {
-  accommodations: ['lodging', 'campground'],
+  accommodations: ['lodging', 'campground', 'bed_and_breakfast', 'hostel', 'guest_house', 'camping_cabin', 'private_guest_room'],
   restaurants:    ['restaurant'],
   supplies:       ['grocery_or_supermarket', 'convenience_store'],
   bike:           ['bicycle_store'],
@@ -39,6 +41,21 @@ interface GoogleTextSearchResponse {
   places?: Array<{ id: string; name?: string }>
 }
 
+// Map Google place types → our PoiCategory
+export function mapGoogleTypesToCategory(types: string[], layer: string): string {
+  if (layer === 'restaurants') return 'restaurant'
+  if (layer === 'bike') return 'bike_shop'
+  if (layer === 'supplies') {
+    if (types.some((t) => ['grocery_or_supermarket', 'supermarket'].includes(t))) return 'supermarket'
+    return 'convenience'
+  }
+  // accommodations layer
+  if (types.some((t) => ['campground', 'rv_park', 'camping_cabin'].includes(t))) return 'camp_site'
+  if (types.some((t) => ['hostel'].includes(t))) return 'hostel'
+  if (types.some((t) => ['guest_house', 'bed_and_breakfast', 'private_guest_room', 'farmstay'].includes(t))) return 'hostel'
+  return 'hotel'
+}
+
 @Injectable()
 export class GooglePlacesProvider {
   private readonly logger = new Logger(GooglePlacesProvider.name)
@@ -47,6 +64,95 @@ export class GooglePlacesProvider {
 
   isConfigured(): boolean {
     return !!this.API_KEY
+  }
+
+  async getPlaceDetails(placeId: string): Promise<GooglePlaceDetails> {
+    if (!this.API_KEY) throw new Error('GOOGLE_PLACES_API_KEY not configured')
+
+    const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`
+    const fieldMask = [
+      'id',
+      'displayName',
+      'formattedAddress',
+      'location',
+      'rating',
+      'regularOpeningHours.openNow',
+      'internationalPhoneNumber',
+      'websiteUri',
+      'types',
+    ].join(',')
+
+    const response = await fetch(url, {
+      headers: {
+        'X-Goog-Api-Key': this.API_KEY,
+        'X-Goog-FieldMask': fieldMask,  // Essentials tier — 10k/month free
+      },
+      signal: AbortSignal.timeout(8_000),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Place Details error: ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json() as {
+      displayName?: { text?: string }
+      formattedAddress?: string
+      location?: { latitude?: number; longitude?: number }
+      rating?: number
+      regularOpeningHours?: { openNow?: boolean }
+      internationalPhoneNumber?: string
+      websiteUri?: string
+      types?: string[]
+    }
+    return {
+      placeId,
+      displayName: data.displayName?.text ?? null,
+      formattedAddress: data.formattedAddress ?? null,
+      lat: data.location?.latitude ?? null,
+      lng: data.location?.longitude ?? null,
+      rating: data.rating ?? null,
+      isOpenNow: data.regularOpeningHours?.openNow ?? null,
+      phone: data.internationalPhoneNumber ?? null,
+      website: data.websiteUri ?? null,
+      types: data.types ?? [],
+    }
+  }
+
+  /** Text Search (IDs Only) to find Google place_id for a known POI by name + location. */
+  async findPlaceId(
+    name: string,
+    lat: number,
+    lng: number,
+  ): Promise<string | null> {
+    if (!this.API_KEY) return null
+
+    const body = {
+      textQuery: name,
+      locationBias: {
+        circle: {
+          center: { latitude: lat, longitude: lng },
+          radius: 150.0,  // 150m — tight radius for specific POI match
+        },
+      },
+      maxResultCount: 1,
+      languageCode: 'fr',
+    }
+
+    const response = await fetch(this.BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': this.API_KEY,
+        'X-Goog-FieldMask': 'places.id',  // IDs Only — unlimited, $0
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8_000),
+    })
+
+    if (!response.ok) return null
+
+    const result = await response.json() as { places?: Array<{ id: string }> }
+    return result.places?.[0]?.id ?? null
   }
 
   /**
@@ -106,9 +212,20 @@ export class GooglePlacesProvider {
     const googleTypes = LAYER_GOOGLE_TYPES[layer] ?? []
     if (googleTypes.length === 0) return []
 
+    // Use a broad textQuery per layer so includedType does the actual filtering.
+    // Using the type name as textQuery (e.g. "private guest room") causes Google
+    // to score by text relevance, missing places whose name doesn't match the type.
+    const LAYER_TEXT_QUERY: Record<string, string> = {
+      accommodations: 'accommodation',
+      restaurants:    'restaurant',
+      supplies:       'grocery store',
+      bike:           'bicycle bike shop',
+    }
+    const textQuery = LAYER_TEXT_QUERY[layer] ?? layer
+
     const results = await Promise.allSettled(
       googleTypes.map((type) =>
-        this.searchPlaceIds(bbox, type, type.replace(/_/g, ' ')),
+        this.searchPlaceIds(bbox, type, textQuery),
       ),
     )
 

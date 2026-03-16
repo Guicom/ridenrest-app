@@ -7,7 +7,7 @@ export type PoiCategory = 'hotel' | 'hostel' | 'camp_site' | 'shelter' | 'restau
 export interface Poi {
   id: string
   externalId: string
-  source: 'overpass' | 'amadeus'
+  source: 'overpass' | 'amadeus' | 'google'
   category: PoiCategory
   name: string
   lat: number
