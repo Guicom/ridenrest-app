@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, act, waitFor } from '@testing-library/react'
-import { MapCanvas } from './map-canvas'
+import { MapCanvas, buildCorridorFeatures } from './map-canvas'
 import type { MapSegmentData } from '@/lib/api-client'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 
@@ -33,7 +33,7 @@ vi.mock('next-themes', () => ({
 
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({ setViewport: vi.fn(), visibleLayers: new Set() }),
+  useMapStore: () => ({ setViewport: vi.fn(), visibleLayers: new Set(), fromKm: 0, toKm: 30 }),
 }))
 
 // Mock usePoiLayers
@@ -137,5 +137,53 @@ describe('MapCanvas', () => {
     const addSourceCalls = mockMapInstance.addSource.mock.calls as [string, unknown][]
     const poiSourceCalls = addSourceCalls.filter(([id]) => id.startsWith('pois-'))
     expect(poiSourceCalls).toHaveLength(0)
+  })
+})
+
+describe('buildCorridorFeatures', () => {
+  const makeSegmentWithWaypoints = (
+    cumulativeStartKm: number,
+    distanceKm: number,
+  ): MapSegmentData => ({
+    id: `seg-${cumulativeStartKm}`,
+    name: 'S',
+    orderIndex: 0,
+    cumulativeStartKm,
+    distanceKm,
+    parseStatus: 'done',
+    waypoints: [
+      { lat: 43.0, lng: 1.0, ele: 100, distKm: 0 },
+      { lat: 43.1, lng: 1.1, ele: 110, distKm: distanceKm / 2 },
+      { lat: 43.2, lng: 1.2, ele: 120, distKm: distanceKm },
+    ],
+    boundingBox: { minLat: 43.0, maxLat: 43.2, minLng: 1.0, maxLng: 1.2 },
+  })
+
+  it('returns empty features for segments completely outside range', () => {
+    const segment = makeSegmentWithWaypoints(50, 20)  // km range [50, 70]
+    const features = buildCorridorFeatures([segment], 0, 30)  // query [0, 30]
+    expect(features).toHaveLength(0)
+  })
+
+  it('returns features for segment within range', () => {
+    const segment = makeSegmentWithWaypoints(0, 50)  // km range [0, 50]
+    const features = buildCorridorFeatures([segment], 0, 30)  // query [0, 30]
+    expect(features.length).toBeGreaterThan(0)
+    expect(features[0].geometry.type).toBe('LineString')
+  })
+
+  it('returns empty when segment has no waypoints', () => {
+    const segment: MapSegmentData = {
+      id: 'seg-no-wp',
+      name: 'S',
+      orderIndex: 0,
+      cumulativeStartKm: 0,
+      distanceKm: 50,
+      parseStatus: 'done',
+      waypoints: null,
+      boundingBox: null,
+    }
+    const features = buildCorridorFeatures([segment], 0, 30)
+    expect(features).toHaveLength(0)
   })
 })

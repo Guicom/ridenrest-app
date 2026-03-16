@@ -1,10 +1,12 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider } from './providers/overpass.provider.js'
+import { GooglePlacesProvider } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
-import type { Poi, PoiCategory } from '@ridenrest/shared'
+import type { Poi } from '@ridenrest/shared'
 import { MAX_SEARCH_RANGE_KM, CORRIDOR_WIDTH_M } from '@ridenrest/shared'
 import type { FindPoisDto } from './dto/find-pois.dto.js'
+import type { Redis } from 'ioredis'
 
 // Layer → PoiCategory mapping (mirrors frontend LAYER_CATEGORIES constant)
 const CATEGORY_TO_OVERPASS_TAGS: Record<string, string[]> = {
@@ -20,6 +22,7 @@ const CATEGORY_TO_OVERPASS_TAGS: Record<string, string[]> = {
 }
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24  // 24h
+const GOOGLE_CACHE_TTL = 60 * 60 * 24 * 7  // 7 days — place_ids are stable
 
 @Injectable()
 export class PoisService {
@@ -28,6 +31,7 @@ export class PoisService {
   constructor(
     private readonly poisRepository: PoisRepository,
     private readonly overpassProvider: OverpassProvider,
+    private readonly googlePlacesProvider: GooglePlacesProvider,
     private readonly redisProvider: RedisProvider,
   ) {}
 
@@ -93,33 +97,72 @@ export class PoisService {
       const expiresAt = new Date(Date.now() + CACHE_TTL_SECONDS * 1000)
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
 
-      // 7. Map to Poi[] response
-      pois = nodes
-        .filter((n) => activeCategories.includes(categoryMap[n.id] ?? ''))
-        .map((n) => ({
-          id: `overpass-${n.id}`,
-          externalId: String(n.id),
-          source: 'overpass' as const,
-          category: (categoryMap[n.id] ?? 'hotel') as PoiCategory,
-          name: n.tags.name ?? n.tags['name:en'] ?? 'Unknown',
-          lat: n.center?.lat ?? n.lat,
-          lng: n.center?.lon ?? n.lon,
-          distFromTraceM: 0,
-          distAlongRouteKm: 0,
-        }))
+      // 7. Update distances with PostGIS after insert
+      await this.poisRepository.updatePoiDistances(segmentId)
+
+      // 8. Google Places: fire-and-forget background job — never awaited for main response
+      void this.prefetchGooglePlaceIds(
+        { minLat, maxLat, minLng, maxLng },
+        segmentId, fromKm, toKm,
+        redis,
+      ).catch((err) => this.logger.warn('Google Places prefetch failed silently', err))
+
+      // 9. Read back from DB with actual PostGIS-computed distances
+      // (mapping directly from Overpass nodes would return distFromTraceM/distAlongRouteKm=0)
+      pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
       overpassSucceeded = true
     } catch (error) {
       this.logger.error('Overpass API failed, falling back to DB cache', error)
       // Fallback: return DB cache filtered by requested categories (may be stale)
-      pois = await this.poisRepository.findCachedPois(segmentId, activeCategories)
+      pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
     }
 
-    // 8. Store in Redis only after a fresh Overpass fetch — never cache stale fallback data
+    // 10. Store in Redis only after a fresh Overpass fetch — never cache stale fallback data
     if (overpassSucceeded) {
       await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(pois))
     }
 
     return pois
+  }
+
+  async getGooglePlaceIds(
+    segmentId: string,
+    fromKm: number,
+    toKm: number,
+    layer: string,
+  ): Promise<string[]> {
+    const redis = this.redisProvider.getClient()
+    const cacheKey = `google_place_ids:${segmentId}:${fromKm}:${toKm}:${layer}`
+    const cached = await redis.get(cacheKey)
+    return cached ? (JSON.parse(cached) as string[]) : []
+  }
+
+  private async prefetchGooglePlaceIds(
+    bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+    segmentId: string,
+    fromKm: number,
+    toKm: number,
+    redis: Redis,
+  ): Promise<void> {
+    if (!this.googlePlacesProvider.isConfigured()) return
+
+    const LAYERS = ['accommodations', 'restaurants', 'supplies', 'bike'] as const
+
+    await Promise.allSettled(
+      LAYERS.map(async (layer) => {
+        const cacheKey = `google_place_ids:${segmentId}:${fromKm}:${toKm}:${layer}`
+
+        // Skip if already cached
+        const existing = await redis.exists(cacheKey)
+        if (existing) return
+
+        const placeIds = await this.googlePlacesProvider.searchLayerPlaceIds(bbox, layer)
+        if (placeIds.length > 0) {
+          await redis.setex(cacheKey, GOOGLE_CACHE_TTL, JSON.stringify(placeIds))
+          this.logger.debug(`Cached ${placeIds.length} Google place_ids for ${layer} in corridor`)
+        }
+      }),
+    )
   }
 }
 

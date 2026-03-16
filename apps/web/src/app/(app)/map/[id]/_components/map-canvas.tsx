@@ -29,7 +29,7 @@ export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasPro
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [styleVersion, setStyleVersion] = useState(0)
   const { resolvedTheme } = useTheme()
-  const { setViewport } = useMapStore()
+  const { setViewport, fromKm, toKm } = useMapStore()
 
   usePoiLayers(mapRef, poisByLayer, styleVersion)
 
@@ -78,6 +78,13 @@ export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasPro
     if (!map || !map.isStyleLoaded()) return
     updateTraceLayers(map, segments)
   }, [segments])
+
+  // Corridor highlight — update when fromKm/toKm or segments change
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+    updateCorridorHighlight(map, segments, fromKm, toKm)
+  }, [segments, fromKm, toKm, styleVersion])  // styleVersion triggers re-add after theme switch
 
   // Theme switching — update map style without reloading the page (AC #3)
   useEffect(() => {
@@ -210,6 +217,76 @@ function updateTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
       },
     })
   }
+}
+
+export function buildCorridorFeatures(
+  segments: MapSegmentData[],
+  fromKm: number,
+  toKm: number,
+): GeoJSON.Feature[] {
+  return segments
+    .filter((s) => s.waypoints)
+    .flatMap((segment) => {
+      const segStart = segment.cumulativeStartKm
+      const segEnd = segStart + segment.distanceKm
+
+      if (toKm <= segStart || fromKm >= segEnd) return []
+
+      const localFrom = Math.max(0, fromKm - segStart)
+      const localTo = Math.min(segment.distanceKm, toKm - segStart)
+
+      const rangeWaypoints = segment.waypoints!.filter(
+        (wp) => wp.distKm >= localFrom && wp.distKm <= localTo,
+      )
+
+      if (rangeWaypoints.length < 2) return []
+
+      return [{
+        type: 'Feature' as const,
+        properties: {},
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: rangeWaypoints.map((wp) => [wp.lng, wp.lat]),
+        },
+      }]
+    })
+}
+
+function updateCorridorHighlight(
+  map: maplibregl.Map,
+  segments: MapSegmentData[],
+  fromKm: number,
+  toKm: number,
+) {
+  const features = buildCorridorFeatures(segments, fromKm, toKm)
+  const source = map.getSource('corridor') as maplibregl.GeoJSONSource | undefined
+
+  if (source) {
+    source.setData({ type: 'FeatureCollection', features })
+    return
+  }
+
+  // Add corridor source + layer (rendered BELOW trace-line so trace stays on top)
+  map.addSource('corridor', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features },
+  })
+
+  const beforeId = map.getLayer('trace-line') ? 'trace-line' : undefined
+  map.addLayer(
+    {
+      id: 'corridor-highlight',
+      type: 'line',
+      source: 'corridor',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': '#FBBF24',   // amber-400 — visible on both light/dark themes
+        'line-width': 6,
+        'line-opacity': 0.7,
+      },
+    },
+    beforeId,
+  )
 }
 
 function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {

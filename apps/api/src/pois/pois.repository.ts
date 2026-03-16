@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common'
 import { db, accommodationsCache, adventureSegments, adventures } from '@ridenrest/database'
-import { eq, and, gte, sql, inArray } from 'drizzle-orm'
+import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm'
 import type { OverpassNode } from './providers/overpass.provider.js'
 import type { Poi } from '@ridenrest/shared'
 
 @Injectable()
 export class PoisRepository {
-  /** Retrieve cached POIs for a segment from accommodations_cache, filtered by categories. */
-  async findCachedPois(segmentId: string, categories: string[]): Promise<Poi[]> {
+  /** Retrieve cached POIs for a segment from accommodations_cache, filtered by categories and km range. */
+  async findCachedPois(
+    segmentId: string,
+    categories: string[],
+    fromKm: number,
+    toKm: number,
+  ): Promise<Poi[]> {
     const now = new Date()
     const rows = await db
       .select()
@@ -17,6 +22,8 @@ export class PoisRepository {
           eq(accommodationsCache.segmentId, segmentId),
           gte(accommodationsCache.expiresAt, now),
           inArray(accommodationsCache.category, categories),
+          gte(accommodationsCache.distAlongRouteKm, fromKm),
+          lte(accommodationsCache.distAlongRouteKm, toKm),
         ),
       )
     return rows.map((r) => ({
@@ -78,6 +85,34 @@ export class PoisRepository {
           expiresAt: sql`excluded.expires_at`,
         },
       })
+  }
+
+  /**
+   * Update distFromTraceM and distAlongRouteKm for POIs using PostGIS.
+   * Requires adventure_segments.geom (PostGIS LineString) to be populated.
+   * Only updates rows where dist_from_trace_m = 0 (freshly inserted).
+   */
+  async updatePoiDistances(segmentId: string): Promise<void> {
+    // PostGIS ST_Distance (meters) and ST_LineLocatePoint (0→1 fraction)
+    // Only update rows where dist_from_trace_m = 0 (freshly inserted)
+    await db.execute(sql`
+      UPDATE accommodations_cache ac
+      SET
+        dist_from_trace_m = ST_Distance(
+          ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,
+          seg.geom::geography
+        ),
+        dist_along_route_km = ROUND(
+          ST_LineLocatePoint(seg.geom, ST_ClosestPoint(seg.geom, ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)))
+          * seg.distance_km,
+          2
+        )
+      FROM adventure_segments seg
+      WHERE ac.segment_id = ${segmentId}
+        AND seg.id = ${segmentId}
+        AND ac.dist_from_trace_m = 0
+        AND seg.geom IS NOT NULL
+    `)
   }
 
   /**

@@ -3,12 +3,14 @@ import { BadRequestException } from '@nestjs/common'
 import { PoisService } from './pois.service.js'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider } from './providers/overpass.provider.js'
+import { GooglePlacesProvider } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi } from '@ridenrest/shared'
 
 const mockRedisClient = {
   get: jest.fn(),
   setex: jest.fn(),
+  exists: jest.fn(),
 }
 
 const mockRedisProvider = {
@@ -19,10 +21,16 @@ const mockPoisRepository = {
   getSegmentWaypoints: jest.fn(),
   insertOverpassPois: jest.fn(),
   findCachedPois: jest.fn(),
+  updatePoiDistances: jest.fn(),
 }
 
 const mockOverpassProvider = {
   queryPois: jest.fn(),
+}
+
+const mockGooglePlacesProvider = {
+  isConfigured: jest.fn(),
+  searchLayerPlaceIds: jest.fn(),
 }
 
 const baseDto = {
@@ -51,6 +59,14 @@ const mockPoi: Poi = {
   distAlongRouteKm: 0,
 }
 
+const overpassNode = {
+  type: 'node' as const,
+  id: 123,
+  lat: 43.1,
+  lon: 1.1,
+  tags: { name: 'Hôtel du Lac', amenity: 'hotel' },
+}
+
 describe('PoisService', () => {
   let service: PoisService
 
@@ -60,6 +76,7 @@ describe('PoisService', () => {
         PoisService,
         { provide: PoisRepository, useValue: mockPoisRepository },
         { provide: OverpassProvider, useValue: mockOverpassProvider },
+        { provide: GooglePlacesProvider, useValue: mockGooglePlacesProvider },
         { provide: RedisProvider, useValue: mockRedisProvider },
       ],
     }).compile()
@@ -69,10 +86,24 @@ describe('PoisService', () => {
     // Reset all mocks
     mockRedisClient.get.mockReset()
     mockRedisClient.setex.mockReset()
+    mockRedisClient.exists.mockReset()
     mockPoisRepository.getSegmentWaypoints.mockReset()
     mockPoisRepository.insertOverpassPois.mockReset()
     mockPoisRepository.findCachedPois.mockReset()
+    mockPoisRepository.updatePoiDistances.mockReset()
     mockOverpassProvider.queryPois.mockReset()
+    mockGooglePlacesProvider.isConfigured.mockReset()
+    mockGooglePlacesProvider.searchLayerPlaceIds.mockReset()
+
+    // Default: Google Places not configured
+    mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
+    // Default: no Redis cache
+    mockRedisClient.get.mockResolvedValue(null)
+    mockRedisClient.exists.mockResolvedValue(0)
+    // Default: successful DB operations
+    mockPoisRepository.insertOverpassPois.mockResolvedValue(undefined)
+    mockPoisRepository.updatePoiDistances.mockResolvedValue(undefined)
+    mockRedisClient.setex.mockResolvedValue('OK')
   })
 
   describe('findPois - validation', () => {
@@ -128,18 +159,8 @@ describe('PoisService', () => {
     })
 
     it('calls Overpass, stores in Redis, and returns results on cache MISS', async () => {
-      const overpassNode = {
-        type: 'node' as const,
-        id: 123,
-        lat: 43.1,
-        lon: 1.1,
-        tags: { name: 'Hôtel du Lac', amenity: 'hotel' },
-      }
-
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
-      mockPoisRepository.insertOverpassPois.mockResolvedValueOnce(undefined)
-      mockRedisClient.setex.mockResolvedValueOnce('OK')
 
       const result = await service.findPois(baseDto, userId)
 
@@ -151,6 +172,40 @@ describe('PoisService', () => {
       expect(result[0].source).toBe('overpass')
     })
 
+    it('calls updatePoiDistances after insertOverpassPois', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+
+      await service.findPois(baseDto, userId)
+
+      expect(mockPoisRepository.insertOverpassPois).toHaveBeenCalledTimes(1)
+      expect(mockPoisRepository.updatePoiDistances).toHaveBeenCalledWith(baseDto.segmentId)
+    })
+
+    it('prefetchGooglePlaceIds is called when isConfigured() returns true', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+
+      await service.findPois(baseDto, userId)
+
+      // Allow fire-and-forget to resolve
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(mockGooglePlacesProvider.isConfigured).toHaveBeenCalled()
+    })
+
+    it('prefetchGooglePlaceIds failure does NOT reject findPois (fire-and-forget)', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockRejectedValue(new Error('Network error'))
+
+      // findPois must NOT throw even if prefetch fails
+      await expect(service.findPois(baseDto, userId)).resolves.not.toThrow()
+    })
+
     it('falls back to DB cache when Overpass throws, does NOT cache in Redis', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockRejectedValueOnce(new Error('Overpass timeout'))
@@ -158,9 +213,28 @@ describe('PoisService', () => {
 
       const result = await service.findPois(baseDto, userId)
 
-      expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(baseDto.segmentId, baseDto.categories)
+      expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm)
       expect(mockRedisClient.setex).not.toHaveBeenCalled()
       expect(result).toEqual([mockPoi])
+    })
+  })
+
+  describe('getGooglePlaceIds', () => {
+    it('returns parsed array from Redis when key exists', async () => {
+      const placeIds = ['ChIJN1t', 'ChIJP2t']
+      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify(placeIds))
+
+      const result = await service.getGooglePlaceIds('seg-1', 0, 30, 'accommodations')
+
+      expect(result).toEqual(placeIds)
+    })
+
+    it('returns [] when key missing (no throw)', async () => {
+      mockRedisClient.get.mockResolvedValueOnce(null)
+
+      const result = await service.getGooglePlaceIds('seg-1', 0, 30, 'accommodations')
+
+      expect(result).toEqual([])
     })
   })
 })
