@@ -101,6 +101,6 @@ describe('usePoiGoogleDetails', () => {
     renderHook(() => usePoiGoogleDetails('ext-123', 'seg-abc'))
 
     const lastCall = mockUseQuery.mock.calls.at(-1)![0] as { queryKey: unknown[] }
-    expect(lastCall.queryKey).toEqual(['poi-google-details', 'ext-123', 'seg-abc'])
+    expect(lastCall.queryKey).toEqual(['pois', 'ext-123', 'google-details', 'seg-abc'])
   })
 })
