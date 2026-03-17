@@ -80,7 +80,16 @@ export class AdventuresRepository {
         cumulativeStartKm: s.cumulativeStartKm,
         distanceKm: s.distanceKm,
         parseStatus: s.parseStatus as MapSegmentData['parseStatus'],
-        waypoints: s.waypoints as MapWaypoint[] | null,
+        waypoints: s.waypoints
+          ? (s.waypoints as Array<{ lat: number; lng: number; ele?: number; dist_km?: number; distKm?: number }>).map(
+              (wp): MapWaypoint => ({
+                lat: wp.lat,
+                lng: wp.lng,
+                ...(wp.ele !== undefined ? { ele: wp.ele } : {}),
+                distKm: wp.distKm ?? wp.dist_km ?? 0,
+              }),
+            )
+          : null,
         boundingBox: s.boundingBox as MapSegmentData['boundingBox'],
       })),
     }

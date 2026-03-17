@@ -10,6 +10,7 @@ describe('useMapStore', () => {
       center: null,
       fromKm: 0,
       toKm: 30,
+      densityColorEnabled: true,
     })
   })
 
@@ -21,6 +22,7 @@ describe('useMapStore', () => {
     expect(state.center).toBeNull()
     expect(state.fromKm).toBe(0)
     expect(state.toKm).toBe(30)
+    expect(state.densityColorEnabled).toBe(true)
   })
 
   it('setActiveLayer updates activeLayer (AC #4)', () => {
@@ -57,5 +59,20 @@ describe('useMapStore', () => {
     const state = useMapStore.getState()
     expect(state.fromKm).toBe(10)
     expect(state.toKm).toBe(40)
+  })
+
+  it('densityColorEnabled defaults to true', () => {
+    expect(useMapStore.getState().densityColorEnabled).toBe(true)
+  })
+
+  it('toggleDensityColor flips densityColorEnabled from true to false', () => {
+    useMapStore.getState().toggleDensityColor()
+    expect(useMapStore.getState().densityColorEnabled).toBe(false)
+  })
+
+  it('toggleDensityColor flips densityColorEnabled back to true', () => {
+    useMapStore.getState().toggleDensityColor()
+    useMapStore.getState().toggleDensityColor()
+    expect(useMapStore.getState().densityColorEnabled).toBe(true)
   })
 })

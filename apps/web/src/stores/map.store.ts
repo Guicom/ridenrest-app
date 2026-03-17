@@ -16,11 +16,15 @@ interface MapState {
   fromKm: number
   toKm: number
 
+  // Density colorization toggle
+  densityColorEnabled: boolean
+
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
   toggleLayer: (layer: MapLayer) => void
   setViewport: (zoom: number, center: [number, number]) => void
   setSearchRange: (fromKm: number, toKm: number) => void
+  toggleDensityColor: () => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -30,6 +34,7 @@ export const useMapStore = create<MapState>((set) => ({
   center: null,
   fromKm: 0,
   toKm: 30,
+  densityColorEnabled: true,
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -47,4 +52,6 @@ export const useMapStore = create<MapState>((set) => ({
   setViewport: (zoom, center) => set({ zoom, center }),
 
   setSearchRange: (fromKm, toKm) => set({ fromKm, toKm }),
+
+  toggleDensityColor: () => set((state) => ({ densityColorEnabled: !state.densityColorEnabled })),
 }))

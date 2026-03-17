@@ -1207,3 +1207,157 @@ So that I can trigger the analysis, close the app, and be notified when the colo
 **Given** push notifications are not supported by the browser (e.g., iOS Safari < 16.4),
 **When** the analysis completes,
 **Then** the in-app notification (via polling au prochain focus de l'app) is the only channel used — no error is thrown for missing push support.
+
+---
+
+## Epic 9: Cache Optimization & Upstash Budget Management
+
+Optimiser la stratégie de cache Redis pour maximiser les performances, partager les données entre utilisateurs, contrôler la consommation Upstash (10k cmds/jour), et donner un levier d'invalidation admin en cas de mise à jour OSM.
+
+### Story 9.1: Geographic Cache Key — Cross-User POI Sharing
+
+As a **backend system**,
+I want POI query results to be cached by geographic corridor rather than by user session,
+So that two users querying the same zone benefit from the same cached data — reducing Overpass API calls and Upstash command consumption.
+
+**Acceptance Criteria:**
+
+**Given** two users query POIs for the same `(segmentId, fromKm, toKm, categories)` combination,
+**When** the second query arrives within the TTL window,
+**Then** only 1 Overpass API call is made (not 2) — the second user is served from Redis cache.
+
+**Given** the current cache key is `pois:{segmentId}:{fromKm}:{toKm}:{categories}` (segment-scoped),
+**When** a geographic key migration is implemented,
+**Then** the new key uses the geographic corridor bbox: `pois:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}:{categories}` (rounded to 3 decimal places ~111m precision) — decoupled from segment identity.
+
+**Given** the new geographic key is active,
+**When** a user with a different segment that overlaps the same geographic zone queries POIs,
+**Then** the cached result from the first segment's corridor is reused if the bboxes match within rounding — no new Overpass call.
+
+**Given** the geographic cache is active,
+**When** monitoring Upstash dashboard,
+**Then** the daily command count should decrease by an estimated 30-50% for popular bikepacking corridors (e.g., repeated queries on same route by different users).
+
+---
+
+### Story 9.2: Adaptive TTL — Density (7-30 days) vs POIs (24h) vs Weather (1h)
+
+As a **backend system**,
+I want different cache TTLs per data type based on OSM data volatility,
+So that stable data (density tronçons, OSM geography) stays cached much longer — reducing redundant Upstash commands while keeping time-sensitive data fresh.
+
+**Acceptance Criteria:**
+
+**Given** the density tronçon cache (`density:troncon:*`) currently uses 24h TTL,
+**When** the adaptive TTL is implemented,
+**Then** density tronçon counts use `TTL_DENSITY_TRONCON = 7 days` (604800s) — OSM accommodation presence changes rarely; staleness tolerance is high.
+
+**Given** a user manually re-triggers density analysis,
+**When** the processor runs,
+**Then** the density tronçon cache is reused if still valid (HIT) — the TTL extension to 7 days means most re-runs don't call Overpass again.
+
+**Given** POI search results (`pois:bbox:*`) currently use 24h TTL,
+**When** the adaptive TTL is reviewed,
+**Then** POI bbox results keep `TTL_POI_BBOX = 24h` (86400s) — acceptable balance between freshness and cache efficiency for planning mode.
+
+**Given** weather cache (`weather:*`) uses 1h TTL,
+**When** no change is needed,
+**Then** weather TTL stays at 1h — documented in `packages/shared/src/constants/api.constants.ts` as `CACHE_TTL_WEATHER_S = 3600`.
+
+**Given** all TTL constants are defined,
+**When** the codebase is audited,
+**Then** ALL cache TTL values are sourced from `packages/shared/src/constants/api.constants.ts` — no magic numbers in service files.
+
+---
+
+### Story 9.3: POI Query Cache by BBox + Category (Map Layer Requests)
+
+As a **cyclist user browsing the map**,
+I want POI layer data to be served from cache when I toggle a layer on a corridor I already searched,
+So that repeated layer toggles and re-visits to the same area are instantaneous — no redundant Overpass calls.
+
+**Acceptance Criteria:**
+
+**Given** a user has already searched accommodations on corridor [fromKm=0, toKm=30] for a segment,
+**When** they toggle the accommodation layer off and back on,
+**Then** the second `GET /pois` request is served from Redis cache in <200ms — no Overpass API call made.
+
+**Given** the POI cache currently stores full `Poi[]` arrays,
+**When** the geographic key migration (Story 9.1) is applied to `GET /pois`,
+**Then** the POI cache key is `pois:bbox:{rounded_bbox}:{sorted_categories}` — segment-agnostic, reusable across users and adventures.
+
+**Given** a segment's waypoints are used to compute a corridor bbox,
+**When** the bbox is computed for caching,
+**Then** lat/lng values are rounded to 3 decimal places (`Math.round(val * 1000) / 1000`) before constructing the cache key — prevents cache fragmentation from floating-point precision differences.
+
+**Given** the cache hit rate for `GET /pois` is monitored,
+**When** reviewing Upstash dashboard after 7 days of activity,
+**Then** the POI cache hit rate should be ≥ 60% (baseline target) — measurable via Upstash Analytics or custom counter keys.
+
+---
+
+### Story 9.4: Admin Cache Invalidation by Geographic Zone
+
+As a **system administrator**,
+I want to purge the cache for a specific geographic zone (bbox),
+So that when a significant OSM data update occurs in a region, the stale cache can be invalidated without restarting the server or flushing the entire Redis database.
+
+**Acceptance Criteria:**
+
+**Given** an admin needs to invalidate cache for a specific bbox (e.g., "Spanish Pyrenees corridor"),
+**When** they call `DELETE /admin/cache/zone?minLat=42.0&minLng=-2.0&maxLat=43.5&maxLng=3.0`,
+**Then** all Redis keys matching `pois:bbox:{keys within bbox}` and `density:troncon:{keys within bbox}` are identified and deleted — the operation returns a count of deleted keys.
+
+**Given** the admin endpoint is created,
+**When** it is accessed,
+**Then** it is protected by a static `ADMIN_SECRET` header (`X-Admin-Secret: ${ADMIN_SECRET}`) — not exposed in Swagger, not subject to the global `JwtAuthGuard`.
+
+**Given** the zone invalidation runs on a large bbox,
+**When** many keys match,
+**Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB` (would wipe all queues and other data).
+
+**Given** the operation completes,
+**When** the admin endpoint responds,
+**Then** the response includes: `{ deletedKeys: number, scanDuration: number }` — useful for monitoring invalidation impact.
+
+**Given** no matching keys are found for the bbox,
+**When** the endpoint responds,
+**Then** it returns `{ deletedKeys: 0 }` with HTTP 200 — not an error.
+
+---
+
+### Story 9.5: Upstash Budget Monitoring & Alerting Dashboard
+
+As a **solo developer operating at the free tier limit**,
+I want visibility into daily Redis command consumption with automatic alerting before quota exhaustion,
+So that I can act before hitting the 10k/day cap — avoiding silent service degradation.
+
+**Acceptance Criteria:**
+
+**Given** Upstash free tier cap is 10,000 commands/day,
+**When** the monitoring system is active,
+**Then** an email alert is sent by Upstash dashboard when daily usage exceeds 7,500 commands (75%) — configured via Upstash console (not code).
+
+**Given** the NestJS API starts,
+**When** a health check is performed,
+**Then** `GET /health` includes a `redis` sub-check that verifies connectivity — existing `HealthModule` extended with `RedisHealthIndicator`.
+
+**Given** a developer wants a per-feature breakdown of Redis usage,
+**When** reviewing the codebase,
+**Then** a comment in `apps/api/src/config/redis.config.ts` documents the estimated command budget per feature:
+- GPX parse job: ~15-20 cmds/job
+- POI search (miss): ~3 cmds (GET + SET + expire)
+- POI search (hit): ~1 cmd (GET)
+- Density tronçon (miss): ~3 cmds
+- Density tronçon (hit): ~1 cmd
+- BullMQ job lifecycle: ~15-20 cmds/job
+
+**Given** daily usage approaches the alert threshold,
+**When** usage exceeds 7,500 cmds/day,
+**Then** the recommended action is documented: switch to Upstash Pay-as-you-go ($0.2/100k cmds) — no code migration required, only billing change.
+
+**Given** a developer wants to understand optimization priority,
+**When** reviewing Story 9.5 completion notes,
+**Then** the measured baseline (7-day average cmds/day) is recorded — this data drives the decision on which stories in Epic 9 deliver the highest ROI.
+
+---

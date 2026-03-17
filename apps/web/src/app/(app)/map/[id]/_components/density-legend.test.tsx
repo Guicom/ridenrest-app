@@ -1,0 +1,110 @@
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { DensityLegend } from './density-legend'
+
+afterEach(cleanup)
+
+// Mock lucide-react icons
+vi.mock('lucide-react', () => ({
+  Map: () => <svg data-testid="map-icon" />,
+}))
+
+// Mock useMapStore
+let mockDensityColorEnabled = true
+const mockToggleDensityColor = vi.fn()
+
+const mockStore = {
+  densityColorEnabled: true,
+  toggleDensityColor: mockToggleDensityColor,
+}
+
+vi.mock('@/stores/map.store', () => {
+  const useMapStore = (selector?: (s: typeof mockStore) => unknown) => {
+    mockStore.densityColorEnabled = mockDensityColorEnabled
+    if (selector) return selector(mockStore)
+    return mockStore
+  }
+  useMapStore.getState = () => ({ ...mockStore, densityColorEnabled: mockDensityColorEnabled, toggleDensityColor: mockToggleDensityColor })
+  return { useMapStore }
+})
+
+describe('DensityLegend', () => {
+  beforeEach(() => {
+    mockDensityColorEnabled = true
+    mockToggleDensityColor.mockReset()
+  })
+
+  it('renders the legend trigger button with aria-label', () => {
+    render(<DensityLegend />)
+    const button = screen.getByRole('button', { name: /légende de densité/i })
+    expect(button).toBeDefined()
+  })
+
+  it('renders map icon inside trigger', () => {
+    render(<DensityLegend />)
+    expect(screen.getByTestId('map-icon')).toBeDefined()
+  })
+
+  it('does not show popover content by default', () => {
+    render(<DensityLegend />)
+    // The severity labels should not be visible before clicking
+    expect(screen.queryByText(/Bonne disponibilité/i)).toBeNull()
+  })
+
+  it('opens popover on click and shows all 3 severity rows', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend />)
+
+    const button = screen.getByRole('button', { name: /légende de densité/i })
+    await user.click(button)
+
+    expect(screen.getByText(/Bonne disponibilité/i)).toBeDefined()
+    expect(screen.getByText(/Disponibilité limitée/i)).toBeDefined()
+    expect(screen.getByText(/Zone critique/i)).toBeDefined()
+  })
+
+  it('shows density detail text for each severity', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend />)
+
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    expect(screen.getByText(/2\+ hébergements \/ 10km/i)).toBeDefined()
+    expect(screen.getByText(/1 hébergement \/ 10km/i)).toBeDefined()
+    expect(screen.getByText(/Aucun hébergement \/ 10km/i)).toBeDefined()
+  })
+
+  it('renders 3 colored swatches with aria-hidden inside the legend list', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend />)
+
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    // Swatches are <div aria-hidden="true"> inside <li> elements
+    const listItems = document.querySelectorAll('li')
+    const swatches = Array.from(listItems).filter((li) => li.querySelector('[aria-hidden="true"]'))
+    expect(swatches.length).toBe(3)
+  })
+
+  it('shows toggle switch checked when densityColorEnabled=true', async () => {
+    mockDensityColorEnabled = true
+    const user = userEvent.setup()
+    render(<DensityLegend />)
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    const toggle = screen.getByRole('switch', { name: /activer\/désactiver/i })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('calls toggleDensityColor when switch is clicked', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend />)
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    const toggle = screen.getByRole('switch', { name: /activer\/désactiver/i })
+    await user.click(toggle)
+
+    expect(mockToggleDensityColor).toHaveBeenCalledTimes(1)
+  })
+})

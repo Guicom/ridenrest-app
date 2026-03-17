@@ -2,12 +2,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAdventureMapData } from '@/lib/api-client'
 import { MapCanvas } from './map-canvas'
+import { DensityLegend } from './density-legend'
 import { LayerToggles } from './layer-toggles'
 import { SearchRangeSlider } from './search-range-slider'
 import { PoiDetailSheet } from './poi-detail-sheet'
 import { StatusBanner } from '@/components/shared/status-banner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePois } from '@/hooks/use-pois'
+import { useDensity } from '@/hooks/use-density'
 import { useUIStore } from '@/stores/ui.store'
 import type { AdventureMapResponse } from '@/lib/api-client'
 
@@ -30,9 +32,10 @@ export function MapView({ adventureId }: MapViewProps) {
     },
   })
 
-  // usePois must be called unconditionally (Rules of Hooks) — pass empty array before data loads
+  // useDensity + usePois must be called unconditionally (Rules of Hooks) — pass empty array before data loads
   const readySegments = data?.segments.filter((s) => s.parseStatus === 'done') ?? []
   const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
+  const { coverageGaps, densityStatus } = useDensity(adventureId)
 
   const { selectedPoiId } = useUIStore()
 
@@ -94,7 +97,14 @@ export function MapView({ adventureId }: MapViewProps) {
         segments={readySegments}
         adventureName={data.adventureName}
         poisByLayer={poisByLayer}
+        coverageGaps={coverageGaps}
+        densityStatus={densityStatus}
       />
+      {densityStatus === 'success' && (
+        <div className="absolute bottom-16 right-4 z-10">
+          <DensityLegend />
+        </div>
+      )}
 
       {/* Layer toggles — bottom center */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MapView } from './map-view'
@@ -17,6 +17,21 @@ vi.mock('@/hooks/use-pois', () => ({
     isPending: false,
     hasError: false,
   }),
+}))
+
+// Mock useDensity hook — default to idle (no density data)
+let mockDensityStatus: string = 'idle'
+vi.mock('@/hooks/use-density', () => ({
+  useDensity: () => ({
+    coverageGaps: [],
+    densityStatus: mockDensityStatus,
+    isPending: false,
+  }),
+}))
+
+// Mock DensityLegend
+vi.mock('./density-legend', () => ({
+  DensityLegend: () => <div data-testid="density-legend" />,
 }))
 
 // Mock map store
@@ -83,6 +98,10 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('MapView', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+  })
+
   it('shows Skeleton when isPending', () => {
     vi.mocked(getAdventureMapData).mockReturnValue(new Promise(() => {})) // never resolves
     render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
@@ -122,6 +141,30 @@ describe('MapView', () => {
 
     await screen.findByTestId('map-canvas')
     expect(screen.queryByTestId('status-banner')).toBeNull()
+  })
+
+  it('renders DensityLegend when densityStatus is success', async () => {
+    mockDensityStatus = 'success'
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(
+      makeMapResponse({ segments: [doneSeg as never] }),
+    )
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+
+    await screen.findByTestId('map-canvas')
+    expect(screen.getByTestId('density-legend')).toBeDefined()
+  })
+
+  it('does not render DensityLegend when densityStatus is idle', async () => {
+    mockDensityStatus = 'idle'
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(
+      makeMapResponse({ segments: [doneSeg as never] }),
+    )
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+
+    await screen.findByTestId('map-canvas')
+    expect(screen.queryByTestId('density-legend')).toBeNull()
   })
 
   it('shows error banner for error segments (AC #5)', async () => {

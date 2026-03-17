@@ -70,13 +70,14 @@ describe('OverpassProvider', () => {
     expect(result).toEqual(mockElements)
   })
 
-  it('throws when Overpass returns non-ok status', async () => {
-    mockFetch.mockResolvedValueOnce({
+  it('throws immediately when Overpass returns non-retryable error status (500)', async () => {
+    // 500 is not 429/503/504 → throws immediately, not retried
+    mockFetch.mockResolvedValue({
       ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
+      status: 500,
+      statusText: 'Internal Server Error',
     })
 
-    await expect(provider.queryPois(bbox, ['hotel'])).rejects.toThrow('Overpass API error: 429')
+    await expect(provider.queryPois(bbox, ['hotel'])).rejects.toThrow('Overpass API error: 500')
   })
 })

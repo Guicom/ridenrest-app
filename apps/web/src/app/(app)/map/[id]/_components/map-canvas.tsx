@@ -5,8 +5,21 @@ import { useMapStore } from '@/stores/map.store'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { usePoiLayers } from '@/hooks/use-poi-layers'
 import type { MapSegmentData } from '@/lib/api-client'
-import type { Poi, MapLayer } from '@ridenrest/shared'
+import type { Poi, MapLayer, CoverageGapSummary, DensityStatus } from '@ridenrest/shared'
 import type maplibregl from 'maplibre-gl'
+
+const DENSITY_COLORS = {
+  critical: '#ef4444',
+  medium: '#f59e0b',
+  none: '#22c55e',
+} as const
+
+// Stores density event handler references per map instance for proper cleanup
+const densityEventHandlers = new WeakMap<object, {
+  click: (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => void
+  mouseenter: () => void
+  mouseleave: () => void
+}>()
 
 // OpenFreeMap tile styles — MIT, commercial ok, OSM attribution required
 const TILE_STYLES = {
@@ -22,14 +35,26 @@ interface MapCanvasProps {
   segments: MapSegmentData[]
   adventureName: string
   poisByLayer: Record<MapLayer, Poi[]>
+  coverageGaps?: CoverageGapSummary[]
+  densityStatus?: DensityStatus
 }
 
-export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasProps) {
+export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, densityStatus }: MapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [styleVersion, setStyleVersion] = useState(0)
   const { resolvedTheme } = useTheme()
-  const { setViewport, fromKm, toKm } = useMapStore()
+  const { setViewport, fromKm, toKm, densityColorEnabled } = useMapStore()
+
+  // Refs for stale-closure-safe access inside event handlers and theme effects
+  const densityStatusRef = useRef(densityStatus)
+  const coverageGapsRef = useRef(coverageGaps)
+  const densityColorEnabledRef = useRef(densityColorEnabled)
+  const segmentsRef = useRef(segments)
+  useEffect(() => { densityStatusRef.current = densityStatus }, [densityStatus])
+  useEffect(() => { coverageGapsRef.current = coverageGaps }, [coverageGaps])
+  useEffect(() => { densityColorEnabledRef.current = densityColorEnabled }, [densityColorEnabled])
+  useEffect(() => { segmentsRef.current = segments }, [segments])
 
   usePoiLayers(mapRef, poisByLayer, styleVersion)
 
@@ -55,6 +80,11 @@ export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasPro
       map.on('load', () => {
         addTraceLayers(map, segments)
         fitToTrace(map, segments)
+
+        // Add density layer immediately if already active (data was cached before map loaded)
+        if (densityStatusRef.current === 'success' && coverageGapsRef.current && densityColorEnabledRef.current) {
+          addDensityLayer(map, segments, coverageGapsRef.current)
+        }
 
         // Sync viewport to store
         map.on('moveend', () => {
@@ -86,6 +116,34 @@ export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasPro
     updateCorridorHighlight(map, segments, fromKm, toKm)
   }, [segments, fromKm, toKm, styleVersion])  // styleVersion triggers re-add after theme switch
 
+  // Density layer — show/hide based on densityStatus, coverageGaps, and styleVersion
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+
+    if (densityStatus === 'success' && densityColorEnabledRef.current && coverageGaps) {
+      addDensityLayer(map, segments, coverageGaps)
+    } else {
+      removeDensityLayer(map)
+    }
+  }, [coverageGaps, densityStatus, segments, styleVersion])  // styleVersion triggers re-add after theme switch
+
+  // Direct store subscription for densityColorEnabled toggle — bypasses React render cycle
+  // to immediately update MapLibre when the toggle is clicked
+  useEffect(() => {
+    const unsubscribe = useMapStore.subscribe((state, prevState) => {
+      if (state.densityColorEnabled === prevState.densityColorEnabled) return
+      const map = mapRef.current
+      if (!map || !map.isStyleLoaded()) return
+      if (state.densityColorEnabled && densityStatusRef.current === 'success' && coverageGapsRef.current) {
+        addDensityLayer(map, segmentsRef.current, coverageGapsRef.current)
+      } else {
+        removeDensityLayer(map)
+      }
+    })
+    return () => unsubscribe()
+  }, [])  // Subscribe once — uses refs for latest values
+
   // Theme switching — update map style without reloading the page (AC #3)
   useEffect(() => {
     const map = mapRef.current
@@ -97,7 +155,11 @@ export function MapCanvas({ segments, adventureName, poisByLayer }: MapCanvasPro
     // will reconcile any delta if segments changed between theme switch and style.load
     map.once('style.load', () => {
       addTraceLayers(map, segments)
-      setStyleVersion((v) => v + 1)  // Triggers usePoiLayers re-run after theme change
+      // Re-add density layer if active (use refs for stale-closure-safe access)
+      if (densityStatusRef.current === 'success' && coverageGapsRef.current && densityColorEnabledRef.current) {
+        addDensityLayer(map, segments, coverageGapsRef.current)
+      }
+      setStyleVersion((v) => v + 1)  // Triggers usePoiLayers + density re-run after theme change
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTheme])
@@ -287,6 +349,146 @@ function updateCorridorHighlight(
     },
     beforeId,
   )
+}
+
+// ── Density layer helpers ─────────────────────────────────────────────────────
+
+export function buildDensityColoredFeatures(
+  segments: MapSegmentData[],
+  coverageGaps: CoverageGapSummary[],
+): GeoJSON.Feature[] {
+  const features: GeoJSON.Feature[] = []
+
+  for (const segment of segments) {
+    if (!segment.waypoints || segment.waypoints.length < 2) continue
+
+    const totalKm = segment.distanceKm
+    for (let fromKm = 0; fromKm < totalKm; fromKm += 10) {
+      const toKm = Math.min(fromKm + 10, totalKm)
+
+      const tronconWaypoints = segment.waypoints.filter(
+        (wp) => wp.distKm >= fromKm && wp.distKm <= toKm,
+      )
+
+      if (tronconWaypoints.length < 2) continue
+
+      // Epsilon comparison (< 0.01 km = 10m) to handle float32 DB values
+      const gap = coverageGaps.find(
+        (g) =>
+          g.segmentId === segment.id &&
+          Math.abs(g.fromKm - fromKm) < 0.01 &&
+          Math.abs(g.toKm - toKm) < 0.01,
+      )
+
+      const severity = gap?.severity ?? 'none'
+      const color = DENSITY_COLORS[severity]
+
+      features.push({
+        type: 'Feature',
+        properties: {
+          color,
+          severity,
+          fromKmAbsolute: segment.cumulativeStartKm + fromKm,
+          toKmAbsolute: segment.cumulativeStartKm + toKm,
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: tronconWaypoints.map((wp) => [wp.lng, wp.lat]),
+        },
+      })
+    }
+  }
+
+  return features
+}
+
+function addDensityLayer(
+  map: maplibregl.Map,
+  segments: MapSegmentData[],
+  coverageGaps: CoverageGapSummary[],
+) {
+  const features = buildDensityColoredFeatures(segments, coverageGaps)
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  // Remove existing density layer+source if present
+  removeDensityLayer(map)
+
+  map.addSource('trace-density', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features },
+  })
+
+  // Insert below trace-joins-circle to preserve correct layer ordering per spec
+  const beforeId = map.getLayer('trace-joins-circle') ? 'trace-joins-circle' : undefined
+  map.addLayer(
+    {
+      id: 'trace-density-line',
+      type: 'line',
+      source: 'trace-density',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 4,
+        'line-opacity': reducedMotion ? 0.9 : 0,
+        'line-opacity-transition': { duration: reducedMotion ? 0 : 300, delay: 0 },
+      },
+    },
+    beforeId,
+  )
+
+  if (!reducedMotion) {
+    // Trigger opacity transition after layer is added
+    requestAnimationFrame(() => {
+      if (map.getLayer('trace-density-line')) {
+        map.setPaintProperty('trace-density-line', 'line-opacity', 0.9)
+      }
+    })
+  }
+
+  // Hide original trace layer
+  if (map.getLayer('trace-line')) {
+    map.setLayoutProperty('trace-line', 'visibility', 'none')
+  }
+
+  // Store handler references so removeDensityLayer can clean them up (prevents accumulation)
+  const clickHandler = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+    const feature = e.features?.[0]
+    if (!feature?.properties) return
+    const { fromKmAbsolute, toKmAbsolute } = feature.properties as {
+      fromKmAbsolute: number
+      toKmAbsolute: number
+    }
+    useMapStore.getState().setSearchRange(fromKmAbsolute, toKmAbsolute)
+  }
+  const mouseenterHandler = () => { map.getCanvas().style.cursor = 'pointer' }
+  const mouseleaveHandler = () => { map.getCanvas().style.cursor = '' }
+
+  densityEventHandlers.set(map, { click: clickHandler, mouseenter: mouseenterHandler, mouseleave: mouseleaveHandler })
+  map.on('click', 'trace-density-line', clickHandler)
+  map.on('mouseenter', 'trace-density-line', mouseenterHandler)
+  map.on('mouseleave', 'trace-density-line', mouseleaveHandler)
+}
+
+function removeDensityLayer(map: maplibregl.Map) {
+  // Remove event listeners first to prevent accumulation across repeated add/remove cycles
+  const handlers = densityEventHandlers.get(map)
+  if (handlers) {
+    map.off('click', 'trace-density-line', handlers.click)
+    map.off('mouseenter', 'trace-density-line', handlers.mouseenter)
+    map.off('mouseleave', 'trace-density-line', handlers.mouseleave)
+    densityEventHandlers.delete(map)
+    map.getCanvas().style.cursor = ''
+  }
+  if (map.getLayer('trace-density-line')) {
+    map.removeLayer('trace-density-line')
+  }
+  if (map.getSource('trace-density')) {
+    map.removeSource('trace-density')
+  }
+  // Restore original trace layer
+  if (map.getLayer('trace-line')) {
+    map.setLayoutProperty('trace-line', 'visibility', 'visible')
+  }
 }
 
 function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {

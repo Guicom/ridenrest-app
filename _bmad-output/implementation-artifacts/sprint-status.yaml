@@ -89,7 +89,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-5: in-progress
   5-1-trigger-density-analysis-async-job-processing: done
-  5-2-colorized-trace-density-legend: backlog
+  5-2-colorized-trace-density-legend: done
   epic-5-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

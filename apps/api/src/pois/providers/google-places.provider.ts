@@ -211,6 +211,9 @@ export class GooglePlacesProvider {
   ): Promise<string[]> {
     const googleTypes = LAYER_GOOGLE_TYPES[layer] ?? []
     if (googleTypes.length === 0) return []
+    if (!this.API_KEY) return []
+
+    this.logger.debug(`Google Places searchLayer bbox: ${bbox.minLat.toFixed(4)},${bbox.minLng.toFixed(4)} → ${bbox.maxLat.toFixed(4)},${bbox.maxLng.toFixed(4)}, layer: ${layer}`)
 
     // Use a broad textQuery per layer so includedType does the actual filtering.
     // Using the type name as textQuery (e.g. "private guest room") causes Google

@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, act, waitFor } from '@testing-library/react'
-import { MapCanvas, buildCorridorFeatures } from './map-canvas'
+import { MapCanvas, buildCorridorFeatures, buildDensityColoredFeatures } from './map-canvas'
 import type { MapSegmentData } from '@/lib/api-client'
-import type { Poi, MapLayer } from '@ridenrest/shared'
+import type { Poi, MapLayer, CoverageGapSummary } from '@ridenrest/shared'
 
 afterEach(cleanup)
 
@@ -33,7 +33,10 @@ vi.mock('next-themes', () => ({
 
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({ setViewport: vi.fn(), visibleLayers: new Set(), fromKm: 0, toKm: 30 }),
+  useMapStore: Object.assign(
+    () => ({ setViewport: vi.fn(), visibleLayers: new Set(), fromKm: 0, toKm: 30, densityColorEnabled: true }),
+    { subscribe: vi.fn(() => vi.fn()) },  // subscribe returns unsubscribe fn
+  ),
 }))
 
 // Mock usePoiLayers
@@ -137,6 +140,94 @@ describe('MapCanvas', () => {
     const addSourceCalls = mockMapInstance.addSource.mock.calls as [string, unknown][]
     const poiSourceCalls = addSourceCalls.filter(([id]) => id.startsWith('pois-'))
     expect(poiSourceCalls).toHaveLength(0)
+  })
+})
+
+describe('buildDensityColoredFeatures', () => {
+  function makeDensitySegment(
+    id: string,
+    distanceKm: number,
+    cumulativeStartKm: number,
+    numWaypoints = 20,
+  ): MapSegmentData {
+    const waypoints = Array.from({ length: numWaypoints }, (_, i) => ({
+      lat: 43 + i * 0.01,
+      lng: 1 + i * 0.01,
+      ele: 100,
+      distKm: (i / (numWaypoints - 1)) * distanceKm,
+    }))
+    return {
+      id,
+      name: `Segment ${id}`,
+      orderIndex: 0,
+      cumulativeStartKm,
+      distanceKm,
+      parseStatus: 'done',
+      waypoints,
+      boundingBox: { minLat: 43, maxLat: 44, minLng: 1, maxLng: 2 },
+    }
+  }
+
+  it('returns empty array for segment with no waypoints', () => {
+    const segment: MapSegmentData = {
+      id: 'seg-1', name: 'S1', orderIndex: 0, cumulativeStartKm: 0, distanceKm: 30,
+      parseStatus: 'done', waypoints: null, boundingBox: null,
+    }
+    expect(buildDensityColoredFeatures([segment], [])).toHaveLength(0)
+  })
+
+  it('all tronçons are green (#22c55e) when coverageGaps is empty', () => {
+    const segment = makeDensitySegment('seg-1', 30, 0)
+    const result = buildDensityColoredFeatures([segment], [])
+    expect(result.length).toBeGreaterThan(0)
+    for (const f of result) expect(f.properties?.color).toBe('#22c55e')
+  })
+
+  it('critical gap → red (#ef4444) tronçon', () => {
+    const segment = makeDensitySegment('seg-1', 30, 0, 30)
+    const gap: CoverageGapSummary = { segmentId: 'seg-1', fromKm: 0, toKm: 10, severity: 'critical' }
+    const result = buildDensityColoredFeatures([segment], [gap])
+    const troncon = result.find((f) => f.properties?.fromKmAbsolute === 0 && f.properties?.toKmAbsolute === 10)
+    expect(troncon?.properties?.color).toBe('#ef4444')
+  })
+
+  it('medium gap → orange (#f59e0b) tronçon', () => {
+    const segment = makeDensitySegment('seg-1', 30, 0, 30)
+    const gap: CoverageGapSummary = { segmentId: 'seg-1', fromKm: 10, toKm: 20, severity: 'medium' }
+    const result = buildDensityColoredFeatures([segment], [gap])
+    const troncon = result.find((f) => f.properties?.fromKmAbsolute === 10 && f.properties?.toKmAbsolute === 20)
+    expect(troncon?.properties?.color).toBe('#f59e0b')
+  })
+
+  it('segment shorter than 10km → single partial tronçon colored correctly', () => {
+    const segment = makeDensitySegment('seg-1', 7, 0, 10)
+    const result = buildDensityColoredFeatures([segment], [])
+    expect(result).toHaveLength(1)
+    expect(result[0].properties?.fromKmAbsolute).toBe(0)
+    expect(result[0].properties?.toKmAbsolute).toBe(7)
+    expect(result[0].properties?.color).toBe('#22c55e')
+  })
+
+  it('fromKmAbsolute uses cumulativeStartKm offset correctly', () => {
+    const segment = makeDensitySegment('seg-1', 20, 50, 20)
+    const result = buildDensityColoredFeatures([segment], [])
+    expect(result[0].properties?.fromKmAbsolute).toBe(50)
+    expect(result[0].properties?.toKmAbsolute).toBe(60)
+  })
+
+  it('floating point matching: fromKm=9.999999 matches tronçon at 10.0 within epsilon < 0.01', () => {
+    const segment = makeDensitySegment('seg-1', 30, 0, 30)
+    const gap: CoverageGapSummary = { segmentId: 'seg-1', fromKm: 9.999999, toKm: 20.000001, severity: 'critical' }
+    const result = buildDensityColoredFeatures([segment], [gap])
+    const matched = result.find((f) => f.properties?.fromKmAbsolute >= 9 && f.properties?.fromKmAbsolute <= 11)
+    expect(matched?.properties?.color).toBe('#ef4444')
+  })
+
+  it('gap for different segmentId does not color the wrong tronçon', () => {
+    const segment = makeDensitySegment('seg-1', 30, 0, 30)
+    const gap: CoverageGapSummary = { segmentId: 'seg-2', fromKm: 0, toKm: 10, severity: 'critical' }
+    const result = buildDensityColoredFeatures([segment], [gap])
+    for (const f of result) expect(f.properties?.color).toBe('#22c55e')
   })
 })
 
