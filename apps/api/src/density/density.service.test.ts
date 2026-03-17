@@ -15,7 +15,7 @@ const makeAdventure = (densityStatus = 'idle') => ({
   updatedAt: new Date('2026-03-15T00:00:00Z'),
 })
 
-const mockRepo: jest.Mocked<DensityRepository> = {
+const mockRepo = {
   findByAdventureId: jest.fn(),
   setDensityStatus: jest.fn().mockResolvedValue(undefined),
   setDensityProgress: jest.fn().mockResolvedValue(undefined),
@@ -24,13 +24,16 @@ const mockRepo: jest.Mocked<DensityRepository> = {
   findSegmentsForAnalysis: jest.fn(),
   insertGaps: jest.fn().mockResolvedValue(undefined),
   findGapsBySegmentIds: jest.fn(),
-} as unknown as jest.Mocked<DensityRepository>
+}
 
 const mockQueue = {
   add: jest.fn().mockResolvedValue(undefined),
-} as unknown as jest.Mocked<Queue>
+}
 
-const service = new DensityService(mockRepo, mockQueue)
+const service = new DensityService(
+  mockRepo as unknown as DensityRepository,
+  mockQueue as unknown as Queue,
+)
 
 beforeEach(() => {
   jest.clearAllMocks()
