@@ -11,6 +11,7 @@ import { SegmentsModule } from './segments/segments.module.js'
 import { StravaModule } from './strava/strava.module.js'
 import { PoisModule } from './pois/pois.module.js'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
+import { DensityModule } from './density/density.module.js'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
     SegmentsModule,
     StravaModule,
     PoisModule,
+    DensityModule,
   ],
   controllers: [AppController],
   providers: [

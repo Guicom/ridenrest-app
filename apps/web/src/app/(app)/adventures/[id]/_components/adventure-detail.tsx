@@ -45,6 +45,7 @@ import {
 import { GpxUploadForm } from './gpx-upload-form'
 import { SortableSegmentCard } from './sortable-segment-card'
 import { StravaImportModal } from './strava-import-modal'
+import { DensityTriggerButton } from './density-trigger-button'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 interface Props {
@@ -296,10 +297,13 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             ? `${adventure.totalDistanceKm.toFixed(1)} km total`
             : 'Distance à calculer'}
         </p>
-        {segments.some((s) => s.parseStatus === 'done') && (
-          <Link href={`/map/${adventureId}`}>
-            <Button variant="outline" size="sm">Voir la carte</Button>
-          </Link>
+        {segments.every((s) => s.parseStatus === 'done') && segments.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Link href={`/map/${adventureId}`}>
+              <Button variant="outline" size="sm">Voir la carte</Button>
+            </Link>
+            <DensityTriggerButton adventureId={adventureId} segments={segments} />
+          </div>
         )}
       </div>
 

@@ -226,6 +226,23 @@ export async function importStravaRoute(
   })
 }
 
+// ── Density ───────────────────────────────────────────────────────────────────
+
+import type { DensityStatusResponse } from '@ridenrest/shared'
+
+export async function triggerDensityAnalysis(adventureId: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>('/api/density/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ adventureId }),
+  })
+}
+
+export async function getDensityStatus(adventureId: string): Promise<DensityStatusResponse> {
+  return apiFetch<DensityStatusResponse>(`/api/density/${adventureId}/status`)
+}
+
+export type { DensityStatusResponse }
+
 export const apiClient = {
   get: <T>(path: string, init?: RequestInit) =>
     apiFetch<T>(path, { ...init, method: 'GET' }),

@@ -8,5 +8,6 @@ import { GooglePlacesProvider } from './providers/google-places.provider.js'
 @Module({
   controllers: [PoisController],
   providers: [PoisService, PoisRepository, OverpassProvider, GooglePlacesProvider],
+  exports: [OverpassProvider, GooglePlacesProvider],
 })
 export class PoisModule {}

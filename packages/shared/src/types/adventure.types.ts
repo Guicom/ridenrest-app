@@ -1,5 +1,6 @@
 export type AdventureStatus = 'planning' | 'active' | 'completed'
 export type ParseStatus = 'pending' | 'processing' | 'done' | 'error'
+export type DensityStatus = 'idle' | 'pending' | 'processing' | 'success' | 'error'
 
 export interface MapWaypoint {
   lat: number
@@ -33,8 +34,23 @@ export interface AdventureResponse {
   name: string
   totalDistanceKm: number
   status: AdventureStatus
+  densityStatus: DensityStatus
+  densityProgress: number  // 0–100
   createdAt: string  // ISO 8601
   updatedAt: string
+}
+
+export interface CoverageGapSummary {
+  segmentId: string
+  fromKm: number
+  toKm: number
+  severity: 'medium' | 'critical'
+}
+
+export interface DensityStatusResponse {
+  densityStatus: DensityStatus
+  densityProgress: number  // 0–100
+  coverageGaps: CoverageGapSummary[]
 }
 
 export interface AdventureSegmentResponse {

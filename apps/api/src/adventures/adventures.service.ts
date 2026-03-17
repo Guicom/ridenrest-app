@@ -59,6 +59,8 @@ export class AdventuresService {
       name: a.name,
       totalDistanceKm: a.totalDistanceKm,
       status: a.status,
+      densityStatus: a.densityStatus,
+      densityProgress: a.densityProgress,
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
     }

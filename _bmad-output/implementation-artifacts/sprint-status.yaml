@@ -76,19 +76,19 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 4: Interactive Map & POI Planning Mode
   # ─────────────────────────────────────────────────────────────
-  epic-4: in-progress
+  epic-4: done
   4-1-gpx-trace-display-on-interactive-map: done
   4-2-poi-layer-toggles-pin-display: done
   4-3-corridor-search-poi-discovery-by-km-range: done
   4-4-poi-detail-sheet-booking-deep-links: done
-  4-5-poi-category-filter-on-map: ready-for-dev
+  4-5-poi-category-filter-on-map: cancelled
   epic-4-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
   # Epic 5: Density Analysis & Visual Intelligence
   # ─────────────────────────────────────────────────────────────
-  epic-5: backlog
-  5-1-trigger-density-analysis-async-job-processing: backlog
+  epic-5: in-progress
+  5-1-trigger-density-analysis-async-job-processing: done
   5-2-colorized-trace-density-legend: backlog
   epic-5-retrospective: optional
 
@@ -118,3 +118,15 @@ development_status:
   8-2-service-worker-partial-offline-support: backlog
   8-3-push-notifications-for-density-analysis: backlog
   epic-8-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 9: Cache Optimization & Upstash Budget Management
+  # (Post-MVP — à planifier après Epic 8)
+  # ─────────────────────────────────────────────────────────────
+  epic-9: backlog
+  9-1-geographic-cache-key-cross-user-poi-sharing: backlog
+  9-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: backlog
+  9-3-poi-query-cache-by-bbox-category-map-layers: backlog
+  9-4-admin-cache-invalidation-by-geographic-zone: backlog
+  9-5-upstash-budget-monitoring-alerting: backlog
+  epic-9-retrospective: optional
