@@ -10,18 +10,30 @@ vi.mock('@/lib/weather-geojson', () => ({
   buildWindArrowPoints: vi.fn().mockReturnValue({ type: 'FeatureCollection', features: [] }),
 }))
 
-// vi.hoisted ensures these variables are initialized before vi.mock's factory runs
+// vi.hoisted ensures variables are initialized before vi.mock's factory executes.
+// Using a class (not vi.fn) as constructor — classes are always valid constructors
+// and survive Vitest's module interception for dynamic imports.
 const popupMocks = vi.hoisted(() => {
-  const instance = {
-    setLngLat: vi.fn().mockReturnThis(),
-    setHTML: vi.fn().mockReturnThis(),
-    addTo: vi.fn().mockReturnThis(),
+  const setLngLatFn = vi.fn()
+  const setHTMLFn = vi.fn()
+  const addToFn = vi.fn()
+
+  // Shared instance — all new MockPopup() calls use the same method references
+  const instance = { setLngLat: setLngLatFn, setHTML: setHTMLFn, addTo: addToFn }
+  setLngLatFn.mockReturnValue(instance)
+  setHTMLFn.mockReturnValue(instance)
+  addToFn.mockReturnValue(instance)
+
+  class MockPopup {
+    setLngLat = setLngLatFn
+    setHTML = setHTMLFn
+    addTo = addToFn
   }
-  const Constructor = vi.fn().mockImplementation(() => instance)
-  return { instance, Constructor }
+
+  return { instance, MockPopup }
 })
 
-vi.mock('maplibre-gl', () => ({ Popup: popupMocks.Constructor }))
+vi.mock('maplibre-gl', () => ({ Popup: popupMocks.MockPopup }))
 
 function createMockMap() {
   const sources = new Map<string, { setData: ReturnType<typeof vi.fn> }>()
@@ -208,7 +220,6 @@ describe('WeatherLayer', () => {
   })
 
   it('shows weather popup with data when clicking an available feature (AC #4)', async () => {
-    popupMocks.Constructor.mockClear()
     popupMocks.instance.setLngLat.mockClear()
     popupMocks.instance.setHTML.mockClear()
     popupMocks.instance.addTo.mockClear()
@@ -247,7 +258,6 @@ describe('WeatherLayer', () => {
       })
     })
 
-    expect(popupMocks.Constructor).toHaveBeenCalled()
     const htmlArg = popupMocks.instance.setHTML.mock.calls[0]?.[0] as string
     expect(htmlArg).toContain('15')  // temperature
     expect(htmlArg).toContain('20')  // wind speed
@@ -255,7 +265,6 @@ describe('WeatherLayer', () => {
   })
 
   it('shows "Prévisions non disponibles" popup when clicking an unavailable grey segment (AC #7)', async () => {
-    popupMocks.Constructor.mockClear()
     popupMocks.instance.setHTML.mockClear()
     popupMocks.instance.addTo.mockClear()
 
@@ -291,7 +300,6 @@ describe('WeatherLayer', () => {
       })
     })
 
-    expect(popupMocks.Constructor).toHaveBeenCalled()
     const htmlArg = popupMocks.instance.setHTML.mock.calls[0]?.[0] as string
     expect(htmlArg).toContain('Prévisions non disponibles')
     expect(popupMocks.instance.addTo).toHaveBeenCalled()
