@@ -10,13 +10,18 @@ vi.mock('@/lib/weather-geojson', () => ({
   buildWindArrowPoints: vi.fn().mockReturnValue({ type: 'FeatureCollection', features: [] }),
 }))
 
-const mockPopupInstance = {
-  setLngLat: vi.fn().mockReturnThis(),
-  setHTML: vi.fn().mockReturnThis(),
-  addTo: vi.fn().mockReturnThis(),
-}
-const MockPopup = vi.fn(() => mockPopupInstance)
-vi.mock('maplibre-gl', () => ({ Popup: MockPopup }))
+// vi.hoisted ensures these variables are initialized before vi.mock's factory runs
+const popupMocks = vi.hoisted(() => {
+  const instance = {
+    setLngLat: vi.fn().mockReturnThis(),
+    setHTML: vi.fn().mockReturnThis(),
+    addTo: vi.fn().mockReturnThis(),
+  }
+  const Constructor = vi.fn().mockImplementation(() => instance)
+  return { instance, Constructor }
+})
+
+vi.mock('maplibre-gl', () => ({ Popup: popupMocks.Constructor }))
 
 function createMockMap() {
   const sources = new Map<string, { setData: ReturnType<typeof vi.fn> }>()
@@ -203,9 +208,10 @@ describe('WeatherLayer', () => {
   })
 
   it('shows weather popup with data when clicking an available feature (AC #4)', async () => {
-    MockPopup.mockClear()
-    mockPopupInstance.setLngLat.mockClear()
-    mockPopupInstance.setHTML.mockClear()
+    popupMocks.Constructor.mockClear()
+    popupMocks.instance.setLngLat.mockClear()
+    popupMocks.instance.setHTML.mockClear()
+    popupMocks.instance.addTo.mockClear()
 
     render(
       <WeatherLayer
@@ -241,16 +247,17 @@ describe('WeatherLayer', () => {
       })
     })
 
-    expect(MockPopup).toHaveBeenCalled()
-    const htmlArg = mockPopupInstance.setHTML.mock.calls[0]?.[0] as string
+    expect(popupMocks.Constructor).toHaveBeenCalled()
+    const htmlArg = popupMocks.instance.setHTML.mock.calls[0]?.[0] as string
     expect(htmlArg).toContain('15')  // temperature
     expect(htmlArg).toContain('20')  // wind speed
-    expect(mockPopupInstance.addTo).toHaveBeenCalled()
+    expect(popupMocks.instance.addTo).toHaveBeenCalled()
   })
 
   it('shows "Prévisions non disponibles" popup when clicking an unavailable grey segment (AC #7)', async () => {
-    MockPopup.mockClear()
-    mockPopupInstance.setHTML.mockClear()
+    popupMocks.Constructor.mockClear()
+    popupMocks.instance.setHTML.mockClear()
+    popupMocks.instance.addTo.mockClear()
 
     render(
       <WeatherLayer
@@ -284,9 +291,9 @@ describe('WeatherLayer', () => {
       })
     })
 
-    expect(MockPopup).toHaveBeenCalled()
-    const htmlArg = mockPopupInstance.setHTML.mock.calls[0]?.[0] as string
+    expect(popupMocks.Constructor).toHaveBeenCalled()
+    const htmlArg = popupMocks.instance.setHTML.mock.calls[0]?.[0] as string
     expect(htmlArg).toContain('Prévisions non disponibles')
-    expect(mockPopupInstance.addTo).toHaveBeenCalled()
+    expect(popupMocks.instance.addTo).toHaveBeenCalled()
   })
 })
