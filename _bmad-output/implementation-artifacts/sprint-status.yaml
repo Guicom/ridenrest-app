@@ -97,8 +97,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-6: in-progress
   6-1-pace-adjusted-weather-forecast-planning-mode: done
-  6-2-weather-fallback-auto-refresh: ready-for-dev
-  6-3-wind-arrows-proportional-size: ready-for-dev
+  6-2-wind-arrows-proportional-size: done
   epic-6-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

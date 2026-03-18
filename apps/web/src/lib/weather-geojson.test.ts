@@ -103,6 +103,26 @@ describe('buildWindArrowPoints', () => {
     expect(firstPoint.coordinates[1]).toBe(48.0)
   })
 
+  it('includes windSpeedKmh in Point feature properties (AC #1)', () => {
+    const pointsWithSpeed: WeatherPoint[] = [
+      { km: 0, forecastAt: '2026-03-22T08:00:00Z', temperatureC: 15, precipitationProbability: 10, windSpeedKmh: 20, windDirection: 270, weatherCode: 1, iconEmoji: '🌤' },
+    ]
+    const result = buildWindArrowPoints(pointsWithSpeed, waypoints)
+    const props = result.features[0].properties
+    expect(props).toHaveProperty('windSpeedKmh')
+    expect(props?.windSpeedKmh).toBe(20)
+  })
+
+  it('includes windSpeedKmh=null in Point feature properties when wind speed is unavailable', () => {
+    const pointsNoWind: WeatherPoint[] = [
+      { km: 5, forecastAt: '2026-03-22T08:15:00Z', temperatureC: null, precipitationProbability: null, windSpeedKmh: null, windDirection: null, weatherCode: null, iconEmoji: null },
+    ]
+    const result = buildWindArrowPoints(pointsNoWind, waypoints)
+    const props = result.features[0].properties
+    expect(props).toHaveProperty('windSpeedKmh')
+    expect(props?.windSpeedKmh).toBeNull()
+  })
+
   it('handles North wind direction (0°) correctly', () => {
     const northWindPoints: WeatherPoint[] = [
       { ...weatherPoints[0], windDirection: 0 },

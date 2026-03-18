@@ -103,14 +103,18 @@ export function WeatherLayer({ map, weatherPoints, segmentWaypoints, dimension, 
         }
 
         import('maplibre-gl').then(({ Popup }) => {
+          const windAngle = props.windDirection !== null ? (props.windDirection - 90 + 360) % 360 : 0
           const windDirStr = props.windDirection !== null ? ` ${props.windDirection}°` : ''
+          const windArrow = props.windSpeedKmh !== null
+            ? `<span style="display:inline-block;transform:rotate(${windAngle}deg)">→</span> ${props.windSpeedKmh.toFixed(0)} km/h`
+            : 'N/A'
           new Popup({ closeButton: true, closeOnClick: true })
             .setLngLat(e.lngLat)
             .setHTML(`
               <div class="text-sm space-y-1">
                 <div class="font-medium">${props.iconEmoji ?? '🌡'} km ${props.km.toFixed(1)}</div>
                 <div>🌡 ${props.temperatureC !== null ? `${props.temperatureC.toFixed(1)}°C` : 'N/A'}</div>
-                <div>💨 ${props.windSpeedKmh !== null ? `${props.windSpeedKmh.toFixed(0)} km/h` : 'N/A'}${windDirStr}</div>
+                <div>💨 ${windArrow}${windDirStr}</div>
                 <div>🌧 ${props.precipitationProbability !== null ? `${props.precipitationProbability}%` : 'N/A'}</div>
               </div>
             `)
@@ -142,7 +146,12 @@ export function WeatherLayer({ map, weatherPoints, segmentWaypoints, dimension, 
           source: sourceArrows,
           layout: {
             'text-field': '→',
-            'text-size': 16,
+            'text-size': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
+              0,  8,   // calm
+              20, 12,  // light breeze
+              40, 18,  // strong breeze
+              60, 24,  // storm
+            ] as maplibregl.ExpressionSpecification,
             'text-rotate': ['coalesce', ['get', 'windDirectionMaplibre'], 0],
             'text-rotation-alignment': 'map',
             'text-allow-overlap': true,
@@ -152,6 +161,10 @@ export function WeatherLayer({ map, weatherPoints, segmentWaypoints, dimension, 
             'text-color': '#1e40af',
             'text-halo-color': '#ffffff',
             'text-halo-width': 1,
+            'text-opacity': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
+              0, 0.4,  // barely visible at calm (AC #2)
+              5, 1.0,  // fully visible from 5 km/h
+            ] as maplibregl.ExpressionSpecification,
           },
         },
         beforeId,

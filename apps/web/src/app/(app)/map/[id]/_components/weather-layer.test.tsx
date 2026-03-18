@@ -264,6 +264,87 @@ describe('WeatherLayer', () => {
     expect(popupMocks.instance.addTo).toHaveBeenCalled()
   })
 
+  it('mounts wind arrows layer with data-driven text-size interpolation (AC #1)', () => {
+    render(
+      <WeatherLayer
+        map={mockMap as unknown as import('maplibre-gl').Map}
+        weatherPoints={sampleWeatherPoints}
+        segmentWaypoints={sampleWaypoints}
+        dimension="wind"
+        id="test"
+      />
+    )
+
+    const addLayerCall = mockMap.addLayer.mock.calls.find(
+      ([layer]: [{ id: string }]) => layer.id === 'weather-wind-arrows-layer-test',
+    )
+    const textSize = addLayerCall?.[0]?.layout?.['text-size'] as unknown[]
+    expect(textSize[0]).toBe('interpolate')
+    expect(textSize).toContain(8)   // calm stop
+    expect(textSize).toContain(24)  // storm stop (capped)
+  })
+
+  it('mounts wind arrows layer with text-opacity 0.4 at calm and coalesce guard (AC #2)', () => {
+    render(
+      <WeatherLayer
+        map={mockMap as unknown as import('maplibre-gl').Map}
+        weatherPoints={sampleWeatherPoints}
+        segmentWaypoints={sampleWaypoints}
+        dimension="wind"
+        id="test"
+      />
+    )
+
+    const addLayerCall = mockMap.addLayer.mock.calls.find(
+      ([layer]: [{ id: string }]) => layer.id === 'weather-wind-arrows-layer-test',
+    )
+    const textOpacity = addLayerCall?.[0]?.paint?.['text-opacity'] as unknown[]
+    expect(textOpacity[0]).toBe('interpolate')
+    expect(textOpacity).toContain(0.4)  // calm opacity per AC #2
+    expect(textOpacity).toContain(1.0)  // fully visible from 5 km/h
+  })
+
+  it('shows wind direction arrow → in popup alongside wind speed (AC #3)', async () => {
+    popupMocks.instance.setHTML.mockClear()
+    popupMocks.instance.addTo.mockClear()
+
+    render(
+      <WeatherLayer
+        map={mockMap as unknown as import('maplibre-gl').Map}
+        weatherPoints={sampleWeatherPoints}
+        segmentWaypoints={sampleWaypoints}
+        dimension="wind"
+        id="test"
+      />
+    )
+
+    const clickCall = mockMap.on.mock.calls.find(
+      (c: unknown[]) => c[0] === 'click' && c[1] === 'weather-lines-layer-test',
+    )
+    const clickHandler = clickCall![2] as (e: object) => void
+
+    await act(async () => {
+      clickHandler({
+        lngLat: { lng: 2.0, lat: 48.0 },
+        features: [{
+          properties: {
+            available: true,
+            temperatureC: 15,
+            windSpeedKmh: 20,
+            windDirection: 180,
+            precipitationProbability: 10,
+            iconEmoji: '🌤',
+            km: 0,
+          },
+        }],
+      })
+    })
+
+    const htmlArg = popupMocks.instance.setHTML.mock.calls[0]?.[0] as string
+    expect(htmlArg).toContain('→')      // proportional arrow emoji consistent with map layer (AC #3)
+    expect(htmlArg).toContain('km/h')   // wind speed value in km/h
+  })
+
   it('shows "Prévisions non disponibles" popup when clicking an unavailable grey segment (AC #7)', async () => {
     popupMocks.instance.setHTML.mockClear()
     popupMocks.instance.addTo.mockClear()
