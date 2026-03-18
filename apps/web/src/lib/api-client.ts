@@ -243,6 +243,25 @@ export async function getDensityStatus(adventureId: string): Promise<DensityStat
 
 export type { DensityStatusResponse }
 
+// ── Weather ───────────────────────────────────────────────────────────────────
+
+import type { WeatherForecast } from '@ridenrest/shared'
+
+export interface GetWeatherParams {
+  segmentId: string
+  departureTime?: string  // ISO 8601
+  speedKmh?: number
+}
+
+export async function getWeatherForecast(params: GetWeatherParams): Promise<WeatherForecast> {
+  const search = new URLSearchParams({ segmentId: params.segmentId })
+  if (params.departureTime) search.set('departureTime', params.departureTime)
+  if (params.speedKmh != null) search.set('speedKmh', String(params.speedKmh))
+  return apiFetch<WeatherForecast>(`/api/weather?${search}`)
+}
+
+export type { WeatherForecast }
+
 export const apiClient = {
   get: <T>(path: string, init?: RequestInit) =>
     apiFetch<T>(path, { ...init, method: 'GET' }),

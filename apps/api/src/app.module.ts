@@ -12,6 +12,7 @@ import { StravaModule } from './strava/strava.module.js'
 import { PoisModule } from './pois/pois.module.js'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
 import { DensityModule } from './density/density.module.js'
+import { WeatherModule } from './weather/weather.module.js'
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DensityModule } from './density/density.module.js'
     StravaModule,
     PoisModule,
     DensityModule,
+    WeatherModule,
   ],
   controllers: [AppController],
   providers: [

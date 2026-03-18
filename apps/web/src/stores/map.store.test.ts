@@ -11,6 +11,8 @@ describe('useMapStore', () => {
       fromKm: 0,
       toKm: 30,
       densityColorEnabled: true,
+      weatherActive: false,
+      weatherDimension: 'temperature',
     })
   })
 
@@ -74,5 +76,34 @@ describe('useMapStore', () => {
     useMapStore.getState().toggleDensityColor()
     useMapStore.getState().toggleDensityColor()
     expect(useMapStore.getState().densityColorEnabled).toBe(true)
+  })
+
+  it('weatherActive defaults to false', () => {
+    expect(useMapStore.getState().weatherActive).toBe(false)
+  })
+
+  it('setWeatherActive sets weather layer active', () => {
+    useMapStore.getState().setWeatherActive(true)
+    expect(useMapStore.getState().weatherActive).toBe(true)
+  })
+
+  it('setWeatherActive deactivates weather layer', () => {
+    useMapStore.getState().setWeatherActive(true)
+    useMapStore.getState().setWeatherActive(false)
+    expect(useMapStore.getState().weatherActive).toBe(false)
+  })
+
+  it('weatherDimension defaults to temperature', () => {
+    expect(useMapStore.getState().weatherDimension).toBe('temperature')
+  })
+
+  it('setWeatherDimension updates the dimension', () => {
+    useMapStore.getState().setWeatherDimension('wind')
+    expect(useMapStore.getState().weatherDimension).toBe('wind')
+  })
+
+  it('setWeatherDimension can be set to precipitation', () => {
+    useMapStore.getState().setWeatherDimension('precipitation')
+    expect(useMapStore.getState().weatherDimension).toBe('precipitation')
   })
 })

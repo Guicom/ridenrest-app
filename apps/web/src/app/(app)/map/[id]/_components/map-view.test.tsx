@@ -36,7 +36,7 @@ vi.mock('./density-legend', () => ({
 
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({ visibleLayers: new Set(), toggleLayer: vi.fn() }),
+  useMapStore: () => ({ visibleLayers: new Set(), toggleLayer: vi.fn(), weatherActive: false, weatherDimension: 'temperature', setWeatherActive: vi.fn(), setWeatherDimension: vi.fn(), densityColorEnabled: false }),
 }))
 
 // Mock MapCanvas to avoid WebGL in tests

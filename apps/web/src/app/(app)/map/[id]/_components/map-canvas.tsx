@@ -4,8 +4,15 @@ import { useTheme } from 'next-themes'
 import { useMapStore } from '@/stores/map.store'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { usePoiLayers } from '@/hooks/use-poi-layers'
+import { WeatherLayer, LINE_COLOR_EXPRESSIONS } from './weather-layer'
 import type { MapSegmentData } from '@/lib/api-client'
-import type { Poi, MapLayer, CoverageGapSummary, DensityStatus } from '@ridenrest/shared'
+import type { Poi, MapLayer, CoverageGapSummary, DensityStatus, WeatherPoint, MapWaypoint } from '@ridenrest/shared'
+
+export interface SegmentWeatherData {
+  segmentId: string
+  weatherPoints: WeatherPoint[]
+  waypoints: MapWaypoint[]
+}
 import type maplibregl from 'maplibre-gl'
 
 const DENSITY_COLORS = {
@@ -37,14 +44,15 @@ interface MapCanvasProps {
   poisByLayer: Record<MapLayer, Poi[]>
   coverageGaps?: CoverageGapSummary[]
   densityStatus?: DensityStatus
+  segmentsWeather?: SegmentWeatherData[]
 }
 
-export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, densityStatus }: MapCanvasProps) {
+export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather }: MapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [styleVersion, setStyleVersion] = useState(0)
   const { resolvedTheme } = useTheme()
-  const { setViewport, fromKm, toKm, densityColorEnabled } = useMapStore()
+  const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension } = useMapStore()
 
   // Refs for stale-closure-safe access inside event handlers and theme effects
   const densityStatusRef = useRef(densityStatus)
@@ -55,6 +63,24 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
   useEffect(() => { coverageGapsRef.current = coverageGaps }, [coverageGaps])
   useEffect(() => { densityColorEnabledRef.current = densityColorEnabled }, [densityColorEnabled])
   useEffect(() => { segmentsRef.current = segments }, [segments])
+
+  // Centralized dimension update: fires for all weather layers together so none are missed.
+  // React runs child effects (WeatherLayer data effect) before parent effects, so layers
+  // are guaranteed to exist by the time this runs.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !segmentsWeather?.length) return
+    for (const sw of segmentsWeather) {
+      const layerLines = `weather-lines-layer-${sw.segmentId}`
+      const layerArrows = `weather-wind-arrows-layer-${sw.segmentId}`
+      if (map.getLayer(layerLines)) {
+        map.setPaintProperty(layerLines, 'line-color', LINE_COLOR_EXPRESSIONS[weatherDimension])
+      }
+      if (map.getLayer(layerArrows)) {
+        map.setLayoutProperty(layerArrows, 'visibility', weatherDimension === 'wind' ? 'visible' : 'none')
+      }
+    }
+  }, [weatherDimension, segmentsWeather])
 
   usePoiLayers(mapRef, poisByLayer, styleVersion)
 
@@ -168,6 +194,16 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
     <div className="relative h-full w-full">
       <div ref={mapContainerRef} className="h-full w-full" aria-label={`Carte de l'aventure ${adventureName}`} role="application" />
       <OsmAttribution />
+      {weatherActive && segmentsWeather?.map((sw) => (
+        <WeatherLayer
+          key={sw.segmentId}
+          map={mapRef.current}
+          weatherPoints={sw.weatherPoints}
+          segmentWaypoints={sw.waypoints}
+          dimension={weatherDimension}
+          id={sw.segmentId}
+        />
+      ))}
     </div>
   )
 }

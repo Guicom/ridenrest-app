@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { MapLayer } from '@ridenrest/shared'
+import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 
 export type { MapLayer }
 
@@ -19,12 +20,18 @@ interface MapState {
   // Density colorization toggle
   densityColorEnabled: boolean
 
+  // Weather state
+  weatherActive: boolean
+  weatherDimension: WeatherDimension
+
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
   toggleLayer: (layer: MapLayer) => void
   setViewport: (zoom: number, center: [number, number]) => void
   setSearchRange: (fromKm: number, toKm: number) => void
   toggleDensityColor: () => void
+  setWeatherActive: (active: boolean) => void
+  setWeatherDimension: (dimension: WeatherDimension) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -35,6 +42,8 @@ export const useMapStore = create<MapState>((set) => ({
   fromKm: 0,
   toKm: 30,
   densityColorEnabled: true,
+  weatherActive: false,
+  weatherDimension: 'temperature',
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -54,4 +63,8 @@ export const useMapStore = create<MapState>((set) => ({
   setSearchRange: (fromKm, toKm) => set({ fromKm, toKm }),
 
   toggleDensityColor: () => set((state) => ({ densityColorEnabled: !state.densityColorEnabled })),
+
+  setWeatherActive: (active) => set({ weatherActive: active }),
+
+  setWeatherDimension: (dimension) => set({ weatherDimension: dimension }),
 }))

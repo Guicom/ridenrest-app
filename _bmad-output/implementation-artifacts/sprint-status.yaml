@@ -95,10 +95,10 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 6: Weather Integration
   # ─────────────────────────────────────────────────────────────
-  epic-6: backlog
-  6-1-pace-adjusted-weather-forecast-planning-mode: backlog
-  6-2-weather-fallback-auto-refresh: backlog
-  6-3-live-mode-weather-gps-based: backlog
+  epic-6: in-progress
+  6-1-pace-adjusted-weather-forecast-planning-mode: done
+  6-2-weather-fallback-auto-refresh: ready-for-dev
+  6-3-wind-arrows-proportional-size: ready-for-dev
   epic-6-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
@@ -107,26 +107,63 @@ development_status:
   epic-7: backlog
   7-1-geolocation-consent-live-mode-activation: backlog
   7-2-real-time-poi-discovery-by-target-distance-configurable-radius: backlog
-  7-3-graceful-degradation-on-unstable-connection: backlog
+  7-3-live-mode-weather-gps-based: backlog          # moved from epic-6 (depends on 7-1 live route)
+  7-4-graceful-degradation-on-unstable-connection: backlog
   epic-7-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
-  # Epic 8: PWA & Offline Capability
+  # Epic 8: App Shell & Navigation  ← NOUVEAU (inséré 2026-03-18)
   # ─────────────────────────────────────────────────────────────
   epic-8: backlog
-  8-1-pwa-manifest-app-install: backlog
-  8-2-service-worker-partial-offline-support: backlog
-  8-3-push-notifications-for-density-analysis: backlog
+  8-1-design-system-tokens: backlog
+  8-2-adventures-list-page: backlog
+  8-3-app-shell-routing: backlog
+  8-4-filter-panel-poi-selector: backlog
+  8-5-density-layer-toggle: backlog
+  8-6-accommodation-type-display-filters: backlog     # filtres affichage carte (shelter/refuge on/off)
+  8-7-density-analysis-category-selection: backlog    # popin sélection catégories avant analyse (dépend 8-6)
   epic-8-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
-  # Epic 9: Cache Optimization & Upstash Budget Management
-  # (Post-MVP — à planifier après Epic 8)
+  # Epic 9: Redesign & Landing Site  ← NOUVEAU (inséré 2026-03-18)
   # ─────────────────────────────────────────────────────────────
   epic-9: backlog
-  9-1-geographic-cache-key-cross-user-poi-sharing: backlog
-  9-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: backlog
-  9-3-poi-query-cache-by-bbox-category-map-layers: backlog
-  9-4-admin-cache-invalidation-by-geographic-zone: backlog
-  9-5-upstash-budget-monitoring-alerting: backlog
+  9-1-landing-page: backlog
+  9-2-auth-pages-polish: backlog
+  9-3-map-view-light-mode-polish: backlog
+  9-4-poi-card-bottom-sheet: backlog
+  9-5-adventure-detail-page-design: backlog
   epic-9-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 10: Cache Optimization & Upstash Budget Management
+  # (renommé depuis Epic 9 — Post-MVP)
+  # ─────────────────────────────────────────────────────────────
+  epic-10: backlog
+  10-1-geographic-cache-key-cross-user-poi-sharing: backlog
+  10-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: backlog
+  10-3-poi-query-cache-by-bbox-category-map-layers: backlog
+  10-4-admin-cache-invalidation-by-geographic-zone: backlog
+  10-5-upstash-budget-monitoring-alerting: backlog
+  epic-10-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 11: Stage Planning (Planning Avancé & Étapes)
+  # ─────────────────────────────────────────────────────────────
+  epic-11: backlog
+  11-1-stage-crud-km-input: backlog                  # CRUD étapes + module NestJS + table adventure_stages
+  11-2-stage-interactive-map-placement: backlog      # clic trace + drag marqueur sur carte
+  11-3-stage-elevation-computation: backlog          # calcul D+ depuis waypoints.ele, graceful si absent
+  11-4-stage-scoped-poi-search: backlog              # POI ancrés sur end_km d'étape (dépend 11-1)
+  11-5-stage-scoped-weather: backlog                 # météo par étape avec heure départ (dépend 11-1 + epic-6)
+  epic-11-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 12: PWA & Offline Capability
+  # (renommé depuis Epic 11 — Post-MVP, dernier)
+  # ─────────────────────────────────────────────────────────────
+  epic-12: backlog
+  12-1-pwa-manifest-app-install: backlog
+  12-2-service-worker-partial-offline-support: backlog
+  12-3-push-notifications-for-density-analysis: backlog
+  epic-12-retrospective: optional
