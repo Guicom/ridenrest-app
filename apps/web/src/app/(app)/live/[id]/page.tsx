@@ -1,15 +1,22 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
+import { snapToTrace } from '@ridenrest/gpx'
+import type { KmWaypoint } from '@ridenrest/gpx'
 import { useLiveMode } from '@/hooks/use-live-mode'
+import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
+import { useLiveStore } from '@/stores/live.store'
+import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
+import { LiveControls } from './_components/live-controls'
+import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
 
 export default function LivePage() {
   const { id: adventureId } = useParams<{ id: string }>()
@@ -28,6 +35,45 @@ export default function LivePage() {
     queryKey: ['adventures', adventureId, 'map'],
     queryFn: () => getAdventureMapData(adventureId),
   })
+
+  const segments = mapData?.segments ?? []
+  const firstSegment = segments[0]
+  const segmentId = firstSegment?.id
+
+  // Live POI search
+  const { pois, isPending: poisPending, targetKm } = useLivePoisSearch(segmentId)
+
+  // POI detail sheet — find selected POI from live results
+  const selectedPoiId = useUIStore((s) => s.selectedPoiId)
+  const selectedPoi = pois.find((p) => p.id === selectedPoiId) ?? null
+
+  // Live context for PoiDetailSheet (D+/ETA with live mode values)
+  const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
+  const speedKmh = useLiveStore((s) => s.speedKmh)
+  const liveContext = isLiveModeActive && currentKmOnRoute !== null
+    ? { currentKmOnRoute, speedKmh }
+    : undefined
+
+  // Waypoints from first segment for D+/ETA calculation
+  const waypoints = firstSegment?.waypoints ?? []
+
+  // Convert MapWaypoint[] → KmWaypoint[] for snapToTrace
+  const kmWaypoints: KmWaypoint[] = useMemo(
+    () => waypoints.map((wp) => ({ lat: wp.lat, lng: wp.lng, km: wp.distKm })),
+    [waypoints],
+  )
+
+  // Snap GPS position to trace → compute currentKmOnRoute
+  const currentPosition = useLiveStore((s) => s.currentPosition)
+  const setCurrentKm = useLiveStore((s) => s.setCurrentKm)
+
+  useEffect(() => {
+    if (!currentPosition || kmWaypoints.length === 0) return
+    const snap = snapToTrace(currentPosition, kmWaypoints)
+    if (snap) {
+      setCurrentKm(snap.kmAlongRoute)
+    }
+  }, [currentPosition, kmWaypoints, setCurrentKm])
 
   // Hydration-safe: defer client-only rendering until after mount
   useEffect(() => {
@@ -53,12 +99,15 @@ export default function LivePage() {
     setShowConsent(false)
   }
 
-  const segments = mapData?.segments ?? []
-
   return (
     <div className="relative h-dvh w-full overflow-hidden">
       {/* Map canvas — z-0 */}
-      <LiveMapCanvas adventureId={adventureId} segments={segments} />
+      <LiveMapCanvas
+        adventureId={adventureId}
+        segments={segments}
+        targetKm={targetKm}
+        pois={pois}
+      />
 
       {/* Top bar — z-40 */}
       <div className="absolute top-4 left-4 z-40">
@@ -80,33 +129,41 @@ export default function LivePage() {
 
       {/* Bottom overlay — z-30 (only render after mount to avoid hydration mismatch) */}
       {mounted && (
-        <div className="absolute bottom-8 left-0 right-0 z-30 flex justify-center">
-          {permissionDenied && (
-            <div className="rounded-lg bg-destructive/90 px-4 py-2 text-sm text-destructive-foreground">
-              Géolocalisation refusée — activez-la dans les paramètres de votre navigateur
+        <>
+          {isLiveModeActive && (
+            <LiveControls targetKm={targetKm} />
+          )}
+
+          {!isLiveModeActive && (
+            <div className="absolute bottom-8 left-0 right-0 z-30 flex justify-center">
+              {permissionDenied && (
+                <div className="rounded-lg bg-destructive/90 px-4 py-2 text-sm text-destructive-foreground">
+                  Géolocalisation refusée — activez-la dans les paramètres de votre navigateur
+                </div>
+              )}
+
+              {!permissionDenied && hasConsented && (
+                <Button
+                  onClick={startWatching}
+                  variant="destructive"
+                  size="lg"
+                >
+                  Activer le mode Live
+                </Button>
+              )}
+
+              {!permissionDenied && !hasConsented && !showConsent && (
+                <Button
+                  onClick={() => setShowConsent(true)}
+                  variant="destructive"
+                  size="lg"
+                >
+                  Activer le mode Live
+                </Button>
+              )}
             </div>
           )}
-
-          {!isLiveModeActive && !permissionDenied && hasConsented && (
-            <Button
-              onClick={startWatching}
-              variant="destructive"
-              size="lg"
-            >
-              Activer le mode Live
-            </Button>
-          )}
-
-          {!isLiveModeActive && !permissionDenied && !hasConsented && !showConsent && (
-            <Button
-              onClick={() => setShowConsent(true)}
-              variant="destructive"
-              size="lg"
-            >
-              Activer le mode Live
-            </Button>
-          )}
-        </div>
+        </>
       )}
 
       {isPending && (
@@ -114,6 +171,24 @@ export default function LivePage() {
           <div className="text-sm text-muted-foreground">Chargement de l&apos;aventure…</div>
         </div>
       )}
+
+      {/* POI search loading indicator */}
+      {poisPending && isLiveModeActive && (
+        <div className="absolute top-4 right-4 z-40">
+          <div className="flex items-center gap-2 rounded-md bg-background/80 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            Recherche POIs…
+          </div>
+        </div>
+      )}
+
+      {/* POI detail sheet — opens when a pin is clicked on the map */}
+      <PoiDetailSheet
+        poi={selectedPoi}
+        segments={segments}
+        segmentId={segmentId ?? null}
+        liveContext={liveContext}
+      />
     </div>
   )
 }

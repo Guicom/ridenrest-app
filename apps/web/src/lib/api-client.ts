@@ -171,6 +171,25 @@ export async function getPois(params: GetPoisParams): Promise<Poi[]> {
   return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
 }
 
+export interface GetLivePoisParams {
+  segmentId: string
+  targetKm: number
+  radiusKm: number
+  categories?: PoiCategory[]
+}
+
+export async function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
+  const searchParams = new URLSearchParams({
+    segmentId: params.segmentId,
+    targetKm: String(params.targetKm),
+    radiusKm: String(params.radiusKm),
+  })
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => searchParams.append('categories', c))
+  }
+  return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
+}
+
 export type { Poi, PoiCategory }
 
 // ── POI Google Details ────────────────────────────────────────────────────────

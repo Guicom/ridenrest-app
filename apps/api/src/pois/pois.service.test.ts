@@ -20,6 +20,8 @@ const mockRedisProvider = {
 
 const mockPoisRepository = {
   getSegmentWaypoints: jest.fn(),
+  getWaypointAtKm: jest.fn(),
+  findPoisNearPoint: jest.fn(),
   insertOverpassPois: jest.fn(),
   findCachedPois: jest.fn(),
   updatePoiDistances: jest.fn(),
@@ -95,6 +97,8 @@ describe('PoisService', () => {
     mockRedisClient.setex.mockReset()
     mockRedisClient.exists.mockReset()
     mockPoisRepository.getSegmentWaypoints.mockReset()
+    mockPoisRepository.getWaypointAtKm.mockReset()
+    mockPoisRepository.findPoisNearPoint.mockReset()
     mockPoisRepository.insertOverpassPois.mockReset()
     mockPoisRepository.findCachedPois.mockReset()
     mockPoisRepository.updatePoiDistances.mockReset()
@@ -116,6 +120,8 @@ describe('PoisService', () => {
     mockRedisClient.exists.mockResolvedValue(0)
     mockRedisClient.del.mockResolvedValue(1)
     // Default: successful DB operations
+    mockPoisRepository.getWaypointAtKm.mockResolvedValue(null)
+    mockPoisRepository.findPoisNearPoint.mockResolvedValue([])
     mockPoisRepository.insertOverpassPois.mockResolvedValue(undefined)
     mockPoisRepository.updatePoiDistances.mockResolvedValue(undefined)
     mockPoisRepository.findCachedPois.mockResolvedValue([])
@@ -276,6 +282,128 @@ describe('PoisService', () => {
       expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm)
       expect(mockRedisClient.setex).not.toHaveBeenCalled()
       expect(result).toEqual([mockPoi])
+    })
+  })
+
+  describe('findPois - live mode', () => {
+    const liveDto = {
+      segmentId: '00000000-0000-0000-0000-000000000001',
+      targetKm: 42.3,
+      radiusKm: 3,
+      categories: ['hotel'] as string[],
+    }
+
+    const mockLivePoi: Poi = {
+      id: 'live-poi-1',
+      externalId: '456',
+      source: 'overpass',
+      category: 'hotel',
+      name: 'Hôtel Live',
+      lat: 43.3,
+      lng: 1.3,
+      distFromTraceM: 500,
+      distAlongRouteKm: 42,
+      distFromTargetM: 150,
+    }
+
+    it('routes to live mode when targetKm is provided', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([mockLivePoi])
+
+      const result = await service.findPois(liveDto, userId)
+
+      expect(mockPoisRepository.getWaypointAtKm).toHaveBeenCalledWith(
+        liveDto.segmentId, liveDto.targetKm, userId,
+      )
+      expect(result).toEqual([mockLivePoi])
+    })
+
+    it('does NOT validate fromKm/toKm range in live mode', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+
+      // Should not throw even though fromKm/toKm are absent
+      await expect(service.findPois(liveDto, userId)).resolves.not.toThrow()
+    })
+
+    it('returns [] when getWaypointAtKm returns null', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce(null)
+
+      const result = await service.findPois(liveDto, userId)
+
+      expect(result).toEqual([])
+      expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+    })
+
+    it('uses correct live mode cache key with rounded targetKm', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+
+      await service.findPois(liveDto, userId)
+
+      expect(mockRedisClient.get).toHaveBeenCalledWith(
+        expect.stringContaining('pois:live:'),
+      )
+      // Verify cache key format: pois:live:{segmentId}:{roundedKm}:{radiusKm}:{categories}
+      const cacheKey = mockRedisClient.get.mock.calls[0][0]
+      expect(cacheKey).toBe(`pois:live:${liveDto.segmentId}:42.3:3:hotel`)
+    })
+
+    it('returns cached result on live mode cache HIT', async () => {
+      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify([mockLivePoi]))
+
+      const result = await service.findPois(liveDto, userId)
+
+      expect(result).toEqual([mockLivePoi])
+      expect(mockPoisRepository.getWaypointAtKm).not.toHaveBeenCalled()
+    })
+
+    it('calls findPoisNearPoint with correct radiusM', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+
+      await service.findPois(liveDto, userId)
+
+      expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledWith(
+        liveDto.segmentId, 43.3, 1.3, 3000, ['hotel'],
+      )
+    })
+
+    it('falls through on Overpass failure and still queries DB', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockRejectedValueOnce(new Error('Overpass timeout'))
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([mockLivePoi])
+
+      const result = await service.findPois(liveDto, userId)
+
+      expect(result).toEqual([mockLivePoi])
+    })
+
+    it('calls Google Places prefetch in live mode when configured', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+
+      await service.findPois(liveDto, userId)
+
+      expect(mockGooglePlacesProvider.isConfigured).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchLayerPlaceIds).toHaveBeenCalled()
+    })
+
+    it('Google Places failure does NOT reject live mode findPois', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockRejectedValue(new Error('Google API error'))
+
+      await expect(service.findPois(liveDto, userId)).resolves.not.toThrow()
     })
   })
 

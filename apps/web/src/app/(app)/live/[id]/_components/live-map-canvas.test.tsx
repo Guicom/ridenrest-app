@@ -9,18 +9,28 @@ afterEach(cleanup)
 // Mock MapLibre — WebGL unavailable in jsdom
 const mockMapInstance = {
   on: vi.fn(),
+  off: vi.fn(),
   once: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn(),
   getSource: vi.fn(),
+  getLayer: vi.fn().mockReturnValue(undefined),
   isStyleLoaded: vi.fn().mockReturnValue(false),
   fitBounds: vi.fn(),
   remove: vi.fn(),
   panTo: vi.fn(),
+  getCanvas: vi.fn().mockReturnValue({ style: {} }),
+  getZoom: vi.fn().mockReturnValue(10),
+  flyTo: vi.fn(),
 }
 
 vi.mock('maplibre-gl', () => ({
   Map: vi.fn().mockImplementation(function (this: unknown) { return mockMapInstance }),
+}))
+
+// Mock findPointAtKm
+vi.mock('@ridenrest/gpx', () => ({
+  findPointAtKm: vi.fn().mockReturnValue({ lat: 43.3, lng: 1.3 }),
 }))
 
 // Mock next-themes
@@ -95,10 +105,12 @@ describe('LiveMapCanvas', () => {
     const addSourceCalls = mockMapInstance.addSource.mock.calls as [string, unknown][]
     const sourceIds = addSourceCalls.map(([id]) => id)
     expect(sourceIds).toContain('live-trace')
+    expect(sourceIds).toContain('live-target-point')
     expect(sourceIds).toContain('live-gps-position')
 
     const addLayerCalls = mockMapInstance.addLayer.mock.calls as [{ id: string }][]
     const layerIds = addLayerCalls.map(([l]) => l.id)
+    expect(layerIds).toContain('target-dot')
     expect(layerIds).toContain('gps-dot')
   })
 

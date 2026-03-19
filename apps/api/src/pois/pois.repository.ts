@@ -214,6 +214,90 @@ export class PoisRepository {
     return rows[0] ?? null
   }
 
+  /** Find POIs near a target point using PostGIS ST_DWithin (live mode). */
+  async findPoisNearPoint(
+    segmentId: string,
+    targetLat: number,
+    targetLng: number,
+    radiusM: number,
+    categories: string[],
+  ): Promise<Poi[]> {
+    const now = new Date()
+    const rows = await db.execute(sql`
+      SELECT
+        ac.id,
+        ac.external_id,
+        ac.source,
+        ac.category,
+        ac.name,
+        ac.lat,
+        ac.lng,
+        ac.dist_from_trace_m,
+        ac.dist_along_route_km,
+        ST_Distance(
+          ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,
+          ST_SetSRID(ST_MakePoint(${targetLng}, ${targetLat}), 4326)::geography
+        ) AS dist_from_target_m
+      FROM accommodations_cache ac
+      WHERE ac.segment_id = ${segmentId}
+        AND ac.category = ANY(${`{${categories.join(',')}}`}::text[])
+        AND ac.expires_at > ${now}
+        AND ST_DWithin(
+          ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,
+          ST_SetSRID(ST_MakePoint(${targetLng}, ${targetLat}), 4326)::geography,
+          ${radiusM}
+        )
+      ORDER BY dist_from_target_m ASC
+    `)
+    return rows.rows.map((r) => ({
+      id: r.id as string,
+      externalId: r.external_id as string,
+      source: r.source as 'overpass' | 'amadeus' | 'google',
+      category: r.category as Poi['category'],
+      name: r.name as string,
+      lat: r.lat as number,
+      lng: r.lng as number,
+      distFromTraceM: r.dist_from_trace_m as number,
+      distAlongRouteKm: r.dist_along_route_km as number,
+      distFromTargetM: Math.round(r.dist_from_target_m as number),
+    }))
+  }
+
+  /**
+   * Interpolate a point at a given km distance along a segment's waypoints.
+   * Returns null if segment not found or does not belong to userId.
+   */
+  async getWaypointAtKm(
+    segmentId: string,
+    targetKm: number,
+    userId: string,
+  ): Promise<{ lat: number; lng: number } | null> {
+    const waypoints = await this.getSegmentWaypoints(segmentId, userId)
+    if (!waypoints || waypoints.length < 2) return null
+
+    // targetKm before route start — clamp to first waypoint
+    if (targetKm <= waypoints[0].distKm) {
+      return { lat: waypoints[0].lat, lng: waypoints[0].lng }
+    }
+
+    // Find bracketing waypoints and interpolate
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const a = waypoints[i]
+      const b = waypoints[i + 1]
+      if (a.distKm <= targetKm && targetKm <= b.distKm) {
+        const t = (targetKm - a.distKm) / (b.distKm - a.distKm)
+        return {
+          lat: a.lat + t * (b.lat - a.lat),
+          lng: a.lng + t * (b.lng - a.lng),
+        }
+      }
+    }
+
+    // targetKm beyond route end — clamp to last waypoint
+    const last = waypoints[waypoints.length - 1]
+    return { lat: last.lat, lng: last.lng }
+  }
+
   /**
    * Get segment waypoints for bbox computation, verifying ownership via adventure join.
    * Returns null if segment not found OR does not belong to userId.

@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useTheme } from 'next-themes'
 import { useLiveStore } from '@/stores/live.store'
+import { useLivePoiLayers } from '@/hooks/use-live-poi-layers'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
-import type { MapSegmentData } from '@ridenrest/shared'
+import { findPointAtKm } from '@ridenrest/gpx'
+import type { Poi, MapSegmentData } from '@ridenrest/shared'
+import type { KmWaypoint } from '@ridenrest/gpx'
 import type maplibregl from 'maplibre-gl'
 
 const TILE_STYLES = {
@@ -17,9 +20,11 @@ const TRACE_COLOR = '#FFFFFF'
 interface LiveMapCanvasProps {
   adventureId: string
   segments: MapSegmentData[]
+  targetKm?: number | null
+  pois?: Poi[]
 }
 
-export function LiveMapCanvas({ adventureId, segments }: LiveMapCanvasProps) {
+export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [] }: LiveMapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
@@ -51,6 +56,7 @@ export function LiveMapCanvas({ adventureId, segments }: LiveMapCanvasProps) {
 
       map.on('load', () => {
         addTraceLayers(map, segmentsRef.current)
+        addTargetPointLayer(map)
         addGpsPositionLayer(map)
         fitToTrace(map, segmentsRef.current)
         setMapReady(true)
@@ -64,6 +70,9 @@ export function LiveMapCanvas({ adventureId, segments }: LiveMapCanvasProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Render POI pins on map
+  useLivePoiLayers(mapRef, pois, mapReady)
 
   // Update trace when segments change AFTER map is ready
   useEffect(() => {
@@ -93,6 +102,31 @@ export function LiveMapCanvas({ adventureId, segments }: LiveMapCanvasProps) {
 
     map.panTo([currentPosition.lng, currentPosition.lat])
   }, [currentPosition, mapReady])
+
+  // Compute waypoints in KmWaypoint format for findPointAtKm
+  const kmWaypoints: KmWaypoint[] = useMemo(() => {
+    const firstSeg = segments[0]
+    if (!firstSeg?.waypoints) return []
+    return firstSeg.waypoints.map((wp) => ({ lat: wp.lat, lng: wp.lng, km: wp.distKm }))
+  }, [segments])
+
+  // Update target point marker
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || targetKm == null || kmWaypoints.length === 0) return
+
+    const point = findPointAtKm(kmWaypoints, targetKm)
+    if (!point) return
+
+    const source = map.getSource('live-target-point') as maplibregl.GeoJSONSource | undefined
+    if (source) {
+      source.setData({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [point.lng, point.lat] },
+        properties: {},
+      })
+    }
+  }, [targetKm, mapReady, kmWaypoints])
 
   return (
     <div className="relative h-full w-full">
@@ -137,6 +171,27 @@ function addTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
       'line-color': TRACE_COLOR,
       'line-width': 3,
       'line-opacity': 0.9,
+    },
+  })
+}
+
+function addTargetPointLayer(map: maplibregl.Map) {
+  map.addSource('live-target-point', {
+    type: 'geojson',
+    data: { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} },
+  })
+
+  map.addLayer({
+    id: 'target-dot',
+    type: 'circle',
+    source: 'live-target-point',
+    paint: {
+      'circle-radius': 14,
+      'circle-color': '#2D6A4A',
+      'circle-opacity': 0.5,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#FFFFFF',
+      'circle-stroke-opacity': 0.8,
     },
   })
 }

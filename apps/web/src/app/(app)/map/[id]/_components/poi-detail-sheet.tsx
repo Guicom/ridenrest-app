@@ -24,12 +24,18 @@ interface PoiDetailSheetProps {
   poi: Poi | null
   segments: MapSegmentData[]
   segmentId: string | null
+  /** Live mode context — overrides planning mode fromKm / speed */
+  liveContext?: {
+    currentKmOnRoute: number
+    speedKmh: number
+  }
 }
 
-export function PoiDetailSheet({ poi, segments, segmentId }: PoiDetailSheetProps) {
+export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDetailSheetProps) {
   const { selectedPoiId, setSelectedPoi } = useUIStore()
   const { fromKm } = useMapStore()
   const isOpen = !!selectedPoiId && !!poi
+  const isLiveMode = !!liveContext
 
   const { details, isPending: detailsPending } = usePoiGoogleDetails(
     poi?.externalId ?? null,
@@ -44,11 +50,13 @@ export function PoiDetailSheet({ poi, segments, segmentId }: PoiDetailSheetProps
   )?.[0] ?? 'accommodations') as MapLayer
 
   const poiKm = poi.distAlongRouteKm
+  const startKm = isLiveMode ? liveContext.currentKmOnRoute : fromKm
+  const speed = isLiveMode ? liveContext.speedKmh : DEFAULT_CYCLING_SPEED_KMH
 
-  // Find waypoints between fromKm and poiKm across all segments
+  // Find waypoints between startKm and poiKm across all segments
   const rangeWaypoints = segments.flatMap((seg) => {
     const segStart = seg.cumulativeStartKm
-    const localFrom = Math.max(0, fromKm - segStart)
+    const localFrom = Math.max(0, startKm - segStart)
     const localTo = Math.min(seg.distanceKm, poiKm - segStart)
     if (localTo <= localFrom || !seg.waypoints) return []
     return seg.waypoints
@@ -60,8 +68,8 @@ export function PoiDetailSheet({ poi, segments, segmentId }: PoiDetailSheetProps
     ? Math.round(computeElevationGain(rangeWaypoints))
     : null
 
-  const distanceKm = Math.max(0, poiKm - fromKm)
-  const etaMin = Math.round((distanceKm / DEFAULT_CYCLING_SPEED_KMH) * 60)
+  const distanceKm = Math.max(0, poiKm - startKm)
+  const etaMin = Math.round((distanceKm / speed) * 60)
 
   // ── OSM fallback data ─────────────────────────────────────────────────────
   const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
@@ -97,21 +105,32 @@ export function PoiDetailSheet({ poi, segments, segmentId }: PoiDetailSheetProps
         {/* ── Stats ── */}
         <div className="grid grid-cols-2 gap-2 py-3 border-y border-zinc-100 dark:border-zinc-800">
           <StatItem label="Sur la trace" value={`km ${poiKm.toFixed(1)}`} />
-          <StatItem
-            label="Distance trace"
-            value={
-              poi.distFromTraceM < 1000
-                ? `${Math.round(poi.distFromTraceM)} m`
-                : `${(poi.distFromTraceM / 1000).toFixed(1)} km`
-            }
-          />
+          {isLiveMode && poi.distFromTargetM != null ? (
+            <StatItem
+              label="Distance cible"
+              value={
+                poi.distFromTargetM < 1000
+                  ? `${poi.distFromTargetM} m`
+                  : `${(poi.distFromTargetM / 1000).toFixed(1)} km`
+              }
+            />
+          ) : (
+            <StatItem
+              label="Distance trace"
+              value={
+                poi.distFromTraceM < 1000
+                  ? `${Math.round(poi.distFromTraceM)} m`
+                  : `${(poi.distFromTraceM / 1000).toFixed(1)} km`
+              }
+            />
+          )}
           {elevationGainM !== null && elevationGainM > 0 && (
-            <StatItem label="D+ depuis km actuel" value={`↑ ${elevationGainM} m`} />
+            <StatItem label="D+" value={`↑ ${elevationGainM} m`} />
           )}
           <StatItem
             label="Temps estimé"
-            value={`~${etaMin} min`}
-            hint={`(à ${DEFAULT_CYCLING_SPEED_KMH} km/h)`}
+            value={formatEta(distanceKm, speed)}
+            hint={`(à ${speed} km/h)`}
           />
         </div>
 
@@ -188,6 +207,14 @@ export function PoiDetailSheet({ poi, segments, segmentId }: PoiDetailSheetProps
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatEta(distanceKm: number, speedKmh: number): string {
+  if (speedKmh <= 0) return '—'
+  const totalMinutes = Math.round((distanceKm / speedKmh) * 60)
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return h > 0 ? `~${h}h${String(m).padStart(2, '0')}` : `~${m} min`
+}
 
 function StatItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (

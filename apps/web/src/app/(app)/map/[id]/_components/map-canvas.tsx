@@ -34,9 +34,9 @@ const TILE_STYLES = {
   dark: 'https://tiles.openfreemap.org/styles/dark',
 } as const
 
-// Trace colors — distinguishable in both themes
-const SEGMENT_COLORS = ['#E44C26', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6']
-const SEGMENT_JOIN_COLOR = '#6B7280'
+// Trace colors — brand green primary, variants for multi-segment adventures
+const SEGMENT_COLORS = ['#4A7C44', '#2D5C3F', '#6B9E65', '#3D6B39', '#8BBF84']
+const SEGMENT_JOIN_COLOR = '#4A7C44'
 
 interface MapCanvasProps {
   segments: MapSegmentData[]

@@ -14,6 +14,7 @@ export interface Poi {
   lng: number
   distFromTraceM: number
   distAlongRouteKm: number
+  distFromTargetM?: number  // Only present in live mode responses
   bookingUrl?: string  // Deep link (Hotels.com / Booking.com parameterized)
   rawData?: Record<string, unknown>
 }

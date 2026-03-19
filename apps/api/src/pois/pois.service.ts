@@ -36,9 +36,16 @@ export class PoisService {
   ) {}
 
   async findPois(dto: FindPoisDto, userId: string): Promise<Poi[]> {
-    const { segmentId, fromKm, toKm, categories } = dto
+    // Live mode branch — radius-based search around interpolated point
+    if (dto.targetKm !== undefined) {
+      return this.findLiveModePois(dto, userId)
+    }
 
-    // Validate range
+    const { segmentId, categories } = dto
+    const fromKm = dto.fromKm!
+    const toKm = dto.toKm!
+
+    // Validate range (corridor mode only)
     if (toKm <= fromKm) {
       throw new BadRequestException('toKm must be greater than fromKm')
     }
@@ -160,6 +167,64 @@ export class PoisService {
     await redis.setex(detailsKey, DETAILS_TTL, JSON.stringify(details))
 
     return details
+  }
+
+  private async findLiveModePois(dto: FindPoisDto, userId: string): Promise<Poi[]> {
+    const { segmentId, targetKm, radiusKm, categories } = dto
+    const radiusM = (radiusKm ?? 3) * 1000
+    const activeCategories = categories ?? Object.keys(CATEGORY_TO_OVERPASS_TAGS)
+
+    // Cache key — round targetKm to 0.1 km to reduce fragmentation
+    const roundedKm = Math.round(targetKm! * 10) / 10
+    const cacheKey = `pois:live:${segmentId}:${roundedKm}:${radiusKm ?? 3}:${activeCategories.sort().join(',')}`
+
+    const redis = this.redisProvider.getClient()
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      this.logger.debug(`Live cache HIT: ${cacheKey}`)
+      return JSON.parse(cached) as Poi[]
+    }
+
+    this.logger.debug(`Live cache MISS: ${cacheKey}`)
+
+    // Get target point (interpolated from waypoints — no GPS sent)
+    const targetPoint = await this.poisRepository.getWaypointAtKm(segmentId, targetKm!, userId)
+    if (!targetPoint) return []
+
+    // Overpass bbox around target point
+    const radDeg = (radiusKm ?? 3) / 111.0
+    const bbox = {
+      minLat: targetPoint.lat - radDeg, maxLat: targetPoint.lat + radDeg,
+      minLng: targetPoint.lng - radDeg, maxLng: targetPoint.lng + radDeg,
+    }
+
+    let overpassSucceeded = false
+    try {
+      const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
+      const categoryMap: Record<number, string> = {}
+      for (const node of nodes) categoryMap[node.id] = resolveCategory(node.tags)
+      const expiresAt = new Date(Date.now() + CACHE_TTL_SECONDS * 1000)
+      await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
+      await this.poisRepository.updatePoiDistances(segmentId)
+      overpassSucceeded = true
+    } catch (err) {
+      this.logger.warn(`Overpass failed in live mode: ${err}`)
+      // Fall through — may still have cached POIs from a previous fetch
+    }
+
+    // Google Places: enrich with additional POIs (same as corridor mode)
+    await this.prefetchAndInsertGooglePois(bbox, segmentId, redis)
+      .catch((err) => this.logger.warn('Google Places prefetch failed in live mode', err))
+
+    const pois = await this.poisRepository.findPoisNearPoint(
+      segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories,
+    )
+
+    // Only cache after a fresh Overpass fetch — never cache stale fallback data
+    if (overpassSucceeded) {
+      await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(pois))
+    }
+    return pois
   }
 
   private async prefetchAndInsertGooglePois(

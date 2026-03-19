@@ -9,6 +9,11 @@ vi.mock('@/hooks/use-live-mode', () => ({
   useLiveMode: () => mockUseLiveMode(),
 }))
 
+// Mock use-live-poi-search hook
+vi.mock('@/hooks/use-live-poi-search', () => ({
+  useLivePoisSearch: () => ({ pois: [], isPending: false, targetKm: null }),
+}))
+
 // Mock LiveMapCanvas
 vi.mock('./_components/live-map-canvas', () => ({
   LiveMapCanvas: ({ adventureId }: { adventureId: string }) => (
@@ -16,11 +21,21 @@ vi.mock('./_components/live-map-canvas', () => ({
   ),
 }))
 
+// Mock LiveControls
+vi.mock('./_components/live-controls', () => ({
+  LiveControls: () => <div data-testid="live-controls" />,
+}))
+
 // Mock GeolocationConsent
 vi.mock('./_components/geolocation-consent', () => ({
   GeolocationConsent: ({ open }: { open: boolean }) => (
     open ? <div data-testid="geolocation-consent" /> : null
   ),
+}))
+
+// Mock PoiDetailSheet (from map route, reused in live)
+vi.mock('../../map/[id]/_components/poi-detail-sheet', () => ({
+  PoiDetailSheet: () => <div data-testid="poi-detail-sheet" />,
 }))
 
 // Mock TanStack Query
@@ -43,6 +58,11 @@ vi.mock('next/navigation', () => ({
 // Mock api-client
 vi.mock('@/lib/api-client', () => ({
   getAdventureMapData: vi.fn(),
+}))
+
+// Mock snapToTrace from gpx package
+vi.mock('@ridenrest/gpx', () => ({
+  snapToTrace: vi.fn().mockReturnValue(null),
 }))
 
 import LivePage from './page'

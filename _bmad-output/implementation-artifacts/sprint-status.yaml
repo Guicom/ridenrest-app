@@ -105,8 +105,8 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-7: in-progress
   7-1-geolocation-consent-live-mode-activation: done
-  7-2-real-time-poi-discovery-by-target-distance-configurable-radius: backlog
-  7-3-live-mode-weather-gps-based: backlog          # moved from epic-6 (depends on 7-1 live route)
+  7-2-real-time-poi-discovery-by-target-distance-configurable-radius: done
+  7-3-live-mode-weather-gps-based: ready-for-dev    # moved from epic-6 (depends on 7-1 live route)
   7-4-graceful-degradation-on-unstable-connection: backlog
   epic-7-retrospective: optional
 
