@@ -69,7 +69,6 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
     : null
 
   const distanceKm = Math.max(0, poiKm - startKm)
-  const etaMin = Math.round((distanceKm / speed) * 60)
 
   // ── OSM fallback data ─────────────────────────────────────────────────────
   const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData

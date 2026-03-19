@@ -348,7 +348,7 @@ describe('PoisService', () => {
         expect.stringContaining('pois:live:'),
       )
       // Verify cache key format: pois:live:{segmentId}:{roundedKm}:{radiusKm}:{categories}
-      const cacheKey = mockRedisClient.get.mock.calls[0][0]
+      const cacheKey = (mockRedisClient.get.mock.calls as string[][])[0][0]
       expect(cacheKey).toBe(`pois:live:${liveDto.segmentId}:42.3:3:hotel`)
     })
 

@@ -21,7 +21,7 @@ vi.mock('./_components/live-map-canvas', () => ({
   ),
 }))
 
-// Mock LiveControls
+// Mock LiveControls (no props)
 vi.mock('./_components/live-controls', () => ({
   LiveControls: () => <div data-testid="live-controls" />,
 }))

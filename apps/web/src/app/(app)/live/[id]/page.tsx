@@ -54,13 +54,10 @@ export default function LivePage() {
     ? { currentKmOnRoute, speedKmh }
     : undefined
 
-  // Waypoints from first segment for D+/ETA calculation
-  const waypoints = firstSegment?.waypoints ?? []
-
   // Convert MapWaypoint[] → KmWaypoint[] for snapToTrace
   const kmWaypoints: KmWaypoint[] = useMemo(
-    () => waypoints.map((wp) => ({ lat: wp.lat, lng: wp.lng, km: wp.distKm })),
-    [waypoints],
+    () => (firstSegment?.waypoints ?? []).map((wp) => ({ lat: wp.lat, lng: wp.lng, km: wp.distKm })),
+    [firstSegment?.waypoints],
   )
 
   // Snap GPS position to trace → compute currentKmOnRoute
@@ -131,7 +128,7 @@ export default function LivePage() {
       {mounted && (
         <>
           {isLiveModeActive && (
-            <LiveControls targetKm={targetKm} />
+            <LiveControls />
           )}
 
           {!isLiveModeActive && (

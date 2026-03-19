@@ -208,7 +208,7 @@ export class PoisService {
       await this.poisRepository.updatePoiDistances(segmentId)
       overpassSucceeded = true
     } catch (err) {
-      this.logger.warn(`Overpass failed in live mode: ${err}`)
+      this.logger.warn(`Overpass failed in live mode: ${String(err)}`)
       // Fall through — may still have cached POIs from a previous fetch
     }
 

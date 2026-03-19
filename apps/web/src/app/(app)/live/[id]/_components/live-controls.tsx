@@ -5,11 +5,7 @@ import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useLiveStore } from '@/stores/live.store'
 
-interface LiveControlsProps {
-  targetKm: number | null
-}
-
-export function LiveControls({ targetKm }: LiveControlsProps) {
+export function LiveControls() {
   const [expanded, setExpanded] = useState(true)
 
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)

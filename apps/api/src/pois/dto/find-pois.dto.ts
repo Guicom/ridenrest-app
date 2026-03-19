@@ -10,13 +10,13 @@ export class FindPoisDto {
   segmentId!: string
 
   // Corridor mode — only required when NOT in live mode
-  @ValidateIf(o => !o.targetKm)
+  @ValidateIf((o: FindPoisDto) => !o.targetKm)
   @IsNumber()
   @Min(0)
   @Type(() => Number)
   fromKm?: number
 
-  @ValidateIf(o => !o.targetKm)
+  @ValidateIf((o: FindPoisDto) => !o.targetKm)
   @IsNumber()
   @Min(0)
   @Type(() => Number)
@@ -29,7 +29,7 @@ export class FindPoisDto {
   @Type(() => Number)
   targetKm?: number
 
-  @ValidateIf(o => o.targetKm !== undefined)
+  @ValidateIf((o: FindPoisDto) => o.targetKm !== undefined)
   @IsNumber()
   @Min(0)
   @Max(10)
