@@ -19,4 +19,11 @@ export class GetWeatherDto {
   @Min(1)
   @Max(100)
   speedKmh?: number
+
+  @ApiPropertyOptional({ description: 'Adventure km — only sample waypoints ahead of this position', minimum: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  fromKm?: number
 }

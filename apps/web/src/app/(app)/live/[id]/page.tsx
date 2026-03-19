@@ -7,8 +7,10 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { snapToTrace } from '@ridenrest/gpx'
 import type { KmWaypoint } from '@ridenrest/gpx'
+import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 import { useLiveMode } from '@/hooks/use-live-mode'
 import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
+import { useLiveWeather } from '@/hooks/use-live-weather'
 import { useLiveStore } from '@/stores/live.store'
 import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData } from '@/lib/api-client'
@@ -16,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
+import { LiveWeatherOverlay } from './_components/live-weather-overlay'
 import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
 
 export default function LivePage() {
@@ -31,6 +34,11 @@ export default function LivePage() {
   const [mounted, setMounted] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
 
+  // Weather layer state
+  const [weatherActive, setWeatherActive] = useState(false)
+  const [weatherDimension, setWeatherDimension] = useState<WeatherDimension>('temperature')
+  const [weatherDepartureTime, setWeatherDepartureTime] = useState('')
+
   const { data: mapData, isPending } = useQuery({
     queryKey: ['adventures', adventureId, 'map'],
     queryFn: () => getAdventureMapData(adventureId),
@@ -42,6 +50,19 @@ export default function LivePage() {
 
   // Live POI search
   const { pois, isPending: poisPending, targetKm } = useLivePoisSearch(segmentId)
+
+  // Live weather — pass user departure time if set
+  const weatherDepartureTimeIso = weatherDepartureTime
+    ? new Date(weatherDepartureTime).toISOString()
+    : undefined
+  const {
+    weatherPoints,
+    isPending: weatherPending,
+    isError: weatherError,
+    isGpsLost,
+  } = useLiveWeather(segmentId, {
+    departureTime: weatherDepartureTimeIso,
+  })
 
   // POI detail sheet — find selected POI from live results
   const selectedPoiId = useUIStore((s) => s.selectedPoiId)
@@ -104,6 +125,9 @@ export default function LivePage() {
         segments={segments}
         targetKm={targetKm}
         pois={pois}
+        weatherPoints={weatherPoints}
+        weatherDimension={weatherDimension}
+        weatherActive={weatherActive}
       />
 
       {/* Top bar — z-40 */}
@@ -116,6 +140,19 @@ export default function LivePage() {
           Aventures
         </Link>
       </div>
+
+      {/* Weather overlay — top right z-40 */}
+      {mounted && isLiveModeActive && (
+        <LiveWeatherOverlay
+          weatherActive={weatherActive}
+          onToggle={() => setWeatherActive((v) => !v)}
+          dimension={weatherDimension}
+          onDimensionChange={setWeatherDimension}
+          isGpsLost={isGpsLost}
+          departureTime={weatherDepartureTime}
+          onDepartureTimeChange={setWeatherDepartureTime}
+        />
+      )}
 
       {/* Consent modal — z-60 */}
       <GeolocationConsent
@@ -171,7 +208,7 @@ export default function LivePage() {
 
       {/* POI search loading indicator */}
       {poisPending && isLiveModeActive && (
-        <div className="absolute top-4 right-4 z-40">
+        <div className="absolute top-14 right-4 z-40">
           <div className="flex items-center gap-2 rounded-md bg-background/80 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">
             <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             Recherche POIs…

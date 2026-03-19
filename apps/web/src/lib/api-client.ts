@@ -270,12 +270,14 @@ export interface GetWeatherParams {
   segmentId: string
   departureTime?: string  // ISO 8601
   speedKmh?: number
+  fromKm?: number
 }
 
 export async function getWeatherForecast(params: GetWeatherParams): Promise<WeatherForecast> {
   const search = new URLSearchParams({ segmentId: params.segmentId })
   if (params.departureTime) search.set('departureTime', params.departureTime)
   if (params.speedKmh != null) search.set('speedKmh', String(params.speedKmh))
+  if (params.fromKm != null) search.set('fromKm', String(params.fromKm))
   return apiFetch<WeatherForecast>(`/api/weather?${search}`)
 }
 

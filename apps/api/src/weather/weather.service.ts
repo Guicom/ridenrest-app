@@ -36,11 +36,26 @@ export class WeatherService {
       }
     }
 
+    // Filter by fromKm (adventure-cumulative km) if provided
+    const filtered = dto.fromKm !== undefined
+      ? sampled.filter(wp => (segment.cumulativeStartKm + wp.dist_km) >= dto.fromKm!)
+      : sampled
+
+    // Early return if no waypoints after filtering
+    if (filtered.length === 0) {
+      return {
+        segmentId: dto.segmentId,
+        waypoints: [],
+        cachedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+      }
+    }
+
     // Compute ETA per sampled waypoint
     const departureTime = dto.departureTime ? new Date(dto.departureTime) : null
     const speedKmh = dto.speedKmh ?? null
 
-    const etas: Date[] = sampled.map((wp) => {
+    const etas: Date[] = filtered.map((wp) => {
       if (departureTime && speedKmh) {
         const adventureKm = segment.cumulativeStartKm + wp.dist_km
         const etaMs = departureTime.getTime() + (adventureKm / speedKmh) * 3_600_000
@@ -52,8 +67,8 @@ export class WeatherService {
     // Fetch weather with bounded concurrency (max 5) to avoid Open-Meteo rate limits
     const CONCURRENCY = 5
     const fetchResults: PromiseSettledResult<Awaited<ReturnType<typeof this.openMeteoProvider.fetchHourlyForecast>>>[] = []
-    for (let i = 0; i < sampled.length; i += CONCURRENCY) {
-      const batch = sampled.slice(i, i + CONCURRENCY)
+    for (let i = 0; i < filtered.length; i += CONCURRENCY) {
+      const batch = filtered.slice(i, i + CONCURRENCY)
       const batchResults = await Promise.allSettled(
         batch.map((wp, j) => this.openMeteoProvider.fetchHourlyForecast(wp.lat, wp.lng, etas[i + j])),
       )
@@ -64,7 +79,7 @@ export class WeatherService {
     const expiresAt = new Date(now.getTime() + 3600 * 1000)
 
     // Map results to WeatherPoint[]
-    const weatherPoints: WeatherPoint[] = sampled.map((wp, i) => {
+    const weatherPoints: WeatherPoint[] = filtered.map((wp, i) => {
       const result = fetchResults[i]
       const data = result.status === 'fulfilled' ? result.value : null
 

@@ -157,6 +157,44 @@ describe('WeatherService', () => {
       expect(result.waypoints[1].temperatureC).toBeNull()
     })
 
+    it('filters waypoints by fromKm — excludes past waypoints', async () => {
+      mockWeatherRepo.findSegmentByIdAndUserId.mockResolvedValueOnce(SAMPLE_SEGMENT)
+      mockOpenMeteoProvider.fetchHourlyForecast.mockResolvedValue(SAMPLE_WEATHER)
+
+      // cumulativeStartKm=10, waypoints at dist_km 0,5,10,15,20,25
+      // adventure km: 10,15,20,25,30,35
+      // fromKm=25 → only dist_km 15,20,25 (adventure km 25,30,35)
+      const dto: GetWeatherDto = { segmentId: 'seg-uuid-1', fromKm: 25 }
+      const result = await service.getWeatherForecast(dto, 'user-1')
+
+      expect(result.waypoints).toHaveLength(3)
+      expect(result.waypoints[0].km).toBe(25)
+      expect(result.waypoints[1].km).toBe(30)
+      expect(result.waypoints[2].km).toBe(35)
+    })
+
+    it('returns empty waypoints when fromKm is beyond segment end', async () => {
+      mockWeatherRepo.findSegmentByIdAndUserId.mockResolvedValueOnce(SAMPLE_SEGMENT)
+      mockOpenMeteoProvider.fetchHourlyForecast.mockResolvedValue(SAMPLE_WEATHER)
+
+      // adventure km max = 10 + 25 = 35, fromKm=100 → no waypoints
+      const dto: GetWeatherDto = { segmentId: 'seg-uuid-1', fromKm: 100 }
+      const result = await service.getWeatherForecast(dto, 'user-1')
+
+      expect(result.waypoints).toHaveLength(0)
+      expect(result.segmentId).toBe('seg-uuid-1')
+    })
+
+    it('returns all waypoints when fromKm is undefined (existing behaviour)', async () => {
+      mockWeatherRepo.findSegmentByIdAndUserId.mockResolvedValueOnce(SAMPLE_SEGMENT)
+      mockOpenMeteoProvider.fetchHourlyForecast.mockResolvedValue(SAMPLE_WEATHER)
+
+      const dto: GetWeatherDto = { segmentId: 'seg-uuid-1' }
+      const result = await service.getWeatherForecast(dto, 'user-1')
+
+      expect(result.waypoints).toHaveLength(6)
+    })
+
     it('returns correct segmentId, cachedAt, expiresAt structure', async () => {
       mockWeatherRepo.findSegmentByIdAndUserId.mockResolvedValueOnce(SAMPLE_SEGMENT)
       mockOpenMeteoProvider.fetchHourlyForecast.mockResolvedValue(SAMPLE_WEATHER)

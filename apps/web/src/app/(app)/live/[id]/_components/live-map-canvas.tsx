@@ -6,7 +6,8 @@ import { useLiveStore } from '@/stores/live.store'
 import { useLivePoiLayers } from '@/hooks/use-live-poi-layers'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { findPointAtKm } from '@ridenrest/gpx'
-import type { Poi, MapSegmentData } from '@ridenrest/shared'
+import { WeatherLayer, LINE_COLOR_EXPRESSIONS, type WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
+import type { Poi, MapSegmentData, WeatherPoint } from '@ridenrest/shared'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import type maplibregl from 'maplibre-gl'
 
@@ -22,9 +23,12 @@ interface LiveMapCanvasProps {
   segments: MapSegmentData[]
   targetKm?: number | null
   pois?: Poi[]
+  weatherPoints?: WeatherPoint[]
+  weatherDimension?: WeatherDimension
+  weatherActive?: boolean
 }
 
-export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [] }: LiveMapCanvasProps) {
+export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false }: LiveMapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
@@ -128,6 +132,23 @@ export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [] }: Li
     }
   }, [targetKm, mapReady, kmWaypoints])
 
+  // Centralized dimension update — same pattern as map-canvas.tsx in planning mode
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !weatherActive) return
+    const layerLines = 'weather-lines-layer-live'
+    const layerArrows = 'weather-wind-arrows-layer-live'
+    if (map.getLayer(layerLines)) {
+      map.setPaintProperty(layerLines, 'line-color', LINE_COLOR_EXPRESSIONS[weatherDimension])
+    }
+    if (map.getLayer(layerArrows)) {
+      map.setLayoutProperty(layerArrows, 'visibility', weatherDimension === 'wind' ? 'visible' : 'none')
+    }
+  }, [weatherDimension, weatherActive, mapReady])
+
+  // Segment waypoints for weather layer (MapWaypoint format)
+  const segmentWaypoints = segments[0]?.waypoints ?? []
+
   return (
     <div className="relative h-full w-full">
       <div
@@ -137,6 +158,15 @@ export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [] }: Li
         role="application"
       />
       <OsmAttribution />
+      {mapReady && weatherActive && weatherPoints.length > 0 && segmentWaypoints.length > 0 && (
+        <WeatherLayer
+          map={mapRef.current}
+          weatherPoints={weatherPoints}
+          segmentWaypoints={segmentWaypoints}
+          dimension={weatherDimension}
+          id="live"
+        />
+      )}
     </div>
   )
 }

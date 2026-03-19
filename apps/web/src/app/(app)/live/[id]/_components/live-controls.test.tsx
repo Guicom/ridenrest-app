@@ -71,4 +71,9 @@ describe('LiveControls', () => {
     fireEvent.change(screen.getByTestId('input-speed'), { target: { value: '20' } })
     expect(useLiveStore.getState().speedKmh).toBe(20)
   })
+
+  it('does not render weather panel (weather is on map overlay)', () => {
+    render(<LiveControls />)
+    expect(screen.queryByTestId('live-weather-panel')).toBeNull()
+  })
 })
