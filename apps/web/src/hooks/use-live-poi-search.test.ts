@@ -21,7 +21,7 @@ vi.mock('@/lib/api-client', () => ({
 }))
 
 // Mock useQuery
-const mockUseQuery = vi.fn().mockReturnValue({ data: [], isPending: false })
+const mockUseQuery = vi.fn().mockReturnValue({ data: [], isPending: false, isError: false })
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
 }))
@@ -35,7 +35,7 @@ describe('useLivePoisSearch', () => {
       targetAheadKm: 30,
       searchRadiusKm: 3,
     }
-    mockUseQuery.mockReturnValue({ data: [], isPending: false })
+    mockUseQuery.mockReturnValue({ data: [], isPending: false, isError: false })
   })
 
   it('returns null targetKm when currentKmOnRoute is null', () => {
@@ -108,5 +108,16 @@ describe('useLivePoisSearch', () => {
     const queryConfig = mockUseQuery.mock.calls[mockUseQuery.mock.calls.length - 1][0]
     // targetKm = Math.round((10.6 + 30) * 10) / 10 = 40.6
     expect(queryConfig.queryKey[2].targetKm).toBe(40.6)
+  })
+
+  it('exposes isError from useQuery', () => {
+    mockUseQuery.mockReturnValue({ data: [], isPending: false, isError: true })
+    const { result } = renderHook(() => useLivePoisSearch('seg-1'))
+    expect(result.current.isError).toBe(true)
+  })
+
+  it('returns isError = false by default', () => {
+    const { result } = renderHook(() => useLivePoisSearch('seg-1'))
+    expect(result.current.isError).toBe(false)
   })
 })

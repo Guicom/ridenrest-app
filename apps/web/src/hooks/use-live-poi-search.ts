@@ -38,7 +38,7 @@ export function useLivePoisSearch(segmentId: string | undefined) {
     ? Math.round((activeTriggerKm + targetAheadKm) * 10) / 10
     : null
 
-  const { data: pois = [], isPending } = useQuery<Poi[]>({
+  const { data: pois = [], isPending, isError } = useQuery<Poi[]>({
     queryKey: ['pois', 'live', { segmentId, targetKm, radiusKm: searchRadiusKm }],
     queryFn: () => getLivePois({
       segmentId: segmentId!,
@@ -49,5 +49,5 @@ export function useLivePoisSearch(segmentId: string | undefined) {
     staleTime: 5 * 60 * 1000, // 5 min
   })
 
-  return { pois, isPending, targetKm }
+  return { pois, isPending, targetKm, isError }
 }

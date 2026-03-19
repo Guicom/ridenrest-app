@@ -10,6 +10,7 @@ import type { KmWaypoint } from '@ridenrest/gpx'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 import { useLiveMode } from '@/hooks/use-live-mode'
 import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
+import { useNetworkStatus } from '@/hooks/use-network-status'
 import { useLiveWeather } from '@/hooks/use-live-weather'
 import { useLiveStore } from '@/stores/live.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
+import { StatusBanner } from './_components/status-banner'
 import { LiveWeatherOverlay } from './_components/live-weather-overlay'
 import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
 
@@ -48,8 +50,15 @@ export default function LivePage() {
   const firstSegment = segments[0]
   const segmentId = firstSegment?.id
 
+  // Network status
+  const { isOnline } = useNetworkStatus()
+
   // Live POI search
-  const { pois, isPending: poisPending, targetKm } = useLivePoisSearch(segmentId)
+  const { pois, isPending: poisPending, targetKm, isError: poisError } = useLivePoisSearch(segmentId)
+
+  // Banner state
+  const showOfflineBanner = !isOnline && isLiveModeActive
+  const showErrorBanner = isOnline && poisError && isLiveModeActive && !poisPending
 
   // Live weather — pass user departure time if set
   const weatherDepartureTimeIso = weatherDepartureTime
@@ -158,6 +167,17 @@ export default function LivePage() {
         onConsent={handleConsent}
         onDismiss={handleDismiss}
       />
+
+      {/* Status banners — z-30, above LiveControls */}
+      {mounted && showOfflineBanner && (
+        <StatusBanner variant="offline" message="Mode hors ligne — données non disponibles" />
+      )}
+      {mounted && showErrorBanner && !showOfflineBanner && (
+        <StatusBanner
+          variant="error"
+          message={`Connexion instable — ${pois.length} résultat${pois.length !== 1 ? 's' : ''} chargé${pois.length !== 1 ? 's' : ''}`}
+        />
+      )}
 
       {/* Bottom overlay — z-30 (only render after mount to avoid hydration mismatch) */}
       {mounted && (

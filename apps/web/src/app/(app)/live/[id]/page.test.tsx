@@ -10,8 +10,39 @@ vi.mock('@/hooks/use-live-mode', () => ({
 }))
 
 // Mock use-live-poi-search hook
+const mockUseLivePoisSearch = vi.fn().mockReturnValue({ pois: [], isPending: false, targetKm: null, isError: false })
 vi.mock('@/hooks/use-live-poi-search', () => ({
-  useLivePoisSearch: () => ({ pois: [], isPending: false, targetKm: null }),
+  useLivePoisSearch: () => mockUseLivePoisSearch(),
+}))
+
+// Mock useNetworkStatus hook
+const mockUseNetworkStatus = vi.fn().mockReturnValue({ isOnline: true })
+vi.mock('@/hooks/use-network-status', () => ({
+  useNetworkStatus: () => mockUseNetworkStatus(),
+}))
+
+// Mock useLiveWeather hook
+vi.mock('@/hooks/use-live-weather', () => ({
+  useLiveWeather: () => ({ weatherPoints: [], isGpsLost: false }),
+}))
+
+// Mock Zustand stores
+vi.mock('@/stores/live.store', () => ({
+  useLiveStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      isLiveModeActive: false,
+      currentKmOnRoute: null,
+      targetAheadKm: 30,
+      searchRadiusKm: 3,
+      speedKmh: 15,
+      currentPosition: null,
+      setCurrentKm: () => {},
+    }),
+}))
+
+vi.mock('@/stores/ui.store', () => ({
+  useUIStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ selectedPoiId: null }),
 }))
 
 // Mock LiveMapCanvas
@@ -24,6 +55,18 @@ vi.mock('./_components/live-map-canvas', () => ({
 // Mock LiveControls (no props)
 vi.mock('./_components/live-controls', () => ({
   LiveControls: () => <div data-testid="live-controls" />,
+}))
+
+// Mock StatusBanner
+vi.mock('./_components/status-banner', () => ({
+  StatusBanner: ({ variant, message }: { variant: string; message: string }) => (
+    <div data-testid="status-banner" data-variant={variant}>{message}</div>
+  ),
+}))
+
+// Mock LiveWeatherOverlay
+vi.mock('./_components/live-weather-overlay', () => ({
+  LiveWeatherOverlay: () => <div data-testid="live-weather-overlay" />,
 }))
 
 // Mock GeolocationConsent
@@ -129,5 +172,50 @@ describe('LivePage', () => {
     const button = screen.getByText(/Activer le mode Live/)
     button.click()
     expect(startWatching).toHaveBeenCalledTimes(callsBeforeClick + 1)
+  })
+
+  it('shows offline banner when navigator.onLine is false and live mode active (AC #3, #4)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseNetworkStatus.mockReturnValue({ isOnline: false })
+    render(<LivePage />)
+    const banner = screen.getByTestId('status-banner')
+    expect(banner.getAttribute('data-variant')).toBe('offline')
+    expect(banner.textContent).toContain('Mode hors ligne')
+  })
+
+  it('shows error banner when POI query fails and online (AC #1)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseNetworkStatus.mockReturnValue({ isOnline: true })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [{ id: '1' }, { id: '2' }], isPending: false, targetKm: 40, isError: true })
+    render(<LivePage />)
+    const banner = screen.getByTestId('status-banner')
+    expect(banner.getAttribute('data-variant')).toBe('error')
+    expect(banner.textContent).toContain('Connexion instable')
+    expect(banner.textContent).toContain('2 résultats chargés')
+  })
+
+  it('does not show banner when live mode is inactive', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: false }))
+    mockUseNetworkStatus.mockReturnValue({ isOnline: false })
+    render(<LivePage />)
+    expect(screen.queryByTestId('status-banner')).toBeNull()
+  })
+
+  it('hides banner when POI query succeeds after error (AC #2)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseNetworkStatus.mockReturnValue({ isOnline: true })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [], isPending: false, targetKm: 40, isError: false })
+    render(<LivePage />)
+    expect(screen.queryByTestId('status-banner')).toBeNull()
+  })
+
+  it('shows offline banner over error banner when both apply', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseNetworkStatus.mockReturnValue({ isOnline: false })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [], isPending: false, targetKm: 40, isError: true })
+    render(<LivePage />)
+    const banners = screen.getAllByTestId('status-banner')
+    expect(banners).toHaveLength(1)
+    expect(banners[0].getAttribute('data-variant')).toBe('offline')
   })
 })
