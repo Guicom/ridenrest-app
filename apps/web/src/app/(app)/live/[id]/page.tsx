@@ -57,8 +57,6 @@ export default function LivePage() {
     : undefined
   const {
     weatherPoints,
-    isPending: weatherPending,
-    isError: weatherError,
     isGpsLost,
   } = useLiveWeather(segmentId, {
     departureTime: weatherDepartureTimeIso,
