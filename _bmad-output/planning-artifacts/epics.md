@@ -1116,11 +1116,415 @@ So that I can still find a place to stop even when the app can't load everything
 
 ---
 
-## Epic 8: PWA & Offline Capability
+## Epic 8: App Shell & Navigation
+
+> **Ajouté 2026-03-18** — Suite aux décisions UX : implémentation du design system light mode vert sauge, navigation Planning/Live, et panneau filtres POI. Fondation visuelle et structurelle de l'application.
+
+L'utilisateur dispose d'une application visuellement cohérente avec un design system défini, une navigation claire entre ses aventures et les deux modes (Planning/Live), et un panneau de filtres permettant de sélectionner les types de POI qu'il souhaite afficher sur la carte.
+
+### Story 8.1: Design System Tokens
+
+As a **developer building the Ride'n'Rest UI**,
+I want a complete, consistent design token system configured in Tailwind and shadcn/ui,
+So that every component in the app uses the same colors, typography, and spacing — eliminating visual inconsistencies.
+
+**Acceptance Criteria:**
+
+**Given** the Tailwind config and global CSS are updated,
+**When** the app is rendered,
+**Then** all CSS custom properties are defined: `--primary: #2D6A4A`, `--primary-hover: #245740`, `--primary-light: #EBF5EE`, `--background: #FFFFFF`, `--background-page: #F5F7F5`, `--surface: #F8FAF9`, `--surface-raised: #EFF5F1`, `--border: #D4E0DA`, `--text-primary: #1A2D22`, `--text-secondary: #4D6E5A`, `--text-muted: #8EA899`.
+
+**Given** the density trace colors are defined,
+**When** referenced in components,
+**Then** `--density-high: #16a34a`, `--density-medium: #d97706`, `--density-low: #dc2626` are available as CSS vars — distinct from `--primary`.
+
+**Given** the shadcn/ui theme is configured,
+**When** shadcn components render,
+**Then** `--primary`, `--primary-foreground: #FFFFFF`, `--muted`, `--muted-foreground`, `--card`, `--border`, `--ring` all map to the corresponding design tokens above.
+
+**Given** the typography system is configured,
+**When** text renders,
+**Then** Geist Sans is the default font for all UI text; Geist Mono is used exclusively for numeric values (km, D+, ETA) — configured via `font-mono` Tailwind class.
+
+**Given** the design tokens are applied,
+**When** WCAG contrast is checked,
+**Then** all text/background combinations meet AA minimum: `text-primary`/`background` ≥ 16:1, `text-secondary`/`background` ≥ 5.5:1, `primary`/`background` ≥ 5.4:1.
+
+---
+
+### Story 8.2: Adventures List Page
+
+As a **cyclist user**,
+I want a clean, well-structured list of my adventures with clear entry points to Planning and Live modes,
+So that I can quickly find my adventure and choose the right mode for my current context.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `/adventures`,
+**When** the page renders,
+**Then** the page background is `--background-page` (`#F5F7F5`) and adventure cards are white (`--surface`) with `rounded-xl border border-[--border]`.
+
+**Given** an adventure is selected on mobile (< 1024px),
+**When** the action buttons render,
+**Then** a full-width primary button "🔴 Démarrer en Live" and a `⚙️` gear icon with dropdown are visible; the dropdown contains "Mode Planning" and "Voir les détails".
+
+**Given** an adventure is selected on desktop (≥ 1024px),
+**When** the action row renders,
+**Then** three explicit buttons display: `[🔴 Live]` (primary), `[📋 Planning]` (secondary), `[✏️ Modifier]` (ghost).
+
+**Given** the adventures list is empty,
+**When** the page renders,
+**Then** an empty state shows a bicycle icon, "Aucune aventure" title, and a primary CTA "Créer une aventure".
+
+---
+
+### Story 8.3: App Shell & Routing
+
+As a **developer building the app navigation**,
+I want a consistent app shell with proper routing between Planning and Live modes,
+So that users always know where they are and how to get back.
+
+**Acceptance Criteria:**
+
+**Given** a user enters Planning mode,
+**When** navigated to `/adventures/:id/map?mode=planning`,
+**Then** the map renders full-bleed (`100dvh`) with a "← Aventures" back button (top-left, `z-40`) and the sidebar visible on desktop.
+
+**Given** the desktop Planning sidebar,
+**When** rendered,
+**Then** it is 360px wide with a `◀`/`▶` collapse toggle — collapsed state hides the sidebar and gives full width to the map.
+
+**Given** a user enters Live mode at `/adventures/:id/live`,
+**When** it's their first access,
+**Then** `GeolocationConsent` dialog appears; subsequent accesses skip it if consent was granted.
+
+**Given** the user is in Live mode,
+**When** the map renders,
+**Then** only a "⏹ Quitter le live" button is visible for navigation — all other nav intentionally hidden.
+
+**Given** a user clicks "Quitter le live",
+**When** confirmed,
+**Then** `clearWatch()` is called and the user is redirected to `/adventures`.
+
+---
+
+### Story 8.4: Filter Panel — POI Selector
+
+As a **cyclist user planning a route**,
+I want to filter which types of places are shown on my map,
+So that I can focus on what I need without visual clutter.
+
+**Acceptance Criteria:**
+
+**Given** a user taps the "Filtres" button,
+**When** the filter panel opens,
+**Then** it opens as a Vaul Drawer on mobile or a sidebar panel on desktop (`z-50`).
+
+**Given** the filter panel is open,
+**When** the POI type section renders,
+**Then** four toggle chips are visible: 🏨 Hébergements, 🍽️ Restauration, 🛒 Alimentation, 🚲 Vélo — multi-selection, active state uses `--primary` background with white text.
+
+**Given** 🏨 Hébergements is active,
+**When** the panel renders,
+**Then** sub-type chips appear: 🏩 Hôtel, 🏕️ Camping, 🛖 Refuge, 🏘️ Hostel — all active by default, individually toggleable.
+
+**Given** the distance filter renders,
+**When** displayed,
+**Then** a slider "Distance max de la trace" shows (0.1–30 km, default 5 km, hard-capped at 30 km).
+
+**Given** 🍽️ Restauration or 🚲 Vélo is active,
+**When** the panel renders,
+**Then** a range slider "Plage kilométrique" appears (fromKm/toKm) for segment-scoped searches.
+
+**Given** a user taps "Appliquer les filtres",
+**When** applied,
+**Then** the map updates immediately with only selected POI types; `<LayerToggleGroup>` reflects active categories.
+
+**Given** no POI type is selected,
+**When** the user tries to apply,
+**Then** a validation message appears and the apply button stays disabled.
+
+---
+
+## Epic 9: Redesign & Landing Site
+
+> **Ajouté 2026-03-18** — Refonte visuelle complète avec le design system light mode vert sauge, et création de la landing page marketing.
+
+L'utilisateur arrive sur une landing page qui communique clairement la valeur du produit, et navigue dans une application visuellement soignée et cohérente du premier au dernier écran.
+
+### Story 9.1: Landing Page
+
+As a **potential cyclist user discovering Ride'n'Rest**,
+I want a compelling landing page that shows me what the app does immediately,
+So that I understand the value in seconds and feel motivated to sign up.
+
+**Acceptance Criteria:**
+
+**Given** a visitor arrives at `/`,
+**When** the hero renders,
+**Then** it shows a full-bleed cycling landscape photo, headline "TROUVE OÙ DORMIR LE LONG DE TA TRACE" (large white bold), subtitle, and a primary CTA "Essayer gratuitement".
+
+**Given** the "Étape 01 — Crée ton aventure" section renders,
+**When** displayed,
+**Then** it shows a phone mockup (GPX import screen) and step content on white background with "Compatible Strava" and "Analyse de relief instantanée" checkmarks.
+
+**Given** the "Étape 02 — Décide en roulant" section renders,
+**When** displayed,
+**Then** it shows the step text and map mockup on `--primary-light` (`#EBF5EE`) section background.
+
+**Given** the manifesto section renders,
+**When** displayed,
+**Then** italic centered manifesto text inside a white card, "LA COMMUNAUTÉ" overline in `--primary` uppercase.
+
+**Given** the page renders on mobile,
+**When** étape sections display,
+**Then** two-column layout stacks vertically — no horizontal scroll.
+
+---
+
+### Story 9.2: Auth Pages Polish
+
+As a **new or returning user**,
+I want auth pages cohesive with the app's identity,
+So that my first interaction is reassuring and polished.
+
+**Acceptance Criteria:**
+
+**Given** a user visits any auth page (`/login`, `/register`, `/forgot-password`, `/reset-password`),
+**When** the page renders,
+**Then** background is `--background-page`, form is centered in a white card (`max-w-sm mx-auto`, `rounded-2xl shadow-sm`).
+
+**Given** the auth form renders,
+**When** displayed,
+**Then** Ride'n'Rest logo above the title; primary CTA uses `--primary` bg + white text; inputs have `border-[--border]` with `focus:ring-[--primary]`.
+
+**Given** a form validation error,
+**When** displayed,
+**Then** error text in `--density-low` (`#dc2626`) below the field, `text-sm`.
+
+---
+
+### Story 9.3: Map View — Light Mode Polish
+
+As a **cyclist planning a route**,
+I want the map view to feel clean and visually consistent,
+So that the map is the star without visual noise from UI chrome.
+
+**Acceptance Criteria:**
+
+**Given** the map renders in Planning mode,
+**When** displayed,
+**Then** OpenFreeMap light tiles are used as the default base layer.
+
+**Given** POI pins render,
+**When** displayed,
+**Then** all pins use `--poi-pin` (`#1A2D22`) fill with white inner category icon; selected pin scales to 1.2× with `--primary` ring.
+
+**Given** the `<LayerToggleGroup>` renders,
+**When** displayed,
+**Then** each 40×40px toggle: inactive = white bg + `--border` border; active = `--primary` bg + white icon.
+
+**Given** the corridor slider overlay renders (mobile bottom),
+**When** displayed,
+**Then** white panel `--surface`, `rounded-t-2xl shadow-lg`; km value in `font-mono text-2xl font-bold`.
+
+**Given** the GPS indicator renders in Live mode,
+**When** displayed,
+**Then** it is a `--primary` pulsing circle (CSS keyframe) — distinct from POI pins.
+
+---
+
+### Story 9.4: POI Card & Bottom Sheet
+
+As a **cyclist browsing accommodation options**,
+I want a clear POI detail card with key info and a direct booking link,
+So that I can decide quickly without leaving the map.
+
+**Acceptance Criteria:**
+
+**Given** a user taps a POI pin,
+**When** the Vaul Drawer opens,
+**Then** it snaps to 40% height (name, price, rating, CTA) and 85% on pull-up (full details); map backdrop blur applied; dismisses via swipe down or tap backdrop.
+
+**Given** the POI card renders for an accommodation,
+**When** displayed,
+**Then** shows: name (`text-lg font-semibold`), type badge (`--primary-light` chip), distance from trace (`text-sm text-[--text-secondary]`), km on route (`font-mono text-sm`), price/night (`font-mono text-xl font-bold`), star rating.
+
+**Given** the Booking.com CTA renders,
+**When** displayed,
+**Then** full-width primary button "Voir sur Booking.com" with external link icon; `target="_blank" rel="noopener noreferrer"`; explicit `aria-label`.
+
+**Given** a non-accommodation POI (restau, vélo) renders,
+**When** the card displays,
+**Then** Booking.com CTA replaced by "Voir sur OpenStreetMap" ghost button.
+
+---
+
+### Story 9.5: Adventure Detail Page Design
+
+As a **cyclist managing their adventure**,
+I want the adventure detail page to be well-designed,
+So that managing GPX segments feels as polished as the map experience.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `/adventures/:id`,
+**When** the page renders,
+**Then** background is `--background-page`; content centered `max-w-3xl mx-auto`; adventure name `text-2xl font-bold text-[--text-primary]`.
+
+**Given** the segment list renders,
+**When** displayed,
+**Then** each segment is a white card (`--surface`, `rounded-xl`, `border border-[--border]`) showing: drag handle, name, distance (`font-mono`), parse status badge, and actions menu.
+
+**Given** `parse_status: 'pending'`,
+**When** badge renders,
+**Then** amber pulsing "En cours..." badge (`--density-medium`, `animate-pulse`).
+
+**Given** `parse_status: 'done'`,
+**When** badge renders,
+**Then** green "Prêt" badge (`--density-high`, static).
+
+**Given** `parse_status: 'error'`,
+**When** badge renders,
+**Then** red "Erreur" badge (`--density-low`) with "Réessayer" ghost button.
+
+**Given** the "Analyser la densité" CTA,
+**When** all segments are `done`,
+**Then** it appears as a secondary button — disabled with tooltip if any segment is pending.
+
+---
+
+## Epic 10: Cache Optimization & Upstash Budget Management
+
+> **Note 2026-03-18 : renommé depuis Epic 9** — numérotation mise à jour suite à l'insertion des épics 8 (App Shell) et 9 (Redesign). Contenu inchangé.
+
+Optimiser la stratégie de cache Redis pour maximiser les performances, partager les données entre utilisateurs, contrôler la consommation Upstash (10k cmds/jour), et donner un levier d'invalidation admin en cas de mise à jour OSM.
+
+### Story 10.1: Geographic Cache Key — Cross-User POI Sharing
+
+As a **backend system**,
+I want POI query results to be cached by geographic corridor rather than by user session,
+So that two users querying the same zone benefit from the same cached data — reducing Overpass API calls and Upstash command consumption.
+
+**Acceptance Criteria:**
+
+**Given** two users query POIs for the same `(segmentId, fromKm, toKm, categories)` combination,
+**When** the second query arrives within the TTL window,
+**Then** only 1 Overpass API call is made (not 2) — the second user is served from Redis cache.
+
+**Given** the current cache key is `pois:{segmentId}:{fromKm}:{toKm}:{categories}` (segment-scoped),
+**When** a geographic key migration is implemented,
+**Then** the new key uses the geographic corridor bbox: `pois:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}:{categories}` (rounded to 3 decimal places ~111m precision) — decoupled from segment identity.
+
+**Given** the new geographic key is active,
+**When** a user with a different segment that overlaps the same geographic zone queries POIs,
+**Then** the cached result from the first segment's corridor is reused if the bboxes match within rounding — no new Overpass call.
+
+**Given** the geographic cache is active,
+**When** monitoring Upstash dashboard,
+**Then** the daily command count should decrease by an estimated 30-50% for popular bikepacking corridors.
+
+---
+
+### Story 10.2: Adaptive TTL — Density (7-30 days) vs POIs (24h) vs Weather (1h)
+
+As a **backend system**,
+I want different cache TTLs per data type based on OSM data volatility,
+So that stable data stays cached much longer — reducing redundant Upstash commands while keeping time-sensitive data fresh.
+
+**Acceptance Criteria:**
+
+**Given** the density tronçon cache currently uses 24h TTL,
+**When** the adaptive TTL is implemented,
+**Then** density tronçon counts use `TTL_DENSITY_TRONCON = 7 days` (604800s).
+
+**Given** POI search results (`pois:bbox:*`) currently use 24h TTL,
+**When** the adaptive TTL is reviewed,
+**Then** POI bbox results keep `TTL_POI_BBOX = 24h` (86400s).
+
+**Given** weather cache uses 1h TTL,
+**When** no change is needed,
+**Then** weather TTL stays at 1h — documented in `packages/shared/src/constants/api.constants.ts` as `CACHE_TTL_WEATHER_S = 3600`.
+
+**Given** all TTL constants are defined,
+**When** the codebase is audited,
+**Then** ALL cache TTL values are sourced from `packages/shared/src/constants/api.constants.ts` — no magic numbers in service files.
+
+---
+
+### Story 10.3: POI Query Cache by BBox + Category (Map Layer Requests)
+
+As a **cyclist user browsing the map**,
+I want POI layer data to be served from cache when I toggle a layer on a corridor I already searched,
+So that repeated layer toggles and re-visits to the same area are instantaneous — no redundant Overpass calls.
+
+**Acceptance Criteria:**
+
+**Given** a user has already searched accommodations on a corridor,
+**When** they toggle the accommodation layer off and back on,
+**Then** the second `GET /pois` request is served from Redis cache in <200ms — no Overpass API call made.
+
+**Given** the geographic key migration (Story 10.1) is applied to `GET /pois`,
+**When** the POI cache key is constructed,
+**Then** the key is `pois:bbox:{rounded_bbox}:{sorted_categories}` — segment-agnostic, reusable across users and adventures.
+
+**Given** lat/lng values are used to compute the cache key,
+**When** the bbox is computed,
+**Then** values are rounded to 3 decimal places (`Math.round(val * 1000) / 1000`) — prevents cache fragmentation from floating-point precision differences.
+
+---
+
+### Story 10.4: Admin Cache Invalidation by Geographic Zone
+
+As a **system administrator**,
+I want to purge the cache for a specific geographic zone (bbox),
+So that when a significant OSM data update occurs in a region, the stale cache can be invalidated without restarting the server.
+
+**Acceptance Criteria:**
+
+**Given** an admin needs to invalidate cache for a specific bbox,
+**When** they call `DELETE /admin/cache/zone?minLat=42.0&minLng=-2.0&maxLat=43.5&maxLng=3.0`,
+**Then** all Redis keys matching `pois:bbox:{keys within bbox}` and `density:troncon:{keys within bbox}` are deleted — response includes count of deleted keys.
+
+**Given** the admin endpoint is created,
+**When** accessed,
+**Then** it is protected by a static `ADMIN_SECRET` header — not exposed in Swagger, not subject to `JwtAuthGuard`.
+
+**Given** the zone invalidation runs on a large bbox,
+**When** many keys match,
+**Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB`.
+
+---
+
+### Story 10.5: Upstash Budget Monitoring & Alerting
+
+As a **solo developer operating at the free tier limit**,
+I want visibility into daily Redis command consumption with automatic alerting before quota exhaustion,
+So that I can act before hitting the 10k/day cap — avoiding silent service degradation.
+
+**Acceptance Criteria:**
+
+**Given** Upstash free tier cap is 10,000 commands/day,
+**When** the monitoring system is active,
+**Then** an email alert is sent by Upstash dashboard when daily usage exceeds 7,500 commands (75%) — configured via Upstash console.
+
+**Given** the NestJS API starts,
+**When** a health check is performed,
+**Then** `GET /health` includes a `redis` sub-check verifying connectivity — existing `HealthModule` extended with `RedisHealthIndicator`.
+
+**Given** daily usage approaches the alert threshold,
+**When** usage exceeds 7,500 cmds/day,
+**Then** the recommended action is documented: switch to Upstash Pay-as-you-go ($0.2/100k cmds) — no code migration required.
+
+---
+
+## Epic 11: PWA & Offline Capability
+
+> **Note 2026-03-18 : renommé depuis Epic 8** — numérotation mise à jour suite à l'insertion des épics 8 (App Shell) et 9 (Redesign). Contenu inchangé.
 
 Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa dernière trace + POIs en mode offline partiel, et recevoir une notification push quand une analyse de densité est terminée.
 
-### Story 8.1: PWA Manifest & App Install
+### Story 11.1: PWA Manifest & App Install
 
 As a **cyclist user on mobile**,
 I want to install Ride'n'Rest on my home screen like a native app,
@@ -1138,7 +1542,7 @@ So that I can launch it instantly without going through the browser — especial
 
 **Given** the Web App Manifest is configured,
 **When** it is validated by Lighthouse,
-**Then** it includes: `display: standalone`, `theme_color: #1a1a2e`, `background_color`, maskable icon 512×512, standard icon 192×192, and `orientation: portrait`.
+**Then** it includes: `display: standalone`, `theme_color: #2D6A4A` (brand primary green), `background_color: #FFFFFF`, maskable icon 512×512, standard icon 192×192, and `orientation: portrait`.
 
 **Given** the app is installed and launched from the home screen,
 **When** it opens,
@@ -1150,7 +1554,7 @@ So that I can launch it instantly without going through the browser — especial
 
 ---
 
-### Story 8.2: Service Worker & Partial Offline Support
+### Story 11.2: Service Worker & Partial Offline Support
 
 As a **cyclist user with intermittent connectivity**,
 I want my last loaded trace and POIs to remain accessible when I lose signal,
@@ -1180,7 +1584,7 @@ So that I can still consult the map and POI cards I already loaded — even with
 
 ---
 
-### Story 8.3: Push Notifications for Density Analysis
+### Story 11.3: Push Notifications for Density Analysis
 
 As a **cyclist user**,
 I want to receive a push notification when my density analysis is complete,
@@ -1210,154 +1614,72 @@ So that I can trigger the analysis, close the app, and be notified when the colo
 
 ---
 
-## Epic 9: Cache Optimization & Upstash Budget Management
+## Epic 13: Marketing Assets & Production Polish
 
-Optimiser la stratégie de cache Redis pour maximiser les performances, partager les données entre utilisateurs, contrôler la consommation Upstash (10k cmds/jour), et donner un levier d'invalidation admin en cas de mise à jour OSM.
+> **Ajouté 2026-03-18** — À réaliser après Epic 12 (PWA). L'app est installable et stable : on capture les vrais écrans pour remplacer les assets marketing basés sur les mockups AI (Desertus Bikus).
 
-### Story 9.1: Geographic Cache Key — Cross-User POI Sharing
+L'utilisateur qui découvre Ride'n'Rest voit la vraie application dans les vidéos et screenshots de la landing page — pas des mockups générés avec le mauvais nom d'app.
 
-As a **backend system**,
-I want POI query results to be cached by geographic corridor rather than by user session,
-So that two users querying the same zone benefit from the same cached data — reducing Overpass API calls and Upstash command consumption.
+### Story 13.1: Capture des vrais assets app
 
-**Acceptance Criteria:**
-
-**Given** two users query POIs for the same `(segmentId, fromKm, toKm, categories)` combination,
-**When** the second query arrives within the TTL window,
-**Then** only 1 Overpass API call is made (not 2) — the second user is served from Redis cache.
-
-**Given** the current cache key is `pois:{segmentId}:{fromKm}:{toKm}:{categories}` (segment-scoped),
-**When** a geographic key migration is implemented,
-**Then** the new key uses the geographic corridor bbox: `pois:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}:{categories}` (rounded to 3 decimal places ~111m precision) — decoupled from segment identity.
-
-**Given** the new geographic key is active,
-**When** a user with a different segment that overlaps the same geographic zone queries POIs,
-**Then** the cached result from the first segment's corridor is reused if the bboxes match within rounding — no new Overpass call.
-
-**Given** the geographic cache is active,
-**When** monitoring Upstash dashboard,
-**Then** the daily command count should decrease by an estimated 30-50% for popular bikepacking corridors (e.g., repeated queries on same route by different users).
-
----
-
-### Story 9.2: Adaptive TTL — Density (7-30 days) vs POIs (24h) vs Weather (1h)
-
-As a **backend system**,
-I want different cache TTLs per data type based on OSM data volatility,
-So that stable data (density tronçons, OSM geography) stays cached much longer — reducing redundant Upstash commands while keeping time-sensitive data fresh.
+As a **product owner**,
+I want real screenshots and screen recordings of the finished app,
+So that the marketing site shows the actual product experience — not AI-generated mockups.
 
 **Acceptance Criteria:**
 
-**Given** the density tronçon cache (`density:troncon:*`) currently uses 24h TTL,
-**When** the adaptive TTL is implemented,
-**Then** density tronçon counts use `TTL_DENSITY_TRONCON = 7 days` (604800s) — OSM accommodation presence changes rarely; staleness tolerance is high.
+**Given** the app is in its final PWA state (Epic 12 complete),
+**When** asset capture is performed,
+**Then** screenshots are taken on iPhone (Safari) and Android (Chrome) for these key screens: liste aventures, carte avec POIs visibles, fiche hébergement ouverte, panneau filtres, mode Live avec GPS actif.
 
-**Given** a user manually re-triggers density analysis,
-**When** the processor runs,
-**Then** the density tronçon cache is reused if still valid (HIT) — the TTL extension to 7 days means most re-runs don't call Overpass again.
+**Given** screenshots are captured,
+**When** exported,
+**Then** they are exported at 2× resolution minimum, in WebP format, stored in `apps/web/public/images/app-screens/`.
 
-**Given** POI search results (`pois:bbox:*`) currently use 24h TTL,
-**When** the adaptive TTL is reviewed,
-**Then** POI bbox results keep `TTL_POI_BBOX = 24h` (86400s) — acceptable balance between freshness and cache efficiency for planning mode.
-
-**Given** weather cache (`weather:*`) uses 1h TTL,
-**When** no change is needed,
-**Then** weather TTL stays at 1h — documented in `packages/shared/src/constants/api.constants.ts` as `CACHE_TTL_WEATHER_S = 3600`.
-
-**Given** all TTL constants are defined,
-**When** the codebase is audited,
-**Then** ALL cache TTL values are sourced from `packages/shared/src/constants/api.constants.ts` — no magic numbers in service files.
+**Given** screen recordings are captured,
+**When** exported,
+**Then** key flows are recorded: onboarding GPX → première carte colorisée, recherche hébergement → tap pin → Booking deep link.
 
 ---
 
-### Story 9.3: POI Query Cache by BBox + Category (Map Layer Requests)
+### Story 13.2: Mise à jour landing page avec vrais assets
 
-As a **cyclist user browsing the map**,
-I want POI layer data to be served from cache when I toggle a layer on a corridor I already searched,
-So that repeated layer toggles and re-visits to the same area are instantaneous — no redundant Overpass calls.
+As a **potential user discovering Ride'n'Rest**,
+I want to see the real app in action on the landing page,
+So that what I see matches exactly what I'll use after signing up.
 
 **Acceptance Criteria:**
 
-**Given** a user has already searched accommodations on corridor [fromKm=0, toKm=30] for a segment,
-**When** they toggle the accommodation layer off and back on,
-**Then** the second `GET /pois` request is served from Redis cache in <200ms — no Overpass API call made.
+**Given** real app assets are captured (Story 13.1),
+**When** the landing page is updated,
+**Then** all GIFs/vidéos basés sur les mockups Desertus Bikus sont remplacés par les captures réelles — aucune référence à "Desertus Bikus" comme nom d'app ne subsiste.
 
-**Given** the POI cache currently stores full `Poi[]` arrays,
-**When** the geographic key migration (Story 9.1) is applied to `GET /pois`,
-**Then** the POI cache key is `pois:bbox:{rounded_bbox}:{sorted_categories}` — segment-agnostic, reusable across users and adventures.
+**Given** `FeatureStepOne` and `FeatureStepTwo` are updated,
+**When** rendered,
+**Then** `feature-step-one-phone.svg` and `step2.gif` are replaced by real app screenshots/recordings — même layout, nouveaux assets.
 
-**Given** a segment's waypoints are used to compute a corridor bbox,
-**When** the bbox is computed for caching,
-**Then** lat/lng values are rounded to 3 decimal places (`Math.round(val * 1000) / 1000`) before constructing the cache key — prevents cache fragmentation from floating-point precision differences.
-
-**Given** the cache hit rate for `GET /pois` is monitored,
-**When** reviewing Upstash dashboard after 7 days of activity,
-**Then** the POI cache hit rate should be ≥ 60% (baseline target) — measurable via Upstash Analytics or custom counter keys.
+**Given** any animation shows the app header,
+**When** displayed,
+**Then** the header shows "Ride'n'Rest" and the adventure name in the correct position.
 
 ---
 
-### Story 9.4: Admin Cache Invalidation by Geographic Zone
+### Story 13.3: Polish final landing + SEO de base
 
-As a **system administrator**,
-I want to purge the cache for a specific geographic zone (bbox),
-So that when a significant OSM data update occurs in a region, the stale cache can be invalidated without restarting the server or flushing the entire Redis database.
+As a **user discovering Ride'n'Rest via search or social share**,
+I want the landing page to be findable and share correctly,
+So that links shared on Strava, Instagram, or WhatsApp show a preview that makes people want to click.
 
 **Acceptance Criteria:**
 
-**Given** an admin needs to invalidate cache for a specific bbox (e.g., "Spanish Pyrenees corridor"),
-**When** they call `DELETE /admin/cache/zone?minLat=42.0&minLng=-2.0&maxLat=43.5&maxLng=3.0`,
-**Then** all Redis keys matching `pois:bbox:{keys within bbox}` and `density:troncon:{keys within bbox}` are identified and deleted — the operation returns a count of deleted keys.
+**Given** the landing page is finalized,
+**When** `<head>` metadata is reviewed,
+**Then** the following are set: `<title>Ride'n'Rest — Trouve où dormir le long de ta trace</title>`, `<meta name="description">` (150 chars max), `og:title`, `og:description`, `og:image` (1200×630px), `og:url`, `twitter:card: summary_large_image`.
 
-**Given** the admin endpoint is created,
-**When** it is accessed,
-**Then** it is protected by a static `ADMIN_SECRET` header (`X-Admin-Secret: ${ADMIN_SECRET}`) — not exposed in Swagger, not subject to the global `JwtAuthGuard`.
+**Given** the `og:image` is set,
+**When** a link is shared on WhatsApp, Strava, or Twitter/X,
+**Then** a preview card appears with a real app screenshot — not a blank preview.
 
-**Given** the zone invalidation runs on a large bbox,
-**When** many keys match,
-**Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB` (would wipe all queues and other data).
-
-**Given** the operation completes,
-**When** the admin endpoint responds,
-**Then** the response includes: `{ deletedKeys: number, scanDuration: number }` — useful for monitoring invalidation impact.
-
-**Given** no matching keys are found for the bbox,
-**When** the endpoint responds,
-**Then** it returns `{ deletedKeys: 0 }` with HTTP 200 — not an error.
-
----
-
-### Story 9.5: Upstash Budget Monitoring & Alerting Dashboard
-
-As a **solo developer operating at the free tier limit**,
-I want visibility into daily Redis command consumption with automatic alerting before quota exhaustion,
-So that I can act before hitting the 10k/day cap — avoiding silent service degradation.
-
-**Acceptance Criteria:**
-
-**Given** Upstash free tier cap is 10,000 commands/day,
-**When** the monitoring system is active,
-**Then** an email alert is sent by Upstash dashboard when daily usage exceeds 7,500 commands (75%) — configured via Upstash console (not code).
-
-**Given** the NestJS API starts,
-**When** a health check is performed,
-**Then** `GET /health` includes a `redis` sub-check that verifies connectivity — existing `HealthModule` extended with `RedisHealthIndicator`.
-
-**Given** a developer wants a per-feature breakdown of Redis usage,
-**When** reviewing the codebase,
-**Then** a comment in `apps/api/src/config/redis.config.ts` documents the estimated command budget per feature:
-- GPX parse job: ~15-20 cmds/job
-- POI search (miss): ~3 cmds (GET + SET + expire)
-- POI search (hit): ~1 cmd (GET)
-- Density tronçon (miss): ~3 cmds
-- Density tronçon (hit): ~1 cmd
-- BullMQ job lifecycle: ~15-20 cmds/job
-
-**Given** daily usage approaches the alert threshold,
-**When** usage exceeds 7,500 cmds/day,
-**Then** the recommended action is documented: switch to Upstash Pay-as-you-go ($0.2/100k cmds) — no code migration required, only billing change.
-
-**Given** a developer wants to understand optimization priority,
-**When** reviewing Story 9.5 completion notes,
-**Then** the measured baseline (7-day average cmds/day) is recorded — this data drives the decision on which stories in Epic 9 deliver the highest ROI.
-
----
+**Given** landing page copy is reviewed with real product in hand,
+**When** any copy feels inaccurate vs. the real experience,
+**Then** it is updated to reflect what the app actually does.

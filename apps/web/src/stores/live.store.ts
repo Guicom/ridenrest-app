@@ -9,6 +9,7 @@ interface LiveState {
   currentKmOnRoute: number | null
   speedKmh: number // User-configured pace
   targetAheadKm: number // How far ahead to show POIs in live mode
+  searchRadiusKm: number // Radius for POI search around GPS position (Story 7.2 prep)
 
   // Actions
   activateLiveMode: () => void
@@ -18,6 +19,7 @@ interface LiveState {
   setCurrentKm: (km: number) => void
   setSpeedKmh: (speed: number) => void
   setTargetAheadKm: (km: number) => void
+  setSearchRadius: (km: number) => void
 }
 
 export const useLiveStore = create<LiveState>((set) => ({
@@ -27,6 +29,7 @@ export const useLiveStore = create<LiveState>((set) => ({
   currentKmOnRoute: null,
   speedKmh: 15, // Default cycling pace
   targetAheadKm: 30, // Default look-ahead distance
+  searchRadiusKm: 3, // Default POI search radius (km)
 
   activateLiveMode: () => set({ isLiveModeActive: true }),
   deactivateLiveMode: () =>
@@ -39,4 +42,5 @@ export const useLiveStore = create<LiveState>((set) => ({
   setCurrentKm: (km) => set({ currentKmOnRoute: km }),
   setSpeedKmh: (speed) => set({ speedKmh: speed }),
   setTargetAheadKm: (km) => set({ targetAheadKm: km }),
+  setSearchRadius: (km) => set({ searchRadiusKm: km }),
 }))

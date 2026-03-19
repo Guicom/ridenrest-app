@@ -10,6 +10,7 @@ describe('useLiveStore', () => {
       currentKmOnRoute: null,
       speedKmh: 15,
       targetAheadKm: 30,
+      searchRadiusKm: 3,
     })
   })
 
@@ -59,5 +60,14 @@ describe('useLiveStore', () => {
   it('setTargetAheadKm updates targetAheadKm', () => {
     useLiveStore.getState().setTargetAheadKm(15)
     expect(useLiveStore.getState().targetAheadKm).toBe(15)
+  })
+
+  it('searchRadiusKm defaults to 3', () => {
+    expect(useLiveStore.getState().searchRadiusKm).toBe(3)
+  })
+
+  it('setSearchRadius updates searchRadiusKm', () => {
+    useLiveStore.getState().setSearchRadius(5)
+    expect(useLiveStore.getState().searchRadiusKm).toBe(5)
   })
 })

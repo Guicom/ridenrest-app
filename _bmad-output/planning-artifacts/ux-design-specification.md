@@ -524,59 +524,81 @@ Le pattern "glisser pour définir une zone sur une trace" est nouveau, mais ses 
 
 ### Color System
 
-**Philosophie : dark-first, lisible sous soleil, sémantiquement distinct**
+> **⚠️ AMENDEMENT 2026-03-18** — Direction visuelle corrigée : **light mode** + **vert sauge** en remplacement du dark mode + cyan initialement spécifié. Les maquettes validées par Guillaume (Desertus Bikus) font foi.
 
-La palette se construit autour d'une contrainte forte : les 3 couleurs de densité (vert/ambre/rouge) sont réservées à la trace. Tout le reste de l'interface doit être neutre pour que la trace reste le foyer visuel principal.
+**Philosophie : light-first, identité outdoor/nature, vert sauge comme couleur de marque**
+
+La palette se construit autour d'une contrainte forte : les 3 couleurs de densité (vert foncé/ambre/rouge) sont réservées à la trace. Le vert primaire de marque est plus sombre et plus saturé que la couleur de densité haute — distinction sémantique essentielle.
 
 #### Palette principale
 
 ```css
 :root {
   /* === TRACE DENSITY (réservées — ne jamais utiliser ailleurs) === */
-  --density-high:   #22c55e;  /* vert   — nombreux hébergements */
-  --density-medium: #f59e0b;  /* ambre  — options limitées */
-  --density-low:    #ef4444;  /* rouge  — zone critique */
+  --density-high:   #16a34a;  /* vert foncé  — nombreux hébergements (distinct du brand) */
+  --density-medium: #d97706;  /* ambre       — options limitées */
+  --density-low:    #dc2626;  /* rouge       — zone critique */
 
-  /* === BRAND ACCENT === */
-  --accent:         #06b6d4;  /* cyan   — "la couleur de la route" */
-  --accent-hover:   #0891b2;  /* cyan foncé pour états hover/active */
+  /* === BRAND PRIMARY (vert sauge forêt) === */
+  --primary:        #4A7C44;  /* vert forêt  — CTA, boutons primaires, sélection active */
+  --primary-hover:  #3D6B39;  /* vert foncé  — états hover/active */
+  --primary-light:  #EBF3E8;  /* vert très clair — fonds sections, tags, chips, bg sélection */
 
-  /* === DARK SURFACES (mode par défaut) === */
-  --background:     #0f1117;  /* fond app, carte */
-  --surface:        #1a1d27;  /* cards, panels, bottom sheet */
-  --surface-raised: #232736;  /* éléments élevés, hover states */
-  --border:         #2d3149;  /* séparateurs, contours */
+  /* === LIGHT SURFACES (mode par défaut) === */
+  --background:     #FFFFFF;  /* fond app, pages liste */
+  --background-page:#F5F7F5;  /* fond de page (gris-vert très clair) */
+  --surface:        #F8FAF9;  /* cards, panels, bottom sheet */
+  --surface-raised: #EFF5F1;  /* éléments élevés, hover states */
+  --border:         #D4E0DA;  /* séparateurs, contours */
 
   /* === TEXTE === */
-  --text-primary:   #f1f5f9;  /* titres, labels principaux */
-  --text-secondary: #94a3b8;  /* sous-titres, métadonnées */
-  --text-muted:     #475569;  /* placeholders, désactivés */
+  --text-primary:   #1A2D22;  /* titres, labels principaux (vert très foncé) */
+  --text-secondary: #4D6E5A;  /* sous-titres, métadonnées */
+  --text-muted:     #8EA899;  /* placeholders, désactivés */
 
   /* === STATUS (non density) === */
-  --status-offline:  #6b7280;  /* gris — offline complet */
-  --status-warning:  #f59e0b;  /* ambre — connexion instable, GPS perdu */
-  --status-success:  #22c55e;  /* vert  — confirmation action */
+  --status-offline:  #6b7280;  /* gris   — offline complet */
+  --status-warning:  #d97706;  /* ambre  — connexion instable, GPS perdu */
+  --status-success:  #16a34a;  /* vert   — confirmation action */
 
   /* === MAP-SPECIFIC === */
-  --trace-default:   #94a3b8;  /* trace avant colorisation (gris-bleu) */
-  --gps-indicator:   #06b6d4;  /* point GPS pulsant (accent) */
-  --target-marker:   #f1f5f9;  /* marqueur point cible (blanc) */
-  --corridor-highlight: rgba(241,245,249,0.15); /* surlignage corridor */
-}
-
-/* Light mode (optionnel, non recommandé comme expérience principale) */
-.light {
-  --background:     #f8fafc;
-  --surface:        #ffffff;
-  --surface-raised: #f1f5f9;
-  --border:         #e2e8f0;
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
-  --text-muted:     #94a3b8;
+  --trace-default:      #9DB8A8;       /* trace avant colorisation (vert-gris neutre) */
+  --gps-indicator:      #4A7C44;       /* point GPS pulsant (brand primary) */
+  --target-marker:      #1A2D22;       /* marqueur point cible (texte foncé) */
+  --poi-pin:            #1A2D22;       /* pins POI (noir quasi-pur, comme mockups) */
+  --corridor-highlight: rgba(45,106,74,0.10); /* surlignage corridor (primary à 10%) */
 }
 ```
 
-Le cyan `#06b6d4` est distinct des 3 couleurs de densité, excellent contraste sur fond sombre (> 4.5:1), et évocateur outdoor/tech/route. Il est utilisé uniquement pour : GPS indicator, boutons primaires, liens actifs.
+**Tokens sémantiques shadcn/ui (light mode)**
+
+```css
+--primary:            var(--primary);        /* #4A7C44 */
+--primary-foreground: #FFFFFF;               /* texte blanc sur fond primary */
+--muted:              var(--surface-raised);  /* #EFF5F1 */
+--muted-foreground:   var(--text-secondary);  /* #4D6E5A */
+--card:               var(--surface);         /* #F8FAF9 */
+--border:             var(--border);          /* #D4E0DA */
+--ring:               var(--primary);         /* #4A7C44 */
+--background:         var(--background);      /* #FFFFFF */
+--foreground:         var(--text-primary);    /* #1A2D22 */
+```
+
+**Contrastes WCAG (light mode)**
+
+| Combinaison | Ratio | Conformité |
+|---|---|---|
+| `text-primary` / `background` | 16.2:1 | AAA |
+| `text-secondary` / `background` | 5.8:1 | AA |
+| `primary` / `background` | 5.4:1 | AA |
+| `primary-foreground` (blanc) / `primary` | 5.4:1 | AA |
+| `density-low` / `background` | 4.8:1 | AA |
+| `density-high` / `background` | 6.1:1 | AA |
+
+**Layout pages non-carte (liste aventures, détail GPX)**
+- Fond de page : `--background-page` (`#F5F7F5`) — gris-vert très clair
+- Contenu centré sur fond blanc (`--background`) avec `max-w-3xl mx-auto`
+- Cards : `--surface` avec `border border-[--border]` et `rounded-xl`
 
 #### Tokens sémantiques shadcn/ui
 
@@ -651,19 +673,20 @@ Minimum absolu : **14px** pour tout texte informatif. Exception réglementaire :
 
 ### Accessibility Considerations
 
-**Contrastes WCAG AA minimum, AAA visé pour texte critique**
+**Contrastes WCAG AA minimum, AAA visé pour texte critique** (light mode — voir palette color system)
 
 | Combinaison | Ratio | Conformité |
 |---|---|---|
-| `text-primary` / `background` | 15.8:1 | AAA |
-| `text-secondary` / `background` | 5.9:1 | AA |
-| `accent` / `background` | 5.2:1 | AA |
-| `density-low` / `background` | 4.6:1 | AA |
-| `density-high` / `background` | 7.1:1 | AAA |
+| `text-primary` (#1A2D22) / `background` (#FFF) | 16.2:1 | AAA |
+| `text-secondary` (#4D6E5A) / `background` (#FFF) | 5.8:1 | AA |
+| `primary` (#4A7C44) / `background` (#FFF) | 5.4:1 | AA |
+| `primary-foreground` (#FFF) / `primary` (#4A7C44) | 5.4:1 | AA |
+| `density-low` (#dc2626) / `background` (#FFF) | 4.8:1 | AA |
+| `density-high` (#16a34a) / `background` (#FFF) | 6.1:1 | AA |
 
 **Règles d'accessibilité**
 - La couleur ne suffit jamais seule : densité encodée en couleur *et* épaisseur de trait ; badges textuels en complément
-- Focus rings : `ring-2 ring-offset-2` avec `--ring: var(--accent)` sur tous les éléments interactifs
+- Focus rings : `ring-2 ring-offset-2` avec `--ring: var(--primary)` sur tous les éléments interactifs
 - Réduction de mouvement : `@media (prefers-reduced-motion)` → animations de colorisation et GPS indicator désactivées
 - Taille de police : 14px minimum absolu pour tout contenu informatif
 
@@ -685,21 +708,67 @@ Fichier de référence : `_bmad-output/planning-artifacts/ux-design-directions.h
 
 ### Chosen Direction
 
-**D1 + D2 + D3 + D4 + D5** — Carte full-bleed comme canvas principal, overlays minimaux, bottom sheet Vaul pour les POI, interface Live épurée à 2 sliders, StatusBanner non bloquant systématisé.
+> **⚠️ AMENDEMENT 2026-03-18** — Mode de couleur corrigé (light), navigation Planning/Live tranchée.
 
-**Navigation — décision différée** : deux options maintenues jusqu'à l'implémentation :
-- **Option A — FAB flottant** : bouton "Mode Aventure" flottant sur la carte. Maximalise l'espace carte.
-- **Option B — Bottom tab bar** (D6) : 3 tabs (Carte / Aventure central / Réglages). Pattern iOS/Android familier, -56px de hauteur carte.
+**D1 + D2 + D3 + D4 + D5** — Carte full-bleed comme canvas principal, overlays minimaux, bottom sheet Vaul pour les POI, interface Live épurée, StatusBanner non bloquant systématisé.
+
+**Navigation Planning/Live — DÉCISION ARRÊTÉE (2026-03-18)**
+
+**Mobile (< 1024px) — liste des aventures :**
+```
+┌─────────────────────────────────────┐
+│  Mes Aventures                  👤  │
+│  ─────────────────────────────────  │
+│  > Desertus Bikus          1000 km  │  ← sélectionnée
+│    Hamster Classique        440 km  │
+│    Race Across France      2300 km  │
+│                                     │
+│  ┌─────────────────────────┐  ⚙️   │  ← gros bouton Live + gear
+│  │   🔴 DÉMARRER EN LIVE   │  ▾   │
+│  └─────────────────────────┘        │
+│  ┌────────────────────────────────┐ │
+│  │      + Ajouter une aventure    │ │
+│  └────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+- **Bouton LIVE** : primary, pleine largeur, rouge pulsant quand GPS actif
+- **⚙️ dropdown** : "Mode Planning" (→ carte planning) · "Voir les détails" (→ page détail GPX)
+
+**Desktop (≥ 1024px) — liste des aventures :**
+```
+┌──────────────────────────────────────────────┐
+│  Desertus Bikus  1000 km                     │
+│  [🔴 LIVE]  [📋 Planning]  [✏️ Modifier]     │
+└──────────────────────────────────────────────┘
+```
+- 3 boutons explicites côte à côte sous le nom d'aventure
+- LIVE = primary vert (ou rouge si actif) · Planning = secondary · Modifier = ghost
+
+**Carte desktop Planning — sidebar rétractable :**
+```
+┌─────────────────┬──────────────────────────┐
+│  Sidebar 360px  │  Carte (reste)           │
+│  [←] rétracter │  - Trace colorisée       │
+│  - Segments     │  - Layer toggles         │
+│  - Sliders      │  - DensityLegend         │
+│  - Liste POI    │  - Attribution OSM       │
+└─────────────────┴──────────────────────────┘
+```
+Sidebar toggle : bouton chevron `◀` / `▶` flottant sur le bord gauche de la carte.
 
 ### Design Rationale
 
-La direction principale émerge naturellement de toutes les décisions précédentes : la carte est le produit, les overlays sont minimaux, le dark mode est l'identité visuelle. Les 5 écrans (D1→D5) sont cohérents — même palette, mêmes tokens Tailwind, même logique de z-index.
+La direction principale : la carte est le produit, les overlays sont minimaux, le **light mode** avec vert sauge est l'identité visuelle. Cohérence avec les maquettes Desertus Bikus validées par Guillaume.
 
-La navigation (FAB vs tab bar) est la seule décision ouverte. Pour Thomas sur le vélo (mode Live, fatigue), le FAB est plus accessible (tap unique). Pour Sophie en planning, le tab bar offre plus de discoverabilité.
+La distinction Planning/Live est fondamentale car les contextes d'usage sont quasi-opposés (à la maison assis vs sur le vélo épuisé). La séparation doit être visible dès la liste des aventures, pas découverte dans l'interface carte.
 
 ### Implementation Approach
 
 ```
+Pages liste/détail (non-carte)
+  ↳ bg-[--background-page] (#F5F7F5) — fond de page
+  ↳ Contenu centré max-w-3xl bg-white — cards et listes
+
 Carte (100dvh full-bleed)
   ↳ Layer toggles flottants (top-right, z-20)
   ↳ DensityLegend discoverable (bottom-right, z-10)
@@ -708,7 +777,7 @@ Carte (100dvh full-bleed)
   ↳ CorridorSlider / Live Panel (bottom overlay, z-30)
   ↳ Vaul Drawer POICard (z-50, snap 40%/85%)
   ↳ GeolocationConsent Dialog (z-60, unique modal bloquant)
-Navigation : FAB flottant OU bottom tab bar — à confirmer à l'implémentation
+  ↳ Sidebar desktop Planning (z-20, lg:block, rétractable)
 ```
 
 ---
@@ -1070,11 +1139,24 @@ Labels toujours visibles au-dessus · erreurs `text-sm text-destructive` sous le
 
 ### Navigation Patterns
 
-**Architecture :** `/ → /auth → /adventures → /adventures/:id → /settings`
+> **⚠️ AMENDEMENT 2026-03-18** — Navigation Planning/Live tranchée.
 
-Mode Live : bouton "← Planning" haut gauche uniquement — aucune autre navigation accessible intentionnellement.
+**Architecture :** `/ → /auth → /adventures → /adventures/:id/map?mode=planning → /adventures/:id/live`
 
-**Retour arrière :** Drawer → swipe down / tap backdrop · Dialog Consent → Escape / bouton refus · mode Live → bouton "Quitter" = `clearWatch()`.
+**Entrée Planning (mode carte bureau)** : `/adventures/:id/map?mode=planning`
+**Entrée Live (mode GPS)** : `/adventures/:id/live` → déclenche `GeolocationConsent` au premier accès
+
+**Depuis la liste des aventures :**
+- Mobile : bouton LIVE (→ `/live`) + ⚙️ dropdown → "Planning" (→ `/map`) | "Détails" (→ `/adventures/:id`)
+- Desktop : boutons [LIVE] [Planning] [Modifier] explicites sous le nom d'aventure
+
+**En mode carte Planning :** bouton "← Aventures" haut gauche pour revenir à la liste
+**En mode Live :** bouton "⏹ Quitter le live" haut gauche uniquement — navigation intentionnellement bloquée pendant le ride
+
+**Retour arrière :**
+- Drawer POICard → swipe down / tap backdrop
+- Dialog Consent → Escape / bouton "Refuser"
+- Mode Live → bouton "Quitter" = `clearWatch()` + redirect `/adventures`
 
 ---
 
@@ -1112,9 +1194,41 @@ Skeletons localisés : 3 items POI list · jamais de spinner global · carte = c
 
 ### Search & Filter Patterns
 
-**Filtre unique : le slider de distance** — pas de recherche textuelle, pas de filtres prix/étoiles (délégués à Booking.com via deep link).
+> **⚠️ AMENDEMENT 2026-03-18** — Le panneau Filtres est repensé : il devient le sélecteur de types de POI + configuration de recherche. Pas de filtres prix/étoiles (délégués à Booking.com via deep link).
 
-**Calques :** `<LayerToggleGroup>` par catégorie · activation immédiate depuis cache · résultats triés par km sur la trace (Planning) ou distance au point cible (Live) · jamais de tri algorithmique.
+**Panneau Filtres — contenu :**
+
+```
+┌─────────────────────────────────┐
+│  Filtres                      × │
+│ ─────────────────────────────── │
+│  TYPES DE LIEUX                 │
+│  [🏨 Hébergements ✓] [🍽️ Restau]│
+│  [🛒 Alimentation] [🚲 Vélo]    │
+│                                 │
+│  HÉBERGEMENTS (si actif)        │
+│  [🏩 Hôtel ✓] [🏕️ Camping ✓]   │
+│  [🛖 Refuge]   [🏘️ Hostel]      │
+│                                 │
+│  DISTANCE MAX DE LA TRACE       │
+│  ──────●──────────── 5 km       │
+│                                 │
+│  PLAGE KILOMÉTRIQUE (Restau/Vélo)│
+│  De ── 20 km ──● à ──● 80 km    │
+│  (visible si Restau ou Vélo actif│
+│                                 │
+│  [  Appliquer les filtres  ]    │
+└─────────────────────────────────┘
+```
+
+**Règles du panneau Filtres :**
+- Multi-sélection pour les types de lieux (plusieurs catégories simultanées)
+- Sous-types hébergements visibles uniquement si 🏨 Hébergements est actif
+- "Distance max de la trace" : slider simple (1–30 km, cap 30 km API)
+- "Plage kilométrique" : range slider fromKm/toKm — visible si Restau ou Vélo actif (recherche sur segment, pas depuis position GPS)
+- Pas de filtres prix/étoiles : délégués à Booking.com via deep link paramétré
+
+**Calques carte :** `<LayerToggleGroup>` reflète les types actifs dans les Filtres · activation immédiate depuis cache · résultats triés par km sur la trace (Planning) ou distance au point cible (Live) · jamais de tri algorithmique.
 
 ---
 
