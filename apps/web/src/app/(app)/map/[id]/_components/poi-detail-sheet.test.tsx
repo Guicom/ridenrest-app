@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { PoiDetailSheet } from './poi-detail-sheet'
-import type { Poi, MapLayer } from '@ridenrest/shared'
+import type { Poi } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 
 afterEach(cleanup)
@@ -173,8 +173,8 @@ describe('PoiDetailSheet', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi({ distAlongRouteKm: 15 })} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    // 15km at 15km/h = 60 min
-    expect(screen.getByText('~60 min')).toBeDefined()
+    // 15km at 15km/h = 1h00
+    expect(screen.getByText('~1h00')).toBeDefined()
     expect(screen.getByText('(à 15 km/h)')).toBeDefined()
   })
 
