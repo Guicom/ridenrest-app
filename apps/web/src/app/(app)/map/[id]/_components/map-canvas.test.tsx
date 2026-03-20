@@ -176,27 +176,27 @@ describe('buildDensityColoredFeatures', () => {
     expect(buildDensityColoredFeatures([segment], [])).toHaveLength(0)
   })
 
-  it('all tronçons are green (#22c55e) when coverageGaps is empty', () => {
+  it('all tronçons are green (#16a34a) when coverageGaps is empty', () => {
     const segment = makeDensitySegment('seg-1', 30, 0)
     const result = buildDensityColoredFeatures([segment], [])
     expect(result.length).toBeGreaterThan(0)
-    for (const f of result) expect(f.properties?.color).toBe('#22c55e')
+    for (const f of result) expect(f.properties?.color).toBe('#16a34a')
   })
 
-  it('critical gap → red (#ef4444) tronçon', () => {
+  it('critical gap → red (#dc2626) tronçon', () => {
     const segment = makeDensitySegment('seg-1', 30, 0, 30)
     const gap: CoverageGapSummary = { segmentId: 'seg-1', fromKm: 0, toKm: 10, severity: 'critical' }
     const result = buildDensityColoredFeatures([segment], [gap])
     const troncon = result.find((f) => f.properties?.fromKmAbsolute === 0 && f.properties?.toKmAbsolute === 10)
-    expect(troncon?.properties?.color).toBe('#ef4444')
+    expect(troncon?.properties?.color).toBe('#dc2626')
   })
 
-  it('medium gap → orange (#f59e0b) tronçon', () => {
+  it('medium gap → amber (#d97706) tronçon', () => {
     const segment = makeDensitySegment('seg-1', 30, 0, 30)
     const gap: CoverageGapSummary = { segmentId: 'seg-1', fromKm: 10, toKm: 20, severity: 'medium' }
     const result = buildDensityColoredFeatures([segment], [gap])
     const troncon = result.find((f) => f.properties?.fromKmAbsolute === 10 && f.properties?.toKmAbsolute === 20)
-    expect(troncon?.properties?.color).toBe('#f59e0b')
+    expect(troncon?.properties?.color).toBe('#d97706')
   })
 
   it('segment shorter than 10km → single partial tronçon colored correctly', () => {
@@ -205,7 +205,7 @@ describe('buildDensityColoredFeatures', () => {
     expect(result).toHaveLength(1)
     expect(result[0].properties?.fromKmAbsolute).toBe(0)
     expect(result[0].properties?.toKmAbsolute).toBe(7)
-    expect(result[0].properties?.color).toBe('#22c55e')
+    expect(result[0].properties?.color).toBe('#16a34a')
   })
 
   it('fromKmAbsolute uses cumulativeStartKm offset correctly', () => {
@@ -220,14 +220,14 @@ describe('buildDensityColoredFeatures', () => {
     const gap: CoverageGapSummary = { segmentId: 'seg-1', fromKm: 9.999999, toKm: 20.000001, severity: 'critical' }
     const result = buildDensityColoredFeatures([segment], [gap])
     const matched = result.find((f) => f.properties?.fromKmAbsolute >= 9 && f.properties?.fromKmAbsolute <= 11)
-    expect(matched?.properties?.color).toBe('#ef4444')
+    expect(matched?.properties?.color).toBe('#dc2626')
   })
 
   it('gap for different segmentId does not color the wrong tronçon', () => {
     const segment = makeDensitySegment('seg-1', 30, 0, 30)
     const gap: CoverageGapSummary = { segmentId: 'seg-2', fromKm: 0, toKm: 10, severity: 'critical' }
     const result = buildDensityColoredFeatures([segment], [gap])
-    for (const f of result) expect(f.properties?.color).toBe('#22c55e')
+    for (const f of result) expect(f.properties?.color).toBe('#16a34a')
   })
 })
 

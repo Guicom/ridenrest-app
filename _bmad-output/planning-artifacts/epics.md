@@ -70,6 +70,12 @@ FR-073: Les fonctionnalités nécessitant le réseau sont désactivées offline 
 FR-080: En mode Planification, chaque fiche POI affiche le dénivelé positif cumulé (D+) entre le fromKm courant et la position du POI sur la trace
 FR-081: En mode Planification, chaque fiche POI affiche le temps estimé pour atteindre le POI depuis le fromKm, calculé selon l'allure saisie (fallback : 15 km/h si non saisie)
 FR-082: En mode Live, chaque POI dans la liste affiche le D+ et le temps estimé depuis la position GPS courante jusqu'au point cible sur la trace
+FR-083: Le mode Planning est optimisé pour desktop (≥ 1024px) — sur mobile un toast/popup informe l'utilisateur que l'expérience est meilleure sur desktop, sans bloquer l'accès
+FR-084: En mode Planning, un profil d'élévation interactif est affiché — au survol du graphique la position correspondante sur la trace est mise en évidence ; les étapes (Epic 11) y sont matérialisées
+FR-085: En mode Live, le rayon de recherche autour du point cible est configurable via un stepper (— / +) dans le drawer Filtres — pas via un slider sur la carte
+FR-086: Le drawer Filtres (Planning : panneau latéral desktop / drawer mobile ; Live : drawer "FILTERS") expose les calques à afficher : Hébergements, Restauration, Vélo, Densité, Météo — plus les sous-types d'hébergement (Overpass + Google Places)
+FR-087: En mode Live, la trace s'affiche en gris/noir foncé par défaut ; le segment entre la position GPS courante et le point de recherche s'affiche en vert dynamiquement à mesure que le slider change
+FR-088: Post-MVP — Le drawer Filtres expose : dates d'arrivée/sortie, nombre de personnes, nombre de chambres, types de lits, options (annulation sans frais, logement avec cuisine) — paramètres passés dans les deep links Booking.com
 
 ### NonFunctional Requirements
 
@@ -1186,13 +1192,17 @@ So that users always know where they are and how to get back.
 
 **Acceptance Criteria:**
 
-**Given** a user enters Planning mode,
+**Given** a user enters Planning mode on mobile (< 1024px),
 **When** navigated to `/adventures/:id/map?mode=planning`,
-**Then** the map renders full-bleed (`100dvh`) with a "← Aventures" back button (top-left, `z-40`) and the sidebar visible on desktop.
+**Then** a non-blocking toast/banner appears: "Mode Planning optimisé pour desktop — certaines fonctionnalités sont réduites sur mobile" — the map still loads but the sidebar is hidden and replaced by the "FILTERS" bottom drawer pattern.
+
+**Given** a user enters Planning mode on desktop (≥ 1024px),
+**When** navigated to `/adventures/:id/map?mode=planning`,
+**Then** the map renders full-bleed (`100dvh`) with a "← Aventures" back button (top-left, `z-40`) and the sidebar visible.
 
 **Given** the desktop Planning sidebar,
 **When** rendered,
-**Then** it is 360px wide with a `◀`/`▶` collapse toggle — collapsed state hides the sidebar and gives full width to the map.
+**Then** it is 360px wide with a `◀`/`▶` collapse toggle — collapsed state hides the sidebar and gives full width to the map; the sidebar contains: fromKm/toKm slider, layer toggles (Hébergements / Restauration / Vélo / Densité / Météo), accommodation sub-type chips, and (Epic 11) stages list.
 
 **Given** a user enters Live mode at `/adventures/:id/live`,
 **When** it's their first access,
@@ -1210,39 +1220,146 @@ So that users always know where they are and how to get back.
 
 ### Story 8.4: Filter Panel — POI Selector
 
-As a **cyclist user planning a route**,
-I want to filter which types of places are shown on my map,
+As a **cyclist user**,
+I want to filter which types of places are shown on my map and configure search parameters,
 So that I can focus on what I need without visual clutter.
+
+> **Décisions UX 2026-03-20 :**
+> - Planning (desktop) : filtres dans le panneau latéral — pas de drawer séparé
+> - Live (mobile) : bouton "FILTERS" ouvre un Vaul Drawer
+> - Rayon = stepper (— / +) dans le drawer Live, pas un slider sur la carte
+> - Post-MVP uniquement : dates, personnes, chambres, types de lits, options Booking
 
 **Acceptance Criteria:**
 
-**Given** a user taps the "Filtres" button,
-**When** the filter panel opens,
-**Then** it opens as a Vaul Drawer on mobile or a sidebar panel on desktop (`z-50`).
+**[Planning Mode — Panneau latéral desktop]**
 
-**Given** the filter panel is open,
-**When** the POI type section renders,
-**Then** four toggle chips are visible: 🏨 Hébergements, 🍽️ Restauration, 🛒 Alimentation, 🚲 Vélo — multi-selection, active state uses `--primary` background with white text.
+**Given** the Planning sidebar is visible,
+**When** the filter section renders,
+**Then** it shows inline (no separate drawer): layer toggles (🏨 Hébergements, 🍽️ Restauration, 🛒 Alimentation, 🚲 Vélo, 🌤️ Météo, 📊 Densité) as toggle chips — multi-selection, active = `--primary` bg + white text.
 
-**Given** 🏨 Hébergements is active,
-**When** the panel renders,
-**Then** sub-type chips appear: 🏩 Hôtel, 🏕️ Camping, 🛖 Refuge, 🏘️ Hostel — all active by default, individually toggleable.
+**Given** 🏨 Hébergements is active in Planning sidebar,
+**When** the accommodation sub-section renders,
+**Then** sub-type chips appear for all Overpass + Google Places categories (Hôtel, Camping, Refuge, Hostel, Maison d'hôte…) — all active by default, individually toggleable.
 
-**Given** the distance filter renders,
-**When** displayed,
-**Then** a slider "Distance max de la trace" shows (0.1–30 km, default 5 km, hard-capped at 30 km).
+**[Live Mode — Drawer Filtres]**
 
-**Given** 🍽️ Restauration or 🚲 Vélo is active,
-**When** the panel renders,
-**Then** a range slider "Plage kilométrique" appears (fromKm/toKm) for segment-scoped searches.
+**Given** a user taps the "FILTERS" button in Live mode,
+**When** the drawer opens,
+**Then** it opens as a Vaul Drawer from bottom (`z-50`).
 
-**Given** a user taps "Appliquer les filtres",
+**Given** the Live filters drawer is open,
+**When** rendered,
+**Then** it shows: (1) Distance de la trace — stepper `— 5 km +` (0.5–30 km, default 5 km); (2) Calques — toggle chips: 🏨 Hébergements, 🍽️ Restauration, 🛒 Alimentation, 🚲 Vélo, 🌤️ Météo, 📊 Densité; (3) Sub-types hébergement (si 🏨 actif).
+
+**Given** the "Appliquer les filtres" button is tapped (Live drawer),
 **When** applied,
-**Then** the map updates immediately with only selected POI types; `<LayerToggleGroup>` reflects active categories.
+**Then** the map updates immediately; drawer closes; active filter count badge appears on the "FILTERS" button.
 
 **Given** no POI type is selected,
 **When** the user tries to apply,
 **Then** a validation message appears and the apply button stays disabled.
+
+**[Post-MVP — not in this story]**
+> Dates arrivée/sortie, nombre de personnes, nombre de chambres, types de lits, options (annulation sans frais, logement avec cuisine) — à implémenter après MVP uniquement.
+
+---
+
+### Story 8.5: Density Layer Toggle
+
+As a **cyclist user viewing the map**,
+I want to toggle the density colorization on/off independently from other layers,
+So that I can switch between a clean trace view and the density-colored view depending on my focus.
+
+**Acceptance Criteria:**
+
+**Given** the density analysis has been run on an adventure,
+**When** the density layer toggle is active (default),
+**Then** the GPX trace is rendered with the tricolor density colorization (green/orange/red per tronçon).
+
+**Given** the user toggles density off,
+**When** the toggle is inactive,
+**Then** the trace renders in a neutral color (`--text-secondary` or `#94A3B8`) — uniform, no density colors.
+
+**Given** the density toggle is in the Planning sidebar (desktop) or Live Filters drawer,
+**When** rendered,
+**Then** it appears as a chip `📊 Densité` consistent with other layer toggles.
+
+---
+
+### Story 8.6: Accommodation Type Display Filters
+
+As a **cyclist user**,
+I want to filter which accommodation sub-types are shown on the map,
+So that I can hide shelter/refuge pins if I only care about hotels, for example.
+
+**Acceptance Criteria:**
+
+**Given** the 🏨 Hébergements layer is active,
+**When** the sub-type filter section renders,
+**Then** chips are displayed for all available categories from Overpass + Google Places: Hôtel, Camping, Refuge/Shelter, Hostel, Maison d'hôte, Gîte — all active by default.
+
+**Given** the user deactivates a sub-type chip (e.g. Refuge),
+**When** applied,
+**Then** refuge/shelter pins disappear from the map immediately; other accommodation pins remain.
+
+**Given** a sub-type has no results in the current corridor,
+**When** the chip renders,
+**Then** it is displayed greyed-out with a `(0)` count badge — still tappable to pre-select for future searches.
+
+---
+
+### Story 8.7: Density Analysis Category Selection
+
+As a **cyclist user triggering a density analysis**,
+I want to choose which accommodation categories are included in the analysis,
+So that the density colorization reflects only the types I plan to use (e.g. no camping if I always sleep in hotels).
+
+**Acceptance Criteria:**
+
+**Given** a user triggers density analysis (from Epic 5 flow),
+**When** the analysis is requested,
+**Then** a pre-analysis modal appears with category chips: Hôtel, Camping, Refuge, Hostel, Maison d'hôte — all selected by default.
+
+**Given** the user deselects one or more categories,
+**When** they confirm and launch the analysis,
+**Then** the density job runs with only the selected categories; the selection is stored in `adventure.density_categories` for reference.
+
+**Given** the density analysis was run with a specific category selection,
+**When** the map displays the colorized trace,
+**Then** a small label near the density legend shows the active categories (e.g. "Hôtels + Campings").
+
+---
+
+### Story 8.8: Interactive Elevation Profile
+
+As a **cyclist planning a multi-day route**,
+I want an interactive elevation profile below the map,
+So that I can visualize the terrain, understand cumulative D+, and identify where steep sections align with accommodation scarcity.
+
+> **Note:** This story is a prerequisite for Epic 11 (Stage Planning) — stages are created by clicking on the elevation profile.
+
+**Acceptance Criteria:**
+
+**Given** a user is in Planning mode on desktop,
+**When** the map view renders,
+**Then** an elevation profile chart (Recharts or Victory) appears below the map or in the sidebar — height ~120px, displaying elevation (m) on Y-axis and distance (km) on X-axis.
+
+**Given** the user hovers over the elevation profile,
+**When** the cursor moves,
+**Then** a vertical tooltip shows: elevation at that point, cumulative distance (km), cumulative D+ from start — and a crosshair marker appears on the corresponding position on the GPX trace on the map.
+
+**Given** the adventure has multiple segments,
+**When** the profile renders,
+**Then** segment boundaries are marked with a vertical dashed line and segment name label.
+
+**Given** the user is in Live mode,
+**When** the bottom sheet is visible,
+**Then** a compact elevation strip (height ~60px, no hover interaction) shows the elevation profile with: current GPS position marked (green dot), target search point marked (white dot).
+
+**Given** the adventure has no elevation data in waypoints (missing `ele` values),
+**When** the profile would render,
+**Then** a graceful fallback message "Données d'élévation non disponibles pour cette trace" appears in the profile area — no crash.
 
 ---
 
@@ -1518,9 +1635,133 @@ So that I can act before hitting the 10k/day cap — avoiding silent service deg
 
 ---
 
-## Epic 11: PWA & Offline Capability
+## Epic 11: Stage Planning (Étapes de planification)
 
-> **Note 2026-03-18 : renommé depuis Epic 8** — numérotation mise à jour suite à l'insertion des épics 8 (App Shell) et 9 (Redesign). Contenu inchangé.
+> **Ajouté 2026-03-20** — Fonctionnalité MVP permettant de définir des étapes jour par jour sur l'aventure. Dépend de Story 8.8 (Profil d'élévation). Les étapes sont créées depuis la carte et/ou le profil d'élévation, chaque étape a une couleur, un nom, un D+ calculé et une distance inter-étapes.
+
+L'utilisateur peut découper son aventure en étapes journalières, les visualiser sur la trace et le profil d'élévation, et organiser sa planification jour par jour avec D+ et distance par étape.
+
+### Story 11.1: Stage CRUD — Création, Renommage, Suppression
+
+As a **cyclist planning a multi-day adventure**,
+I want to create, name, and delete planning stages on my route,
+So that I can organize my adventure day by day with clear endpoints.
+
+**Acceptance Criteria:**
+
+**Given** a user clicks "Créer une étape" in Planning mode,
+**When** they click on a point on the trace or elevation profile,
+**Then** a stage endpoint marker is placed at that km position; if it's the first stage, the start is km 0; otherwise the start is the end of the previous stage.
+
+**Given** a stage endpoint is placed,
+**When** the user confirms,
+**Then** a naming dialog appears (default: "Étape 1", "Étape 2"…); the stage is saved with `start_km`, `end_km`, `name`, `color` (auto-assigned from a palette, user-changeable).
+
+**Given** stages exist in the sidebar stages list,
+**When** rendered,
+**Then** each stage shows: color swatch, name, distance (km), D+ cumulative, ETA (based on default 15 km/h if no pace set).
+
+**Given** a user wants to edit a stage,
+**When** they click the edit icon,
+**Then** they can rename it and change its color — endpoint km is not editable directly (drag on map instead, Epic 11.2).
+
+**Given** a user deletes a stage,
+**When** confirmed,
+**Then** the stage is removed; subsequent stages' start_km values are recalculated automatically.
+
+---
+
+### Story 11.2: Stage Interactive Map & Profile Placement
+
+As a **cyclist creating stages**,
+I want to place and adjust stage endpoints directly on the map or elevation profile,
+So that I can visually fine-tune where each day ends based on terrain.
+
+**Acceptance Criteria:**
+
+**Given** the user is in "Créer une étape" mode,
+**When** they hover over the map trace or the elevation profile,
+**Then** a preview shows the distance and D+ from the last stage endpoint to the cursor position in real time.
+
+**Given** a stage endpoint marker exists on the map,
+**When** the user drags it to a new position on the trace,
+**Then** the marker snaps to the nearest GPX point; `end_km` is updated and D+/distance recalculated.
+
+**Given** stages are defined,
+**When** the elevation profile renders (Story 8.8),
+**Then** each stage boundary appears as a colored vertical line on the profile, with the stage name as a label.
+
+**Given** the user toggles "Afficher les étapes" off,
+**When** the map renders,
+**Then** all stage markers and colored trace segments disappear; the density colorization (if active) takes precedence.
+
+---
+
+### Story 11.3: Stage D+ & Distance Computation
+
+As a **backend system**,
+I want to accurately compute D+ and distance for each stage,
+So that cyclists get reliable day-by-day effort estimates.
+
+**Acceptance Criteria:**
+
+**Given** a stage has `start_km` and `end_km` defined,
+**When** the stage is saved,
+**Then** the API computes: `distance_km = end_km - start_km`, `elevation_gain_m = sum of positive ele differences between waypoints in [start_km, end_km]`.
+
+**Given** waypoints have `ele` values,
+**When** D+ is computed,
+**Then** only positive elevation deltas are summed (gains only, not losses) — standard cycling D+ definition.
+
+**Given** waypoints have missing or null `ele` values,
+**When** D+ is requested,
+**Then** `elevation_gain_m` is returned as `null` with a `elevation_data_available: false` flag — no crash, graceful UI fallback.
+
+**Given** the pace is set on the adventure,
+**When** ETA is computed per stage,
+**Then** `eta_minutes = (distance_km / pace_kmh) * 60 + (elevation_gain_m / 100) * 6` (Naismith's rule approximation).
+
+---
+
+### Story 11.4: Stage-Scoped POI Search
+
+As a **cyclist with defined stages**,
+I want to search for POIs scoped to the end of each stage,
+So that I find accommodation at exactly my planned overnight stop.
+
+**Acceptance Criteria:**
+
+**Given** stages are defined and a stage is selected in the sidebar,
+**When** the user triggers a POI search for that stage,
+**Then** the corridor search uses `end_km` of the stage as the focal point (±5 km window by default, configurable via filters).
+
+**Given** the stage-scoped search returns results,
+**When** POI pins render,
+**Then** they are visually linked to the stage (matching color accent on pins).
+
+---
+
+### Story 11.5: Stage-Scoped Weather
+
+As a **cyclist planning stages**,
+I want weather forecasts aligned with my expected arrival time at each stage endpoint,
+So that I know what conditions to expect at my overnight stop.
+
+**Acceptance Criteria:**
+
+**Given** stages are defined with a departure time set on the adventure,
+**When** weather is requested for a stage,
+**Then** `eta_datetime = departure_datetime + sum of ETAs of preceding stages + this stage ETA`; weather forecast is fetched at `end_km` for `eta_datetime`.
+
+**Given** no departure time is set,
+**When** weather for a stage is requested,
+**Then** weather is shown for the current time at `end_km` — same fallback as Epic 6.
+
+---
+
+## Epic 12: PWA & Offline Capability
+
+> **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.
 
 Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa dernière trace + POIs en mode offline partiel, et recevoir une notification push quand une analyse de densité est terminée.
 

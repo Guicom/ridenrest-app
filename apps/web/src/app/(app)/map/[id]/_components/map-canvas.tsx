@@ -16,9 +16,9 @@ export interface SegmentWeatherData {
 import type maplibregl from 'maplibre-gl'
 
 const DENSITY_COLORS = {
-  critical: '#ef4444',
-  medium: '#f59e0b',
-  none: '#22c55e',
+  critical: '#dc2626', // var(--density-low)
+  medium: '#d97706',   // var(--density-medium)
+  none: '#16a34a',     // var(--density-high)
 } as const
 
 // Stores density event handler references per map instance for proper cleanup

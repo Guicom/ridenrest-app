@@ -562,7 +562,7 @@ La palette se construit autour d'une contrainte forte : les 3 couleurs de densit
   --status-success:  #16a34a;  /* vert   — confirmation action */
 
   /* === MAP-SPECIFIC === */
-  --trace-default:      #9DB8A8;       /* trace avant colorisation (vert-gris neutre) */
+  --trace-default:      #4A7C44;       /* trace avant colorisation (vert brand — même que primary) */
   --gps-indicator:      #4A7C44;       /* point GPS pulsant (brand primary) */
   --target-marker:      #1A2D22;       /* marqueur point cible (texte foncé) */
   --poi-pin:            #1A2D22;       /* pins POI (noir quasi-pur, comme mockups) */
