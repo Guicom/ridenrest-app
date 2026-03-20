@@ -8,6 +8,12 @@ import type { CreateAdventureInput } from '@ridenrest/shared'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface Props {
   onSubmit: (name: string) => void
@@ -32,35 +38,40 @@ export function CreateAdventureDialog({ onSubmit, isPending }: Props) {
     setOpen(false)
   }
 
-  if (!open) {
-    return (
-      <Button onClick={() => setOpen(true)} className="w-full">
-        + Nouvelle aventure
-      </Button>
-    )
-  }
-
   return (
-    <form onSubmit={handleSubmit(handleCreate)} className="border rounded-lg p-4 space-y-3">
-      <h2 className="font-semibold">Nouvelle aventure</h2>
-      <div className="space-y-1">
-        <Label htmlFor="adventure-name">Nom de l&apos;aventure</Label>
-        <Input
-          id="adventure-name"
-          placeholder="Ex: Transcantabrique 2026"
-          autoFocus
-          {...register('name')}
-        />
-        {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? 'Création...' : 'Créer'}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => { setOpen(false); reset() }}>
-          Annuler
-        </Button>
-      </div>
-    </form>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>+ Nouvelle aventure</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogTitle>Nouvelle aventure</DialogTitle>
+        <form onSubmit={handleSubmit(handleCreate)} className="space-y-4 mt-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="adventure-name">Nom de l&apos;aventure</Label>
+            <Input
+              id="adventure-name"
+              placeholder="Ex: Transcantabrique 2026"
+              autoFocus
+              {...register('name')}
+            />
+            {errors.name && (
+              <p className="text-destructive text-xs">{errors.name.message}</p>
+            )}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setOpen(false); reset() }}
+            >
+              Annuler
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? 'Création...' : 'Créer'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

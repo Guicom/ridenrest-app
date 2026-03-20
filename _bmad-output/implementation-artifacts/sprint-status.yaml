@@ -114,14 +114,15 @@ development_status:
   # Epic 8: App Shell & Navigation  ← NOUVEAU (inséré 2026-03-18)
   # ─────────────────────────────────────────────────────────────
   epic-8: in-progress
-  8-1-design-system-tokens: in-progress
-  8-2-adventures-list-page: backlog
-  8-3-app-shell-routing: backlog
+  8-1-design-system-tokens: done
+  8-2-adventures-list-page: done
+  8-3-app-shell-routing: ready-for-dev
   8-4-filter-panel-poi-selector: backlog
   8-5-density-layer-toggle: backlog
   8-6-accommodation-type-display-filters: backlog     # filtres affichage carte (shelter/refuge on/off)
   8-7-density-analysis-category-selection: backlog    # popin sélection catégories avant analyse (dépend 8-6)
   8-8-interactive-elevation-profile: backlog          # prérequis Epic 11 Étapes — hover trace ↔ map + D+ live
+  8-9-app-header-global-navigation-bar: ready-for-dev  # header persistant: logo + nom aventure + nav (Mes aventures / Mon compte)
   epic-8-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

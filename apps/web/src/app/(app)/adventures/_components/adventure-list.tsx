@@ -1,72 +1,66 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { listAdventures, createAdventure } from '@/lib/api-client'
-import { CreateAdventureDialog } from './create-adventure-dialog'
+import { Bike } from 'lucide-react'
+import { listAdventures } from '@/lib/api-client'
+import { CreateAdventureButton } from './create-adventure-button'
+import { AdventureCard } from './adventure-card'
+
+export function AdventureListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="animate-pulse h-24 bg-surface rounded-xl border border-[--border]" />
+      ))}
+    </div>
+  )
+}
 
 export function AdventureList() {
   const router = useRouter()
-  const queryClient = useQueryClient()
-
-  const { data: adventures = [], isPending } = useQuery({
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { data: adventures = [], isPending, isError } = useQuery({
     queryKey: ['adventures'],
     queryFn: listAdventures,
   })
 
-  const createMutation = useMutation({
-    mutationFn: (name: string) => createAdventure(name),
-    onSuccess: (adventure) => {
-      queryClient.invalidateQueries({ queryKey: ['adventures'] })
-      router.push(`/adventures/${adventure.id}`)
-    },
-  })
-
   if (isPending) {
+    return <AdventureListSkeleton />
+  }
+
+  if (isError) {
     return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse h-20 bg-muted rounded-lg" />
-        ))}
+      <div className="text-center py-16">
+        <p className="text-text-muted mb-2">Impossible de charger les aventures.</p>
+        <p className="text-sm text-text-muted">Vérifiez votre connexion et réessayez.</p>
+      </div>
+    )
+  }
+
+  if (adventures.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <Bike className="mx-auto mb-4 text-text-muted" size={48} />
+        <h2 className="text-xl font-semibold text-text-primary mb-2">Aucune aventure</h2>
+        <p className="text-text-muted mb-6">Créez votre première aventure pour commencer.</p>
+        <CreateAdventureButton />
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <CreateAdventureDialog
-        onSubmit={(name) => createMutation.mutate(name)}
-        isPending={createMutation.isPending}
-      />
-
-      {adventures.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <p>Aucune aventure pour l&apos;instant.</p>
-          <p className="text-sm mt-1">Créez votre première aventure ci-dessus.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {adventures.map((adventure) => (
-            <button
-              key={adventure.id}
-              onClick={() => router.push(`/adventures/${adventure.id}`)}
-              className="w-full text-left p-4 border rounded-lg hover:bg-accent transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{adventure.name}</span>
-                <span className="text-sm text-muted-foreground">
-                  {adventure.totalDistanceKm > 0
-                    ? `${adventure.totalDistanceKm.toFixed(1)} km`
-                    : 'Distance à calculer'}
-                </span>
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {new Date(adventure.createdAt).toLocaleDateString('fr-FR')}
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="space-y-3">
+      {adventures.map((adventure) => (
+        <AdventureCard
+          key={adventure.id}
+          adventure={adventure}
+          isSelected={adventure.id === selectedId}
+          onSelect={(id) => setSelectedId((prev) => (prev === id ? null : id))}
+          onNavigate={(path) => router.push(path)}
+        />
+      ))}
     </div>
   )
 }

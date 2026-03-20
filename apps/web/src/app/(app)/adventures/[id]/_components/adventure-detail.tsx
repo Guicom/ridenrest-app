@@ -238,14 +238,17 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
 
   if (!adventure) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
-        Aventure introuvable.
-      </div>
+      <main className="min-h-screen bg-background-page">
+        <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8">
+          <p className="text-center text-muted-foreground">Aventure introuvable.</p>
+        </div>
+      </main>
     )
   }
 
   return (
-    <main className="container mx-auto max-w-4xl p-4 space-y-6">
+    <main className="min-h-screen bg-background-page">
+      <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-6">
       <div>
         <div className="flex items-center gap-2">
           {isRenamingAdventure ? (
@@ -391,6 +394,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         onOpenChange={setStravaImportOpen}
         stravaConnected={stravaConnected}
       />
+    </div>
     </main>
   )
 }
