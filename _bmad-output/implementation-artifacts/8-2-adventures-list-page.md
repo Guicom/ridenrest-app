@@ -305,7 +305,7 @@ No API changes. No new packages. shadcn `DropdownMenu` and lucide icons (`Settin
 
 - [x] [Review2][HIGH] **Aucune gestion de l'état isError** — `adventure-list.tsx` n'extrayait que `{ data, isPending }`. Si l'API échoue, l'utilisateur voyait l'empty state. Ajouté extraction de `isError` et rendu d'un message d'erreur explicite.
 
-- [x] [Review2][HIGH] **`DialogTrigger render={<Button />}` — API Base UI utilisée avec shadcn/ui** — `create-adventure-dialog.tsx:43` utilisait la prop `render` (syntaxe Base UI) au lieu de `asChild` (shadcn/ui). Corrigé en `<DialogTrigger asChild><Button>...</Button></DialogTrigger>`.
+- [x] [Review2][HIGH] **`DialogTrigger render={<Button />}`** — ~~Faux positif du code review~~ : `@/components/ui/dialog` est une implémentation Base UI (non Radix/shadcn). `render={<Button />}` est l'API correcte pour Base UI — le bouton trigger est bien stylé. Aucun changement requis.
 
 - [x] [Review2][MEDIUM] **Mutation `createAdventure` dupliquée** — `adventure-list.tsx` et `create-adventure-button.tsx` définissaient la même mutation. L'empty state utilise désormais `<CreateAdventureButton />` directement. `useMutation`/`useQueryClient` supprimés de `adventure-list.tsx`.
 

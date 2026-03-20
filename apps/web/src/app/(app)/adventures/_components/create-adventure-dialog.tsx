@@ -40,8 +40,8 @@ export function CreateAdventureDialog({ onSubmit, isPending }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>+ Nouvelle aventure</Button>
+      <DialogTrigger render={<Button />}>
+        + Nouvelle aventure
       </DialogTrigger>
       <DialogContent>
         <DialogTitle>Nouvelle aventure</DialogTitle>
