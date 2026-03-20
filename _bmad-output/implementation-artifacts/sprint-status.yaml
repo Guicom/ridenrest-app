@@ -116,7 +116,7 @@ development_status:
   epic-8: in-progress
   8-1-design-system-tokens: done
   8-2-adventures-list-page: done
-  8-3-app-shell-routing: ready-for-dev
+  8-3-app-shell-routing: done
   8-4-filter-panel-poi-selector: backlog
   8-5-density-layer-toggle: backlog
   8-6-accommodation-type-display-filters: backlog     # filtres affichage carte (shelter/refuge on/off)

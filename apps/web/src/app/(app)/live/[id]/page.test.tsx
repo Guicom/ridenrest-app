@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 
 afterEach(cleanup)
 
@@ -94,8 +94,10 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 // Mock next/navigation
+const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
   useParams: () => ({ id: 'adv-123' }),
+  useRouter: () => ({ push: mockPush }),
 }))
 
 // Mock api-client
@@ -145,11 +147,39 @@ describe('LivePage', () => {
     expect(screen.getByTestId('live-map-canvas')).toBeDefined()
   })
 
-  it('shows back link to adventures', () => {
+  it('does NOT render "Aventures" ArrowLeft back link (AC #5 — removed in Story 8.3)', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode())
     render(<LivePage />)
-    const backLink = screen.getByRole('link')
-    expect(backLink.getAttribute('href')).toBe('/adventures')
+    // No <a> link to /adventures should exist on the live page
+    const links = screen.queryAllByRole('link')
+    const adventuresLink = links.find((l) => l.getAttribute('href') === '/adventures')
+    expect(adventuresLink).toBeUndefined()
+  })
+
+  it('renders "Quitter le live" button (AC #5)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode())
+    render(<LivePage />)
+    expect(screen.getByTestId('quit-live-btn')).toBeDefined()
+    expect(screen.getByTestId('quit-live-btn').textContent).toContain('Quitter le live')
+  })
+
+  it('first click on "Quitter le live" shows confirm state (AC #6)', async () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode())
+    render(<LivePage />)
+    const btn = screen.getByTestId('quit-live-btn')
+    await act(async () => { fireEvent.click(btn) })
+    expect(btn.textContent).toContain('Confirmer')
+  })
+
+  it('second click on "Quitter le live" calls stopWatching and navigates to /adventures (AC #6)', async () => {
+    const stopWatching = vi.fn()
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ stopWatching }))
+    render(<LivePage />)
+    const btn = screen.getByTestId('quit-live-btn')
+    await act(async () => { fireEvent.click(btn) }) // first click — confirm state
+    await act(async () => { fireEvent.click(btn) }) // second click — confirmed
+    expect(stopWatching).toHaveBeenCalledTimes(1)
+    expect(mockPush).toHaveBeenCalledWith('/adventures')
   })
 
   it('shows permission denied message', () => {
@@ -170,7 +200,7 @@ describe('LivePage', () => {
     render(<LivePage />)
     const callsBeforeClick = startWatching.mock.calls.length // 1 from useEffect auto-start
     const button = screen.getByText(/Activer le mode Live/)
-    button.click()
+    fireEvent.click(button)
     expect(startWatching).toHaveBeenCalledTimes(callsBeforeClick + 1)
   })
 

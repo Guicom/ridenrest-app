@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
+import Link from 'next/link'
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getAdventureMapData, getWeatherForecast } from '@/lib/api-client'
 import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import { MapCanvas } from './map-canvas'
@@ -23,6 +25,8 @@ interface MapViewProps {
 }
 
 export function MapView({ adventureId }: MapViewProps) {
+  const [collapsed, setCollapsed] = useState(false)
+
   // Read saved pace params from localStorage (lazy init — runs once on mount)
   const [savedPace] = useState<{ departureTime: string; speedKmh: string }>(() => {
     try {
@@ -63,7 +67,6 @@ export function MapView({ adventureId }: MapViewProps) {
   const { coverageGaps, densityStatus } = useDensity(adventureId)
 
   // Fetch weather for all ready segments as soon as layer is active.
-  // No pace = current-time weather (FR-055 fallback handled by the API).
   const weatherEnabled = weatherActive
   const weatherQueries = useQueries({
     queries: (weatherEnabled ? readySegments : []).map((segment) => ({
@@ -79,8 +82,6 @@ export function MapView({ adventureId }: MapViewProps) {
   const weatherPending = weatherQueries.some((q) => q.isFetching)
 
   // Combine all segments into one continuous trace with cumulative distKm.
-  // WeatherPoint.km is already cumulative (cumulativeStartKm + dist_km) from the API.
-  // MapWaypoint.distKm is segment-local, so we offset it here to match.
   const allCumulativeWaypoints = readySegments.flatMap((s) =>
     (s.waypoints ?? []).map((wp) => ({ ...wp, distKm: s.cumulativeStartKm + wp.distKm })),
   )
@@ -132,93 +133,124 @@ export function MapView({ adventureId }: MapViewProps) {
   const errorCount = data.segments.filter((s) => s.parseStatus === 'error').length
 
   return (
-    <div className="relative flex h-full w-full">
-      {pendingCount > 0 && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
-          <StatusBanner
-            message={`${pendingCount} segment(s) en cours de traitement — ils apparaîtront automatiquement une fois prêts.`}
-          />
-        </div>
-      )}
-      {errorCount > 0 && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" style={{ marginTop: pendingCount > 0 ? '3rem' : 0 }}>
-          <StatusBanner
-            message={`${errorCount} segment(s) n'ont pas pu être analysés — vérifiez le format GPX.`}
-          />
-        </div>
-      )}
-      <MapCanvas
-        segments={readySegments}
-        adventureName={data.adventureName}
-        poisByLayer={poisByLayer}
-        coverageGaps={coverageGaps}
-        densityStatus={densityStatus}
-        segmentsWeather={segmentsWeather}
-      />
-      {densityStatus === 'success' && (
-        <div className="absolute bottom-16 right-4 z-10">
-          <DensityLegend />
-        </div>
-      )}
+    <div className="flex h-full w-full">
+      {/* Left column: desktop sidebar (hidden on mobile) */}
+      <aside
+        data-testid="planning-sidebar"
+        className={`hidden lg:flex flex-col shrink-0 bg-background border-r border-[--border] transition-all duration-200 ${
+          collapsed ? 'w-0 overflow-hidden' : 'w-[360px] overflow-y-auto'
+        }`}
+      >
+        <div className="flex flex-col gap-4 p-4">
+          {/* Search range slider */}
+          <SearchRangeSlider totalDistanceKm={data.totalDistanceKm} />
 
-      {/* Weather toggle button */}
-      <div className="absolute top-4 left-4 z-10">
+          {/* Layer toggles */}
+          <LayerToggles isPending={poisPending} />
+
+          {/* Weather toggle + controls */}
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setWeatherActive(!weatherActive)}
+              className={`h-10 px-3 text-sm font-medium rounded-lg border shadow-sm transition-colors ${
+                weatherActive
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-foreground border-border hover:bg-muted'
+              }`}
+              aria-pressed={weatherActive}
+            >
+              ⛅ Météo
+            </button>
+            {weatherActive && (
+              <WeatherControls
+                isPending={weatherPending}
+                dimension={weatherDimension}
+                onDimensionChange={setWeatherDimension}
+                initialDepartureTime={savedPace.departureTime}
+                initialSpeedKmh={savedPace.speedKmh}
+                onPaceSubmit={(departureTime, speedKmh) => {
+                  setPaceParams({ departureTime, speedKmh })
+                }}
+              />
+            )}
+          </div>
+
+          {/* Sub-type chips — Story 8.4 */}
+          {/* Stages list — Epic 11 */}
+        </div>
+      </aside>
+
+      {/* Right column: map */}
+      <div className="flex-1 relative min-w-0">
+        {/* Sidebar collapse toggle — desktop only, at left edge of map column */}
         <button
-          onClick={() => setWeatherActive(!weatherActive)}
-          className={`h-10 px-3 text-sm font-medium rounded-lg border shadow-sm transition-colors ${
-            weatherActive
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-background text-foreground border-border hover:bg-muted'
+          data-testid="sidebar-toggle"
+          onClick={() => setCollapsed((v) => !v)}
+          className={`hidden lg:flex absolute top-1/2 z-20 -translate-y-1/2 h-6 w-6 items-center justify-center rounded-full bg-background border border-[--border] shadow-sm text-text-secondary hover:text-text-primary ${
+            collapsed ? 'left-0' : '-left-3'
           }`}
-          aria-pressed={weatherActive}
+          aria-label={collapsed ? 'Ouvrir le panneau' : 'Fermer le panneau'}
         >
-          ⛅ Météo
+          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
         </button>
+
+        {/* "← Aventures" back button */}
+        <Link
+          href="/adventures"
+          data-testid="back-to-adventures"
+          className="absolute top-4 left-4 z-40 inline-flex items-center gap-1 rounded-md bg-background/80 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-sm hover:bg-background/90"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Aventures
+        </Link>
+
+        {pendingCount > 0 && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
+            <StatusBanner
+              message={`${pendingCount} segment(s) en cours de traitement — ils apparaîtront automatiquement une fois prêts.`}
+            />
+          </div>
+        )}
+        {errorCount > 0 && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" style={{ marginTop: pendingCount > 0 ? '3rem' : 0 }}>
+            <StatusBanner
+              message={`${errorCount} segment(s) n'ont pas pu être analysés — vérifiez le format GPX.`}
+            />
+          </div>
+        )}
+
+        <MapCanvas
+          segments={readySegments}
+          adventureName={data.adventureName}
+          poisByLayer={poisByLayer}
+          coverageGaps={coverageGaps}
+          densityStatus={densityStatus}
+          segmentsWeather={segmentsWeather}
+        />
+        {densityStatus === 'success' && (
+          <div className="absolute bottom-16 right-4 z-10">
+            <DensityLegend />
+          </div>
+        )}
+
+        {poisError && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1">
+            <StatusBanner message="Recherche indisponible — réessayer dans quelques instants." />
+            <button
+              onClick={handlePoiRetry}
+              className="text-xs text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              Réessayer
+            </button>
+          </div>
+        )}
+
+        <PoiDetailSheet
+          poi={selectedPoi}
+          segments={readySegments}
+          segmentId={selectedSegmentId}
+        />
       </div>
-
-      {/* Weather controls panel */}
-      {weatherActive && (
-        <div className="absolute top-16 left-4 z-10">
-          <WeatherControls
-            isPending={weatherPending}
-            dimension={weatherDimension}
-            onDimensionChange={setWeatherDimension}
-            initialDepartureTime={savedPace.departureTime}
-            initialSpeedKmh={savedPace.speedKmh}
-            onPaceSubmit={(departureTime, speedKmh) => {
-              setPaceParams({ departureTime, speedKmh })
-            }}
-          />
-        </div>
-      )}
-
-      {/* Layer toggles — bottom center */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-        <LayerToggles isPending={poisPending} />
-      </div>
-
-      {/* Search range slider — top right */}
-      <div className="absolute top-4 right-4 z-10">
-        <SearchRangeSlider totalDistanceKm={data.totalDistanceKm} />
-      </div>
-
-      {poisError && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1">
-          <StatusBanner message="Recherche indisponible — réessayer dans quelques instants." />
-          <button
-            onClick={handlePoiRetry}
-            className="text-xs text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            Réessayer
-          </button>
-        </div>
-      )}
-
-      <PoiDetailSheet
-        poi={selectedPoi}
-        segments={readySegments}
-        segmentId={selectedSegmentId}
-      />
     </div>
   )
 }

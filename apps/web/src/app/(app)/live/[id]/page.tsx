@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
 import { snapToTrace } from '@ridenrest/gpx'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
@@ -25,13 +23,32 @@ import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
 
 export default function LivePage() {
   const { id: adventureId } = useParams<{ id: string }>()
+  const router = useRouter()
   const {
     isLiveModeActive,
     hasConsented,
     permissionDenied,
     startWatching,
+    stopWatching,
     grantConsent,
   } = useLiveMode()
+
+  const [quitPending, setQuitPending] = useState(false)
+  const quitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => { if (quitTimerRef.current) clearTimeout(quitTimerRef.current) }
+  }, [])
+
+  const handleQuitRequest = () => {
+    if (quitPending) {
+      stopWatching()
+      router.push('/adventures')
+      return
+    }
+    setQuitPending(true)
+    quitTimerRef.current = setTimeout(() => setQuitPending(false), 3000)
+  }
 
   const [mounted, setMounted] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
@@ -137,15 +154,15 @@ export default function LivePage() {
         weatherActive={weatherActive}
       />
 
-      {/* Top bar — z-40 */}
-      <div className="absolute top-4 left-4 z-40">
-        <Link
-          href="/adventures"
-          className="inline-flex items-center gap-1 rounded-md bg-background/80 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-sm hover:bg-background/90"
+      {/* Quitter le live — top right z-40 */}
+      <div className="absolute top-4 right-4 z-40">
+        <button
+          data-testid="quit-live-btn"
+          onClick={handleQuitRequest}
+          className="inline-flex items-center gap-1.5 rounded-md bg-background/80 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-sm hover:bg-background/90 border border-[--border]"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Aventures
-        </Link>
+          {quitPending ? '✓ Confirmer ?' : '⏹ Quitter le live'}
+        </button>
       </div>
 
       {/* Weather overlay — top right z-40 */}
