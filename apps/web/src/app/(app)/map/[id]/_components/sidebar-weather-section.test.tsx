@@ -44,35 +44,45 @@ describe('SidebarWeatherSection', () => {
     expect(screen.getByText('Météo')).toBeDefined()
   })
 
-  it('renders toggle switch', () => {
+  it('is collapsed by default (WeatherControls not visible)', () => {
     render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
-    expect(screen.getByTestId('weather-toggle')).toBeDefined()
+    expect(screen.queryByTestId('weather-controls')).toBeNull()
   })
 
-  it('WeatherControls IS rendered by default (expanded by default)', () => {
+  it('switch is NOT visible when collapsed (default)', () => {
     render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
+    expect(screen.queryByTestId('weather-toggle')).toBeNull()
+  })
+
+  it('clicking header expands section', () => {
+    render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('weather-section-header'))
     expect(screen.getByTestId('weather-controls')).toBeDefined()
   })
 
-  it('clicking header collapses WeatherControls', () => {
+  it('renders toggle switch inside expanded body', () => {
     render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('weather-section-header'))
+    expect(screen.getByTestId('weather-toggle')).toBeDefined()
+  })
+
+  it('clicking header twice collapses again', () => {
+    render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('weather-section-header'))
     fireEvent.click(screen.getByTestId('weather-section-header'))
     expect(screen.queryByTestId('weather-controls')).toBeNull()
   })
 
-  it('switch is visible inside the expanded body', () => {
-    render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
-    expect(screen.getByTestId('weather-toggle')).toBeDefined()
-  })
-
   it('switch is NOT visible when collapsed', () => {
     render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('weather-section-header'))
     fireEvent.click(screen.getByTestId('weather-section-header'))
     expect(screen.queryByTestId('weather-toggle')).toBeNull()
   })
 
   it('clicking toggle calls setWeatherActive', () => {
     render(<SidebarWeatherSection isPending={false} onPaceSubmit={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('weather-section-header'))
     fireEvent.click(screen.getByTestId('weather-toggle'))
     expect(mockSetWeatherActive).toHaveBeenCalledWith(true)
   })

@@ -6,10 +6,11 @@ import type { MapWaypoint } from '@ridenrest/shared'
 afterEach(cleanup)
 
 const mockSetSearchRange = vi.fn()
+let mockFromKm = 0
 
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
-    fromKm: 0,
+    fromKm: mockFromKm,
     toKm: 30,
     setSearchRange: mockSetSearchRange,
     visibleLayers: new Set(),
@@ -45,6 +46,7 @@ const makeWaypoints = (): MapWaypoint[] => [
 describe('SearchRangeControl', () => {
   beforeEach(() => {
     mockSetSearchRange.mockClear()
+    mockFromKm = 0
   })
 
   it('renders section header with Recherche label', () => {
@@ -74,6 +76,7 @@ describe('SearchRangeControl', () => {
   })
 
   it('shows computed D+ when waypoints have elevation data', () => {
+    mockFromKm = 10
     render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
     expect(screen.getByTestId('elevation-gain')).toBeDefined()
   })
