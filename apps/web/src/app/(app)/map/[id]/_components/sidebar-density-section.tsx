@@ -19,7 +19,7 @@ function LegendItem({ color, label, detail }: { color: string; label: string; de
 }
 
 export function SidebarDensitySection() {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const { densityColorEnabled, toggleDensityColor } = useMapStore()
 
   return (

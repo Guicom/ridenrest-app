@@ -26,7 +26,7 @@ export function PoiLayerGrid({ isPending }: PoiLayerGridProps) {
   const { visibleLayers, toggleLayer } = useMapStore()
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="flex gap-2">
       {LAYER_CARDS.map(({ layer, label, icon: Icon }) => {
         const isActive = visibleLayers.has(layer)
         return (
@@ -36,19 +36,17 @@ export function PoiLayerGrid({ isPending }: PoiLayerGridProps) {
             aria-pressed={isActive}
             aria-label={`${isActive ? 'Masquer' : 'Afficher'} les ${label}`}
             className={[
-              'flex flex-col items-center justify-center gap-2 rounded-2xl p-4 min-h-[80px]',
-              'text-sm font-medium transition-colors',
+              'flex-1 flex items-center justify-center rounded-xl p-3',
+              'transition-colors',
               isActive
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:bg-surface-raised',
             ].join(' ')}
           >
-            <Icon className="h-6 w-6" aria-hidden="true" />
-            {isPending && isActive ? (
-              <Skeleton className="h-2.5 w-16" />
-            ) : (
-              <span>{label}</span>
-            )}
+            {isPending && isActive
+              ? <Skeleton className="h-5 w-5 rounded" />
+              : <Icon className="h-5 w-5" aria-hidden="true" />
+            }
           </button>
         )
       })}

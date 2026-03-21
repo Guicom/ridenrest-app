@@ -13,7 +13,7 @@ interface SidebarWeatherSectionProps {
 }
 
 export function SidebarWeatherSection({ isPending, initialDepartureTime, initialSpeedKmh, onPaceSubmit }: SidebarWeatherSectionProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const { weatherActive, weatherDimension, setWeatherActive, setWeatherDimension } = useMapStore()
 
   return (

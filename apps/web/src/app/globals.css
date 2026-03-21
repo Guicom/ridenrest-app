@@ -143,3 +143,46 @@
     @apply font-sans;
   }
 }
+
+/* ── Borderless range slider ──────────────────────────────────────────────── */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  background: #e5e7eb;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: -6px;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+input[type='range']::-moz-range-track {
+  background: #e5e7eb;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}

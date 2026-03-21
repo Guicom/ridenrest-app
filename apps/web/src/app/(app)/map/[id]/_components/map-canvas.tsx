@@ -135,14 +135,15 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
   // Update trace when segments change
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
+    if (!map || !map.getSource('trace')) return
     updateTraceLayers(map, segments)
   }, [segments])
 
   // Corridor highlight — update when fromKm/toKm, segments, or interaction state change
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
+    // isStyleLoaded() stays false while tiles load in background — check trace source instead
+    if (!map || !map.getSource('trace')) return
     updateCorridorHighlight(map, segments, fromKm, toKm, searchRangeInteracted)
   }, [segments, fromKm, toKm, styleVersion, searchRangeInteracted])  // styleVersion triggers re-add after theme switch
 
@@ -174,7 +175,7 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
   // Density layer — show/hide based on densityStatus, coverageGaps, and styleVersion
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
+    if (!map || !map.getSource('trace')) return
 
     if (densityStatus === 'success' && densityColorEnabledRef.current && coverageGaps) {
       addDensityLayer(map, segments, coverageGaps)
@@ -189,7 +190,7 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
     const unsubscribe = useMapStore.subscribe((state, prevState) => {
       if (state.densityColorEnabled === prevState.densityColorEnabled) return
       const map = mapRef.current
-      if (!map || !map.isStyleLoaded()) return
+      if (!map || !map.getSource('trace')) return
       if (state.densityColorEnabled && densityStatusRef.current === 'success' && coverageGapsRef.current) {
         addDensityLayer(map, segmentsRef.current, coverageGapsRef.current)
       } else {
@@ -390,25 +391,32 @@ function updateCorridorHighlight(
 
   if (source) {
     source.setData({ type: 'FeatureCollection', features })
+    // Re-add layer if it was removed (e.g., style reset)
+    if (!map.getLayer('corridor-highlight')) {
+      map.addLayer({
+        id: 'corridor-highlight',
+        type: 'line',
+        source: 'corridor',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#FBBF24', 'line-width': 8, 'line-opacity': 0.9 },
+      })
+    }
     return
   }
-
-  // Add corridor source + layer (rendered BELOW trace-line so trace stays on top)
   map.addSource('corridor', {
     type: 'geojson',
     data: { type: 'FeatureCollection', features },
   })
 
-  // Render on top of trace (no beforeId) so the highlight is clearly visible
   map.addLayer({
     id: 'corridor-highlight',
     type: 'line',
     source: 'corridor',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': '#1A2D22',   // var(--text-primary) — dark green on both themes (C7.4)
-      'line-width': 5,
-      'line-opacity': 0.85,
+      'line-color': '#FBBF24',   // amber — high contrast against green trace
+      'line-width': 8,
+      'line-opacity': 0.9,
     },
   })
 }

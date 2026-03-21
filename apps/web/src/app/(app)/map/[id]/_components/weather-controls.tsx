@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { Calendar } from 'lucide-react'
+import { Calendar, Thermometer, Umbrella, Wind } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import type { LucideIcon } from 'lucide-react'
 import type { WeatherDimension } from './weather-layer'
 
 export const WEATHER_PACE_STORAGE_KEY = 'ridenrest:weather-pace'
@@ -15,10 +16,10 @@ interface WeatherControlsProps {
   initialSpeedKmh?: string
 }
 
-const DIMENSIONS: { id: WeatherDimension; label: string }[] = [
-  { id: 'temperature', label: 'Température' },
-  { id: 'precipitation', label: 'Précip' },
-  { id: 'wind', label: 'Vent' },
+const DIMENSIONS: { id: WeatherDimension; label: string; icon: LucideIcon }[] = [
+  { id: 'temperature', label: 'Temp.',  icon: Thermometer },
+  { id: 'precipitation', label: 'Pluie', icon: Umbrella },
+  { id: 'wind', label: 'Vent',          icon: Wind },
 ]
 
 const COLOR_LEGENDS: Record<WeatherDimension, { label: string; stops: { color: string; value: string }[] }> = {
@@ -64,22 +65,25 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
     <div className="space-y-4">
       {/* Segmented control */}
       <div className="flex p-1 bg-muted rounded-full">
-        {DIMENSIONS.map((dim) => (
-          <button
-            key={dim.id}
-            data-testid={`weather-dim-${dim.id}`}
-            onClick={() => onDimensionChange(dim.id)}
-            aria-pressed={dimension === dim.id}
-            className={[
-              'flex-1 py-1.5 text-sm font-medium rounded-full transition-colors',
-              dimension === dim.id
-                ? 'bg-background text-primary shadow-sm'
-                : 'text-muted-foreground',
-            ].join(' ')}
-          >
-            {dim.label}
-          </button>
-        ))}
+        {DIMENSIONS.map((dim) => {
+          const Icon = dim.icon
+          const active = dimension === dim.id
+          return (
+            <button
+              key={dim.id}
+              data-testid={`weather-dim-${dim.id}`}
+              onClick={() => onDimensionChange(dim.id)}
+              aria-pressed={active}
+              className={[
+                'flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm font-medium rounded-full transition-colors',
+                active ? 'bg-background text-primary shadow-sm' : 'text-muted-foreground',
+              ].join(' ')}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              {dim.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Departure date/time */}
@@ -95,25 +99,21 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
         />
       </div>
 
-      {/* Speed */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-          Vitesse (km/h)
-        </p>
-        <div className="flex items-center bg-muted rounded-xl px-4 py-3">
-          <input
-            id="speed"
-            type="number"
-            min="1"
-            max="100"
-            placeholder="15"
-            value={speedKmh}
-            onChange={(e) => setSpeedKmh(e.target.value)}
-            onBlur={(e) => submitPace(departureTime, e.target.value)}
-            className="bg-transparent text-xl font-medium text-foreground w-full outline-none"
-          />
-          <span className="text-muted-foreground text-sm shrink-0">km/h</span>
-        </div>
+      {/* Speed — même style que le champ date */}
+      <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
+        <span className="text-sm text-muted-foreground shrink-0">Vitesse moyenne</span>
+        <input
+          id="speed"
+          type="number"
+          min="1"
+          max="100"
+          placeholder="20"
+          value={speedKmh}
+          onChange={(e) => setSpeedKmh(e.target.value)}
+          onBlur={(e) => submitPace(departureTime, e.target.value)}
+          className="bg-transparent text-sm text-foreground w-full outline-none text-right"
+        />
+        <span className="text-muted-foreground text-sm shrink-0">km/h</span>
       </div>
 
       {isPending && <Skeleton className="h-2 w-full" data-testid="weather-submit" />}

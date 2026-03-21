@@ -10,8 +10,6 @@ import { DensityLegend } from './density-legend'
 import { SearchRangeControl } from './search-range-control'
 import { PoiDetailSheet } from './poi-detail-sheet'
 import { WEATHER_PACE_STORAGE_KEY } from './weather-controls'
-import { AccommodationSubTypes } from './accommodation-sub-types'
-import { PoiLayerGrid } from './poi-layer-grid'
 import { SidebarWeatherSection } from './sidebar-weather-section'
 import { SidebarDensitySection } from './sidebar-density-section'
 import { StatusBanner } from '@/components/shared/status-banner'
@@ -148,17 +146,8 @@ export function MapView({ adventureId }: MapViewProps) {
           <SearchRangeControl
             totalDistanceKm={data.totalDistanceKm}
             waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
+            isPoisPending={poisPending}
           />
-
-          {/* POI layer grid — 2×2 cards (Story 8.4 correction) */}
-          <PoiLayerGrid isPending={poisPending} />
-
-          {/* Accommodation sub-type chips */}
-          {visibleLayers.has('accommodations') && (
-            <div className="flex flex-col gap-1">
-              <AccommodationSubTypes />
-            </div>
-          )}
 
           {/* Météo section — collapsible accordion (Story 8.4 correction) */}
           <SidebarWeatherSection

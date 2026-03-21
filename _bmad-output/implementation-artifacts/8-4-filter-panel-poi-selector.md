@@ -1,6 +1,6 @@
 # Story 8.4: Filter Panel — POI Selector
 
-Status: review
+Status: done
 
 ## Story
 
@@ -596,7 +596,7 @@ La légende est affichée en permanence dans la section (pas conditionnelle à l
   - [x] C7.1 Dans `map-canvas.tsx`, lire `fromKm` et `toKm` depuis `useMapStore()`
   - [x] C7.2 **Marqueur point de départ** : calculer la position lat/lng via `findPointAtKm(allWaypoints, fromKm)` (déjà dans `packages/gpx`) → créer un `new maplibregl.Marker({ element })` avec un rond gris foncé
   - [x] C7.3 Le marqueur se met à jour à chaque changement de `fromKm` — `markerRef.current.setLngLat([lng, lat])` sans recréer l'élément
-  - [x] C7.4 **Segment surligné [fromKm → toKm]** : `corridor-highlight` layer existant mis à jour — couleur changée de amber `#FBBF24` → dark `#1A2D22`, masqué si `!searchRangeInteracted`
+  - [x] C7.4 **Segment surligné [fromKm → toKm]** : `corridor-highlight` layer amber `#FBBF24` (8px, rendu au-dessus de la trace), masqué si `!searchRangeInteracted`. Bug fix: `map.isStyleLoaded()` remplacé par `map.getSource('trace')` — MapLibre retourne `isStyleLoaded=false` tant que des tuiles chargent en arrière-plan.
   - [x] C7.5 `allWaypoints` — hook `useAdventureWaypoints(segments)` créé dans `hooks/use-adventure-waypoints.ts`, utilisé dans `map-view.tsx` et passé à `MapCanvas` via prop `allWaypoints`
   - [x] C7.6 État initial : `searchRangeInteracted: boolean` ajouté au `map.store.ts` (défaut `false`, mis à `true` au 1er appel `setSearchRange`). Marqueur et surligné masqués tant que `!searchRangeInteracted`
 
@@ -790,9 +790,20 @@ None.
 - `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx` — uses `useAdventureWaypoints` hook, passes `allWaypoints` to `MapCanvas`
 - `apps/web/src/app/(app)/map/[id]/_components/map-canvas.test.tsx` — updated store mock (`searchRangeInteracted`, `weatherActive`, `weatherDimension`)
 
+**Modified files (UX polish — post-review 2026-03-21):**
+- `apps/web/src/app/(app)/map/[id]/_components/map-canvas.tsx` — corridor bug fix: `map.isStyleLoaded()` → `map.getSource('trace')`; corridor color amber `#FBBF24` 8px (visible); idem pour effects densité et trace
+- `apps/web/src/app/(app)/map/[id]/_components/search-range-control.tsx` — distance dynamique (`fromKm` au lieu de `totalDistanceKm`); D+ cumulé de 0 à `fromKm`; suppression doublon "PLAGE DE RECHERCHE"; icône `Search` lucide; max range 50km; input éditable; `PoiLayerGrid` + `AccommodationSubTypes` intégrés dans l'accordéon
+- `apps/web/src/app/(app)/map/[id]/_components/poi-layer-grid.tsx` — icônes seules sur une ligne (suppression labels)
+- `apps/web/src/app/(app)/map/[id]/_components/weather-controls.tsx` — icônes Thermometer/Umbrella/Wind sur les boutons dimension; champ vitesse restyled (même style que date); label "Vitesse moyenne"
+- `apps/web/src/app/(app)/map/[id]/_components/sidebar-weather-section.tsx` — `expanded: false` par défaut
+- `apps/web/src/app/(app)/map/[id]/_components/sidebar-density-section.tsx` — `expanded: false` par défaut
+- `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx` — suppression `PoiLayerGrid` et `AccommodationSubTypes` standalone (déplacés dans `SearchRangeControl`)
+- `apps/web/src/app/globals.css` — CSS borderless range slider (appearance: none + track/thumb custom)
+
 ## Change Log
 
 - Initial Tasks 1–9 implementation: vaul, accommodation sub-types, layer toggles refactor, live filters drawer, FILTERS button, search radius default 5km
 - Design Corrections C0–C6: PoiLayerGrid, SidebarWeatherSection, SidebarDensitySection, SearchRangeControl, totalElevationGainM DB migration
 - C7: Search-range visualization on map — start marker + corridor highlight (dark green), hidden until user interacts
 - C8: Uniform trace color `#2D6A4A` for all segments (replaces per-segment color array)
+- UX polish post-review: corridor highlight visible (amber, isStyleLoaded fix), SearchRangeControl restructuré (distance/D+ dynamiques, POIs intégrés, max 50km, input éditable), météo/densité fermés par défaut, POI grid icônes seules, weather controls icônes + vitesse restyled, borderless range slider
