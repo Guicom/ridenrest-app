@@ -26,15 +26,7 @@ describe('PoiLayerGrid', () => {
     mockVisibleLayers = new Set()
   })
 
-  it('renders 4 layer cards', () => {
-    render(<PoiLayerGrid isPending={false} />)
-    expect(screen.getByText('Hébergements')).toBeDefined()
-    expect(screen.getByText('Restauration')).toBeDefined()
-    expect(screen.getByText('Alimentation')).toBeDefined()
-    expect(screen.getByText('Vélo')).toBeDefined()
-  })
-
-  it('uses grid layout with 2 columns', () => {
+  it('renders 4 buttons', () => {
     render(<PoiLayerGrid isPending={false} />)
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(4)
@@ -51,7 +43,7 @@ describe('PoiLayerGrid', () => {
     render(<PoiLayerGrid isPending={false} />)
     const btn = screen.getByLabelText(/Masquer les Hébergements/)
     expect(btn.className).toContain('bg-primary')
-    expect(btn.className).toContain('rounded-2xl')
+    expect(btn.className).toContain('rounded-xl')
   })
 
   it('active card has aria-pressed="true"', () => {
@@ -71,6 +63,5 @@ describe('PoiLayerGrid', () => {
     mockVisibleLayers = new Set(['accommodations'])
     render(<PoiLayerGrid isPending={true} />)
     expect(screen.getByTestId('skeleton')).toBeDefined()
-    expect(screen.getByText('Restauration')).toBeDefined()
   })
 })

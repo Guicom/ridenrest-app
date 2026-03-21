@@ -289,12 +289,13 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     expect(sidebar.contains(control)).toBe(true)
   })
 
-  it('PoiLayerGrid is rendered inside the sidebar (AC #3)', async () => {
+  it('PoiLayerGrid is rendered inside SearchRangeControl (AC #3)', async () => {
+    // PoiLayerGrid is now inside SearchRangeControl — verified via SearchRangeControl presence in sidebar
     renderWithData()
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const grid = screen.getByTestId('poi-layer-grid')
-    expect(sidebar.contains(grid)).toBe(true)
+    const control = screen.getByTestId('search-range-control')
+    expect(sidebar.contains(control)).toBe(true)
   })
 })
 
@@ -303,23 +304,7 @@ describe('MapView — Story 8.4 AccommodationSubTypes', () => {
     mockDensityStatus = 'idle'
   })
 
-  it('renders AccommodationSubTypes when accommodations layer is active', async () => {
-    mockMapStoreVisibleLayers = new Set(['accommodations'])
-    const doneSeg = makeSegment('done')
-    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
-    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
-    await screen.findByTestId('map-canvas')
-    expect(screen.getByTestId('accommodation-sub-types')).toBeDefined()
-  })
-
-  it('does not render AccommodationSubTypes when accommodations layer is inactive', async () => {
-    mockMapStoreVisibleLayers = new Set()
-    const doneSeg = makeSegment('done')
-    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
-    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
-    await screen.findByTestId('map-canvas')
-    expect(screen.queryByTestId('accommodation-sub-types')).toBeNull()
-  })
+  // AccommodationSubTypes is now inside SearchRangeControl (mocked) — conditional logic tested in search-range-control.test.tsx
 
   it('SidebarWeatherSection is rendered inside the sidebar', async () => {
     const doneSeg = makeSegment('done')
