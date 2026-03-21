@@ -37,7 +37,7 @@ describe('WeatherControls', () => {
     const onPaceSubmit = vi.fn()
     render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
 
-    fireEvent.blur(screen.getByPlaceholderText('15'))
+    fireEvent.blur(screen.getByPlaceholderText('20'))
     expect(onPaceSubmit).toHaveBeenCalledWith(null, null)
   })
 
@@ -45,7 +45,7 @@ describe('WeatherControls', () => {
     const onPaceSubmit = vi.fn()
     render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
 
-    const speedInput = screen.getByPlaceholderText('15')
+    const speedInput = screen.getByPlaceholderText('20')
     fireEvent.change(speedInput, { target: { value: '20' } })
     fireEvent.blur(speedInput)
 
