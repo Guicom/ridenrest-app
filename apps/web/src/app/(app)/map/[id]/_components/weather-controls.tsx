@@ -22,32 +22,6 @@ const DIMENSIONS: { id: WeatherDimension; label: string; icon: LucideIcon }[] = 
   { id: 'wind', label: 'Vent',          icon: Wind },
 ]
 
-const COLOR_LEGENDS: Record<WeatherDimension, { label: string; stops: { color: string; value: string }[] }> = {
-  temperature: {
-    label: '°C',
-    stops: [
-      { color: '#3b82f6', value: '0°' },
-      { color: '#fbbf24', value: '15°' },
-      { color: '#ef4444', value: '30°+' },
-    ],
-  },
-  precipitation: {
-    label: '%',
-    stops: [
-      { color: '#86efac', value: '0%' },
-      { color: '#facc15', value: '50%' },
-      { color: '#1d4ed8', value: '100%' },
-    ],
-  },
-  wind: {
-    label: 'km/h',
-    stops: [
-      { color: '#d1fae5', value: '0' },
-      { color: '#fb923c', value: '30' },
-      { color: '#7c3aed', value: '60+' },
-    ],
-  },
-}
 
 export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensionChange, initialDepartureTime = '', initialSpeedKmh = '' }: WeatherControlsProps) {
   const [departureTime, setDepartureTime] = useState(initialDepartureTime)
@@ -121,18 +95,3 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
   )
 }
 
-function ColorLegend({ stops, label }: { stops: { color: string; value: string }[]; label: string }) {
-  const gradient = `linear-gradient(to right, ${stops.map((s) => s.color).join(', ')})`
-
-  return (
-    <div className="space-y-1">
-      <div className="h-2 rounded-full w-full" style={{ background: gradient }} />
-      <div className="flex justify-between text-[10px] text-muted-foreground">
-        {stops.map((s) => (
-          <span key={s.value}>{s.value}</span>
-        ))}
-      </div>
-      <div className="text-center text-[10px] text-muted-foreground">{label}</div>
-    </div>
-  )
-}

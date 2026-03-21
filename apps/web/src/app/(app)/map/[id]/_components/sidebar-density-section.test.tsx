@@ -37,44 +37,54 @@ describe('SidebarDensitySection', () => {
     expect(screen.getByText('Densité')).toBeDefined()
   })
 
-  it('is expanded by default (legend visible)', () => {
+  it('is collapsed by default (legend not visible)', () => {
     render(<SidebarDensitySection />)
+    expect(screen.queryByText('Bonne disponibilité')).toBeNull()
+  })
+
+  it('clicking header expands the section', () => {
+    render(<SidebarDensitySection />)
+    fireEvent.click(screen.getByTestId('density-section-header'))
     expect(screen.getByText('Bonne disponibilité')).toBeDefined()
     expect(screen.getByText('Disponibilité limitée')).toBeDefined()
     expect(screen.getByText('Zone critique')).toBeDefined()
   })
 
-  it('clicking header collapses the section', () => {
+  it('clicking header twice collapses again', () => {
     render(<SidebarDensitySection />)
+    fireEvent.click(screen.getByTestId('density-section-header'))
     fireEvent.click(screen.getByTestId('density-section-header'))
     expect(screen.queryByText('Bonne disponibilité')).toBeNull()
   })
 
+  it('switch is NOT visible when collapsed (default)', () => {
+    render(<SidebarDensitySection />)
+    expect(screen.queryByTestId('density-toggle')).toBeNull()
+  })
+
   it('switch is visible inside the expanded body', () => {
     render(<SidebarDensitySection />)
+    fireEvent.click(screen.getByTestId('density-section-header'))
     expect(screen.getByTestId('density-toggle')).toBeDefined()
   })
 
   it('switch has aria-checked="true" when density is active', () => {
     mockDensityColorEnabled = true
     render(<SidebarDensitySection />)
-    expect(screen.getByTestId('density-toggle').getAttribute('aria-checked')).toBe('true')
-  })
-
-  it('switch is NOT visible when collapsed', () => {
-    render(<SidebarDensitySection />)
     fireEvent.click(screen.getByTestId('density-section-header'))
-    expect(screen.queryByTestId('density-toggle')).toBeNull()
+    expect(screen.getByTestId('density-toggle').getAttribute('aria-checked')).toBe('true')
   })
 
   it('clicking toggle calls toggleDensityColor', () => {
     render(<SidebarDensitySection />)
+    fireEvent.click(screen.getByTestId('density-section-header'))
     fireEvent.click(screen.getByTestId('density-toggle'))
     expect(mockToggleDensityColor).toHaveBeenCalledTimes(1)
   })
 
   it('legend items have correct color indicators', () => {
     render(<SidebarDensitySection />)
+    fireEvent.click(screen.getByTestId('density-section-header'))
     expect(screen.getByText('Bonne disponibilité')).toBeDefined()
   })
 })

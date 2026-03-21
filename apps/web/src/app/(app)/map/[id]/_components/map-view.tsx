@@ -42,7 +42,7 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, weatherDimension, setWeatherActive, visibleLayers } = useMapStore()
+  const { weatherActive, setWeatherActive } = useMapStore()
 
   // Reset weatherActive when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
