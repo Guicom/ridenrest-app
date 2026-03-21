@@ -26,6 +26,9 @@ vi.mock('@/hooks/use-live-weather', () => ({
   useLiveWeather: () => ({ weatherPoints: [], isGpsLost: false }),
 }))
 
+// Mutable live store state for Story 8.4 badge tests
+let mockLiveSearchRadiusKm = 5
+
 // Mock Zustand stores
 vi.mock('@/stores/live.store', () => ({
   useLiveStore: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -33,7 +36,7 @@ vi.mock('@/stores/live.store', () => ({
       isLiveModeActive: false,
       currentKmOnRoute: null,
       targetAheadKm: 30,
-      searchRadiusKm: 3,
+      searchRadiusKm: mockLiveSearchRadiusKm,
       speedKmh: 15,
       currentPosition: null,
       setCurrentKm: () => {},
@@ -43,6 +46,19 @@ vi.mock('@/stores/live.store', () => ({
 vi.mock('@/stores/ui.store', () => ({
   useUIStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({ selectedPoiId: null }),
+}))
+
+// Mock useMapStore for Story 8.4 (activeFilterCount computation)
+let mockMapVisibleLayers = new Set(['accommodations'])
+let mockMapWeatherActive = false
+let mockMapDensityColorEnabled = true
+vi.mock('@/stores/map.store', () => ({
+  useMapStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      visibleLayers: mockMapVisibleLayers,
+      weatherActive: mockMapWeatherActive,
+      densityColorEnabled: mockMapDensityColorEnabled,
+    }),
 }))
 
 // Mock LiveMapCanvas
@@ -55,6 +71,13 @@ vi.mock('./_components/live-map-canvas', () => ({
 // Mock LiveControls (no props)
 vi.mock('./_components/live-controls', () => ({
   LiveControls: () => <div data-testid="live-controls" />,
+}))
+
+// Mock LiveFiltersDrawer (Story 8.4)
+vi.mock('./_components/live-filters-drawer', () => ({
+  LiveFiltersDrawer: ({ open }: { open: boolean }) => (
+    open ? <div data-testid="live-filters-drawer" /> : null
+  ),
 }))
 
 // Mock StatusBanner
@@ -247,5 +270,60 @@ describe('LivePage', () => {
     const banners = screen.getAllByTestId('status-banner')
     expect(banners).toHaveLength(1)
     expect(banners[0].getAttribute('data-variant')).toBe('offline')
+  })
+})
+
+describe('LivePage — Story 8.4 FILTERS button', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+    mockMapVisibleLayers = new Set(['accommodations'])
+    mockMapWeatherActive = false
+    mockMapDensityColorEnabled = true
+    mockLiveSearchRadiusKm = 5
+  })
+
+  it('renders FILTERS button when live mode is active', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+    expect(screen.getByTestId('live-filters-btn')).toBeDefined()
+  })
+
+  it('does not render FILTERS button when live mode is inactive', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: false, isLiveModeActive: false }))
+    render(<LivePage />)
+    expect(screen.queryByTestId('live-filters-btn')).toBeNull()
+  })
+
+  it('clicking FILTERS button opens the drawer', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+    expect(screen.queryByTestId('live-filters-drawer')).toBeNull()
+    fireEvent.click(screen.getByTestId('live-filters-btn'))
+    expect(screen.getByTestId('live-filters-drawer')).toBeDefined()
+  })
+
+  it('shows no badge when filter count is zero (default state)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockMapVisibleLayers = new Set(['accommodations'])
+    mockMapWeatherActive = false
+    mockMapDensityColorEnabled = true
+    mockLiveSearchRadiusKm = 5
+    render(<LivePage />)
+    // Badge span only renders when activeFilterCount > 0
+    const btn = screen.getByTestId('live-filters-btn')
+    expect(btn.querySelector('span')).toBeNull()
+  })
+
+  it('shows badge when active filter count > 0 (e.g. restaurants active)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockMapVisibleLayers = new Set(['accommodations', 'restaurants'])
+    mockMapWeatherActive = false
+    mockMapDensityColorEnabled = true
+    mockLiveSearchRadiusKm = 5
+    render(<LivePage />)
+    const btn = screen.getByTestId('live-filters-btn')
+    const badge = btn.querySelector('span')
+    expect(badge).toBeDefined()
+    expect(badge?.textContent).toBe('1')
   })
 })

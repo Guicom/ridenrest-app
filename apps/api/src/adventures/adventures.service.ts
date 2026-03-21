@@ -29,8 +29,8 @@ export class AdventuresService {
     if (!adventure) throw new NotFoundException('Adventure not found')
   }
 
-  async updateTotalDistance(id: string, totalDistanceKm: number): Promise<void> {
-    await this.adventuresRepo.updateTotalDistance(id, totalDistanceKm)
+  async updateTotals(id: string, totalDistanceKm: number, totalElevationGainM: number | null): Promise<void> {
+    await this.adventuresRepo.updateTotals(id, totalDistanceKm, totalElevationGainM)
   }
 
   async renameAdventure(id: string, userId: string, name: string): Promise<AdventureResponse> {

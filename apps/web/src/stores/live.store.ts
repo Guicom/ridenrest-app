@@ -29,7 +29,7 @@ export const useLiveStore = create<LiveState>((set) => ({
   currentKmOnRoute: null,
   speedKmh: 15, // Default cycling pace
   targetAheadKm: 30, // Default look-ahead distance
-  searchRadiusKm: 3, // Default POI search radius (km)
+  searchRadiusKm: 5, // Story 8.4: updated default (was 3)
 
   activateLiveMode: () => set({ isLiveModeActive: true }),
   deactivateLiveMode: () =>

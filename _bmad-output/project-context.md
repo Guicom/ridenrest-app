@@ -17,13 +17,13 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Layer | Technology | Version | Notes |
 |---|---|---|---|
 | Monorepo | Turborepo + pnpm workspaces | 2.6.1 / pnpm 9+ | `pnpm create turbo@latest` base |
-| Web app | Next.js (React 19) | 15.x | App Router, Vercel deploy |
-| API | NestJS | 11.x | Fly.io deploy, Node.js full runtime |
-| Database | Aiven PostgreSQL + PostGIS | hosted | ST_Buffer, ST_DWithin corridor search |
+| Web app | Next.js (React 19) | 15.x | App Router, VPS deploy (Node.js natif + PM2 + Caddy) |
+| API | NestJS | 11.x | VPS deploy (Node.js natif + PM2) |
+| Database | PostgreSQL + PostGIS | 16 + 3.4 | Docker sur VPS Hostinger, ST_Buffer, ST_DWithin corridor search |
 | ORM | Drizzle ORM + drizzle-kit | latest | Schemas in `packages/database/`, pool max:10, idleTimeout:30s, connTimeout:5s |
-| Cache | Upstash Redis | latest | Dual role: API cache + BullMQ backend |
+| Cache | Redis | 7 | Docker sur VPS, dual role: API cache + BullMQ backend (pas de limite cmds/jour) |
 | Job queue | BullMQ | v5 | `@nestjs/bullmq`, async GPX parsing |
-| File storage | Fly.io volumes | — | GPX files, block storage, 3GB free |
+| File storage | VPS disk | — | GPX files, `/data/gpx/`, limité par disque VPS (~100GB) |
 | Server state | TanStack Query | v5 | Fetch, cache, invalidation + polling job status |
 | Client state | Zustand | v5 | Live mode GPS, map layers, UI state |
 | UI components | shadcn/ui + Tailwind CSS | latest / v4 | Radix UI base, dark/light native |
@@ -32,7 +32,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Forms | React Hook Form + Zod resolver | v7 | Validation shared with backend |
 | Auth | Better Auth | latest | Drizzle adapter, Email + Google OAuth + Strava OAuth |
 | Testing | Vitest (web/packages), Jest (api) | latest | Co-located `.test.ts` files |
-| CI/CD | GitHub Actions | — | Turborepo-aware pipeline |
+| CI/CD | GitHub Actions | — | Turborepo-aware pipeline, SSH deploy vers VPS |
+| Reverse proxy | Caddy 2 | latest | Docker sur VPS, auto Let's Encrypt, HTTPS |
+| Process manager | PM2 | latest | Gère Next.js + NestJS sur VPS, restart auto |
+| Monitoring | Uptime Kuma | latest | Docker sur VPS, alertes email/Telegram |
 
 ---
 
@@ -112,9 +115,10 @@ src/{feature}/
 - `middleware.ts` + Better Auth middleware manages session server-side
 - `lib/auth/client.ts` (browser) + `lib/auth/server.ts` (server components)
 
-**Vercel deployment:**
-- Full Node.js runtime — no Edge Runtime limitations
+**VPS deployment (Next.js standalone + PM2):**
+- Full Node.js runtime — `output: 'standalone'` in `next.config.ts`
 - SSG for `(marketing)/` (SEO), CSR for `(app)/` (auth-gated)
+- Caddy reverse proxy handles HTTPS + CDN (Cloudflare optionnel devant)
 
 **Data fetching:**
 - Server state: TanStack Query v5 hooks (useQuery, useMutation)
@@ -278,15 +282,10 @@ GET /pois?segmentId=xxx&fromKm=10&toKm=50  // no GPS
 | WeatherAPI.com | 1M calls/month | Redis 1h per waypoint |
 | Strava API | 100 req/15min, 1000/day | Import only, no polling |
 | Geoapify (geocoding) | 3000 req/day | Redis 7d (stable data) |
-| Upstash Redis | 10k cmds/day | Alert at 7500 cmds/day (75%) |
+| Redis (self-hosted) | Illimité (VPS) | N/A — pas de quota externe |
 
 Rate limiting guard: `@nestjs/throttler` global on all NestJS endpoints.
-Alert at 80% quota consumed.
-
-**Upstash Redis quota monitoring:**
-- Enable email alerts in Upstash dashboard at **7500 cmds/day (75%)** threshold
-- MVP estimate: ~500 GPX parse jobs/day max → well within quota
-- If exceeded: switch to Pay-as-you-go ($0.2/100k cmds) — no code change required
+Alert at 80% quota consumed (APIs externes uniquement).
 
 ---
 
@@ -297,20 +296,21 @@ Component: `<OsmAttribution />` — always rendered, never hidden.
 
 ---
 
-### Drizzle Pool Configuration (Aiven Free Tier Constraint)
+### Drizzle Pool Configuration
 
-Aiven free tier max ~25 connections. Mandatory pool config in `apps/api/src/config/database.config.ts`:
+PostgreSQL runs locally on the VPS (Docker) — no external connection limit. Pool config in `apps/api/src/config/database.config.ts`:
 
 ```typescript
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 10,                    // NestJS — leaves room for CI/CD migrations
+  max: 10,                    // Good practice — sufficient for single-VPS setup
   idleTimeoutMillis: 30000,   // release idle connections after 30s
   connectionTimeoutMillis: 5000, // fail fast if DB unreachable
+  // No SSL needed — localhost connection
 })
 ```
 
-**NEVER exceed `max: 10`** in NestJS. Budget: 10 NestJS + 5 CI/CD migrations + 10 margin = 25.
+**`max: 10`** remains a good default. The VPS PostgreSQL has no hard connection limit, but 10 is sufficient for the expected load.
 
 ---
 
@@ -331,9 +331,9 @@ From address: `Ride'n'Rest <noreply@ridenrest.com>`
 
 ---
 
-### GPX File Access Control (Security — Fly.io volumes)
+### GPX File Access Control (Security)
 
-GPX files are stored at `/data/gpx/{segmentId}.gpx` on Fly.io volume.
+GPX files are stored at `/data/gpx/{segmentId}.gpx` on the VPS disk.
 **The UUID alone is NOT sufficient access control** (obscurity ≠ authorization).
 
 **Rule: ALL GPX file access goes through NestJS with ownership verification.**
@@ -356,19 +356,34 @@ NEVER expose a direct public URL to `/data/gpx/*.gpx`.
 
 ---
 
-### Fly.io Deployment Config (apps/api)
+### VPS Deployment Config
 
-**CRITICAL: Do NOT use Fly.io free tier (256MB RAM)** — NestJS + BullMQ workers reach ~230MB at idle → OOM kill under load.
+**Architecture hybride** — Docker pour infra, Node.js natif pour apps :
 
-Required `apps/api/fly.toml`:
-```toml
-[[vm]]
-  memory = '512mb'
-  cpu_kind = 'shared'
-  cpus = 1
+```
+VPS Hostinger (~$8/mois)
+├── Docker: PostgreSQL+PostGIS, Redis, Caddy, Uptime Kuma
+└── PM2:    Next.js (port 3011), NestJS (port 3010)
 ```
 
-Cost: ~$1.94/month (shared-cpu-1x, 512MB). Budget this in MVP operational costs.
+Deploy via GitHub Actions SSH : `git pull → turbo build → pm2 restart all`
+
+> ⚠️ L'ancienne config Fly.io (`apps/api/fly.toml`) et le `Dockerfile` sont obsolètes — à supprimer lors de l'Epic 14.
+
+---
+
+### Doc Sync Rule (CRITICAL)
+
+**When implementing a change that deviates from the story or epics — due to a user request, a technical constraint, or a design decision made during implementation — the dev agent MUST update the relevant documents BEFORE or IMMEDIATELY AFTER implementing the change.**
+
+Documents to keep in sync:
+- `_bmad-output/planning-artifacts/epics.md` — update the AC or story description
+- `_bmad-output/implementation-artifacts/{story-file}.md` — update tasks/subtasks/notes
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — if scope changes
+
+**Why this matters:** The code review agent uses the story file and epics as the source of truth. If the implementation diverges without updating the docs, the code review will flag it as incorrect and recommend a rollback — even if the change was intentional and validated by Guillaume.
+
+**Never** leave a gap between what was implemented and what the docs describe.
 
 ---
 

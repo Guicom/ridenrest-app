@@ -24,6 +24,7 @@ export interface AdventureMapResponse {
   adventureId: string
   adventureName: string
   totalDistanceKm: number
+  totalElevationGainM: number | null
   segments: MapSegmentData[]
 }
 

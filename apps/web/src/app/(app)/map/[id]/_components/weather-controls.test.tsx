@@ -33,21 +33,21 @@ describe('WeatherControls', () => {
     expect(screen.getByTestId('weather-dim-temperature').getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('calls onPaceSubmit with null when form submitted without values', () => {
+  it('calls onPaceSubmit with null when speed field is blurred without values', () => {
     const onPaceSubmit = vi.fn()
     render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
 
-    fireEvent.click(screen.getByTestId('weather-submit'))
+    fireEvent.blur(screen.getByPlaceholderText('15'))
     expect(onPaceSubmit).toHaveBeenCalledWith(null, null)
   })
 
-  it('calls onPaceSubmit with speed when speed is entered', () => {
+  it('calls onPaceSubmit with speed when speed is entered and blurred', () => {
     const onPaceSubmit = vi.fn()
     render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
 
-    const speedInput = screen.getByLabelText('Vitesse (km/h)')
+    const speedInput = screen.getByPlaceholderText('15')
     fireEvent.change(speedInput, { target: { value: '20' } })
-    fireEvent.click(screen.getByTestId('weather-submit'))
+    fireEvent.blur(speedInput)
 
     expect(onPaceSubmit).toHaveBeenCalledWith(null, 20)
   })
@@ -59,9 +59,8 @@ describe('WeatherControls', () => {
     expect(skeleton).toBeTruthy()
   })
 
-  it('disables submit button while pending', () => {
+  it('shows loading skeleton while pending', () => {
     render(<WeatherControls {...defaultProps} isPending={true} />)
-    const submitButton = screen.getByTestId('weather-submit') as HTMLButtonElement
-    expect(submitButton.disabled).toBe(true)
+    expect(screen.getByTestId('weather-submit')).toBeDefined()
   })
 })

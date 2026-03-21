@@ -1,6 +1,6 @@
 # Story 8.1: Design System Tokens
 
-Status: in-progress
+Status: done
 
 ## Story
 

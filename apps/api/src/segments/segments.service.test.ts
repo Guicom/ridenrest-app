@@ -26,7 +26,7 @@ const mockSegmentsRepo = {
 
 const mockAdventuresService = {
   verifyOwnership: jest.fn(),
-  updateTotalDistance: jest.fn(),
+  updateTotals: jest.fn(),
 }
 
 const mockGpxQueue = { add: jest.fn() }
@@ -105,7 +105,7 @@ describe('reorderSegments', () => {
       .mockResolvedValueOnce([seg2, seg1]) // for listSegments at the end
     mockSegmentsRepo.updateOrderIndexes.mockResolvedValue(undefined)
     mockSegmentsRepo.updateCumulativeDistances.mockResolvedValue(undefined)
-    mockAdventuresService.updateTotalDistance.mockResolvedValue(undefined)
+    mockAdventuresService.updateTotals.mockResolvedValue(undefined)
 
     await service.reorderSegments('adv-1', 'user-1', ['s2', 's1'])
 
@@ -132,13 +132,13 @@ describe('deleteSegment', () => {
     mockSegmentsRepo.delete.mockResolvedValue(undefined)
     mockSegmentsRepo.findAllByAdventureId.mockResolvedValue([])
     mockSegmentsRepo.updateCumulativeDistances.mockResolvedValue(undefined)
-    mockAdventuresService.updateTotalDistance.mockResolvedValue(undefined)
+    mockAdventuresService.updateTotals.mockResolvedValue(undefined)
 
     const result = await service.deleteSegment('adv-1', 'seg-1', 'user-1')
 
     expect(mockSegmentsRepo.delete).toHaveBeenCalledWith('seg-1')
     expect(fsPromises.unlink).toHaveBeenCalledWith(seg.storageUrl)
-    expect(mockAdventuresService.updateTotalDistance).toHaveBeenCalledWith('adv-1', 0)
+    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null)
     expect(result).toEqual({ deleted: true })
   })
 
@@ -192,7 +192,7 @@ describe('recomputeCumulativeDistances', () => {
       makeSegment('s3', 50, 2),
     ])
     mockSegmentsRepo.updateCumulativeDistances.mockResolvedValue(undefined)
-    mockAdventuresService.updateTotalDistance.mockResolvedValue(undefined)
+    mockAdventuresService.updateTotals.mockResolvedValue(undefined)
 
     await service.recomputeCumulativeDistances('adv-1')
 
@@ -201,7 +201,7 @@ describe('recomputeCumulativeDistances', () => {
       { id: 's2', cumulativeStartKm: 100 },
       { id: 's3', cumulativeStartKm: 250 },
     ])
-    expect(mockAdventuresService.updateTotalDistance).toHaveBeenCalledWith('adv-1', 300)
+    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 300, null)
   })
 
   it('sets total distance to 0 for pending segments (distanceKm = 0)', async () => {
@@ -209,10 +209,10 @@ describe('recomputeCumulativeDistances', () => {
       makeSegment('s1', 0, 0), // pending
     ])
     mockSegmentsRepo.updateCumulativeDistances.mockResolvedValue(undefined)
-    mockAdventuresService.updateTotalDistance.mockResolvedValue(undefined)
+    mockAdventuresService.updateTotals.mockResolvedValue(undefined)
 
     await service.recomputeCumulativeDistances('adv-1')
 
-    expect(mockAdventuresService.updateTotalDistance).toHaveBeenCalledWith('adv-1', 0)
+    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null)
   })
 })

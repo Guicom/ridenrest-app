@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useMapStore } from '@/stores/map.store'
+import { findPointAtKm } from '@ridenrest/gpx'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { usePoiLayers } from '@/hooks/use-poi-layers'
 import { WeatherLayer, LINE_COLOR_EXPRESSIONS } from './weather-layer'
@@ -34,9 +35,8 @@ const TILE_STYLES = {
   dark: 'https://tiles.openfreemap.org/styles/dark',
 } as const
 
-// Trace colors — brand green primary, variants for multi-segment adventures
-const SEGMENT_COLORS = ['#4A7C44', '#2D5C3F', '#6B9E65', '#3D6B39', '#8BBF84']
-const SEGMENT_JOIN_COLOR = '#4A7C44'
+// Trace color — uniform brand green for all segments (C8)
+const TRACE_COLOR = '#2D6A4A'
 
 interface MapCanvasProps {
   segments: MapSegmentData[]
@@ -45,14 +45,16 @@ interface MapCanvasProps {
   coverageGaps?: CoverageGapSummary[]
   densityStatus?: DensityStatus
   segmentsWeather?: SegmentWeatherData[]
+  allWaypoints?: MapWaypoint[] | null
 }
 
-export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather }: MapCanvasProps) {
+export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints }: MapCanvasProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
+  const markerRef = useRef<maplibregl.Marker | null>(null)
   const [styleVersion, setStyleVersion] = useState(0)
   const { resolvedTheme } = useTheme()
-  const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension } = useMapStore()
+  const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension, searchRangeInteracted } = useMapStore()
 
   // Refs for stale-closure-safe access inside event handlers and theme effects
   const densityStatusRef = useRef(densityStatus)
@@ -122,6 +124,8 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
 
     return () => {
       cancelled = true
+      markerRef.current?.remove()
+      markerRef.current = null
       map?.remove()
       mapRef.current = null
     }
@@ -135,12 +139,37 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
     updateTraceLayers(map, segments)
   }, [segments])
 
-  // Corridor highlight — update when fromKm/toKm or segments change
+  // Corridor highlight — update when fromKm/toKm, segments, or interaction state change
   useEffect(() => {
     const map = mapRef.current
     if (!map || !map.isStyleLoaded()) return
-    updateCorridorHighlight(map, segments, fromKm, toKm)
-  }, [segments, fromKm, toKm, styleVersion])  // styleVersion triggers re-add after theme switch
+    updateCorridorHighlight(map, segments, fromKm, toKm, searchRangeInteracted)
+  }, [segments, fromKm, toKm, styleVersion, searchRangeInteracted])  // styleVersion triggers re-add after theme switch
+
+  // Search-start marker — show a dot at fromKm when user has interacted (C7)
+  useEffect(() => {
+    if (!searchRangeInteracted || !allWaypoints || allWaypoints.length === 0) {
+      markerRef.current?.remove()
+      markerRef.current = null
+      return
+    }
+    const kmWaypoints = allWaypoints.map((wp) => ({
+      lat: wp.lat, lng: wp.lng, elevM: wp.ele ?? undefined, km: wp.distKm,
+    }))
+    const pos = findPointAtKm(kmWaypoints, fromKm)
+    if (!pos) return
+    import('maplibre-gl').then(({ Marker }) => {
+      const map = mapRef.current
+      if (!map) return
+      if (!markerRef.current) {
+        const el = createSearchStartMarker()
+        markerRef.current = new Marker({ element: el }).setLngLat([pos.lng, pos.lat]).addTo(map)
+      } else {
+        markerRef.current.setLngLat([pos.lng, pos.lat])
+      }
+    })
+    return () => { /* cleanup handled on next run */ }
+  }, [fromKm, allWaypoints, searchRangeInteracted])
 
   // Density layer — show/hide based on densityStatus, coverageGaps, and styleVersion
   useEffect(() => {
@@ -218,7 +247,6 @@ function buildGeoJsonFeatures(segments: MapSegmentData[]) {
       properties: {
         segmentId: segment.id,
         segmentIndex: idx,
-        color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length],
       },
       geometry: {
         type: 'LineString' as const,
@@ -258,7 +286,7 @@ function addTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
     source: 'trace',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': ['get', 'color'],
+      'line-color': TRACE_COLOR,
       'line-width': 3,
       'line-opacity': 0.9,
     },
@@ -275,7 +303,7 @@ function addTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
       source: 'trace-joins',
       paint: {
         'circle-radius': 5,
-        'circle-color': SEGMENT_JOIN_COLOR,
+        'circle-color': TRACE_COLOR,
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.5,
       },
@@ -309,7 +337,7 @@ function updateTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
       source: 'trace-joins',
       paint: {
         'circle-radius': 5,
-        'circle-color': SEGMENT_JOIN_COLOR,
+        'circle-color': TRACE_COLOR,
         'circle-stroke-color': '#ffffff',
         'circle-stroke-width': 1.5,
       },
@@ -355,8 +383,9 @@ function updateCorridorHighlight(
   segments: MapSegmentData[],
   fromKm: number,
   toKm: number,
+  show = true,
 ) {
-  const features = buildCorridorFeatures(segments, fromKm, toKm)
+  const features = show ? buildCorridorFeatures(segments, fromKm, toKm) : []
   const source = map.getSource('corridor') as maplibregl.GeoJSONSource | undefined
 
   if (source) {
@@ -370,21 +399,24 @@ function updateCorridorHighlight(
     data: { type: 'FeatureCollection', features },
   })
 
-  const beforeId = map.getLayer('trace-line') ? 'trace-line' : undefined
-  map.addLayer(
-    {
-      id: 'corridor-highlight',
-      type: 'line',
-      source: 'corridor',
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: {
-        'line-color': '#FBBF24',   // amber-400 — visible on both light/dark themes
-        'line-width': 6,
-        'line-opacity': 0.7,
-      },
+  // Render on top of trace (no beforeId) so the highlight is clearly visible
+  map.addLayer({
+    id: 'corridor-highlight',
+    type: 'line',
+    source: 'corridor',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#1A2D22',   // var(--text-primary) — dark green on both themes (C7.4)
+      'line-width': 5,
+      'line-opacity': 0.85,
     },
-    beforeId,
-  )
+  })
+}
+
+function createSearchStartMarker(): HTMLElement {
+  const el = document.createElement('div')
+  el.style.cssText = 'width:12px;height:12px;border-radius:50%;background:var(--text-primary);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)'
+  return el
 }
 
 // ── Density layer helpers ─────────────────────────────────────────────────────

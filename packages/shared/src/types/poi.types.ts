@@ -2,7 +2,7 @@ import type { MapLayer } from './map.types'
 
 export type { MapLayer }
 
-export type PoiCategory = 'hotel' | 'hostel' | 'camp_site' | 'shelter' | 'restaurant' | 'supermarket' | 'convenience' | 'bike_shop' | 'bike_repair'
+export type PoiCategory = 'hotel' | 'hostel' | 'camp_site' | 'shelter' | 'guesthouse' | 'restaurant' | 'supermarket' | 'convenience' | 'bike_shop' | 'bike_repair'
 
 export interface Poi {
   id: string
@@ -25,7 +25,7 @@ export interface PoiSearchResponse {
 
 // Maps each UI MapLayer toggle to its PoiCategory values
 export const LAYER_CATEGORIES: Record<MapLayer, PoiCategory[]> = {
-  accommodations: ['hotel', 'hostel', 'camp_site', 'shelter'],
+  accommodations: ['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'],
   restaurants:    ['restaurant'],
   supplies:       ['supermarket', 'convenience'],
   bike:           ['bike_shop', 'bike_repair'],
@@ -37,6 +37,7 @@ export const CATEGORY_TO_LAYER: Record<PoiCategory, MapLayer> = {
   hostel:       'accommodations',
   camp_site:    'accommodations',
   shelter:      'accommodations',
+  guesthouse:   'accommodations',
   restaurant:   'restaurants',
   supermarket:  'supplies',
   convenience:  'supplies',

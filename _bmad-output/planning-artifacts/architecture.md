@@ -1143,3 +1143,111 @@ Node.js full runtime sur Vercel = aucune contrainte Edge Runtime. `(marketing)/`
 **Prochaine phase :** Commencer l'implémentation en suivant les décisions et patterns documentés.
 
 **Maintenance du document :** Mettre à jour ce document quand des décisions techniques majeures sont prises pendant l'implémentation.
+
+---
+
+## Addendum — Migration VPS Hostinger (2026-03-21)
+
+> **Décision architecturale majeure** : migration de l'intégralité du stack vers un VPS Hostinger unique. Les sections ci-dessus (Infrastructure & Deployment, Data Architecture) documentent les décisions **originales** qui étaient valides au lancement. Cette section documente la **nouvelle cible** qui remplace le déploiement multi-plateforme.
+
+### Motivation
+
+| Problème | Impact |
+|---|---|
+| 3 datacenter hops par requête (Vercel → Fly.io → Aiven → Upstash) | Latence cumulée sur chaque recherche corridor |
+| 4 dashboards à surveiller | Complexité opérationnelle pour un solo dev |
+| Vercel Pro $20/mois (obligatoire pour commercial) | Coût disproportionné pour un MVP |
+| Aiven 5GB, Upstash 10k cmds/jour | Limites artificielles qui impacteront le scaling |
+
+### Nouvelle architecture cible
+
+**Approche hybride** — Docker pour l'infra, Node.js natif pour les apps :
+
+```
+VPS Hostinger (KVM, ~$8/mois)
+├── Docker Compose
+│   ├── PostgreSQL 16 + PostGIS 3.4  (port 5432, named volume pgdata)
+│   ├── Redis 7                       (port 6379, named volume redisdata)
+│   ├── Caddy 2                       (ports 80/443, auto Let's Encrypt)
+│   └── Uptime Kuma                   (monitoring, port 3001)
+│
+└── Node.js natif (PM2)
+    ├── ridenrest-web   (Next.js standalone, port 3011)
+    └── ridenrest-api   (NestJS dist/main.js, port 3010)
+```
+
+**Pourquoi hybride (pas tout-Docker) :**
+- Le workflow dev reste identique : `turbo dev` / `turbo build` — pas de Dockerfiles à maintenir pour les apps
+- PostgreSQL+PostGIS et Redis sont **beaucoup** plus simples à gérer via Docker (pas d'installation manuelle de PostGIS)
+- PM2 gère les process Node.js (restart auto, logs, startup systemd)
+- Le Dockerfile NestJS existant (`apps/api/Dockerfile`) n'est plus nécessaire
+
+### Décisions qui changent
+
+| Section originale | Avant | Après |
+|---|---|---|
+| Hébergement web | Vercel Pro ($20/mois) | VPS Hostinger, Node.js natif + PM2 + Caddy reverse proxy |
+| Hébergement API | Fly.io (shared-cpu 512MB) | VPS Hostinger, Node.js natif + PM2 |
+| Base de données | Aiven PostgreSQL (5GB free, managed) | Docker PostgreSQL+PostGIS sur VPS (limité par le disque VPS, ~100GB) |
+| Cache | Upstash Redis (10k cmds/jour) | Docker Redis sur VPS (illimité) |
+| File storage | Fly.io volumes (3GB free) | Répertoire `/data/gpx/` sur le disque VPS |
+| CI/CD deploy | Vercel CLI + `flyctl deploy` | SSH → `git pull && turbo build && pm2 restart` |
+| SSL | Vercel (auto) + Fly.io (auto) | Caddy (auto Let's Encrypt) |
+| Monitoring | Sentry (post-MVP) | Uptime Kuma (self-hosted Docker) |
+| Backups DB | Aiven managed backups | Cron `pg_dump` + rclone (optionnel) |
+
+### Décisions qui ne changent PAS
+
+- **Monorepo Turborepo + pnpm** — inchangé
+- **Better Auth** — tourne dans PostgreSQL local au lieu d'Aiven, aucun changement de code
+- **BullMQ + Redis** — même Redis, juste local au lieu d'Upstash — aucune limite de commandes/jour
+- **Drizzle ORM** — `DATABASE_URL` pointe vers `localhost:5432` au lieu d'Aiven — aucun changement de code
+- **MapLibre GL JS + OpenFreeMap** — client-side, aucun lien avec l'infra serveur
+- **Pool config** — `max: 10` reste une bonne pratique, même sans la contrainte Aiven 25 connexions
+
+### Configuration pool Drizzle (mise à jour)
+
+```typescript
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 10,                  // Bonne pratique — le VPS a plus de marge mais 10 reste suffisant
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  // SSL: non requis en localhost (suppression du hack NODE_TLS_REJECT_UNAUTHORIZED=0)
+})
+```
+
+### Pipeline CI/CD (mise à jour)
+
+```
+push main → GitHub Actions:
+  ├── CI: pnpm install → turbo lint → turbo build → turbo test
+  └── Deploy: SSH → cd /opt/ridenrest
+                  → git pull
+                  → pnpm install --frozen-lockfile
+                  → turbo build
+                  → pnpm drizzle-kit migrate
+                  → pm2 restart all
+```
+
+### Environnement local (mise à jour)
+
+```bash
+# Démarrage dev (même workflow qu'avant, PostgreSQL/Redis en local au lieu d'Aiven/Upstash)
+docker compose up -d db redis    # infra uniquement
+turbo dev                        # apps en dev mode avec hot-reload
+```
+
+### Impact sur les implementation artifacts existants
+
+Les stories suivantes documentent le déploiement **original** (Vercel + Fly.io + Aiven). Elles seront mises à jour lors de l'exécution de l'Epic 14 :
+- `1-1-monorepo-setup-developer-environment.md` — sections fly.toml, ports
+- `1-2-database-schema-aiven-configuration.md` — configuration SSL Aiven
+- `1-6-ci-cd-pipeline.md` — Dockerfile, GitHub Actions, Vercel/Fly deploy
+- `.github/workflows/ci.yml` — pipeline à réécrire pour SSH deploy
+
+### Fichiers à supprimer post-migration (Story 14.7)
+
+- `apps/api/Dockerfile` — plus nécessaire (Node.js natif)
+- `apps/api/fly.toml` — plus nécessaire (pas de Fly.io)
+- `.dockerignore` — à adapter (Docker reste pour infra, pas pour apps)

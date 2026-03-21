@@ -7,7 +7,10 @@ import type { Poi, MapLayer } from '@ridenrest/shared'
 
 let mockVisibleLayers = new Set<string>(['accommodations'])
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({ visibleLayers: mockVisibleLayers }),
+  useMapStore: () => ({
+    visibleLayers: mockVisibleLayers,
+    activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
+  }),
 }))
 
 const mockSetSelectedPoi = vi.fn()

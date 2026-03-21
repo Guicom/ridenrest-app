@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MapLayer } from '@ridenrest/shared'
+import type { MapLayer, PoiCategory } from '@ridenrest/shared'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 
 export type { MapLayer }
@@ -16,6 +16,7 @@ interface MapState {
   // Search range
   fromKm: number
   toKm: number
+  searchRangeInteracted: boolean
 
   // Density colorization toggle
   densityColorEnabled: boolean
@@ -23,6 +24,9 @@ interface MapState {
   // Weather state
   weatherActive: boolean
   weatherDimension: WeatherDimension
+
+  // Accommodation sub-type filter (Story 8.4)
+  activeAccommodationTypes: Set<PoiCategory>
 
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
@@ -32,6 +36,7 @@ interface MapState {
   toggleDensityColor: () => void
   setWeatherActive: (active: boolean) => void
   setWeatherDimension: (dimension: WeatherDimension) => void
+  toggleAccommodationType: (type: PoiCategory) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -41,9 +46,11 @@ export const useMapStore = create<MapState>((set) => ({
   center: null,
   fromKm: 0,
   toKm: 30,
-  densityColorEnabled: true,
+  searchRangeInteracted: false,
+  densityColorEnabled: false,
   weatherActive: false,
   weatherDimension: 'temperature',
+  activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'] as PoiCategory[]),
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -60,11 +67,22 @@ export const useMapStore = create<MapState>((set) => ({
 
   setViewport: (zoom, center) => set({ zoom, center }),
 
-  setSearchRange: (fromKm, toKm) => set({ fromKm, toKm }),
+  setSearchRange: (fromKm, toKm) => set({ fromKm, toKm, searchRangeInteracted: true }),
 
   toggleDensityColor: () => set((state) => ({ densityColorEnabled: !state.densityColorEnabled })),
 
   setWeatherActive: (active) => set({ weatherActive: active }),
 
   setWeatherDimension: (dimension) => set({ weatherDimension: dimension }),
+
+  toggleAccommodationType: (type) =>
+    set((state) => {
+      const next = new Set(state.activeAccommodationTypes)
+      if (next.has(type)) {
+        next.delete(type)
+      } else {
+        next.add(type)
+      }
+      return { activeAccommodationTypes: next }
+    }),
 }))

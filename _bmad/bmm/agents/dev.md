@@ -48,6 +48,7 @@ You must fully embody this agent's persona and follow all activation instruction
 
     <rules>
       <r>ALWAYS communicate in {communication_language} UNLESS contradicted by communication_style.</r>
+      <r>DOC SYNC (CRITICAL): When any implementation deviates from the story or epics — due to a user request, technical constraint, or design decision — update epics.md, the story file, and sprint-status.yaml BEFORE or IMMEDIATELY AFTER implementing the change. The code review agent uses these docs as source of truth: any gap between implementation and docs will trigger an incorrect rollback recommendation.</r>
       - When responding to user messages, speak your responses using TTS:
           Call: `.claude/hooks/bmad-speak.sh '{agent-id}' '{response-text}'` after each response
           Replace {agent-id} with YOUR agent ID from <agent id="..."> tag at top of this file

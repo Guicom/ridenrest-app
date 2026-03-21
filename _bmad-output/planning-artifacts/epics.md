@@ -248,6 +248,11 @@ Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa derni
 **FRs couverts :** FR-070, FR-071, FR-072, FR-073
 **NFRs couverts :** NFR-001, NFR-002, NFR-003, NFR-004, NFR-008
 
+### Epic 14: VPS Hostinger Migration & Local Docker Environment
+Migration du stack multi-plateforme (Vercel + Fly.io + Aiven + Upstash) vers un VPS Hostinger unique. Approche hybride : Docker pour infra (PostgreSQL+PostGIS, Redis, Caddy, Uptime Kuma), Node.js natif pour apps (Next.js, NestJS) via `turbo build` + `pm2`. Inclut l'environnement local unifié, backups PostgreSQL, CI/CD GitHub Actions via SSH.
+**FRs couverts :** Aucun FR direct (Infrastructure)
+**NFRs couverts :** NFR-010, NFR-014, NFR-015, NFR-020
+
 ---
 
 ## Epic 1: Foundation & Developer Environment
@@ -1193,18 +1198,18 @@ So that users always know where they are and how to get back.
 **Acceptance Criteria:**
 
 **Given** a user enters Planning mode on mobile (< 1024px),
-**When** navigated to `/adventures/:id/map?mode=planning`,
+**When** navigated to `/map/[id]`,
 **Then** a non-blocking toast/banner appears: "Mode Planning optimisé pour desktop — certaines fonctionnalités sont réduites sur mobile" — the map still loads but the sidebar is hidden and replaced by the "FILTERS" bottom drawer pattern.
 
 **Given** a user enters Planning mode on desktop (≥ 1024px),
-**When** navigated to `/adventures/:id/map?mode=planning`,
+**When** navigated to `/map/[id]`,
 **Then** the map renders full-bleed (`100dvh`) with a "← Aventures" back button (top-left, `z-40`) and the sidebar visible.
 
 **Given** the desktop Planning sidebar,
 **When** rendered,
 **Then** it is 360px wide with a `◀`/`▶` collapse toggle — collapsed state hides the sidebar and gives full width to the map; the sidebar contains: fromKm/toKm slider, layer toggles (Hébergements / Restauration / Vélo / Densité / Météo), accommodation sub-type chips, and (Epic 11) stages list.
 
-**Given** a user enters Live mode at `/adventures/:id/live`,
+**Given** a user enters Live mode at `/live/[id]`,
 **When** it's their first access,
 **Then** `GeolocationConsent` dialog appears; subsequent accesses skip it if consent was granted.
 
@@ -1360,6 +1365,44 @@ So that I can visualize the terrain, understand cumulative D+, and identify wher
 **Given** the adventure has no elevation data in waypoints (missing `ele` values),
 **When** the profile would render,
 **Then** a graceful fallback message "Données d'élévation non disponibles pour cette trace" appears in the profile area — no crash.
+
+---
+
+### Story 8.9: App Header — Global Navigation Bar
+
+As a **cyclist user navigating the app**,
+I want a persistent header bar with the logo, the current adventure name, and quick links to my adventures and account settings,
+So that I always know which adventure I'm viewing and can navigate anywhere in one tap.
+
+**Acceptance Criteria:**
+
+**Given** the user is on any `(app)` page,
+**When** the header renders,
+**Then** a fixed-height header (`h-14`) is visible at the top with `bg-background border-b border-[--border]` and `z-50`.
+
+**Given** the header renders,
+**When** looking at the left section,
+**Then** the Ride'n'Rest `<Logo iconOnly />` is displayed (mobile) or full `<Logo />` (desktop ≥ 640px), clickable link to `/adventures`.
+
+**Given** the user is on an adventure map page (`/map/[id]` or `/live/[id]`),
+**When** the header renders,
+**Then** the center section displays the adventure name (`text-sm font-semibold truncate`).
+
+**Given** the user is NOT on an adventure page,
+**When** the header renders,
+**Then** the center section is empty.
+
+**Given** the header renders,
+**When** looking at the right section,
+**Then** two navigation items are visible: "Mes aventures" (→ `/adventures`) and "Mon compte" (→ `/settings` — Strava connection config).
+
+**Given** the user is in **Live mode** (`/live/[id]`),
+**When** the header renders,
+**Then** the header is **hidden** — Live mode is full-screen immersive (per Story 8.3).
+
+**Given** the viewport is mobile (< 640px),
+**When** the header renders,
+**Then** logo is icon-only, adventure name truncates, and nav links collapse into a hamburger `<DropdownMenu>`.
 
 ---
 
@@ -1924,3 +1967,205 @@ So that links shared on Strava, Instagram, or WhatsApp show a preview that makes
 **Given** landing page copy is reviewed with real product in hand,
 **When** any copy feels inaccurate vs. the real experience,
 **Then** it is updated to reflect what the app actually does.
+
+---
+
+## Epic 14: VPS Hostinger Migration & Local Docker Environment
+
+> **Ajouté 2026-03-21** — Migration du stack multi-plateforme (Vercel + Fly.io + Aiven + Upstash) vers un VPS Hostinger unique. Approche **hybride** : Docker pour les services infra (PostgreSQL+PostGIS, Redis, Caddy), Node.js natif pour les apps (Next.js, NestJS) via `turbo build` + `pm2` — même workflow qu'en local. Élimine la latence inter-services (3 datacenter hops → localhost), réduit les coûts (~$8/mois vs $20+), et supprime les limites free tier.
+
+L'architecture VPS repose sur deux couches :
+- **Docker Compose** pour les services infra : PostgreSQL+PostGIS, Redis, Caddy (reverse proxy + SSL auto), Uptime Kuma (monitoring)
+- **Node.js natif** pour les apps : `pnpm install && turbo build && pm2 start` — identique au workflow de développement local
+
+### Story 14.1: Docker Compose — Services infra (PostgreSQL, Redis, Caddy)
+
+As a **developer**,
+I want a `docker-compose.yml` that runs PostgreSQL+PostGIS, Redis, and Caddy,
+So that the infrastructure services are easy to manage both locally and on the VPS, without manual installation of PostGIS or Redis.
+
+**Acceptance Criteria:**
+
+**Given** `docker compose up -d` is run (locally or on VPS),
+**When** all services start,
+**Then** PostgreSQL 16 + PostGIS 3.4 is accessible on `localhost:5432`, Redis 7 on `localhost:6379`, and Caddy on ports 80/443.
+
+**Given** the `docker-compose.yml` is configured,
+**When** inspecting service definitions,
+**Then** PostgreSQL and Redis use named volumes (`pgdata`, `redisdata`) for data persistence across container restarts.
+
+**Given** Caddy is configured via `Caddyfile`,
+**When** running on the VPS,
+**Then** `ridenrest.com` proxies to Next.js (`localhost:3011`), `api.ridenrest.com` proxies to NestJS (`localhost:3010`), with automatic HTTPS via Let's Encrypt.
+
+**Given** Caddy is running locally,
+**When** in development mode,
+**Then** Caddy is either skipped (`docker compose up db redis` only) or configured for `localhost` without SSL.
+
+**Given** environment variables are needed,
+**When** `.env.example` is copied to `.env`,
+**Then** all required variables are documented with sensible local defaults (`POSTGRES_USER=ridenrest`, `POSTGRES_PASSWORD=ridenrest`, `POSTGRES_DB=ridenrest`).
+
+---
+
+### Story 14.2: Configuration Node.js natif & PM2 — Apps en production
+
+As a **developer deploying to the VPS**,
+I want Next.js and NestJS to run as native Node.js processes managed by PM2,
+So that the deployment workflow is identical to local development (`turbo build` + `pm2 start`) — no Dockerfiles needed for the apps.
+
+**Acceptance Criteria:**
+
+**Given** Node.js 22 LTS and pnpm are installed on the VPS,
+**When** `pnpm install && turbo build` is run from the repo root,
+**Then** both `apps/web` and `apps/api` build successfully — same as on the developer's Mac.
+
+**Given** `next.config.ts` has `output: 'standalone'` configured,
+**When** `turbo build` completes for `apps/web`,
+**Then** the standalone output in `apps/web/.next/standalone/` can be started with `node apps/web/.next/standalone/server.js`.
+
+**Given** a `ecosystem.config.js` (PM2 config) exists at the repo root,
+**When** `pm2 start ecosystem.config.js` is run,
+**Then** two processes are managed: `ridenrest-web` (Next.js standalone, port 3011) and `ridenrest-api` (NestJS `dist/main.js`, port 3010), both with `restart: always` and log rotation.
+
+**Given** a Node.js process crashes,
+**When** PM2 detects the crash,
+**Then** the process is automatically restarted within 5 seconds, and the crash is logged.
+
+**Given** the VPS reboots,
+**When** the system starts,
+**Then** PM2 is configured as a systemd service (`pm2 startup`) so both apps restart automatically.
+
+---
+
+### Story 14.3: Environnement de développement local unifié
+
+As a **developer**,
+I want to start the full stack locally with two commands: `docker compose up -d db redis` + `turbo dev`,
+So that local development uses a real PostgreSQL+PostGIS and Redis instead of external services (Aiven, Upstash).
+
+**Acceptance Criteria:**
+
+**Given** `docker compose up -d db redis` is run,
+**When** containers start,
+**Then** PostgreSQL+PostGIS is accessible on `localhost:5432` and Redis on `localhost:6379` with the credentials from `.env`.
+
+**Given** `turbo dev` is run after infra services are up,
+**When** Next.js and NestJS start in dev mode,
+**Then** `DATABASE_URL` points to the local PostgreSQL (`postgresql://ridenrest:ridenrest@localhost:5432/ridenrest`) and `REDIS_URL` to local Redis (`redis://localhost:6379`).
+
+**Given** the developer modifies source code in `apps/api/` or `apps/web/`,
+**When** the file is saved,
+**Then** hot-reload works exactly as before (NestJS watch, Next.js Fast Refresh) — no Docker rebuild needed for app code.
+
+**Given** `docker compose down -v` is run,
+**When** volumes are destroyed,
+**Then** all data is wiped; `drizzle-kit migrate` re-creates the schema on next `turbo dev`.
+
+---
+
+### Story 14.4: Backups PostgreSQL automatisés
+
+As a **developer managing production data**,
+I want automated daily PostgreSQL backups stored locally and optionally externally,
+So that I can restore data in case of VPS failure or corruption.
+
+**Acceptance Criteria:**
+
+**Given** a cron job is configured on the VPS,
+**When** the schedule triggers (daily at 03:00 UTC),
+**Then** `docker exec ridenrest-db pg_dump --format=custom -U ridenrest ridenrest` creates a backup stored in `/opt/ridenrest/backups/` with the naming convention `ridenrest_YYYY-MM-DD_HH-MM.dump`.
+
+**Given** backups accumulate,
+**When** the retention script runs,
+**Then** backups older than 14 days are automatically deleted to prevent disk exhaustion.
+
+**Given** a backup exists,
+**When** `pg_restore` is run against the PostgreSQL container,
+**Then** the database is fully restored including PostGIS extensions, all tables, indexes, and data.
+
+**Given** external backup is configured (optional),
+**When** a backup is created,
+**Then** it is uploaded via `rclone` to a free-tier cloud storage (Backblaze B2 10GB free or Cloudflare R2 10GB free).
+
+---
+
+### Story 14.5: CI/CD — Déploiement automatisé via GitHub Actions
+
+As a **developer pushing to the main branch**,
+I want an automated deployment pipeline that builds and deploys to the VPS via SSH,
+So that production is updated without manual intervention.
+
+**Acceptance Criteria:**
+
+**Given** a push to `main` branch triggers the GitHub Actions workflow,
+**When** the CI job passes (lint, build, test),
+**Then** the deploy job connects to the VPS via SSH and runs: `cd /opt/ridenrest && git pull && pnpm install --frozen-lockfile && turbo build && pnpm drizzle-kit migrate && pm2 restart all`.
+
+**Given** the deployment completes,
+**When** PM2 process status is checked,
+**Then** both `ridenrest-web` and `ridenrest-api` are in `online` status with uptime > 0.
+
+**Given** the deployment fails (build error),
+**When** the error is detected,
+**Then** the workflow exits with failure status — PM2 keeps the previous running processes untouched.
+
+**Given** GitHub Secrets are configured,
+**When** the deploy job runs,
+**Then** it uses: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` — no Vercel or Fly.io tokens needed.
+
+---
+
+### Story 14.6: Monitoring — Uptime Kuma
+
+As a **developer managing a production VPS**,
+I want basic monitoring and alerting via Uptime Kuma,
+So that I know immediately if the app goes down or the VPS runs out of resources.
+
+**Acceptance Criteria:**
+
+**Given** Uptime Kuma is added to `docker-compose.yml`,
+**When** the container starts,
+**Then** its dashboard is accessible on a non-public port (e.g., `localhost:3001`) — exposed via Caddy on a subdomain (`status.ridenrest.com`) with basic auth.
+
+**Given** monitors are configured,
+**When** checking status,
+**Then** Uptime Kuma monitors: HTTPS `ridenrest.com` (web), HTTPS `api.ridenrest.com/health` (API), PostgreSQL TCP `localhost:5432`, Redis TCP `localhost:6379`.
+
+**Given** a monitored service goes down,
+**When** 2 consecutive checks fail (60s interval),
+**Then** a notification is sent (email or Telegram — at least one channel configured).
+
+**Given** the VPS is running,
+**When** disk usage exceeds 80% or RAM exceeds 90%,
+**Then** an alert is triggered.
+
+---
+
+### Story 14.7: Migration des données & Décommissionnement des anciens services
+
+As a **developer completing the VPS migration**,
+I want to migrate existing data from Aiven/Fly.io to the VPS and decommission old services,
+So that there is a single source of truth and no orphaned cloud resources generating future costs.
+
+**Acceptance Criteria:**
+
+**Given** PostgreSQL data exists on Aiven,
+**When** migration is performed,
+**Then** `pg_dump` from Aiven is restored on the VPS PostgreSQL container with all PostGIS extensions, tables, indexes, and data intact.
+
+**Given** GPX files exist on Fly.io volumes,
+**When** migration is performed,
+**Then** all GPX files are transferred to the VPS `/data/gpx/` directory via `scp` or `rsync`, and file paths in the database remain valid.
+
+**Given** the VPS is serving production traffic correctly,
+**When** all smoke tests pass (auth, GPX upload, corridor search, POI display),
+**Then** Vercel project is deleted (or downgraded), Fly.io app is destroyed, Aiven database is deleted, and Upstash instance is deleted.
+
+**Given** DNS is updated,
+**When** `ridenrest.com` resolves,
+**Then** it points to the VPS IP (A record) — no CNAME to Vercel or Fly.io.
+
+**Given** the existing `apps/api/Dockerfile` and `apps/api/fly.toml` are no longer needed,
+**When** migration is complete,
+**Then** they are removed from the repo (or moved to a `_deprecated/` folder for reference).

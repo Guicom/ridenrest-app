@@ -52,7 +52,7 @@ export function mapGoogleTypesToCategory(types: string[], layer: string): string
   // accommodations layer
   if (types.some((t) => ['campground', 'rv_park', 'camping_cabin'].includes(t))) return 'camp_site'
   if (types.some((t) => ['hostel'].includes(t))) return 'hostel'
-  if (types.some((t) => ['guest_house', 'bed_and_breakfast', 'private_guest_room', 'farmstay'].includes(t))) return 'hostel'
+  if (types.some((t) => ['guest_house', 'bed_and_breakfast', 'private_guest_room', 'farmstay'].includes(t))) return 'guesthouse'
   return 'hotel'
 }
 

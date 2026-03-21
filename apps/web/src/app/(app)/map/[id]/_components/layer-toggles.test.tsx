@@ -61,12 +61,48 @@ describe('LayerToggles', () => {
     expect(accommodationsBtn.getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('active layer button has active color class', () => {
+  it('active layer button uses bg-primary class (design token)', () => {
     mockVisibleLayers = new Set(['accommodations'])
     render(<LayerToggles isPending={false} />)
 
     const btn = screen.getByLabelText(/Masquer les Hébergements/)
-    expect(btn.className).toContain('bg-blue-500')
+    expect(btn.className).toContain('bg-primary')
+    expect(btn.className).not.toContain('bg-blue-500')
+  })
+
+  it('renders Météo chip when weatherActive prop is provided', () => {
+    render(<LayerToggles isPending={false} weatherActive={false} onWeatherToggle={() => {}} />)
+    expect(screen.getByLabelText(/Activer la Météo/)).toBeDefined()
+  })
+
+  it('renders Densité chip when densityActive prop is provided', () => {
+    render(<LayerToggles isPending={false} densityActive={false} onDensityToggle={() => {}} />)
+    expect(screen.getByLabelText(/Activer la Densité/)).toBeDefined()
+  })
+
+  it('clicking Météo chip calls onWeatherToggle', () => {
+    const onWeatherToggle = vi.fn()
+    render(<LayerToggles isPending={false} weatherActive={false} onWeatherToggle={onWeatherToggle} />)
+    fireEvent.click(screen.getByLabelText(/Activer la Météo/))
+    expect(onWeatherToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('clicking Densité chip calls onDensityToggle', () => {
+    const onDensityToggle = vi.fn()
+    render(<LayerToggles isPending={false} densityActive={true} onDensityToggle={onDensityToggle} />)
+    fireEvent.click(screen.getByLabelText(/Désactiver la Densité/))
+    expect(onDensityToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('active Météo chip uses bg-primary class', () => {
+    render(<LayerToggles isPending={false} weatherActive={true} onWeatherToggle={() => {}} />)
+    const btn = screen.getByLabelText(/Désactiver la Météo/)
+    expect(btn.className).toContain('bg-primary')
+  })
+
+  it('does not render Météo chip when weatherActive prop not provided', () => {
+    render(<LayerToggles isPending={false} />)
+    expect(screen.queryByLabelText(/Météo/)).toBeNull()
   })
 
   it('shows Skeleton in active layer button when isPending=true', () => {

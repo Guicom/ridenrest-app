@@ -154,7 +154,14 @@ export class SegmentsService {
       return result
     })
     await this.segmentsRepo.updateCumulativeDistances(updates)
-    await this.adventuresService.updateTotalDistance(adventureId, cumulative)
+
+    // C0.bis: compute total D+ (null if no segment has elevation data)
+    const hasElevationData = segments.some((s) => s.elevationGainM !== null)
+    const totalElevationGainM = hasElevationData
+      ? segments.reduce((sum, s) => sum + (s.elevationGainM ?? 0), 0)
+      : null
+
+    await this.adventuresService.updateTotals(adventureId, cumulative, totalElevationGainM)
   }
 
   private toResponse(s: AdventureSegment): AdventureSegmentResponse {

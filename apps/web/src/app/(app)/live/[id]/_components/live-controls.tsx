@@ -60,8 +60,8 @@ export function LiveControls() {
                 setSearchRadius(val)
               }}
               min={1}
-              max={5}
-              step={1}
+              max={30}
+              step={0.5}
               data-testid="slider-radius"
             />
             <span className="w-14 shrink-0 text-right text-xs font-medium">{searchRadiusKm} km</span>

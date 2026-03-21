@@ -34,7 +34,16 @@ vi.mock('next-themes', () => ({
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
   useMapStore: Object.assign(
-    () => ({ setViewport: vi.fn(), visibleLayers: new Set(), fromKm: 0, toKm: 30, densityColorEnabled: true }),
+    () => ({
+      setViewport: vi.fn(),
+      visibleLayers: new Set(),
+      fromKm: 0,
+      toKm: 30,
+      densityColorEnabled: true,
+      weatherActive: false,
+      weatherDimension: 'temperature',
+      searchRangeInteracted: false,
+    }),
     { subscribe: vi.fn(() => vi.fn()) },  // subscribe returns unsubscribe fn
   ),
 }))

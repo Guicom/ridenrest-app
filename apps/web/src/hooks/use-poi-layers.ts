@@ -20,7 +20,7 @@ export function usePoiLayers(
   poisByLayer: Record<MapLayer, Poi[]>,
   styleVersion: number,  // Forces re-run after theme change
 ) {
-  const { visibleLayers } = useMapStore()
+  const { visibleLayers, activeAccommodationTypes } = useMapStore()
 
   useEffect(() => {
     const map = mapRef.current
@@ -47,7 +47,11 @@ export function usePoiLayers(
         continue
       }
 
-      const pois = poisByLayer[layer]
+      // Client-side sub-type filter for accommodations (Story 8.4)
+      const rawPois = poisByLayer[layer]
+      const pois = layer === 'accommodations'
+        ? rawPois.filter((poi) => activeAccommodationTypes.has(poi.category))
+        : rawPois
       const features: GeoJSON.Feature[] = pois.map((poi) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
@@ -160,6 +164,5 @@ export function usePoiLayers(
     return () => {
       cleanupFns.forEach((fn) => fn())
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapRef, poisByLayer, visibleLayers, styleVersion])
+  }, [mapRef, poisByLayer, visibleLayers, activeAccommodationTypes, styleVersion])
 }

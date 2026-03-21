@@ -17,7 +17,8 @@ export interface OverpassResult {
 // Each category can have multiple OSM tag variants
 const CATEGORY_FILTERS: Record<string, string[]> = {
   hotel:        ['"amenity"="hotel"', '"tourism"="hotel"', '"tourism"="motel"', '"tourism"="chalet"'],
-  hostel:       ['"amenity"="hostel"', '"tourism"="hostel"', '"tourism"="guest_house"'],
+  hostel:       ['"amenity"="hostel"', '"tourism"="hostel"'],
+  guesthouse:   ['"tourism"="guest_house"'],
   camp_site:    ['"tourism"="camp_site"', '"tourism"="caravan_site"'],
   shelter:      ['"amenity"="shelter"', '"tourism"="alpine_hut"', '"tourism"="wilderness_hut"'],
   restaurant:   ['"amenity"="restaurant"'],

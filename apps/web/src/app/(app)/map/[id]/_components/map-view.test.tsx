@@ -41,25 +41,31 @@ vi.mock('./density-legend', () => ({
   DensityLegend: () => <div data-testid="density-legend" />,
 }))
 
+// Mutable map store state for Story 8.4 tests
+let mockMapStoreVisibleLayers = new Set<string>()
+
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
-    visibleLayers: new Set(),
+    visibleLayers: mockMapStoreVisibleLayers,
     toggleLayer: vi.fn(),
     weatherActive: false,
     weatherDimension: 'temperature',
     setWeatherActive: vi.fn(),
     setWeatherDimension: vi.fn(),
     densityColorEnabled: false,
+    toggleDensityColor: vi.fn(),
     fromKm: 0,
     toKm: 30,
     setSearchRange: vi.fn(),
+    activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
+    toggleAccommodationType: vi.fn(),
   }),
 }))
 
-// Mock SearchRangeSlider
-vi.mock('./search-range-slider', () => ({
-  SearchRangeSlider: () => <div data-testid="search-range-slider" />,
+// Mock SearchRangeControl
+vi.mock('./search-range-control', () => ({
+  SearchRangeControl: () => <div data-testid="search-range-control" />,
 }))
 
 // Mock PoiDetailSheet
@@ -74,9 +80,24 @@ vi.mock('./map-canvas', () => ({
   ),
 }))
 
-// Mock LayerToggles
-vi.mock('./layer-toggles', () => ({
-  LayerToggles: () => <div data-testid="layer-toggles" />,
+// Mock PoiLayerGrid
+vi.mock('./poi-layer-grid', () => ({
+  PoiLayerGrid: () => <div data-testid="poi-layer-grid" />,
+}))
+
+// Mock SidebarWeatherSection
+vi.mock('./sidebar-weather-section', () => ({
+  SidebarWeatherSection: () => <div data-testid="sidebar-weather-section" />,
+}))
+
+// Mock SidebarDensitySection
+vi.mock('./sidebar-density-section', () => ({
+  SidebarDensitySection: () => <div data-testid="sidebar-density-section" />,
+}))
+
+// Mock AccommodationSubTypes
+vi.mock('./accommodation-sub-types', () => ({
+  AccommodationSubTypes: () => <div data-testid="accommodation-sub-types" />,
 }))
 
 // Mock StatusBanner
@@ -101,6 +122,7 @@ function makeMapResponse(overrides: Partial<AdventureMapResponse> = {}): Adventu
     adventureId: 'adv-1',
     adventureName: 'Test',
     totalDistanceKm: 100,
+    totalElevationGainM: null,
     segments: [],
     ...overrides,
   }
@@ -128,6 +150,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
 describe('MapView', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
   })
 
   it('shows Skeleton when isPending', () => {
@@ -215,6 +238,7 @@ describe('MapView', () => {
 describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
   })
 
   function renderWithData() {
@@ -257,26 +281,61 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     expect(screen.getByTestId('planning-sidebar').className).toContain('w-[360px]')
   })
 
-  it('SearchRangeSlider is rendered inside the sidebar (AC #3)', async () => {
+  it('SearchRangeControl is rendered inside the sidebar (AC #3)', async () => {
     renderWithData()
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const slider = screen.getByTestId('search-range-slider')
-    expect(sidebar.contains(slider)).toBe(true)
+    const control = screen.getByTestId('search-range-control')
+    expect(sidebar.contains(control)).toBe(true)
   })
 
-  it('LayerToggles is rendered inside the sidebar (AC #3)', async () => {
+  it('PoiLayerGrid is rendered inside the sidebar (AC #3)', async () => {
     renderWithData()
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const toggles = screen.getByTestId('layer-toggles')
-    expect(sidebar.contains(toggles)).toBe(true)
+    const grid = screen.getByTestId('poi-layer-grid')
+    expect(sidebar.contains(grid)).toBe(true)
+  })
+})
+
+describe('MapView — Story 8.4 AccommodationSubTypes', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+  })
+
+  it('renders AccommodationSubTypes when accommodations layer is active', async () => {
+    mockMapStoreVisibleLayers = new Set(['accommodations'])
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    expect(screen.getByTestId('accommodation-sub-types')).toBeDefined()
+  })
+
+  it('does not render AccommodationSubTypes when accommodations layer is inactive', async () => {
+    mockMapStoreVisibleLayers = new Set()
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    expect(screen.queryByTestId('accommodation-sub-types')).toBeNull()
+  })
+
+  it('SidebarWeatherSection is rendered inside the sidebar', async () => {
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    const sidebar = screen.getByTestId('planning-sidebar')
+    const weatherSection = screen.getByTestId('sidebar-weather-section')
+    expect(sidebar.contains(weatherSection)).toBe(true)
   })
 })
 
 describe('MapView — back button (Story 8.3, AC #2)', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
   })
 
   it('"← Aventures" link points to /adventures', async () => {

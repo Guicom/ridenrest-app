@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { Calendar } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { WeatherDimension } from './weather-layer'
 
@@ -14,10 +15,10 @@ interface WeatherControlsProps {
   initialSpeedKmh?: string
 }
 
-const DIMENSIONS: { id: WeatherDimension; label: string; icon: string }[] = [
-  { id: 'temperature', label: 'Température', icon: '🌡' },
-  { id: 'precipitation', label: 'Précip', icon: '🌧' },
-  { id: 'wind', label: 'Vent', icon: '💨' },
+const DIMENSIONS: { id: WeatherDimension; label: string }[] = [
+  { id: 'temperature', label: 'Température' },
+  { id: 'precipitation', label: 'Précip' },
+  { id: 'wind', label: 'Vent' },
 ]
 
 const COLOR_LEGENDS: Record<WeatherDimension, { label: string; stops: { color: string; value: string }[] }> = {
@@ -51,59 +52,55 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
   const [departureTime, setDepartureTime] = useState(initialDepartureTime)
   const [speedKmh, setSpeedKmh] = useState(initialSpeedKmh)
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    try { localStorage.setItem(WEATHER_PACE_STORAGE_KEY, JSON.stringify({ departureTime, speedKmh })) } catch { /* ignore */ }
-    const parsedSpeed = speedKmh ? Number(speedKmh) : null
-    const parsedTime = departureTime ? new Date(departureTime).toISOString() : null
-    onPaceSubmit(parsedTime, parsedSpeed)
+  const submitPace = (dt: string, sp: string) => {
+    try { localStorage.setItem(WEATHER_PACE_STORAGE_KEY, JSON.stringify({ departureTime: dt, speedKmh: sp })) } catch { /* ignore */ }
+    onPaceSubmit(
+      dt ? new Date(dt).toISOString() : null,
+      sp ? Number(sp) : null,
+    )
   }
 
-  const legend = COLOR_LEGENDS[dimension]
-
   return (
-    <div className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-md w-64 space-y-3">
-      {/* Dimension selector */}
-      <div className="flex gap-1">
+    <div className="space-y-4">
+      {/* Segmented control */}
+      <div className="flex p-1 bg-muted rounded-full">
         {DIMENSIONS.map((dim) => (
           <button
             key={dim.id}
             data-testid={`weather-dim-${dim.id}`}
             onClick={() => onDimensionChange(dim.id)}
-            className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 px-1 rounded text-xs font-medium transition-colors ${
-              dimension === dim.id
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-            }`}
             aria-pressed={dimension === dim.id}
+            className={[
+              'flex-1 py-1.5 text-sm font-medium rounded-full transition-colors',
+              dimension === dim.id
+                ? 'bg-background text-primary shadow-sm'
+                : 'text-muted-foreground',
+            ].join(' ')}
           >
-            <span className="text-base leading-none">{dim.icon}</span>
-            <span>{dim.label}</span>
+            {dim.label}
           </button>
         ))}
       </div>
 
-      {/* Color legend */}
-      <ColorLegend stops={legend.stops} label={legend.label} />
+      {/* Departure date/time */}
+      <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
+        <Calendar className="h-5 w-5 text-muted-foreground shrink-0" />
+        <input
+          id="departure-time"
+          type="datetime-local"
+          value={departureTime}
+          onChange={(e) => setDepartureTime(e.target.value)}
+          onBlur={(e) => submitPace(e.target.value, speedKmh)}
+          className="bg-transparent text-sm text-foreground w-full outline-none"
+        />
+      </div>
 
-      {/* Pace form */}
-      <form onSubmit={handleSubmit} className="space-y-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="departure-time" className="text-xs text-muted-foreground">
-            Départ
-          </label>
-          <input
-            id="departure-time"
-            type="datetime-local"
-            value={departureTime}
-            onChange={(e) => setDepartureTime(e.target.value)}
-            className="h-8 px-2 text-xs rounded border bg-background text-foreground w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="speed" className="text-xs text-muted-foreground">
-            Vitesse (km/h)
-          </label>
+      {/* Speed */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+          Vitesse (km/h)
+        </p>
+        <div className="flex items-center bg-muted rounded-xl px-4 py-3">
           <input
             id="speed"
             type="number"
@@ -112,20 +109,14 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
             placeholder="15"
             value={speedKmh}
             onChange={(e) => setSpeedKmh(e.target.value)}
-            className="h-8 px-2 text-xs rounded border bg-background text-foreground w-full"
+            onBlur={(e) => submitPace(departureTime, e.target.value)}
+            className="bg-transparent text-xl font-medium text-foreground w-full outline-none"
           />
+          <span className="text-muted-foreground text-sm shrink-0">km/h</span>
         </div>
-        <button
-          type="submit"
-          data-testid="weather-submit"
-          disabled={isPending}
-          className="w-full h-8 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {isPending ? 'Chargement…' : 'Mettre à jour'}
-        </button>
-      </form>
+      </div>
 
-      {isPending && <Skeleton className="h-2 w-full" />}
+      {isPending && <Skeleton className="h-2 w-full" data-testid="weather-submit" />}
     </div>
   )
 }

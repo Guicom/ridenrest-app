@@ -6,20 +6,24 @@ import { useQuery } from '@tanstack/react-query'
 import { snapToTrace } from '@ridenrest/gpx'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
+import { SlidersHorizontal } from 'lucide-react'
 import { useLiveMode } from '@/hooks/use-live-mode'
 import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
 import { useNetworkStatus } from '@/hooks/use-network-status'
 import { useLiveWeather } from '@/hooks/use-live-weather'
 import { useLiveStore } from '@/stores/live.store'
+import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
+import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { StatusBanner } from './_components/status-banner'
 import { LiveWeatherOverlay } from './_components/live-weather-overlay'
 import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
+const DEFAULT_RADIUS = 5
 
 export default function LivePage() {
   const { id: adventureId } = useParams<{ id: string }>()
@@ -34,6 +38,7 @@ export default function LivePage() {
   } = useLiveMode()
 
   const [quitPending, setQuitPending] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const quitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -91,6 +96,23 @@ export default function LivePage() {
   // POI detail sheet — find selected POI from live results
   const selectedPoiId = useUIStore((s) => s.selectedPoiId)
   const selectedPoi = pois.find((p) => p.id === selectedPoiId) ?? null
+
+  // Active filter count for badge
+  const mapVisibleLayers = useMapStore((s) => s.visibleLayers)
+  const mapWeatherActive = useMapStore((s) => s.weatherActive)
+  const mapDensityColorEnabled = useMapStore((s) => s.densityColorEnabled)
+  const liveSearchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (!mapVisibleLayers.has('accommodations')) count++
+    if (mapVisibleLayers.has('restaurants')) count++
+    if (mapVisibleLayers.has('supplies')) count++
+    if (mapVisibleLayers.has('bike')) count++
+    if (mapWeatherActive) count++
+    if (!mapDensityColorEnabled) count++
+    if (liveSearchRadiusKm !== DEFAULT_RADIUS) count++
+    return count
+  }, [mapVisibleLayers, mapWeatherActive, mapDensityColorEnabled, liveSearchRadiusKm])
 
   // Live context for PoiDetailSheet (D+/ETA with live mode values)
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
@@ -164,6 +186,25 @@ export default function LivePage() {
           {quitPending ? '✓ Confirmer ?' : '⏹ Quitter le live'}
         </button>
       </div>
+
+      {/* FILTERS button — bottom-left z-30, above LiveControls */}
+      {mounted && isLiveModeActive && (
+        <div className="absolute bottom-32 left-4 z-30">
+          <button
+            onClick={() => setFiltersOpen(true)}
+            data-testid="live-filters-btn"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-background/90 px-3 py-2 text-sm font-medium backdrop-blur-sm border border-[--border] shadow-sm"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            FILTERS
+            {activeFilterCount > 0 && (
+              <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Weather overlay — top right z-40 */}
       {mounted && isLiveModeActive && (
@@ -258,6 +299,9 @@ export default function LivePage() {
         segmentId={segmentId ?? null}
         liveContext={liveContext}
       />
+
+      {/* Live filters drawer — z-50 */}
+      <LiveFiltersDrawer open={filtersOpen} onOpenChange={setFiltersOpen} />
     </div>
   )
 }

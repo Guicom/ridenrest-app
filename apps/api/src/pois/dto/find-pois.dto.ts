@@ -3,7 +3,7 @@ import { Type, Transform } from 'class-transformer'
 import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import type { PoiCategory } from '@ridenrest/shared'
 
-export const POI_CATEGORIES = ['hotel', 'hostel', 'camp_site', 'shelter', 'restaurant', 'supermarket', 'convenience', 'bike_shop', 'bike_repair'] as const
+export const POI_CATEGORIES = ['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse', 'restaurant', 'supermarket', 'convenience', 'bike_shop', 'bike_repair'] as const
 
 export class FindPoisDto {
   @IsUUID()

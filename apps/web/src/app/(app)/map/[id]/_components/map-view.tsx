@@ -7,10 +7,13 @@ import { getAdventureMapData, getWeatherForecast } from '@/lib/api-client'
 import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import { MapCanvas } from './map-canvas'
 import { DensityLegend } from './density-legend'
-import { LayerToggles } from './layer-toggles'
-import { SearchRangeSlider } from './search-range-slider'
+import { SearchRangeControl } from './search-range-control'
 import { PoiDetailSheet } from './poi-detail-sheet'
-import { WeatherControls, WEATHER_PACE_STORAGE_KEY } from './weather-controls'
+import { WEATHER_PACE_STORAGE_KEY } from './weather-controls'
+import { AccommodationSubTypes } from './accommodation-sub-types'
+import { PoiLayerGrid } from './poi-layer-grid'
+import { SidebarWeatherSection } from './sidebar-weather-section'
+import { SidebarDensitySection } from './sidebar-density-section'
 import { StatusBanner } from '@/components/shared/status-banner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePois } from '@/hooks/use-pois'
@@ -18,6 +21,7 @@ import { useDensity } from '@/hooks/use-density'
 import { useMapStore } from '@/stores/map.store'
 import type { SegmentWeatherData } from './map-canvas'
 import { useUIStore } from '@/stores/ui.store'
+import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import type { AdventureMapResponse } from '@/lib/api-client'
 
 interface MapViewProps {
@@ -40,7 +44,7 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, weatherDimension, setWeatherActive, setWeatherDimension } = useMapStore()
+  const { weatherActive, weatherDimension, setWeatherActive, visibleLayers } = useMapStore()
 
   // Reset weatherActive when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
@@ -81,10 +85,8 @@ export function MapView({ adventureId }: MapViewProps) {
   })
   const weatherPending = weatherQueries.some((q) => q.isFetching)
 
-  // Combine all segments into one continuous trace with cumulative distKm.
-  const allCumulativeWaypoints = readySegments.flatMap((s) =>
-    (s.waypoints ?? []).map((wp) => ({ ...wp, distKm: s.cumulativeStartKm + wp.distKm })),
-  )
+  // Combine all segments into one continuous trace with cumulative distKm (C7.5).
+  const allCumulativeWaypoints = useAdventureWaypoints(readySegments)
   const allWeatherPoints = weatherEnabled
     ? weatherQueries.flatMap((q) => q.data?.waypoints ?? [])
     : []
@@ -143,39 +145,34 @@ export function MapView({ adventureId }: MapViewProps) {
       >
         <div className="flex flex-col gap-4 p-4">
           {/* Search range slider */}
-          <SearchRangeSlider totalDistanceKm={data.totalDistanceKm} />
+          <SearchRangeControl
+            totalDistanceKm={data.totalDistanceKm}
+            waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
+          />
 
-          {/* Layer toggles */}
-          <LayerToggles isPending={poisPending} />
+          {/* POI layer grid — 2×2 cards (Story 8.4 correction) */}
+          <PoiLayerGrid isPending={poisPending} />
 
-          {/* Weather toggle + controls */}
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => setWeatherActive(!weatherActive)}
-              className={`h-10 px-3 text-sm font-medium rounded-lg border shadow-sm transition-colors ${
-                weatherActive
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-foreground border-border hover:bg-muted'
-              }`}
-              aria-pressed={weatherActive}
-            >
-              ⛅ Météo
-            </button>
-            {weatherActive && (
-              <WeatherControls
-                isPending={weatherPending}
-                dimension={weatherDimension}
-                onDimensionChange={setWeatherDimension}
-                initialDepartureTime={savedPace.departureTime}
-                initialSpeedKmh={savedPace.speedKmh}
-                onPaceSubmit={(departureTime, speedKmh) => {
-                  setPaceParams({ departureTime, speedKmh })
-                }}
-              />
-            )}
-          </div>
+          {/* Accommodation sub-type chips */}
+          {visibleLayers.has('accommodations') && (
+            <div className="flex flex-col gap-1">
+              <AccommodationSubTypes />
+            </div>
+          )}
 
-          {/* Sub-type chips — Story 8.4 */}
+          {/* Météo section — collapsible accordion (Story 8.4 correction) */}
+          <SidebarWeatherSection
+            isPending={weatherPending}
+            initialDepartureTime={savedPace.departureTime}
+            initialSpeedKmh={savedPace.speedKmh}
+            onPaceSubmit={(departureTime, speedKmh) => {
+              setPaceParams({ departureTime, speedKmh })
+            }}
+          />
+
+          {/* Densité section — collapsible with legend (Story 8.4 correction / 8.5 merge) */}
+          <SidebarDensitySection />
+
           {/* Stages list — Epic 11 */}
         </div>
       </aside>
@@ -226,6 +223,7 @@ export function MapView({ adventureId }: MapViewProps) {
           coverageGaps={coverageGaps}
           densityStatus={densityStatus}
           segmentsWeather={segmentsWeather}
+          allWaypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
         />
         {densityStatus === 'success' && (
           <div className="absolute bottom-16 right-4 z-10">
