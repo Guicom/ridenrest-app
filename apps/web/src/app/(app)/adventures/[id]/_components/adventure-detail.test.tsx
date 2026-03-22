@@ -265,12 +265,12 @@ describe('AdventureDetail — adventure rename', () => {
 })
 
 describe('AdventureDetail — delete adventure', () => {
-  it('dialog appears when trash button is clicked', async () => {
+  it('dialog appears when delete button is clicked', async () => {
     vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
     renderDetail()
 
     await waitFor(() => screen.getByText('Tour test'))
-    fireEvent.click(screen.getByTitle("Supprimer l'aventure"))
+    fireEvent.click(screen.getByRole('button', { name: /supprimer l'aventure/i }))
     expect(screen.getByText(/supprimer définitivement/i)).toBeInTheDocument()
   })
 
@@ -279,7 +279,7 @@ describe('AdventureDetail — delete adventure', () => {
     renderDetail()
 
     await waitFor(() => screen.getByText('Tour test'))
-    fireEvent.click(screen.getByTitle("Supprimer l'aventure"))
+    fireEvent.click(screen.getByRole('button', { name: /supprimer l'aventure/i }))
 
     const confirmBtn = screen.getByRole('button', { name: /supprimer définitivement/i })
     expect(confirmBtn).toBeDisabled()

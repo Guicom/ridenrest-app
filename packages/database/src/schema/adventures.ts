@@ -13,6 +13,7 @@ export const adventures = pgTable('adventures', {
   status: adventureStatusEnum('status').notNull().default('planning'),
   densityStatus: densityStatusEnum('density_status').notNull().default('idle'),
   densityProgress: integer('density_progress').notNull().default(0),
+  densityCategories: text('density_categories').array().notNull().default([]),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({

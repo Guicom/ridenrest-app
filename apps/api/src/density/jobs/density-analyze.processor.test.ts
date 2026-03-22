@@ -36,8 +36,10 @@ const processor = new DensityAnalyzeProcessor(
   mockRedisProvider as unknown as RedisProvider,
 )
 
-function makeJob(data: { adventureId: string; segmentIds: string[] }): Job<{ adventureId: string; segmentIds: string[] }> {
-  return { data } as Job<{ adventureId: string; segmentIds: string[] }>
+const DEFAULT_CATEGORIES = ['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']
+
+function makeJob(data: { adventureId: string; segmentIds: string[]; categories?: string[] }): Job<{ adventureId: string; segmentIds: string[]; categories: string[] }> {
+  return { data: { categories: DEFAULT_CATEGORIES, ...data } } as Job<{ adventureId: string; segmentIds: string[]; categories: string[] }>
 }
 
 const WAYPOINTS_50KM = Array.from({ length: 6 }, (_, i) => ({
@@ -144,6 +146,18 @@ describe('DensityAnalyzeProcessor.process', () => {
       expect.arrayContaining([expect.objectContaining({ severity: 'critical' })]),
     )
     expect(mockRepo.setDensityStatus).toHaveBeenCalledWith('adv-1', 'success')
+  })
+
+  it('passes job categories to Overpass (not hardcoded)', async () => {
+    mockRepo.findSegmentsForAnalysis.mockResolvedValue([
+      { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
+    ])
+    mockOverpass.queryPois.mockResolvedValue([])
+
+    const customCategories = ['hotel', 'hostel']
+    await processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'], categories: customCategories }))
+
+    expect(mockOverpass.queryPois).toHaveBeenCalledWith(expect.anything(), customCategories)
   })
 
   it('skips segments with no waypoints gracefully', async () => {

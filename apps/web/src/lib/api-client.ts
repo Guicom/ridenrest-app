@@ -249,10 +249,10 @@ export async function importStravaRoute(
 
 import type { DensityStatusResponse } from '@ridenrest/shared'
 
-export async function triggerDensityAnalysis(adventureId: string): Promise<{ message: string }> {
+export async function triggerDensityAnalysis(adventureId: string, categories: string[]): Promise<{ message: string }> {
   return apiFetch<{ message: string }>('/api/density/analyze', {
     method: 'POST',
-    body: JSON.stringify({ adventureId }),
+    body: JSON.stringify({ adventureId, categories }),
   })
 }
 

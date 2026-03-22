@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import * as apiClient from '@/lib/api-client'
 import { DensityTriggerButton } from './density-trigger-button'
@@ -7,6 +8,26 @@ import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 vi.mock('@/lib/api-client')
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
+// Mock DensityCategoryDialog to control it in tests
+vi.mock('./density-category-dialog', () => ({
+  DensityCategoryDialog: ({ open, onConfirm }: {
+    open: boolean
+    onConfirm: (cats: string[]) => void
+    onOpenChange: (open: boolean) => void
+    isLoading?: boolean
+  }) =>
+    open ? (
+      <div data-testid="density-dialog">
+        <button
+          data-testid="confirm-btn"
+          onClick={() => onConfirm(['hotel', 'hostel'])}
+        >
+          Confirm
+        </button>
+      </div>
+    ) : null,
+}))
 
 function makeDoneSegment(overrides: Partial<AdventureSegmentResponse> = {}): AdventureSegmentResponse {
   return {
@@ -34,19 +55,46 @@ function renderWithQuery(ui: React.ReactElement) {
 afterEach(cleanup)
 
 beforeEach(() => {
-  vi.mocked(apiClient.getDensityStatus).mockResolvedValue({ densityStatus: 'idle', densityProgress: 0, coverageGaps: [] })
+  vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+    densityStatus: 'idle',
+    densityProgress: 0,
+    coverageGaps: [],
+    densityCategories: [],
+  })
 })
 
 describe('DensityTriggerButton', () => {
-  it('shows "Analyser la densité" when idle and all segments done', async () => {
+  it('shows "Calculer la densité" when idle and all segments done', async () => {
     renderWithQuery(
       <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
     )
-    expect(screen.getByRole('button', { name: /analyser la densité/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /calculer la densité/i })).toBeInTheDocument()
+  })
+
+  it('shows "Densité calculée" when densityStatus is success', async () => {
+    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+      densityStatus: 'success',
+      densityProgress: 100,
+      coverageGaps: [],
+      densityCategories: ['hotel'],
+    })
+
+    renderWithQuery(
+      <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /densité calculée/i })).toBeInTheDocument()
+    })
   })
 
   it('shows "Analyse en cours… 0%" and is disabled when densityStatus is pending', async () => {
-    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({ densityStatus: 'pending', densityProgress: 0, coverageGaps: [] })
+    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+      densityStatus: 'pending',
+      densityProgress: 0,
+      coverageGaps: [],
+      densityCategories: [],
+    })
 
     renderWithQuery(
       <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
@@ -58,7 +106,12 @@ describe('DensityTriggerButton', () => {
   })
 
   it('shows progress percentage when densityStatus is processing', async () => {
-    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({ densityStatus: 'processing', densityProgress: 42, coverageGaps: [] })
+    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+      densityStatus: 'processing',
+      densityProgress: 42,
+      coverageGaps: [],
+      densityCategories: [],
+    })
 
     renderWithQuery(
       <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
@@ -69,8 +122,42 @@ describe('DensityTriggerButton', () => {
     })
   })
 
+  it('clicking button opens the DensityCategoryDialog (not directly triggers mutation)', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(
+      <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
+    )
+
+    const btn = screen.getByRole('button', { name: /calculer la densité/i })
+    await user.click(btn)
+
+    expect(screen.getByTestId('density-dialog')).toBeInTheDocument()
+    expect(vi.mocked(apiClient.triggerDensityAnalysis)).not.toHaveBeenCalled()
+  })
+
+  it('confirming in dialog with categories calls triggerDensityAnalysis with correct body', async () => {
+    const user = userEvent.setup()
+    vi.mocked(apiClient.triggerDensityAnalysis).mockResolvedValue({ message: 'ok' })
+
+    renderWithQuery(
+      <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
+    )
+
+    // Open dialog
+    await user.click(screen.getByRole('button', { name: /calculer la densité/i }))
+    // Confirm in dialog (mock calls onConfirm with ['hotel', 'hostel'])
+    await user.click(screen.getByTestId('confirm-btn'))
+
+    expect(vi.mocked(apiClient.triggerDensityAnalysis)).toHaveBeenCalledWith('adv-1', ['hotel', 'hostel'])
+  })
+
   it('is disabled when not all segments are parsed', () => {
-    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({ densityStatus: 'idle', densityProgress: 0, coverageGaps: [] })
+    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+      densityStatus: 'idle',
+      densityProgress: 0,
+      coverageGaps: [],
+      densityCategories: [],
+    })
 
     renderWithQuery(
       <DensityTriggerButton

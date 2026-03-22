@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Plus } from 'lucide-react'
 import { createAdventureSchema } from '@ridenrest/shared'
 import type { CreateAdventureInput } from '@ridenrest/shared'
 import { Button } from '@/components/ui/button'
@@ -40,8 +41,9 @@ export function CreateAdventureDialog({ onSubmit, isPending }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
-        + Nouvelle aventure
+      <DialogTrigger render={<Button variant="ghost" size="lg" className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary" />}>
+        <Plus className="h-4 w-4" />
+        Nouvelle aventure
       </DialogTrigger>
       <DialogContent>
         <DialogTitle>Nouvelle aventure</DialogTitle>

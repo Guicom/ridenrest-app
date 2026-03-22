@@ -58,6 +58,7 @@ export class AdventuresService {
       userId: a.userId,
       name: a.name,
       totalDistanceKm: a.totalDistanceKm,
+      totalElevationGainM: a.totalElevationGainM ?? null,
       status: a.status,
       densityStatus: a.densityStatus,
       densityProgress: a.densityProgress,

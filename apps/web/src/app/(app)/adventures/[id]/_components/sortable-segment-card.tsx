@@ -30,18 +30,22 @@ export function SortableSegmentCard({ segment, onDelete, onReplace, onRename, is
   }
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-start gap-2">
-      <button
-        className="mt-3 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1"
-        aria-label="Réordonner le segment"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
-      <div className="flex-1">
-        <SegmentCard segment={segment} onDelete={onDelete} onReplace={onReplace} onRename={onRename} onRetry={onReplace} isDeleting={isDeleting} />
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="cursor-grab active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+    >
+      <SegmentCard
+        segment={segment}
+        onDelete={onDelete}
+        onReplace={onReplace}
+        onRename={onRename}
+        onRetry={onReplace}
+        isDeleting={isDeleting}
+        dragHandle={<GripVertical className="h-4 w-4" />}
+      />
     </div>
   )
 }

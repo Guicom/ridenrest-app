@@ -66,7 +66,7 @@ export function MapView({ adventureId }: MapViewProps) {
   // useDensity + usePois must be called unconditionally (Rules of Hooks)
   const readySegments = data?.segments.filter((s) => s.parseStatus === 'done') ?? []
   const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
-  const { coverageGaps, densityStatus } = useDensity(adventureId)
+  const { coverageGaps, densityStatus, densityCategories } = useDensity(adventureId)
 
   // Fetch weather for all ready segments as soon as layer is active.
   const weatherEnabled = weatherActive
@@ -217,7 +217,7 @@ export function MapView({ adventureId }: MapViewProps) {
         />
         {densityStatus === 'success' && (
           <div className="absolute bottom-16 right-4 z-10">
-            <DensityLegend />
+            <DensityLegend densityCategories={densityCategories} />
           </div>
         )}
 

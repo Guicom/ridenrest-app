@@ -10,6 +10,17 @@ vi.mock('lucide-react', () => ({
   Map: () => <svg data-testid="map-icon" />,
 }))
 
+// Mock accommodation-sub-types
+vi.mock('./accommodation-sub-types', () => ({
+  ACCOMMODATION_SUB_TYPES: [
+    { type: 'hotel',      label: 'Hôtel',               icon: '🏨' },
+    { type: 'camp_site',  label: 'Camping',              icon: '⛺' },
+    { type: 'shelter',    label: 'Refuge / Abri',        icon: '🏠' },
+    { type: 'hostel',     label: 'Auberge de jeunesse',  icon: '🛏️' },
+    { type: 'guesthouse', label: "Chambre d'hôte",       icon: '🏡' },
+  ],
+}))
+
 // Mock useMapStore
 let mockDensityColorEnabled = true
 const mockToggleDensityColor = vi.fn()
@@ -106,5 +117,32 @@ describe('DensityLegend', () => {
     await user.click(toggle)
 
     expect(mockToggleDensityColor).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows categories label when densityCategories provided', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend densityCategories={['hotel', 'hostel']} />)
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    const label = screen.getByText(/Analysé :/i)
+    expect(label).toBeDefined()
+    expect(label.textContent).toContain('🏨 Hôtel')
+    expect(label.textContent).toContain('🛏️ Auberge de jeunesse')
+  })
+
+  it('does not show categories label when densityCategories is empty', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend densityCategories={[]} />)
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    expect(screen.queryByText(/Analysé :/i)).toBeNull()
+  })
+
+  it('does not show categories label when densityCategories is not provided', async () => {
+    const user = userEvent.setup()
+    render(<DensityLegend />)
+    await user.click(screen.getByRole('button', { name: /légende de densité/i }))
+
+    expect(screen.queryByText(/Analysé :/i)).toBeNull()
   })
 })

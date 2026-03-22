@@ -5,6 +5,7 @@ import type { CoverageGapSummary, DensityStatus } from '@ridenrest/shared'
 interface UseDensityResult {
   coverageGaps: CoverageGapSummary[]
   densityStatus: DensityStatus
+  densityCategories: string[]
   isPending: boolean
 }
 
@@ -22,6 +23,7 @@ export function useDensity(adventureId: string): UseDensityResult {
   return {
     coverageGaps: data?.coverageGaps ?? [],
     densityStatus: data?.densityStatus ?? 'idle',
+    densityCategories: data?.densityCategories ?? [],
     isPending,
   }
 }

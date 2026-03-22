@@ -41,6 +41,13 @@ export class DensityRepository {
       .where(eq(adventures.id, adventureId))
   }
 
+  async saveDensityCategories(adventureId: string, categories: string[]): Promise<void> {
+    await db
+      .update(adventures)
+      .set({ densityCategories: categories, updatedAt: new Date() })
+      .where(eq(adventures.id, adventureId))
+  }
+
   async deleteGapsByAdventureId(adventureId: string): Promise<void> {
     // Delete coverage_gaps rows for all segments of this adventure
     const segmentIds = await db

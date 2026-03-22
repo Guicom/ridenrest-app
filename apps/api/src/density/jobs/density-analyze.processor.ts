@@ -10,6 +10,7 @@ import { RedisProvider } from '../../common/providers/redis.provider.js'
 interface AnalyzeDensityJob {
   adventureId: string
   segmentIds: string[]
+  categories: string[]
 }
 
 interface DbWaypoint {
@@ -26,7 +27,6 @@ interface Troncon {
 }
 
 const TRONCON_SIZE_KM = 10
-const ACCOMMODATION_CATEGORIES = ['hotel', 'hostel', 'camp_site', 'shelter']
 const CACHE_TTL_SECONDS = 60 * 60 * 24 // 24h
 const OVERPASS_RATE_LIMIT_MS = 1100 // ~1 req/s — Overpass fair-use policy
 
@@ -63,7 +63,7 @@ export class DensityAnalyzeProcessor extends WorkerHost {
 
   async process(job: Job<AnalyzeDensityJob>): Promise<void> {
     this.logger.log(`process() called — job.id=${job.id} adventureId=${job.data.adventureId}`)
-    const { adventureId, segmentIds } = job.data
+    const { adventureId, segmentIds, categories } = job.data
 
     try {
       await this.densityRepo.setDensityStatus(adventureId, 'processing')
@@ -81,7 +81,7 @@ export class DensityAnalyzeProcessor extends WorkerHost {
       let processed = 0
 
       for (const troncon of allTroncons) {
-        const count = await this.getTronconAccommodationCount(troncon.segmentId, troncon)
+        const count = await this.getTronconAccommodationCount(troncon.segmentId, troncon, categories)
 
         if (count === 0) {
           gapsToInsert.push({ segmentId: troncon.segmentId, fromKm: troncon.fromKm, toKm: troncon.toKm, severity: 'critical' })
@@ -105,8 +105,9 @@ export class DensityAnalyzeProcessor extends WorkerHost {
     }
   }
 
-  private async getTronconAccommodationCount(segmentId: string, troncon: Troncon): Promise<number> {
-    const cacheKey = `density:troncon:${segmentId}:${troncon.fromKm}:${troncon.toKm}`
+  private async getTronconAccommodationCount(segmentId: string, troncon: Troncon, categories: string[]): Promise<number> {
+    const sortedCategories = [...categories].sort().join(',')
+    const cacheKey = `density:troncon:${segmentId}:${troncon.fromKm}:${troncon.toKm}:${sortedCategories}`
     const redis = this.redisProvider.getClient()
 
     const cached = await redis.get(cacheKey)
@@ -117,7 +118,7 @@ export class DensityAnalyzeProcessor extends WorkerHost {
 
     // Query both sources in parallel — take max count to avoid false gaps
     const [overpassNodes, googleIds] = await Promise.allSettled([
-      this.overpassProvider.queryPois(troncon.bbox, ACCOMMODATION_CATEGORIES),
+      this.overpassProvider.queryPois(troncon.bbox, categories),
       this.googlePlacesProvider.searchLayerPlaceIds(troncon.bbox, 'accommodations'),
     ])
 

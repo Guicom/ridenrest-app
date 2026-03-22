@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
+import { Trash2, LayoutGrid, Map, Route, TrendingUp } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -88,7 +88,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   })
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
@@ -248,9 +248,10 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
 
   return (
     <main className="min-h-screen bg-background-page">
-      <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-6">
-      <div>
-        <div className="flex items-center gap-2">
+      <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-10">
+      <div className="flex items-start justify-between gap-4">
+        {/* Left: title + stats */}
+        <div className="min-w-0 flex-1">
           {isRenamingAdventure ? (
             <input
               className="text-2xl font-bold bg-transparent border-b border-primary outline-none w-full"
@@ -285,27 +286,32 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
               {adventure.name}
             </h1>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-destructive hover:text-destructive"
-            onClick={() => { setDeleteConfirmName(''); setDeleteAdventureDialogOpen(true) }}
-            title="Supprimer l'aventure"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {adventure.totalDistanceKm > 0 && (
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Route className="h-4 w-4" />
+                {adventure.totalDistanceKm.toFixed(1)} km
+              </span>
+              {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
+                <span className="flex items-center gap-1">
+                  <TrendingUp className="h-4 w-4" />
+                  {adventure.totalElevationGainM.toFixed(0)} m D+
+                </span>
+              )}
+            </div>
+          )}
         </div>
-        <p className="text-muted-foreground text-sm">
-          {adventure.totalDistanceKm > 0
-            ? `${adventure.totalDistanceKm.toFixed(1)} km total`
-            : 'Distance à calculer'}
-        </p>
+
+        {/* Right: action buttons — shown when all segments are parsed */}
         {segments.every((s) => s.parseStatus === 'done') && segments.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Link href={`/map/${adventureId}`}>
-              <Button variant="outline" size="sm">Voir la carte</Button>
-            </Link>
+          <div className="flex items-center gap-2 shrink-0">
             <DensityTriggerButton adventureId={adventureId} segments={segments} />
+            <Link href={`/map/${adventureId}`}>
+              <Button variant="default" size="lg" className="rounded-full gap-2 px-6 py-6">
+                <Map className="h-4 w-4" />
+                Voir la carte
+              </Button>
+            </Link>
           </div>
         )}
       </div>
@@ -342,12 +348,20 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Segments</h2>
           {!showUploadForm && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setStravaImportOpen(true)}>
+            <div className="flex items-center gap-3">
+              <button
+                className="text-sm text-foreground hover:text-muted-foreground transition-colors"
+                onClick={() => setStravaImportOpen(true)}
+              >
                 Importer depuis Strava
-              </Button>
+              </button>
               {segments.length > 0 && (
-                <Button variant="outline" size="sm" onClick={() => setShowUploadForm(true)}>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                  onClick={() => setShowUploadForm(true)}
+                >
                   + Ajouter un segment
                 </Button>
               )}
@@ -394,6 +408,18 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         onOpenChange={setStravaImportOpen}
         stravaConnected={stravaConnected}
       />
+
+      {/* Delete adventure — bottom of page */}
+      <div className="flex justify-center pt-4">
+        <Button
+          variant="ghost"
+          className="rounded-full gap-2 px-6 bg-destructive/10 text-destructive hover:bg-destructive/15 hover:text-destructive"
+          onClick={() => { setDeleteConfirmName(''); setDeleteAdventureDialogOpen(true) }}
+        >
+          <Trash2 className="h-4 w-4" />
+          Supprimer l&apos;aventure
+        </Button>
+      </div>
     </div>
     </main>
   )

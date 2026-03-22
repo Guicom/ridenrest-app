@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { useMapStore } from '@/stores/map.store'
+import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
 
 const DENSITY_ITEMS = [
   { color: 'var(--density-high)', label: 'Bonne disponibilité', detail: '2+ hébergements / 10km' },
@@ -11,8 +12,21 @@ const DENSITY_ITEMS = [
   { color: 'var(--density-low)', label: 'Zone critique', detail: 'Aucun hébergement / 10km' },
 ]
 
-export function DensityLegend() {
+interface Props {
+  densityCategories?: string[]
+}
+
+export function DensityLegend({ densityCategories }: Props) {
   const densityColorEnabled = useMapStore((s) => s.densityColorEnabled)
+
+  const categoriesLabel =
+    densityCategories && densityCategories.length > 0
+      ? densityCategories
+          .map((cat) => ACCOMMODATION_SUB_TYPES.find((t) => t.type === cat))
+          .filter(Boolean)
+          .map((t) => `${t!.icon} ${t!.label}`)
+          .join(' + ')
+      : null
 
   return (
     <Popover>
@@ -43,6 +57,11 @@ export function DensityLegend() {
           ))}
         </ul>
         <Separator className="my-2" />
+        {categoriesLabel && (
+          <div className="mt-1 mb-2">
+            <p className="text-xs text-muted-foreground">Analysé : {categoriesLabel}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-text-muted">Colorisation active</span>
           <Switch

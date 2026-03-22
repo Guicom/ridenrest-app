@@ -1,5 +1,6 @@
 // Types
-export type { AdventureResponse, AdventureSegmentResponse, AdventureStatus, ParseStatus, DensityStatus, DensityStatusResponse, CoverageGapSummary, MapWaypoint, MapSegmentData, AdventureMapResponse } from './types/adventure.types'
+export type { AdventureResponse, AdventureSegmentResponse, AdventureStatus, ParseStatus, DensityStatus, DensityStatusResponse, CoverageGapSummary, MapWaypoint, MapSegmentData, AdventureMapResponse, DensityAccommodationCategory } from './types/adventure.types'
+export { DENSITY_ACCOMMODATION_CATEGORIES } from './types/adventure.types'
 export type { Poi, PoiCategory, PoiSearchResponse, MapLayer } from './types/poi.types'
 export { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from './types/poi.types'
 export type { WeatherForecast, WeatherPoint } from './types/weather.types'

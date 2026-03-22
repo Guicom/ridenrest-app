@@ -1,9 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { LayoutGrid } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { triggerDensityAnalysis, getDensityStatus } from '@/lib/api-client'
+import { DensityCategoryDialog } from './density-category-dialog'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 interface Props {
@@ -13,6 +16,7 @@ interface Props {
 
 export function DensityTriggerButton({ adventureId, segments }: Props) {
   const queryClient = useQueryClient()
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const { data: densityStatus } = useQuery({
     queryKey: ['density', adventureId],
@@ -24,10 +28,11 @@ export function DensityTriggerButton({ adventureId, segments }: Props) {
   })
 
   const triggerMutation = useMutation({
-    mutationFn: () => triggerDensityAnalysis(adventureId),
+    mutationFn: (categories: string[]) => triggerDensityAnalysis(adventureId, categories),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['density', adventureId] })
       toast.success('Analyse de densité démarrée')
+      setDialogOpen(false)
     },
     onError: (err: Error & { status?: number }) => {
       if (err.status === 409) {
@@ -38,18 +43,37 @@ export function DensityTriggerButton({ adventureId, segments }: Props) {
     },
   })
 
+  const handleConfirm = (categories: string[]) => {
+    triggerMutation.mutate(categories)
+  }
+
   const isAnalyzing = ['pending', 'processing'].includes(densityStatus?.densityStatus ?? '')
+  const isDone = densityStatus?.densityStatus === 'success'
   const progress = densityStatus?.densityProgress ?? 0
   const allSegmentsParsed = segments.every((s) => s.parseStatus === 'done') && segments.length > 0
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => triggerMutation.mutate()}
-      disabled={isAnalyzing || !allSegmentsParsed || triggerMutation.isPending}
-    >
-      {isAnalyzing ? `Analyse en cours… ${progress}%` : 'Analyser la densité'}
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        size="lg"
+        className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+        onClick={() => setDialogOpen(true)}
+        disabled={isAnalyzing || !allSegmentsParsed}
+      >
+        <LayoutGrid className="h-4 w-4" />
+        {isAnalyzing
+          ? `Analyse en cours… ${progress}%`
+          : isDone
+            ? 'Densité calculée'
+            : 'Calculer la densité'}
+      </Button>
+      <DensityCategoryDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onConfirm={handleConfirm}
+        isLoading={triggerMutation.isPending}
+      />
+    </>
   )
 }

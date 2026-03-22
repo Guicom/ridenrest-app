@@ -20,7 +20,7 @@ export class DensityController {
     @Body() dto: TriggerDensityDto,
   ) {
     this.logger.log(`triggerAnalysis called — adventureId=${dto.adventureId} userId=${user.id}`)
-    return this.densityService.triggerAnalysis(dto.adventureId, user.id)
+    return this.densityService.triggerAnalysis(dto.adventureId, user.id, dto.categories)
   }
 
   @Get(':adventureId/status')

@@ -1,3 +1,6 @@
+export const DENSITY_ACCOMMODATION_CATEGORIES = ['hotel', 'camp_site', 'shelter', 'hostel', 'guesthouse'] as const
+export type DensityAccommodationCategory = typeof DENSITY_ACCOMMODATION_CATEGORIES[number]
+
 export type AdventureStatus = 'planning' | 'active' | 'completed'
 export type ParseStatus = 'pending' | 'processing' | 'done' | 'error'
 export type DensityStatus = 'idle' | 'pending' | 'processing' | 'success' | 'error'
@@ -34,6 +37,7 @@ export interface AdventureResponse {
   userId: string
   name: string
   totalDistanceKm: number
+  totalElevationGainM?: number | null
   status: AdventureStatus
   densityStatus: DensityStatus
   densityProgress: number  // 0–100
@@ -52,6 +56,7 @@ export interface DensityStatusResponse {
   densityStatus: DensityStatus
   densityProgress: number  // 0–100
   coverageGaps: CoverageGapSummary[]
+  densityCategories: string[]  // empty array when no analysis run yet
 }
 
 export interface AdventureSegmentResponse {

@@ -23,6 +23,9 @@ coverage
 .vscode
 .idea
 
+# User-uploaded files (never commit)
+apps/api/uploads/
+
 # Logs
 *.log
 npm-debug.log*

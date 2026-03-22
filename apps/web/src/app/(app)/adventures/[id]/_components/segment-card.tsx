@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef } from 'react'
-import { AlertCircle, MapPin, MoreHorizontal } from 'lucide-react'
+import { AlertCircle, MoreHorizontal } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -29,9 +29,10 @@ export interface SegmentCardProps {
   onReplace?: () => void
   onRename?: (name: string) => void
   isDeleting?: boolean
+  dragHandle?: React.ReactNode
 }
 
-export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, isDeleting }: SegmentCardProps) {
+export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, isDeleting, dragHandle }: SegmentCardProps) {
   const { parseStatus, name, distanceKm, elevationGainM } = segment
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
@@ -79,7 +80,11 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
   const elevationLabel = elevationGainM != null ? `${Math.round(elevationGainM)}m D+` : 'N/A'
 
   return (
-    <div className="rounded-lg border p-4 space-y-2">
+    <div className="rounded-lg border p-4 flex items-center gap-3">
+      {dragHandle && (
+        <div className="shrink-0 text-muted-foreground">{dragHandle}</div>
+      )}
+      <div className="flex-1 space-y-2">
       <div className="flex items-center justify-between">
         {isRenaming ? (
           <input
@@ -176,15 +181,7 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
           </span>
         )}
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled
-        title="Disponible dans la version carte"
-      >
-        <MapPin className="h-3 w-3 mr-1" />
-        Afficher sur la carte
-      </Button>
+      </div>
     </div>
   )
 }
