@@ -24,6 +24,9 @@ const mockMapInstance = {
 vi.mock('maplibre-gl', () => ({
   // Use regular function (not arrow) so it can be used as constructor with `new`
   Map: vi.fn().mockImplementation(function (this: unknown) { return mockMapInstance }),
+  Marker: vi.fn().mockImplementation(function (this: unknown) {
+    return { setLngLat: vi.fn().mockReturnThis(), addTo: vi.fn().mockReturnThis(), remove: vi.fn() }
+  }),
 }))
 
 // Mock next-themes

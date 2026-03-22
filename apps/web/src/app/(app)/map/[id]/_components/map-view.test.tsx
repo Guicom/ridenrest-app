@@ -36,11 +36,6 @@ vi.mock('@/hooks/use-density', () => ({
   }),
 }))
 
-// Mock DensityLegend
-vi.mock('./density-legend', () => ({
-  DensityLegend: () => <div data-testid="density-legend" />,
-}))
-
 // Mutable map store state for Story 8.4 tests
 let mockMapStoreVisibleLayers = new Set<string>()
 
@@ -58,6 +53,7 @@ vi.mock('@/stores/map.store', () => ({
     fromKm: 0,
     toKm: 30,
     setSearchRange: vi.fn(),
+    searchRangeInteracted: false,
     activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
     toggleAccommodationType: vi.fn(),
   }),
@@ -78,6 +74,11 @@ vi.mock('./map-canvas', () => ({
   MapCanvas: ({ segments }: { segments: unknown[] }) => (
     <div data-testid="map-canvas" data-segments={segments.length} />
   ),
+}))
+
+// Mock ElevationProfile to avoid Recharts in map-view integration tests
+vi.mock('./elevation-profile', () => ({
+  ElevationProfile: () => <div data-testid="elevation-profile" />,
 }))
 
 // Mock PoiLayerGrid
@@ -192,30 +193,6 @@ describe('MapView', () => {
 
     await screen.findByTestId('map-canvas')
     expect(screen.queryByTestId('status-banner')).toBeNull()
-  })
-
-  it('renders DensityLegend when densityStatus is success', async () => {
-    mockDensityStatus = 'success'
-    const doneSeg = makeSegment('done')
-    vi.mocked(getAdventureMapData).mockResolvedValue(
-      makeMapResponse({ segments: [doneSeg as never] }),
-    )
-    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
-
-    await screen.findByTestId('map-canvas')
-    expect(screen.getByTestId('density-legend')).toBeDefined()
-  })
-
-  it('does not render DensityLegend when densityStatus is idle', async () => {
-    mockDensityStatus = 'idle'
-    const doneSeg = makeSegment('done')
-    vi.mocked(getAdventureMapData).mockResolvedValue(
-      makeMapResponse({ segments: [doneSeg as never] }),
-    )
-    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
-
-    await screen.findByTestId('map-canvas')
-    expect(screen.queryByTestId('density-legend')).toBeNull()
   })
 
   it('shows error banner for error segments (AC #5)', async () => {
@@ -339,5 +316,45 @@ describe('MapView — back button (Story 8.3, AC #2)', () => {
     await screen.findByTestId('map-canvas')
     const link = screen.getByTestId('back-to-adventures')
     expect(link.className).toContain('z-40')
+  })
+})
+
+describe('MapView — elevation profile collapse (Story 8.8, AC #1, AC #6)', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
+  })
+
+  function renderWithData() {
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+  }
+
+  it('renders elevation profile container (desktop hidden lg:block)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    expect(screen.getByTestId('elevation-profile')).toBeInTheDocument()
+  })
+
+  it('collapse toggle shows "Masquer le profil" button initially (expanded)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    expect(screen.getByRole('button', { name: /Masquer le profil/i })).toBeInTheDocument()
+  })
+
+  it('collapse toggle changes aria-label to "Afficher" after click', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    fireEvent.click(screen.getByRole('button', { name: /Masquer le profil/i }))
+    expect(screen.getByRole('button', { name: /Afficher le profil/i })).toBeInTheDocument()
+  })
+
+  it('collapse toggle expands profile on second click', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    fireEvent.click(screen.getByRole('button', { name: /Masquer le profil/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Afficher le profil/i }))
+    expect(screen.getByRole('button', { name: /Masquer le profil/i })).toBeInTheDocument()
   })
 })

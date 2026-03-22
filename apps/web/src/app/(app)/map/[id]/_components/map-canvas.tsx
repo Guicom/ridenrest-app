@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTheme } from 'next-themes'
 import { useMapStore } from '@/stores/map.store'
 import { findPointAtKm } from '@ridenrest/gpx'
@@ -38,6 +38,11 @@ const TILE_STYLES = {
 // Trace color — uniform brand green for all segments (C8)
 const TRACE_COLOR = '#2D6A4A'
 
+export interface MapCanvasHandle {
+  /** Update the crosshair marker position directly — no React re-render */
+  updateCrosshair: (km: number | null) => void
+}
+
 interface MapCanvasProps {
   segments: MapSegmentData[]
   adventureName: string
@@ -48,10 +53,19 @@ interface MapCanvasProps {
   allWaypoints?: MapWaypoint[] | null
 }
 
-export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints }: MapCanvasProps) {
+export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas(
+  { segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints },
+  ref,
+) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
+  const crosshairMarkerRef = useRef<maplibregl.Marker | null>(null)
+  // Keep allWaypoints current without re-creating the imperative handle
+  const allWaypointsRef = useRef(allWaypoints)
+  useEffect(() => { allWaypointsRef.current = allWaypoints }, [allWaypoints])
+  // Cache the Marker class after first import so crosshair updates are fully synchronous
+  const MarkerClassRef = useRef<typeof maplibregl.Marker | null>(null)
   const [styleVersion, setStyleVersion] = useState(0)
   const { resolvedTheme } = useTheme()
   const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension, searchRangeInteracted } = useMapStore()
@@ -96,6 +110,7 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
     // Dynamic import — MapLibre GL JS is browser-only, no SSR
     import('maplibre-gl').then((maplibreglModule) => {
       if (cancelled) return  // Component unmounted before import resolved — bail out
+      MarkerClassRef.current = maplibreglModule.Marker  // Cache for synchronous crosshair updates
       map = new maplibreglModule.Map({
         container: mapContainerRef.current!,
         style: resolvedTheme === 'dark' ? TILE_STYLES.dark : TILE_STYLES.light,
@@ -126,6 +141,8 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
       cancelled = true
       markerRef.current?.remove()
       markerRef.current = null
+      crosshairMarkerRef.current?.remove()
+      crosshairMarkerRef.current = null
       map?.remove()
       mapRef.current = null
     }
@@ -200,6 +217,35 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
     return () => unsubscribe()
   }, [])  // Subscribe once — uses refs for latest values
 
+  // Imperative crosshair handle — bypasses React state/render cycle entirely for zero-latency updates
+  useImperativeHandle(ref, () => ({
+    updateCrosshair(km: number | null) {
+      const map = mapRef.current
+      const waypoints = allWaypointsRef.current
+
+      if (km === null || !waypoints?.length || !map) {
+        crosshairMarkerRef.current?.remove()
+        crosshairMarkerRef.current = null
+        return
+      }
+
+      const nearest = waypoints.reduce((a, b) =>
+        Math.abs(b.distKm - km) < Math.abs(a.distKm - km) ? b : a,
+      )
+
+      if (!MarkerClassRef.current) return
+
+      if (!crosshairMarkerRef.current) {
+        const el = createCrosshairMarker()
+        crosshairMarkerRef.current = new MarkerClassRef.current({ element: el })
+          .setLngLat([nearest.lng, nearest.lat])
+          .addTo(map)
+      } else {
+        crosshairMarkerRef.current.setLngLat([nearest.lng, nearest.lat])
+      }
+    },
+  }), []) // Stable handle — accesses latest values via refs
+
   // Theme switching — update map style without reloading the page (AC #3)
   useEffect(() => {
     const map = mapRef.current
@@ -236,7 +282,7 @@ export function MapCanvas({ segments, adventureName, poisByLayer, coverageGaps, 
       ))}
     </div>
   )
-}
+})
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -425,6 +471,30 @@ function createSearchStartMarker(): HTMLElement {
   const el = document.createElement('div')
   el.style.cssText = 'width:12px;height:12px;border-radius:50%;background:var(--text-primary);border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)'
   return el
+}
+
+function createCrosshairMarker(): HTMLElement {
+  const wrapper = document.createElement('div')
+  wrapper.style.cssText = 'position:relative;width:12px;height:12px'
+
+  const pulse = document.createElement('div')
+  pulse.style.cssText = 'position:absolute;width:12px;height:12px;border-radius:50%;background:#16a34a;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);animation:ping 1s cubic-bezier(0,0,0.2,1) infinite;opacity:0.75'
+
+  const dot = document.createElement('div')
+  dot.style.cssText = 'position:relative;width:12px;height:12px;border-radius:50%;background:#16a34a;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)'
+
+  wrapper.appendChild(pulse)
+  wrapper.appendChild(dot)
+
+  // Inject keyframes if not already present
+  if (!document.getElementById('crosshair-ping-style')) {
+    const style = document.createElement('style')
+    style.id = 'crosshair-ping-style'
+    style.textContent = '@keyframes ping{75%,100%{transform:scale(2);opacity:0}}'
+    document.head.appendChild(style)
+  }
+
+  return wrapper
 }
 
 // ── Density layer helpers ─────────────────────────────────────────────────────

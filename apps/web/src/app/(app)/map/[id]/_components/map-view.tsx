@@ -1,12 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
 import { getAdventureMapData, getWeatherForecast } from '@/lib/api-client'
 import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import { MapCanvas } from './map-canvas'
-import { DensityLegend } from './density-legend'
+import type { MapCanvasHandle } from './map-canvas'
 import { SearchRangeControl } from './search-range-control'
 import { PoiDetailSheet } from './poi-detail-sheet'
 import { WEATHER_PACE_STORAGE_KEY } from './weather-controls'
@@ -21,6 +21,7 @@ import type { SegmentWeatherData } from './map-canvas'
 import { useUIStore } from '@/stores/ui.store'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import type { AdventureMapResponse } from '@/lib/api-client'
+import { ElevationProfile } from './elevation-profile'
 
 interface MapViewProps {
   adventureId: string
@@ -28,6 +29,12 @@ interface MapViewProps {
 
 export function MapView({ adventureId }: MapViewProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [elevationCollapsed, setElevationCollapsed] = useState(false)
+  // Ref-based crosshair — bypasses React state to avoid re-renders on every mouse move
+  const mapCanvasRef = useRef<MapCanvasHandle>(null)
+  const handleHoverKm = useCallback((km: number | null) => {
+    mapCanvasRef.current?.updateCrosshair(km)
+  }, [])
 
   // Read saved pace params from localStorage (lazy init — runs once on mount)
   const [savedPace] = useState<{ departureTime: string; speedKmh: string }>(() => {
@@ -167,77 +174,95 @@ export function MapView({ adventureId }: MapViewProps) {
         </div>
       </aside>
 
-      {/* Right column: map */}
-      <div className="flex-1 relative min-w-0">
-        {/* Sidebar collapse toggle — desktop only, at left edge of map column */}
-        <button
-          data-testid="sidebar-toggle"
-          onClick={() => setCollapsed((v) => !v)}
-          className={`hidden lg:flex absolute top-1/2 z-20 -translate-y-1/2 h-6 w-6 items-center justify-center rounded-full bg-background border border-[--border] shadow-sm text-text-secondary hover:text-text-primary ${
-            collapsed ? 'left-0' : '-left-3'
-          }`}
-          aria-label={collapsed ? 'Ouvrir le panneau' : 'Fermer le panneau'}
-        >
-          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-        </button>
+      {/* Right column: map + elevation profile */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Map area */}
+        <div className="relative flex-1 min-h-0">
+          {/* Sidebar collapse toggle — desktop only, at left edge of map column */}
+          <button
+            data-testid="sidebar-toggle"
+            onClick={() => setCollapsed((v) => !v)}
+            className={`hidden lg:flex absolute top-1/2 z-20 -translate-y-1/2 h-6 w-6 items-center justify-center rounded-full bg-background border border-[--border] shadow-sm text-text-secondary hover:text-text-primary ${
+              collapsed ? 'left-0' : '-left-3'
+            }`}
+            aria-label={collapsed ? 'Ouvrir le panneau' : 'Fermer le panneau'}
+          >
+            {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+          </button>
 
-        {/* "← Aventures" back button */}
-        <Link
-          href="/adventures"
-          data-testid="back-to-adventures"
-          className="absolute top-4 left-4 z-40 inline-flex items-center gap-1 rounded-md bg-background/80 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-sm hover:bg-background/90"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Aventures
-        </Link>
+          {/* "← Aventures" back button */}
+          <Link
+            href="/adventures"
+            data-testid="back-to-adventures"
+            className="absolute top-4 left-4 z-40 inline-flex items-center gap-1 rounded-md bg-background/80 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-sm hover:bg-background/90"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Aventures
+          </Link>
 
-        {pendingCount > 0 && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
-            <StatusBanner
-              message={`${pendingCount} segment(s) en cours de traitement — ils apparaîtront automatiquement une fois prêts.`}
-            />
-          </div>
-        )}
-        {errorCount > 0 && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" style={{ marginTop: pendingCount > 0 ? '3rem' : 0 }}>
-            <StatusBanner
-              message={`${errorCount} segment(s) n'ont pas pu être analysés — vérifiez le format GPX.`}
-            />
-          </div>
-        )}
+          {pendingCount > 0 && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
+              <StatusBanner
+                message={`${pendingCount} segment(s) en cours de traitement — ils apparaîtront automatiquement une fois prêts.`}
+              />
+            </div>
+          )}
+          {errorCount > 0 && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10" style={{ marginTop: pendingCount > 0 ? '3rem' : 0 }}>
+              <StatusBanner
+                message={`${errorCount} segment(s) n'ont pas pu être analysés — vérifiez le format GPX.`}
+              />
+            </div>
+          )}
 
-        <MapCanvas
-          segments={readySegments}
-          adventureName={data.adventureName}
-          poisByLayer={poisByLayer}
-          coverageGaps={coverageGaps}
-          densityStatus={densityStatus}
-          segmentsWeather={segmentsWeather}
-          allWaypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
-        />
-        {densityStatus === 'success' && (
-          <div className="absolute bottom-16 right-4 z-10">
-            <DensityLegend densityCategories={densityCategories} />
-          </div>
-        )}
+          <MapCanvas
+            ref={mapCanvasRef}
+            segments={readySegments}
+            adventureName={data.adventureName}
+            poisByLayer={poisByLayer}
+            coverageGaps={coverageGaps}
+            densityStatus={densityStatus}
+            segmentsWeather={segmentsWeather}
+            allWaypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
+          />
 
-        {poisError && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1">
-            <StatusBanner message="Recherche indisponible — réessayer dans quelques instants." />
-            <button
-              onClick={handlePoiRetry}
-              className="text-xs text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              Réessayer
-            </button>
-          </div>
-        )}
 
-        <PoiDetailSheet
-          poi={selectedPoi}
-          segments={readySegments}
-          segmentId={selectedSegmentId}
-        />
+          {poisError && (
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1">
+              <StatusBanner message="Recherche indisponible — réessayer dans quelques instants." />
+              <button
+                onClick={handlePoiRetry}
+                className="text-xs text-zinc-500 underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                Réessayer
+              </button>
+            </div>
+          )}
+
+          <PoiDetailSheet
+            poi={selectedPoi}
+            segments={readySegments}
+            segmentId={selectedSegmentId}
+          />
+        </div>
+
+        {/* Elevation profile — desktop only (AC6: hidden on mobile) */}
+        <div className={`hidden lg:block relative shrink-0 border-t border-[--border] bg-background transition-all duration-200 ${elevationCollapsed ? 'h-0' : 'h-[180px]'}`}>
+          {/* Collapse toggle — circle button at top edge, centered */}
+          <button
+            onClick={() => setElevationCollapsed((v) => !v)}
+            className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background border border-[--border] shadow-sm text-muted-foreground hover:text-foreground"
+            aria-label={elevationCollapsed ? "Afficher le profil d'élévation" : "Masquer le profil d'élévation"}
+          >
+            {elevationCollapsed ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          <ElevationProfile
+            waypoints={allCumulativeWaypoints}
+            segments={readySegments}
+            onHoverKm={handleHoverKm}
+            className="h-full w-full"
+          />
+        </div>
       </div>
     </div>
   )

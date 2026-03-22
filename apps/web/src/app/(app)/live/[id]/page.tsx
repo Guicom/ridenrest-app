@@ -16,6 +16,7 @@ import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData } from '@/lib/api-client'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
+import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
@@ -24,6 +25,7 @@ import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { StatusBanner } from './_components/status-banner'
 import { LiveWeatherOverlay } from './_components/live-weather-overlay'
 import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
+import { ElevationStrip } from './_components/elevation-strip'
 const DEFAULT_RADIUS = 5
 
 export default function LivePage() {
@@ -72,6 +74,10 @@ export default function LivePage() {
   const segments = mapData?.segments ?? []
   const firstSegment = segments[0]
   const segmentId = firstSegment?.id
+
+  // Elevation strip data
+  const readySegments = segments.filter((s) => s.parseStatus === 'done')
+  const allCumulativeWaypoints = useAdventureWaypoints(readySegments)
 
   // Network status
   const { isOnline } = useNetworkStatus()
@@ -124,6 +130,11 @@ export default function LivePage() {
   // Live context for PoiDetailSheet (D+/ETA with live mode values)
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
   const speedKmh = useLiveStore((s) => s.speedKmh)
+  const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
+
+  // Elevation strip positions
+  const elevationCurrentDistKm = currentKmOnRoute
+  const elevationTargetDistKm = currentKmOnRoute !== null ? currentKmOnRoute + targetAheadKm : null
   const liveContext = isLiveModeActive && currentKmOnRoute !== null
     ? { currentKmOnRoute, speedKmh }
     : undefined
@@ -247,6 +258,17 @@ export default function LivePage() {
       {/* Bottom overlay — z-30 (only render after mount to avoid hydration mismatch) */}
       {mounted && (
         <>
+          {isLiveModeActive && allCumulativeWaypoints.length > 0 && (
+            <div className="absolute bottom-[88px] left-0 right-0 z-20 h-[60px] bg-background/80 backdrop-blur-sm border-t border-[--border]">
+              <ElevationStrip
+                waypoints={allCumulativeWaypoints}
+                segments={readySegments}
+                currentDistKm={elevationCurrentDistKm}
+                targetDistKm={elevationTargetDistKm}
+              />
+            </div>
+          )}
+
           {isLiveModeActive && (
             <LiveControls />
           )}
