@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from '@/lib/auth/server'
+import { AuthPageWrapper } from '../_components/auth-page-wrapper'
 import { LoginForm } from './_components/login-form'
 
 export const metadata = {
@@ -21,19 +22,20 @@ export default async function LoginPage({
   const safeRedirectTo = redirectTo?.startsWith('/') ? redirectTo : '/adventures'
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold">Connexion</h1>
-          <p className="text-muted-foreground text-sm">
-            Pas encore de compte ?{' '}
-            <a href="/register" className="text-primary underline-offset-4 hover:underline">
-              Créer un compte
-            </a>
-          </p>
-        </div>
-        <LoginForm redirectTo={safeRedirectTo} />
+    <AuthPageWrapper>
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl font-bold">Connexion</h1>
+        <p className="text-muted-foreground text-sm">
+          Pas encore de compte ?{' '}
+          <a href="/register" className="text-primary underline-offset-4 hover:underline">
+            Créer un compte
+          </a>
+        </p>
       </div>
-    </div>
+      <p className="text-sm text-muted-foreground text-center">
+        Reprends là où tu t&apos;es arrêté.
+      </p>
+      <LoginForm redirectTo={safeRedirectTo} />
+    </AuthPageWrapper>
   )
 }

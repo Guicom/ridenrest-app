@@ -31,7 +31,7 @@ export function GoogleSignInButton({ callbackURL = '/adventures' }: GoogleSignIn
     <Button
       type="button"
       variant="outline"
-      className="w-full"
+      className="w-full py-6"
       disabled={isPending}
       onClick={handleGoogleSignIn}
     >

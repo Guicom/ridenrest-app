@@ -61,10 +61,10 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
+          <span className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">ou</span>
+          <span className="bg-white px-2 text-foreground font-medium">ou</span>
         </div>
       </div>
 
@@ -103,7 +103,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
 
         {authError && <ErrorMessage message={authError} />}
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full py-6" disabled={isSubmitting}>
           {isSubmitting ? 'Connexion...' : 'Se connecter'}
         </Button>
       </form>
