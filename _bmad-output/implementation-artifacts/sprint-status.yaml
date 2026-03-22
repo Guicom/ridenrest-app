@@ -129,7 +129,7 @@ development_status:
   # Epic 9: Redesign & Landing Site  ← NOUVEAU (inséré 2026-03-18)
   # ─────────────────────────────────────────────────────────────
   epic-9: in-progress
-  9-1-landing-page: ready-for-dev
+  9-1-landing-page: done
   9-2-auth-pages-polish: backlog
   9-3-map-view-light-mode-polish: backlog
   9-4-poi-card-bottom-sheet: backlog

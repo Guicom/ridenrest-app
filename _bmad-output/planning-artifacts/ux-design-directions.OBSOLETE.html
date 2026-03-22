@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ride'n'Rest — Design Directions</title>
+<style>
+  :root {
+    --density-high:   #22c55e;
+    --density-medium: #f59e0b;
+    --density-low:    #ef4444;
+    --accent:         #06b6d4;
+    --accent-hover:   #0891b2;
+    --background:     #0f1117;
+    --surface:        #1a1d27;
+    --surface-raised: #232736;
+    --border:         #2d3149;
+    --text-primary:   #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted:     #475569;
+    --status-offline: #6b7280;
+    --status-warning: #f59e0b;
+    --trace-default:  #94a3b8;
+    --gps-indicator:  #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'SF Pro Display', 'Geist', system-ui, sans-serif;
+    background: #070a0f;
+    color: var(--text-primary);
+    padding: 32px 24px;
+  }
+
+  /* ── Page layout ── */
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin-bottom: 40px; }
+  .section-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    color: var(--text-muted); text-transform: uppercase;
+    margin-bottom: 16px; margin-top: 48px;
+  }
+  .directions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 32px;
+  }
+  .direction-card {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .direction-header {
+    padding: 14px 18px;
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .direction-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--accent);
+    background: rgba(6,182,212,0.1); padding: 2px 8px; border-radius: 4px;
+  }
+  .direction-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .direction-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .mockup { position: relative; width: 100%; aspect-ratio: 9/16; max-height: 640px; overflow: hidden; }
+
+  /* ── Map background simulation ── */
+  .map-bg {
+    position: absolute; inset: 0;
+    background: #0d1520;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .map-roads {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(135deg, transparent 30%, rgba(35,39,54,0.6) 30%, rgba(35,39,54,0.6) 31%, transparent 31%),
+      linear-gradient(45deg, transparent 40%, rgba(35,39,54,0.5) 40%, rgba(35,39,54,0.5) 41%, transparent 41%),
+      linear-gradient(160deg, transparent 20%, rgba(35,39,54,0.4) 20%, rgba(35,39,54,0.4) 21%, transparent 21%);
+  }
+
+  /* ── GPX Trace ── */
+  .trace-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+  }
+
+  /* ── Map overlays ── */
+  .osm-attribution {
+    position: absolute; bottom: 8px; right: 8px;
+    font-size: 10px; color: rgba(148,163,184,0.7);
+    background: rgba(15,17,23,0.75); padding: 2px 6px; border-radius: 3px;
+  }
+
+  /* ── Status Banner ── */
+  .status-banner {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 500; z-index: 40;
+  }
+  .status-banner.warning { background: rgba(245,158,11,0.15); border-bottom: 1px solid rgba(245,158,11,0.3); color: #fbbf24; }
+  .status-banner.offline  { background: rgba(107,114,128,0.15); border-bottom: 1px solid rgba(107,114,128,0.3); color: #9ca3af; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-banner.warning .status-dot { background: #f59e0b; }
+  .status-banner.offline  .status-dot { background: #6b7280; }
+
+  /* ── Layer toggles ── */
+  .layer-toggles {
+    position: absolute; top: 16px; right: 12px; z-index: 20;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .layer-btn {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer;
+  }
+  .layer-btn.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(6,182,212,0.25); }
+
+  /* ── Corridor Slider (Planning) ── */
+  .corridor-slider-panel {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 30;
+    background: linear-gradient(to top, rgba(15,17,23,0.98) 70%, transparent);
+    padding: 20px 16px 28px;
+  }
+  .slider-label-row {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+  }
+  .slider-label { font-size: 12px; color: var(--text-secondary); }
+  .slider-value { font-size: 14px; font-weight: 600; font-family: monospace; color: var(--text-primary); }
+  .slider-track {
+    height: 4px; border-radius: 2px; background: var(--border);
+    position: relative; margin: 8px 0 16px;
+  }
+  .slider-fill { position: absolute; height: 100%; border-radius: 2px; background: var(--accent); }
+  .slider-thumb {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--text-primary); border: 2px solid var(--accent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .slider-meta { font-size: 12px; color: var(--text-secondary); text-align: center; }
+  .slider-meta span { color: var(--accent); font-weight: 600; }
+
+  /* ── Live Mode Sliders ── */
+  .live-panel {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 30;
+    background: linear-gradient(to top, rgba(15,17,23,0.98) 80%, transparent);
+    padding: 16px 16px 28px;
+  }
+  .live-mode-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(6,182,212,0.1); border: 1px solid rgba(6,182,212,0.3);
+    color: var(--accent); font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px; margin-bottom: 12px;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+  .live-sliders { display: flex; flex-direction: column; gap: 14px; }
+  .live-slider-item label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+  .live-slider-item .km-value { font-size: 15px; font-weight: 700; font-family: monospace; color: var(--text-primary); }
+
+  /* ── POI Bottom Sheet ── */
+  .bottom-sheet {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 50;
+    background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 12px 16px 28px;
+  }
+  .sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--border); margin: 0 auto 16px;
+  }
+  .poi-list { display: flex; flex-direction: column; gap: 1px; }
+  .poi-item {
+    padding: 12px; border-radius: 10px; background: var(--surface-raised);
+    display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px;
+  }
+  .poi-item.selected { border: 1px solid var(--accent); }
+  .poi-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+  .poi-meta {
+    display: flex; gap: 12px; align-items: center;
+    font-size: 12px; color: var(--text-secondary); font-family: monospace;
+  }
+  .poi-category {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 4px;
+    background: rgba(6,182,212,0.1); color: var(--accent); align-self: flex-start;
+  }
+  .poi-cta {
+    margin-top: 12px; width: 100%; padding: 14px;
+    background: var(--accent); color: #0f1117;
+    font-size: 15px; font-weight: 700; border-radius: 10px;
+    border: none; cursor: pointer; text-align: center;
+  }
+  .poi-disclaimer { font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 8px; }
+
+  /* ── Map pins ── */
+  .map-pin {
+    position: absolute; transform: translate(-50%, -100%);
+    width: 28px; height: 34px; cursor: pointer;
+  }
+  .pin-dot {
+    width: 28px; height: 28px; border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .pin-dot.hotel    { background: var(--accent); }
+  .pin-dot.hostel   { background: #8b5cf6; }
+  .pin-dot.camping  { background: var(--density-high); }
+  .pin-dot.refuge   { background: var(--density-medium); }
+  .pin-dot span { transform: rotate(45deg); display: block; }
+
+  /* ── GPS indicator ── */
+  .gps-dot {
+    position: absolute; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--gps-indicator);
+    border: 2px solid white;
+    box-shadow: 0 0 0 6px rgba(6,182,212,0.2), 0 2px 8px rgba(0,0,0,0.4);
+    z-index: 15;
+  }
+  .target-marker {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 20px; height: 20px; border-radius: 50%;
+    background: white; border: 3px solid var(--accent);
+    box-shadow: 0 0 0 8px rgba(6,182,212,0.15), 0 2px 8px rgba(0,0,0,0.4);
+    z-index: 15;
+  }
+  .radius-circle {
+    position: absolute; transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1.5px dashed rgba(6,182,212,0.4);
+    background: rgba(6,182,212,0.05);
+    z-index: 12;
+  }
+
+  /* ── Consent modal ── */
+  .consent-overlay {
+    position: absolute; inset: 0; z-index: 60;
+    background: rgba(7,10,15,0.85); backdrop-filter: blur(4px);
+    display: flex; align-items: flex-end;
+  }
+  .consent-modal {
+    background: var(--surface); border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 24px 20px 36px; width: 100%;
+  }
+  .consent-icon { font-size: 36px; margin-bottom: 12px; text-align: center; }
+  .consent-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; text-align: center; }
+  .consent-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; text-align: center; }
+  .consent-privacy { font-size: 12px; color: var(--text-muted); background: var(--surface-raised); padding: 10px; border-radius: 8px; margin-bottom: 20px; line-height: 1.5; }
+  .consent-cta { width: 100%; padding: 15px; background: var(--accent); color: #0f1117; font-size: 15px; font-weight: 700; border-radius: 12px; border: none; margin-bottom: 10px; cursor: pointer; }
+  .consent-skip { width: 100%; padding: 12px; background: transparent; color: var(--text-secondary); font-size: 14px; border-radius: 12px; border: 1px solid var(--border); cursor: pointer; }
+
+  /* ── Navigation bar ── */
+  .nav-bar {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 35;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; padding: 8px 0 20px;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-size: 10px; color: var(--text-muted); padding: 4px 0;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 20px; }
+
+  /* ── Mode toggle floating ── */
+  .mode-toggle-fab {
+    position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #0f1117; z-index: 30;
+    padding: 12px 20px; border-radius: 24px;
+    font-size: 14px; font-weight: 700;
+    box-shadow: 0 4px 20px rgba(6,182,212,0.4);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── Density Legend ── */
+  .density-legend-fab {
+    position: absolute; bottom: 56px; right: 12px; z-index: 10;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px;
+    font-size: 10px; color: var(--text-secondary);
+  }
+  .legend-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .legend-row:last-child { margin-bottom: 0; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Caption ── */
+  .direction-caption {
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .caption-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .caption-desc  { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .caption-tags  { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .caption-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    background: var(--surface-raised); color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<h1>Ride'n'Rest — Design Directions</h1>
+<p class="subtitle">6 écrans clés · Palette dark-first · shadcn/ui + Tailwind CSS v4</p>
+
+<div class="section-label">Direction A — Planning Mode : Carte + Corridor Slider</div>
+<div class="directions-grid">
+
+  <!-- D1: Planning mode, corridor slider, pins visibles -->
+  <div class="direction-card">
+    <div class="direction-header">
+      <div>
+        <div class="direction-tag">D1</div>
+      </div>
+      <div>
+        <div class="direction-title">Mode Planning — Recherche corridor</div>
+        <div class="direction-desc">Double slider actif · 4 pins hébergements</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="map-bg"></div>
+      <div class="map-roads"></div>
+      <!-- Trace GPX colorisée -->
+      <svg class="trace-svg" viewBox="0 0 390 700" preserveAspectRatio="xMidYMid slice">
+        <!-- Segment vert -->
+        <path d="M 60,600 Q 100,500 130,420 Q 160,350 180,290" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <!-- Segment ambre -->
+        <path d="M 180,290 Q 210,240 240,210 Q 260,190 280,175" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <!-- Segment rouge (zone critique) -->
+        <path d="M 280,175 Q 300,155 320,140 Q 340,128 355,120" stroke="#ef4444" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <!-- Highlight corridor sélectionné -->
+        <path d="M 180,290 Q 210,240 240,210 Q 260,190 280,175" stroke="rgba(241,245,249,0.3)" stroke-width="12" fill="none" stroke-linecap="round"/>
+      </svg>
+      <!-- Pins -->
+      <div class="map-pin" style="left:195px;top:275px"><div class="pin-dot hotel"><span>🏨</span></div></div>
+      <div class="map-pin" style="left:235px;top:225px"><div class="pin-dot hostel"><span>🛏</span></div></div>
+      <div class="map-pin" style="left:258px;top:198px"><div class="pin-dot camping"><span>⛺</span></div></div>
+      <div class="map-pin" style="left:272px;top:182px"><div class="pin-dot refuge"><span>🏠</span></div></div>
+      <!-- Layer toggles -->
+      <div class="layer-toggles">
+        <div class="layer-btn active">🏨</div>
+        <div class="layer-btn">🍽️</div>
+        <div class="layer-btn">🛒</div>
+        <div class="layer-btn">🚲</div>
+      </div>
+      <!-- Density legend -->
+      <div class="density-legend-fab">
+        <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div>Dense</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div>Moyen</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div>Rare</div>
+      </div>
+      <!-- OSM Attribution -->
+      <div class="osm-attribution">© OpenStreetMap contributors</div>
+      <!-- Corridor Slider -->
+      <div class="corridor-slider-panel">
+        <div class="slider-label-row">
+          <span class="slider-label">De</span>
+          <span class="slider-value">km 168</span>
+          <span class="slider-label">À</span>
+          <span class="slider-value">km 195</span>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="left:43%;width:27%"></div>
+          <div class="slider-thumb" style="left:43%"></div>
+          <div class="slider-thumb" style="left:70%"></div>
+        </div>
+        <div class="slider-meta"><span>4 hébergements détectés</span> · Plus d'options sur Booking.com</div>
+      </div>
+    </div>
+    <div class="direction-caption">
+      <div class="caption-title">Corridor Search — Planning Mode</div>
+      <div class="caption-desc">Double slider sur fond de carte. Trace surlignée entre les bornes. Pins apparaissent en temps réel au drag. Layer toggles flottants à droite.</div>
+      <div class="caption-tags">
+        <span class="caption-tag">Carte full-bleed</span>
+        <span class="caption-tag">Overlay minimal</span>
+        <span class="caption-tag">Slider bottom</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- D2: POICard bottom sheet ouverte -->
+  <div class="direction-card">
+    <div class="direction-header">
+      <div>
+        <div class="direction-tag">D2</div>
+      </div>
+      <div>
+        <div class="direction-title">POICard — Bottom Sheet</div>
+        <div class="direction-desc">Fiche hébergement · CTA Booking</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="map-bg"></div>
+      <div class="map-roads"></div>
+      <svg class="trace-svg" viewBox="0 0 390 700" preserveAspectRatio="xMidYMid slice">
+        <path d="M 60,600 Q 100,500 130,420 Q 160,350 180,290" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M 180,290 Q 210,240 240,210 Q 260,190 280,175" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M 280,175 Q 300,155 320,140 Q 340,128 355,120" stroke="#ef4444" stroke-width="5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="map-pin" style="left:195px;top:200px"><div class="pin-dot hotel" style="background:var(--accent);box-shadow:0 0 0 4px rgba(6,182,212,0.3)"><span>🏨</span></div></div>
+      <div class="osm-attribution">© OpenStreetMap contributors</div>
+      <!-- Bottom sheet ouverte -->
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="poi-item selected">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="poi-name">Hostal La Ruta</div>
+            <div class="poi-category">Hôtel</div>
+          </div>
+          <div class="poi-meta">
+            <span>📍 km 183</span>
+            <span>⬆ D+ 420m</span>
+            <span>⏱ ~4h30</span>
+          </div>
+          <div class="poi-cta">Rechercher sur Booking.com →</div>
+          <div class="poi-disclaimer">5 hébergements détectés · Plus d'options sur Booking.com</div>
+        </div>
+        <div class="poi-item">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="poi-name">Albergue del Camino</div>
+            <div class="poi-category" style="background:rgba(139,92,246,0.1);color:#a78bfa">Hostel</div>
+          </div>
+          <div class="poi-meta">
+            <span>📍 km 187</span>
+            <span>⬆ D+ 480m</span>
+            <span>⏱ ~5h</span>
+          </div>
+        </div>
+        <div class="poi-item">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="poi-name">Camping Sierra Verde</div>
+            <div class="poi-category" style="background:rgba(34,197,94,0.1);color:#4ade80">Camping</div>
+          </div>
+          <div class="poi-meta">
+            <span>📍 km 191</span>
+            <span>⬆ D+ 550m</span>
+            <span>⏱ ~5h45</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="direction-caption">
+      <div class="caption-title">POICard avec D+ et ETA</div>
+      <div class="caption-desc">Vaul Drawer à mi-écran. Carte toujours visible. Pin sélectionné en cyan. Distance trace + dénivelé + ETA en monospace. CTA Booking.com proéminent.</div>
+      <div class="caption-tags">
+        <span class="caption-tag">Vaul Drawer</span>
+        <span class="caption-tag">D+ / ETA</span>
+        <span class="caption-tag">Carte visible</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section-label">Direction B — Live/Aventure Mode</div>
+<div class="directions-grid">
+
+  <!-- D3: Live mode interface épurée -->
+  <div class="direction-card">
+    <div class="direction-header">
+      <div>
+        <div class="direction-tag">D3</div>
+      </div>
+      <div>
+        <div class="direction-title">Mode Live — Interface épurée</div>
+        <div class="direction-desc">GPS actif · 2 sliders · Point cible</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="map-bg"></div>
+      <div class="map-roads"></div>
+      <svg class="trace-svg" viewBox="0 0 390 700" preserveAspectRatio="xMidYMid slice">
+        <path d="M 60,600 Q 100,500 130,420 Q 160,350 180,290 Q 210,240 240,210 Q 260,190 280,175 Q 300,155 320,140 Q 340,128 355,120" stroke="var(--trace-default)" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="6 3"/>
+        <!-- Portion parcourue en vert -->
+        <path d="M 60,600 Q 100,500 130,420 Q 155,360 175,305" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </svg>
+      <!-- GPS position actuelle -->
+      <div class="gps-dot" style="left:172px;top:308px;transform:translate(-50%,-50%)"></div>
+      <!-- Point cible (20km devant) -->
+      <div class="target-marker" style="left:255px;top:198px"></div>
+      <!-- Cercle rayon -->
+      <div class="radius-circle" style="left:255px;top:198px;width:80px;height:80px;transform:translate(-50%,-50%)"></div>
+      <!-- Pins autour du point cible -->
+      <div class="map-pin" style="left:240px;top:190px"><div class="pin-dot hotel"><span>🏨</span></div></div>
+      <div class="map-pin" style="left:265px;top:178px"><div class="pin-dot camping"><span>⛺</span></div></div>
+      <div class="osm-attribution">© OpenStreetMap contributors</div>
+      <!-- Live panel -->
+      <div class="live-panel">
+        <div class="live-mode-badge">
+          <div class="live-dot"></div>
+          Mode Aventure
+        </div>
+        <div class="live-sliders">
+          <div class="live-slider-item">
+            <div style="display:flex;justify-content:space-between">
+              <label>Chercher à</label>
+              <span class="km-value">+ 20 km</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" style="left:0;width:40%"></div>
+              <div class="slider-thumb" style="left:40%"></div>
+            </div>
+          </div>
+          <div class="live-slider-item">
+            <div style="display:flex;justify-content:space-between">
+              <label>Rayon</label>
+              <span class="km-value">2 km</span>
+            </div>
+            <div class="slider-track">
+              <div class="slider-fill" style="left:0;width:20%"></div>
+              <div class="slider-thumb" style="left:20%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="slider-meta" style="margin-top:12px"><span>2 hébergements</span> autour du km 342 · <a style="color:var(--accent);text-decoration:none">Plus sur Booking</a></div>
+      </div>
+    </div>
+    <div class="direction-caption">
+      <div class="caption-title">Live Mode — 2 sliders, zéro menu</div>
+      <div class="caption-desc">GPS pulsant sur la trace. Marqueur blanc = point cible. Cercle pointillé = rayon. Interface réduite au strict nécessaire : 2 sliders + résultats.</div>
+      <div class="caption-tags">
+        <span class="caption-tag">GPS pulsant</span>
+        <span class="caption-tag">Point cible</span>
+        <span class="caption-tag">Rayon configurable</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- D4: Geolocation consent -->
+  <div class="direction-card">
+    <div class="direction-header">
+      <div>
+        <div class="direction-tag">D4</div>
+      </div>
+      <div>
+        <div class="direction-title">GeolocationConsent — RGPD</div>
+        <div class="direction-desc">Modal explicite avant activation GPS</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="map-bg"></div>
+      <div class="map-roads"></div>
+      <svg class="trace-svg" viewBox="0 0 390 700" preserveAspectRatio="xMidYMid slice">
+        <path d="M 60,600 Q 100,500 130,420 Q 160,350 180,290 Q 210,240 240,210 Q 260,190 280,175" stroke="var(--trace-default)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="osm-attribution">© OpenStreetMap contributors</div>
+      <div class="consent-overlay">
+        <div class="consent-modal">
+          <div class="consent-icon">📍</div>
+          <div class="consent-title">Activer la géolocalisation</div>
+          <div class="consent-text">Le mode Aventure utilise votre GPS pour positionner le point de recherche sur votre parcours.</div>
+          <div class="consent-privacy">🔒 <strong>Votre position reste sur votre appareil.</strong><br>Elle n'est jamais envoyée à nos serveurs. Seul un périmètre anonyme est utilisé pour la recherche.</div>
+          <button class="consent-cta">Activer la géolocalisation</button>
+          <button class="consent-skip">Rester en mode Planning</button>
+        </div>
+      </div>
+    </div>
+    <div class="direction-caption">
+      <div class="caption-title">Consentement RGPD explicite</div>
+      <div class="caption-desc">Seul modal bloquant de l'app. Texte court, promesse de confidentialité claire. Fond semi-transparent conserve le contexte de la carte.</div>
+      <div class="caption-tags">
+        <span class="caption-tag">RGPD</span>
+        <span class="caption-tag">Vaul / Dialog</span>
+        <span class="caption-tag">Unique modal bloquant</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section-label">Direction C — États dégradés & Navigation</div>
+<div class="directions-grid">
+
+  <!-- D5: StatusBanner variants -->
+  <div class="direction-card">
+    <div class="direction-header">
+      <div>
+        <div class="direction-tag">D5</div>
+      </div>
+      <div>
+        <div class="direction-title">StatusBanner — États dégradés</div>
+        <div class="direction-desc">Connexion instable · Offline · GPS perdu</div>
+      </div>
+    </div>
+    <div class="mockup" style="aspect-ratio:auto;height:auto;min-height:380px;background:var(--background);padding:0;display:flex;flex-direction:column;gap:2px">
+      <!-- Banner 1: Connexion instable -->
+      <div style="position:relative">
+        <div class="map-bg" style="height:120px;position:relative;overflow:hidden">
+          <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 390 120" preserveAspectRatio="xMidYMid slice">
+            <path d="M 20,100 Q 80,60 140,50 Q 200,40 260,30 Q 320,20 370,15" stroke="#f59e0b" stroke-width="3" fill="none"/>
+          </svg>
+        </div>
+        <div class="status-banner warning" style="position:absolute;top:0;left:0;right:0">
+          <div class="status-dot"></div>
+          Connexion instable — derniers résultats affichés
+        </div>
+      </div>
+      <!-- Banner 2: Offline -->
+      <div style="position:relative">
+        <div class="map-bg" style="height:120px;position:relative;overflow:hidden">
+          <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 390 120" preserveAspectRatio="xMidYMid slice">
+            <path d="M 20,100 Q 80,60 140,50 Q 200,40 260,30 Q 320,20 370,15" stroke="var(--trace-default)" stroke-width="3" fill="none" stroke-dasharray="8 4"/>
+          </svg>
+        </div>
+        <div class="status-banner offline" style="position:absolute;top:0;left:0;right:0">
+          <div class="status-dot"></div>
+          Hors ligne — trace et POIs mis en cache disponibles
+        </div>
+      </div>
+      <!-- Banner 3: GPS perdu -->
+      <div style="position:relative">
+        <div class="map-bg" style="height:120px;position:relative;overflow:hidden">
+          <svg style="position:absolute;inset:0;width:100%;height:100%" viewBox="0 0 390 120" preserveAspectRatio="xMidYMid slice">
+            <path d="M 20,100 Q 80,60 140,50 Q 200,40 260,30 Q 320,20 370,15" stroke="#22c55e" stroke-width="3" fill="none"/>
+          </svg>
+          <div class="gps-dot" style="left:140px;top:50px;opacity:0.4"></div>
+        </div>
+        <div class="status-banner warning" style="position:absolute;top:0;left:0;right:0">
+          <div class="status-dot"></div>
+          Signal GPS perdu — dernière position km 312 utilisée
+        </div>
+      </div>
+    </div>
+    <div class="direction-caption">
+      <div class="caption-title">Dégradation gracieuse — toujours informatif</div>
+      <div class="caption-desc">Trois variantes : instable (ambre), offline (gris), GPS perdu (ambre). Ton informatif, jamais alarmiste. Carte et données restent visibles.</div>
+      <div class="caption-tags">
+        <span class="caption-tag">Non bloquant</span>
+        <span class="caption-tag">Auto-dismiss</span>
+        <span class="caption-tag">Ton neutre</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- D6: Navigation variant — Bottom tab bar -->
+  <div class="direction-card">
+    <div class="direction-header">
+      <div>
+        <div class="direction-tag">D6</div>
+      </div>
+      <div>
+        <div class="direction-title">Navigation — Bottom Tab Bar</div>
+        <div class="direction-desc">Alternative : tabs vs. FAB flottant</div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="map-bg"></div>
+      <div class="map-roads"></div>
+      <svg class="trace-svg" viewBox="0 0 390 700" preserveAspectRatio="xMidYMid slice">
+        <path d="M 60,600 Q 100,500 130,420 Q 160,350 180,290" stroke="#22c55e" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M 180,290 Q 210,240 240,210 Q 260,190 280,175" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M 280,175 Q 300,155 320,140 Q 340,128 355,120" stroke="#ef4444" stroke-width="5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <div class="layer-toggles">
+        <div class="layer-btn active">🏨</div>
+        <div class="layer-btn">🍽️</div>
+      </div>
+      <div class="density-legend-fab" style="bottom:72px">
+        <div class="legend-row"><div class="legend-dot" style="background:#22c55e"></div>Dense</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#f59e0b"></div>Moyen</div>
+        <div class="legend-row"><div class="legend-dot" style="background:#ef4444"></div>Rare</div>
+      </div>
+      <div class="osm-attribution" style="bottom:64px">© OpenStreetMap contributors</div>
+      <!-- Bottom nav -->
+      <div class="nav-bar">
+        <div class="nav-item active">
+          <div class="nav-icon">🗺️</div>
+          <span>Carte</span>
+        </div>
+        <div class="nav-item" style="position:relative">
+          <div style="position:absolute;top:-20px;background:var(--accent);border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 16px rgba(6,182,212,0.4);border:3px solid var(--background)">🧭</div>
+          <div class="nav-icon" style="opacity:0">⠀</div>
+          <span>Aventure</span>
+        </div>
+        <div class="nav-item">
+          <div class="nav-icon">⚙️</div>
+          <span>Réglages</span>
+        </div>
+      </div>
+    </div>
+    <div class="direction-caption">
+      <div class="caption-title">Navigation — Tab Bar (variante)</div>
+      <div class="caption-desc">Alternative au bouton FAB flottant : bottom tab bar avec bouton central "Mode Aventure" en accent. Plus familier (iOS/Android), mais prend 56px de l'écran.</div>
+      <div class="caption-tags">
+        <span class="caption-tag">Tab bar</span>
+        <span class="caption-tag">FAB centré</span>
+        <span class="caption-tag">Pattern iOS natif</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:48px;padding:20px;background:var(--surface);border-radius:12px;border:1px solid var(--border)">
+  <div style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--text-primary)">Synthèse des directions</div>
+  <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+    <strong style="color:var(--text-primary)">D1 + D2</strong> — Direction principale : carte full-bleed, corridor slider overlay, bottom sheet Vaul pour les POI. La carte n'est jamais masquée.<br>
+    <strong style="color:var(--text-primary)">D3 + D4</strong> — Mode Live cohérent avec la direction principale : interface épurée, consentement RGPD explicite.<br>
+    <strong style="color:var(--text-primary)">D5</strong> — États dégradés systématisés : toujours informatif, jamais alarmiste, données maintenues visibles.<br>
+    <strong style="color:var(--text-primary)">D6</strong> — Variante navigation : bottom tab bar vs. FAB flottant. <em>Question ouverte</em> : D6 est plus familier iOS, mais consomme 56px de la carte.
+  </div>
+</div>
+
+</body>
+</html>

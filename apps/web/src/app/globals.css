@@ -59,6 +59,16 @@
   --color-density-medium: var(--density-medium);     /* text-density-medium, bg-density-medium */
   --color-density-low: var(--density-low);           /* text-density-low, bg-density-low */
   --color-background-intro: var(--background-intro); /* bg-background-intro */
+
+  /* ─── Marketing / Landing page tokens ──────────────────────────────── */
+  --color-earth-light: var(--earth-light);             /* bg-earth-light */
+  --color-earth-dark: var(--earth-dark);               /* text-earth-dark, bg-earth-dark */
+  --color-sage: var(--sage);                           /* text-sage */
+  --color-marketing-primary: var(--marketing-primary); /* text-marketing-primary, bg-marketing-primary */
+  --color-marketing-yellow: var(--accent-yellow);      /* text-marketing-yellow, bg-marketing-yellow */
+
+  /* ─── Ken Burns animation ───────────────────────────────────────────── */
+  --animate-ken-burns: ken-burns 20s ease-in-out infinite alternate;
 }
 
 :root {
@@ -130,6 +140,13 @@
 
   /* ─── Radius ───────────────────────────────────────────────────────── */
   --radius: 0.625rem;
+
+  /* ─── Marketing palette ─────────────────────────────────────────────── */
+  --marketing-primary: #4A7C44;
+  --earth-light:       #E9EDEB;
+  --earth-dark:        #333634;
+  --sage:              #7A8C82;
+  --accent-yellow:     #F4C542;
 }
 
 @layer base {
@@ -142,6 +159,12 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ── Ken Burns animation ──────────────────────────────────────────────────── */
+@keyframes ken-burns {
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.1); }
 }
 
 /* ── Borderless range slider ──────────────────────────────────────────────── */
