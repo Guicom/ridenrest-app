@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function AdventuresPage() {
   return (
-    <main className="min-h-screen bg-background-page">
+    <main className="min-h-screen bg-background-page pt-10">
       <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold text-text-primary">Mes aventures</h1>

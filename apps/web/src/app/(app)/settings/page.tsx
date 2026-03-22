@@ -23,7 +23,7 @@ export default async function SettingsPage() {
   const isStravaConnected = Boolean(profile?.stravaAthleteId)
 
   return (
-    <div className="container max-w-2xl py-8">
+    <div className="container max-w-2xl pt-10 pb-8">
       <h1 className="text-2xl font-bold mb-6">Paramètres</h1>
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Intégrations</h2>

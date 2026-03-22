@@ -11,7 +11,6 @@ interface MapPageProps {
 export default async function MapPage({ params }: MapPageProps) {
   const { id } = await params
   return (
-    // h-14 header from Story 8.9 — update when AppHeader is added to (app)/layout.tsx
     <div className="relative h-[calc(100dvh-3.5rem)] w-full">
       <PlanningMobileToast />
       <Suspense fallback={<Skeleton className="h-full w-full" />}>

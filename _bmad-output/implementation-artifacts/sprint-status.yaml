@@ -122,14 +122,14 @@ development_status:
   8-6-accommodation-type-display-filters: done     # filtres affichage carte avec badge (0) par sous-type
   8-7-density-analysis-category-selection: done       # popin sélection catégories avant analyse (dépend 8-6)
   8-8-interactive-elevation-profile: done      # prérequis Epic 11 Étapes — hover trace ↔ map + D+ live
-  8-9-app-header-global-navigation-bar: ready-for-dev  # header persistant: logo + nom aventure + nav (Mes aventures / Mon compte)
+  8-9-app-header-global-navigation-bar: done    # header persistant: logo + nom aventure + nav (Mes aventures / Mon compte)
   epic-8-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
   # Epic 9: Redesign & Landing Site  ← NOUVEAU (inséré 2026-03-18)
   # ─────────────────────────────────────────────────────────────
-  epic-9: backlog
-  9-1-landing-page: backlog
+  epic-9: in-progress
+  9-1-landing-page: ready-for-dev
   9-2-auth-pages-polish: backlog
   9-3-map-view-light-mode-polish: backlog
   9-4-poi-card-bottom-sheet: backlog

@@ -238,7 +238,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
 
   if (!adventure) {
     return (
-      <main className="min-h-screen bg-background-page">
+      <main className="min-h-screen bg-background-page pt-10">
         <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8">
           <p className="text-center text-muted-foreground">Aventure introuvable.</p>
         </div>
@@ -247,7 +247,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   }
 
   return (
-    <main className="min-h-screen bg-background-page">
+    <main className="min-h-screen bg-background-page pt-10">
       <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-10">
       <div className="flex items-start justify-between gap-4">
         {/* Left: title + stats */}
