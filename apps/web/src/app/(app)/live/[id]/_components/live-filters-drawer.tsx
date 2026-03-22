@@ -1,17 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
-import type { MapLayer, PoiCategory } from '@ridenrest/shared'
+import type { MapLayer, Poi, PoiCategory } from '@ridenrest/shared'
 import { useMapStore } from '@/stores/map.store'
 import { useLiveStore } from '@/stores/live.store'
-
-const ACCOMMODATION_SUB_TYPES: { type: PoiCategory; label: string; icon: string }[] = [
-  { type: 'hotel',      label: 'Hôtel',               icon: '🏨' },
-  { type: 'camp_site',  label: 'Camping',              icon: '⛺' },
-  { type: 'shelter',    label: 'Refuge / Abri',        icon: '🏠' },
-  { type: 'hostel',     label: 'Auberge de jeunesse',  icon: '🛏️' },
-  { type: 'guesthouse', label: 'Chambre d\'hôte',      icon: '🏡' },
-]
+import { ACCOMMODATION_SUB_TYPES, computeAccCountByType } from '@/app/(app)/map/[id]/_components/accommodation-sub-types'
 
 const POI_LAYER_CARDS: { layer: MapLayer; label: string; icon: string }[] = [
   { layer: 'accommodations', label: 'Hébergements', icon: '🛏️' },
@@ -23,12 +16,16 @@ const POI_LAYER_CARDS: { layer: MapLayer; label: string; icon: string }[] = [
 interface LiveFiltersDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  accommodationPois?: Poi[]
 }
 
-export function LiveFiltersDrawer({ open, onOpenChange }: LiveFiltersDrawerProps) {
+export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois }: LiveFiltersDrawerProps) {
   const { visibleLayers, weatherActive, densityColorEnabled, activeAccommodationTypes } = useMapStore()
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
   const setSearchRadius = useLiveStore((s) => s.setSearchRadius)
+
+  // Count POIs per accommodation sub-type — null when no data (no badge shown)
+  const accCountByType = computeAccCountByType(accommodationPois)
 
   // Local state — only committed on "Appliquer"
   const [localLayers, setLocalLayers] = useState<Set<MapLayer>>(new Set(visibleLayers))
@@ -195,6 +192,8 @@ export function LiveFiltersDrawer({ open, onOpenChange }: LiveFiltersDrawerProps
               <div className="flex flex-wrap gap-1.5">
                 {ACCOMMODATION_SUB_TYPES.map(({ type, label, icon }) => {
                   const isActive = localAccTypes.has(type)
+                  const count = accCountByType ? (accCountByType[type] ?? 0) : null
+                  const hasZeroResults = count !== null && count === 0
                   return (
                     <button
                       key={type}
@@ -202,12 +201,14 @@ export function LiveFiltersDrawer({ open, onOpenChange }: LiveFiltersDrawerProps
                       aria-pressed={isActive}
                       className={[
                         'text-xs px-2.5 py-1 rounded-full font-medium',
-                        isActive
-                          ? 'bg-primary text-primary-foreground border border-transparent'
-                          : 'bg-muted text-muted-foreground border border-[--border]',
+                        hasZeroResults
+                          ? 'bg-muted text-muted-foreground border border-[--border] opacity-60'
+                          : isActive
+                            ? 'bg-primary text-primary-foreground border border-transparent'
+                            : 'bg-muted text-muted-foreground border border-[--border]',
                       ].join(' ')}
                     >
-                      {icon} {label}
+                      {icon} {label}{count !== null ? ` (${count})` : ''}
                     </button>
                   )
                 })}

@@ -117,9 +117,9 @@ development_status:
   8-1-design-system-tokens: done
   8-2-adventures-list-page: done
   8-3-app-shell-routing: done
-  8-4-filter-panel-poi-selector: review
+  8-4-filter-panel-poi-selector: done
   8-5-density-layer-toggle: cancelled  # merged into 8.4 corrections (2026-03-21)
-  8-6-accommodation-type-display-filters: backlog     # filtres affichage carte (shelter/refuge on/off)
+  8-6-accommodation-type-display-filters: done     # filtres affichage carte avec badge (0) par sous-type
   8-7-density-analysis-category-selection: backlog    # popin sélection catégories avant analyse (dépend 8-6)
   8-8-interactive-elevation-profile: backlog          # prérequis Epic 11 Étapes — hover trace ↔ map + D+ live
   8-9-app-header-global-navigation-bar: ready-for-dev  # header persistant: logo + nom aventure + nav (Mes aventures / Mon compte)

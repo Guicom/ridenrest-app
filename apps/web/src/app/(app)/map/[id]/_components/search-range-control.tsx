@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
 import { computeElevationGain } from '@ridenrest/gpx'
-import type { MapWaypoint } from '@ridenrest/shared'
+import type { MapWaypoint, Poi } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
 
@@ -13,6 +13,7 @@ interface SearchRangeControlProps {
   totalDistanceKm: number
   waypoints: MapWaypoint[] | null
   isPoisPending: boolean
+  accommodationPois?: Poi[]
 }
 
 // D+ cumulé de km 0 jusqu'au point de départ (fromKm) — pas la plage
@@ -23,7 +24,7 @@ function computeElevationToStart(waypoints: MapWaypoint[], fromKm: number): numb
   return computeElevationGain(toStart.map((w) => ({ lat: w.lat, lng: w.lng, elevM: w.ele ?? undefined })))
 }
 
-export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending }: SearchRangeControlProps) {
+export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, accommodationPois }: SearchRangeControlProps) {
   const [expanded, setExpanded] = useState(true)
   const { fromKm, toKm, setSearchRange, visibleLayers } = useMapStore()
 
@@ -125,7 +126,7 @@ export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending }
           <PoiLayerGrid isPending={isPoisPending} />
 
           {/* Accommodation sub-types — visible uniquement si Hébergements actif */}
-          {visibleLayers.has('accommodations') && <AccommodationSubTypes />}
+          {visibleLayers.has('accommodations') && <AccommodationSubTypes accommodationPois={accommodationPois} />}
 
           {/* Range stepper + input */}
           <div className="flex items-center justify-between">

@@ -15,6 +15,7 @@ import { useLiveStore } from '@/stores/live.store'
 import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData } from '@/lib/api-client'
+import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
@@ -113,6 +114,12 @@ export default function LivePage() {
     if (liveSearchRadiusKm !== DEFAULT_RADIUS) count++
     return count
   }, [mapVisibleLayers, mapWeatherActive, mapDensityColorEnabled, liveSearchRadiusKm])
+
+  // Filter accommodation pois once — memoized to avoid new reference on every render (GPS poll)
+  const accommodationPois = useMemo(
+    () => pois.filter((p) => (LAYER_CATEGORIES.accommodations as readonly string[]).includes(p.category)),
+    [pois],
+  )
 
   // Live context for PoiDetailSheet (D+/ETA with live mode values)
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
@@ -301,7 +308,11 @@ export default function LivePage() {
       />
 
       {/* Live filters drawer — z-50 */}
-      <LiveFiltersDrawer open={filtersOpen} onOpenChange={setFiltersOpen} />
+      <LiveFiltersDrawer
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        accommodationPois={accommodationPois}
+      />
     </div>
   )
 }

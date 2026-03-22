@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { LiveFiltersDrawer } from './live-filters-drawer'
-import type { MapLayer, PoiCategory } from '@ridenrest/shared'
+import type { MapLayer, Poi, PoiCategory } from '@ridenrest/shared'
 
 afterEach(cleanup)
 
@@ -135,5 +135,42 @@ describe('LiveFiltersDrawer', () => {
     render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
     // After toggle off on open, sub-types should not be visible
     expect(screen.queryByText(/Refuge/)).toBeNull()
+  })
+
+  it('shows count for all sub-types when accommodationPois provided', () => {
+    const pois: Poi[] = [
+      { id: 'h1', category: 'hotel', name: 'Hotel A', lat: 0, lng: 0 } as unknown as Poi,
+      { id: 'h2', category: 'hotel', name: 'Hotel B', lat: 0, lng: 0 } as unknown as Poi,
+    ]
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} accommodationPois={pois} />)
+    // hotel has 2 results
+    expect(screen.getByText(/Hôtel \(2\)/)).toBeDefined()
+    // camp_site has 0 results — should show (0)
+    expect(screen.getByText(/Camping \(0\)/)).toBeDefined()
+  })
+
+  it('renders no (0) badge when accommodationPois is not provided', () => {
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    expect(screen.queryByText(/\(0\)/)).toBeNull()
+  })
+
+  it('greyed-out chip (opacity-60) when count = 0 in live mode', () => {
+    const pois: Poi[] = [
+      { id: 'h1', category: 'hotel', name: 'Hotel A', lat: 0, lng: 0 } as unknown as Poi,
+    ]
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} accommodationPois={pois} />)
+    const campingBtn = screen.getByText(/Camping \(0\)/).closest('button')
+    expect(campingBtn?.className).toContain('opacity-60')
+  })
+
+  it('zero-count chip is still tappable — aria-pressed toggles on click', () => {
+    const pois: Poi[] = [
+      { id: 'h1', category: 'hotel', name: 'Hotel A', lat: 0, lng: 0 } as unknown as Poi,
+    ]
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} accommodationPois={pois} />)
+    const campingBtn = screen.getByText(/Camping \(0\)/).closest('button')!
+    expect(campingBtn.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(campingBtn)
+    expect(campingBtn.getAttribute('aria-pressed')).toBe('false')
   })
 })

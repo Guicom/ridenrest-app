@@ -147,6 +147,7 @@ export function MapView({ adventureId }: MapViewProps) {
             totalDistanceKm={data.totalDistanceKm}
             waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
             isPoisPending={poisPending}
+            accommodationPois={poisByLayer.accommodations}
           />
 
           {/* Météo section — collapsible accordion (Story 8.4 correction) */}

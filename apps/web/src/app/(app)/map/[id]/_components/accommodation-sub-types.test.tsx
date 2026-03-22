@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { AccommodationSubTypes } from './accommodation-sub-types'
-import type { PoiCategory } from '@ridenrest/shared'
+import type { Poi, PoiCategory } from '@ridenrest/shared'
 
 afterEach(cleanup)
 
@@ -14,6 +14,9 @@ vi.mock('@/stores/map.store', () => ({
     toggleAccommodationType: mockToggleAccommodationType,
   }),
 }))
+
+const makePoi = (category: PoiCategory): Poi =>
+  ({ id: `${category}-1`, category, name: category, lat: 0, lng: 0 }) as unknown as Poi
 
 describe('AccommodationSubTypes', () => {
   afterEach(() => {
@@ -57,5 +60,40 @@ describe('AccommodationSubTypes', () => {
   it('renders section label', () => {
     render(<AccommodationSubTypes />)
     expect(screen.getByText("Type d'hébergement")).toBeDefined()
+  })
+
+  it('renders no badge when accommodationPois is undefined', () => {
+    render(<AccommodationSubTypes />)
+    expect(screen.queryByText(/\(0\)/)).toBeNull()
+  })
+
+  it('renders count for all sub-types when accommodationPois provided', () => {
+    const pois: Poi[] = [makePoi('hotel'), makePoi('hotel'), makePoi('camp_site')]
+    render(<AccommodationSubTypes accommodationPois={pois} />)
+    expect(screen.getByText(/Hôtel \(2\)/)).toBeDefined()
+    expect(screen.getByText(/Camping \(1\)/)).toBeDefined()
+    // shelter has 0 results — shows (0)
+    expect(screen.getByText(/Refuge \/ Abri \(0\)/)).toBeDefined()
+  })
+
+  it('greyed-out chip when count = 0 — has opacity-60 class', () => {
+    const pois: Poi[] = [makePoi('hotel')]
+    render(<AccommodationSubTypes accommodationPois={pois} />)
+    const campingBtn = screen.getByText(/Camping \(0\)/).closest('button')
+    expect(campingBtn?.className).toContain('opacity-60')
+  })
+
+  it('chip with zero results is still tappable (calls toggleAccommodationType)', () => {
+    const pois: Poi[] = [makePoi('hotel')]
+    render(<AccommodationSubTypes accommodationPois={pois} />)
+    fireEvent.click(screen.getByText(/Camping \(0\)/))
+    expect(mockToggleAccommodationType).toHaveBeenCalledWith('camp_site')
+  })
+
+  it('chip with results shows normal active style (not greyed out)', () => {
+    const pois: Poi[] = [makePoi('hotel'), makePoi('camp_site')]
+    render(<AccommodationSubTypes accommodationPois={pois} />)
+    const campingBtn = screen.getByText(/Camping \(1\)/).closest('button')
+    expect(campingBtn?.className).not.toContain('opacity-60')
   })
 })
