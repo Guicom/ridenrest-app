@@ -18,18 +18,26 @@ vi.mock('@dnd-kit/utilities', () => ({
   CSS: { Transform: { toString: () => '' } },
 }))
 
+// Mock GripVertical so we can assert the drag handle is rendered
+vi.mock('lucide-react', () => ({
+  GripVertical: () => <svg data-testid="grip-icon" />,
+}))
+
 // Mock SegmentCard to isolate SortableSegmentCard behavior
 vi.mock('./segment-card', () => ({
   SegmentCard: ({
     segment,
     onDelete,
     onReplace,
+    dragHandle,
   }: {
     segment: AdventureSegmentResponse
     onDelete?: () => void
     onReplace?: () => void
+    dragHandle?: React.ReactNode
   }) => (
     <div data-testid={`seg-${segment.id}`}>
+      {dragHandle}
       <button onClick={onDelete}>Delete</button>
       <button onClick={onReplace}>Replace</button>
     </div>
@@ -57,7 +65,7 @@ const makeSegment = (overrides: Partial<AdventureSegmentResponse> = {}): Adventu
 })
 
 describe('SortableSegmentCard', () => {
-  it('renders drag handle and SegmentCard', () => {
+  it('renders SegmentCard with grip icon as dragHandle', () => {
     render(
       <SortableSegmentCard
         segment={makeSegment()}
@@ -65,8 +73,8 @@ describe('SortableSegmentCard', () => {
         onReplace={vi.fn()}
       />,
     )
-    expect(screen.getByRole('button', { name: /réordonner le segment/i })).toBeInTheDocument()
     expect(screen.getByTestId('seg-seg-1')).toBeInTheDocument()
+    expect(screen.getByTestId('grip-icon')).toBeInTheDocument()
   })
 
   it('passes onDelete and onReplace to SegmentCard', () => {

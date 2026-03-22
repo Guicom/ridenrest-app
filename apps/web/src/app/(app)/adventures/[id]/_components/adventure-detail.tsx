@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Trash2, LayoutGrid, Map, Route, TrendingUp } from 'lucide-react'
+import { Trash2, Map, Route, TrendingUp } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
