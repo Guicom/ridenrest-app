@@ -130,8 +130,8 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-9: in-progress
   9-1-landing-page: done
-  9-2-auth-pages-polish: backlog
-  9-3-map-view-light-mode-polish: backlog
+  9-2-auth-pages-polish: done
+  9-3-map-view-light-mode-polish: review
   9-4-poi-card-bottom-sheet: backlog
   9-5-adventure-detail-page-design: backlog
   epic-9-retrospective: optional
@@ -178,3 +178,28 @@ development_status:
   13-2-landing-page-real-assets-update: backlog
   13-3-landing-page-seo-polish: backlog
   epic-13-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 14: VPS Hostinger Migration & Local Docker Environment
+  # (ajouté 2026-03-21 — migration multi-plateforme → VPS unique)
+  # ─────────────────────────────────────────────────────────────
+  epic-14: backlog
+  14-1-docker-compose-infra-services: backlog
+  14-2-nodejs-natif-pm2-production: backlog
+  14-3-environnement-dev-local-unifie: backlog
+  14-4-backups-postgresql-automatises: backlog
+  14-5-cicd-deploiement-github-actions: backlog
+  14-6-monitoring-uptime-kuma: backlog
+  14-7-migration-donnees-decommissionnement: backlog
+  epic-14-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 15: Analytics & Affiliate Partnership Readiness
+  # (ajouté 2026-03-23 — tracking dès le lancement pour Booking.com)
+  # ─────────────────────────────────────────────────────────────
+  epic-15: backlog
+  15-1-plausible-ce-setup-vps-nextjs: backlog        # Docker Plausible CE + stats.ridenrest.com + pageviews auto
+  15-2-click-tracking-enrichi-booking-links: backlog  # event booking_click avec poi_id, source, page, user_tier
+  15-3-funnel-tracking-complet: backlog               # gpx_uploaded → map_opened → poi_search → poi_detail → booking_click
+  15-4-admin-analytics-dashboard: backlog             # /admin/analytics protégé, embed Plausible, métriques affilié
+  epic-15-retrospective: optional

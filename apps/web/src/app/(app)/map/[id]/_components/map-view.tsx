@@ -22,6 +22,7 @@ import { useUIStore } from '@/stores/ui.store'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import type { AdventureMapResponse } from '@/lib/api-client'
 import { ElevationProfile } from './elevation-profile'
+import { MapStylePicker } from './map-style-picker'
 
 interface MapViewProps {
   adventureId: string
@@ -49,7 +50,7 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, setWeatherActive } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm } = useMapStore()
 
   // Reset weatherActive when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
@@ -244,6 +245,18 @@ export function MapView({ adventureId }: MapViewProps) {
             segments={readySegments}
             segmentId={selectedSegmentId}
           />
+
+          {/* Map style selector — floating bottom-right (AC #6) */}
+          <MapStylePicker />
+
+          {/* Mobile corridor range pill — visible on mobile only when user has interacted (AC #4) */}
+          {searchRangeInteracted && (
+            <div className="lg:hidden absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-[--surface] rounded-t-2xl shadow-lg px-6 py-3">
+              <span className="font-mono text-lg font-bold text-[--text-primary]">
+                {Math.round(mapFromKm).toLocaleString('fr')} – {Math.round(mapToKm).toLocaleString('fr')} km
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Elevation profile — desktop only (AC6: hidden on mobile) */}

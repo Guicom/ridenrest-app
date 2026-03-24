@@ -35,7 +35,7 @@ describe('useLivePoisSearch', () => {
       targetAheadKm: 30,
       searchRadiusKm: 3,
     }
-    mockUseQuery.mockReturnValue({ data: [], isPending: false, isError: false })
+    mockUseQuery.mockReturnValue({ data: [], isFetching: false, isError: false })
   })
 
   it('returns null targetKm when currentKmOnRoute is null', () => {
@@ -80,34 +80,12 @@ describe('useLivePoisSearch', () => {
     expect(queryConfig.enabled).toBe(false)
   })
 
-  it('does not trigger re-search for GPS move < 500m', () => {
+  it('query is always disabled (manual-only via refetch)', () => {
     mockStoreState.currentKmOnRoute = 10
-    const { rerender } = renderHook(() => useLivePoisSearch('seg-1'))
-    rerender() // let effect run
+    renderHook(() => useLivePoisSearch('seg-1'))
 
-    // Move by 0.3 km (< 0.5 threshold)
-    mockStoreState.currentKmOnRoute = 10.3
-    rerender()
-    rerender() // let effect run again
-
-    // Should still use original trigger km → targetKm = 40
-    const queryConfig = mockUseQuery.mock.calls[mockUseQuery.mock.calls.length - 1][0]
-    expect(queryConfig.queryKey[2].targetKm).toBe(40)
-  })
-
-  it('triggers re-search when GPS moves >= 500m', () => {
-    mockStoreState.currentKmOnRoute = 10
-    const { rerender } = renderHook(() => useLivePoisSearch('seg-1'))
-    rerender() // let effect run
-
-    // Move by 0.6 km (>= 0.5 threshold)
-    mockStoreState.currentKmOnRoute = 10.6
-    rerender()
-    rerender() // let effect run
-
-    const queryConfig = mockUseQuery.mock.calls[mockUseQuery.mock.calls.length - 1][0]
-    // targetKm = Math.round((10.6 + 30) * 10) / 10 = 40.6
-    expect(queryConfig.queryKey[2].targetKm).toBe(40.6)
+    const queryConfig = mockUseQuery.mock.calls[0][0]
+    expect(queryConfig.enabled).toBe(false)
   })
 
   it('exposes isError from useQuery', () => {

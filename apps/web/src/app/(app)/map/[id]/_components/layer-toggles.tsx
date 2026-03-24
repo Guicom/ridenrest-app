@@ -28,7 +28,7 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
   const { visibleLayers, toggleLayer } = useMapStore()
 
   return (
-    <div className="flex flex-wrap gap-2 p-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur rounded-xl shadow-md">
+    <div className="flex flex-wrap gap-2 p-2 bg-white border border-[--border] rounded-xl shadow-sm">
       {LAYER_CONFIGS.map(({ layer, label, icon }) => {
         const isActive = visibleLayers.has(layer)
         return (
@@ -36,13 +36,12 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
             key={layer}
             onClick={() => toggleLayer(layer)}
             className={[
-              'min-w-[48px] min-h-[48px]',
+              'min-w-[40px] min-h-[40px]',
               'flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-2',
               'text-xs font-medium transition-colors',
-              'border border-transparent',
               isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:border-[--border]',
+                ? 'bg-primary text-primary-foreground border border-primary'
+                : 'bg-white text-foreground border border-[--border]',
             ].join(' ')}
             aria-label={`${isActive ? 'Masquer' : 'Afficher'} les ${label}`}
             aria-pressed={isActive}
@@ -61,13 +60,12 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
         <button
           onClick={onWeatherToggle}
           className={[
-            'min-w-[48px] min-h-[48px]',
+            'min-w-[40px] min-h-[40px]',
             'flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-2',
             'text-xs font-medium transition-colors',
-            'border border-transparent',
             weatherActive
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:border-[--border]',
+              ? 'bg-primary text-primary-foreground border border-primary'
+              : 'bg-white text-foreground border border-[--border]',
           ].join(' ')}
           aria-label={`${weatherActive ? 'Désactiver' : 'Activer'} la Météo`}
           aria-pressed={!!weatherActive}
@@ -81,13 +79,12 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
         <button
           onClick={onDensityToggle}
           className={[
-            'min-w-[48px] min-h-[48px]',
+            'min-w-[40px] min-h-[40px]',
             'flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-2',
             'text-xs font-medium transition-colors',
-            'border border-transparent',
             densityActive
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:border-[--border]',
+              ? 'bg-primary text-primary-foreground border border-primary'
+              : 'bg-white text-foreground border border-[--border]',
           ].join(' ')}
           aria-label={`${densityActive ? 'Désactiver' : 'Activer'} la Densité`}
           aria-pressed={!!densityActive}

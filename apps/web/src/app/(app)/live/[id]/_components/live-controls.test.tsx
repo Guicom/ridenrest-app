@@ -20,6 +20,13 @@ vi.mock('@/components/ui/slider', () => ({
   ),
 }))
 
+const defaultProps = {
+  onFiltersOpen: vi.fn(),
+  onSearch: vi.fn(),
+  activeFilterCount: 0,
+  elevationGain: null,
+}
+
 describe('LiveControls', () => {
   beforeEach(() => {
     useLiveStore.setState({
@@ -34,46 +41,82 @@ describe('LiveControls', () => {
     vi.clearAllMocks()
   })
 
-  it('renders toggle button with ETA summary', () => {
-    render(<LiveControls />)
-    const toggle = screen.getByTestId('live-controls-toggle')
-    expect(toggle.textContent).toContain('30 km')
-    expect(toggle.textContent).toContain('~2h00')
+  it('renders "MON HÔTEL DANS" label', () => {
+    render(<LiveControls {...defaultProps} />)
+    expect(screen.getByText('MON HÔTEL DANS')).toBeDefined()
   })
 
-  it('renders sliders and speed input when expanded', () => {
-    render(<LiveControls />)
+  it('renders targetAheadKm value in font-mono', () => {
+    render(<LiveControls {...defaultProps} />)
+    const el = screen.getByText('30 km')
+    expect(el.className).toContain('font-mono')
+  })
+
+  it('renders ETA display', () => {
+    render(<LiveControls {...defaultProps} />)
+    // 30km at 15km/h = 2h00
+    expect(screen.getByTestId('eta-display').textContent).toContain('~2h00')
+  })
+
+  it('renders elevation gain when provided', () => {
+    render(<LiveControls {...defaultProps} elevationGain={450} />)
+    expect(screen.getByTestId('elevation-gain-display').textContent).toContain('D+ 450m')
+  })
+
+  it('renders — when elevationGain is null', () => {
+    render(<LiveControls {...defaultProps} />)
+    expect(screen.getByTestId('elevation-gain-display').textContent).toBe('—')
+  })
+
+  it('renders distance slider', () => {
+    render(<LiveControls {...defaultProps} />)
     expect(screen.getByTestId('slider-target')).toBeDefined()
-    expect(screen.getByTestId('slider-radius')).toBeDefined()
-    expect(screen.getByTestId('input-speed')).toBeDefined()
   })
 
-  it('collapses when toggle is clicked', () => {
-    render(<LiveControls />)
-    fireEvent.click(screen.getByTestId('live-controls-toggle'))
-    expect(screen.queryByTestId('slider-target')).toBeNull()
+  it('renders RECHERCHER and FILTERS buttons', () => {
+    render(<LiveControls {...defaultProps} />)
+    expect(screen.getByTestId('btn-search')).toBeDefined()
+    expect(screen.getByTestId('btn-filters')).toBeDefined()
   })
 
-  it('updates targetAheadKm when distance slider changes', () => {
-    render(<LiveControls />)
+  it('calls onSearch when RECHERCHER is clicked', () => {
+    const onSearch = vi.fn()
+    render(<LiveControls {...defaultProps} onSearch={onSearch} />)
+    fireEvent.click(screen.getByTestId('btn-search'))
+    expect(onSearch).toHaveBeenCalled()
+  })
+
+  it('calls onFiltersOpen when FILTERS is clicked', () => {
+    const onFiltersOpen = vi.fn()
+    render(<LiveControls {...defaultProps} onFiltersOpen={onFiltersOpen} />)
+    fireEvent.click(screen.getByTestId('btn-filters'))
+    expect(onFiltersOpen).toHaveBeenCalled()
+  })
+
+  it('shows activeFilterCount badge when > 0', () => {
+    render(<LiveControls {...defaultProps} activeFilterCount={3} />)
+    expect(screen.getByText('3')).toBeDefined()
+  })
+
+  it('does not show badge when activeFilterCount is 0', () => {
+    render(<LiveControls {...defaultProps} activeFilterCount={0} />)
+    expect(screen.queryByText('0')).toBeNull()
+  })
+
+  it('updates targetAheadKm when slider changes', () => {
+    render(<LiveControls {...defaultProps} />)
     fireEvent.change(screen.getByTestId('slider-target'), { target: { value: '50' } })
     expect(useLiveStore.getState().targetAheadKm).toBe(50)
   })
 
-  it('updates searchRadiusKm when radius slider changes', () => {
-    render(<LiveControls />)
-    fireEvent.change(screen.getByTestId('slider-radius'), { target: { value: '5' } })
-    expect(useLiveStore.getState().searchRadiusKm).toBe(5)
-  })
-
-  it('updates speedKmh when speed input changes', () => {
-    render(<LiveControls />)
-    fireEvent.change(screen.getByTestId('input-speed'), { target: { value: '20' } })
-    expect(useLiveStore.getState().speedKmh).toBe(20)
+  it('has lg:hidden class on container', () => {
+    render(<LiveControls {...defaultProps} />)
+    const container = screen.getByTestId('live-controls')
+    expect(container.className).toContain('lg:hidden')
   })
 
   it('does not render weather panel (weather is on map overlay)', () => {
-    render(<LiveControls />)
+    render(<LiveControls {...defaultProps} />)
     expect(screen.queryByTestId('live-weather-panel')).toBeNull()
   })
 })

@@ -92,7 +92,7 @@ export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, 
         <div className="px-4 pb-4 flex flex-col gap-4">
           {/* Position + D+ dynamiques */}
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span data-testid="current-position" className="font-mono font-medium text-foreground">
+            <span data-testid="current-position" className="font-mono font-bold text-foreground">
               {Math.round(fromKm).toLocaleString('fr')} km
             </span>
             {elevationGain != null ? (

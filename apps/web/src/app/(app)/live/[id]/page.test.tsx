@@ -10,7 +10,8 @@ vi.mock('@/hooks/use-live-mode', () => ({
 }))
 
 // Mock use-live-poi-search hook
-const mockUseLivePoisSearch = vi.fn().mockReturnValue({ pois: [], isPending: false, targetKm: null, isError: false })
+const mockRefetchPois = vi.fn()
+const mockUseLivePoisSearch = vi.fn().mockReturnValue({ pois: [], isFetching: false, targetKm: null, isError: false, refetch: mockRefetchPois, canSearch: false })
 vi.mock('@/hooks/use-live-poi-search', () => ({
   useLivePoisSearch: () => mockUseLivePoisSearch(),
 }))
@@ -39,7 +40,9 @@ vi.mock('@/stores/live.store', () => ({
       searchRadiusKm: mockLiveSearchRadiusKm,
       speedKmh: 15,
       currentPosition: null,
+      weatherDepartureTime: null,
       setCurrentKm: () => {},
+      setTargetAheadKm: () => {},
     }),
 }))
 
@@ -57,6 +60,7 @@ vi.mock('@/stores/map.store', () => ({
     selector({
       visibleLayers: mockMapVisibleLayers,
       weatherActive: mockMapWeatherActive,
+      weatherDimension: 'temperature',
       densityColorEnabled: mockMapDensityColorEnabled,
     }),
 }))
@@ -68,9 +72,30 @@ vi.mock('./_components/live-map-canvas', () => ({
   ),
 }))
 
-// Mock LiveControls (no props)
+// Mock LiveControls — expose btn-filters + activeFilterCount badge for page-level tests
 vi.mock('./_components/live-controls', () => ({
-  LiveControls: () => <div data-testid="live-controls" />,
+  LiveControls: ({ onFiltersOpen, activeFilterCount }: { onFiltersOpen: () => void; activeFilterCount: number }) => (
+    <div data-testid="live-controls">
+      <button data-testid="live-filters-btn" onClick={onFiltersOpen}>
+        {activeFilterCount > 0 && <span>{activeFilterCount}</span>}
+      </button>
+    </div>
+  ),
+}))
+
+// Mock PoiLayerGrid (used in desktop sidebar)
+vi.mock('../../map/[id]/_components/poi-layer-grid', () => ({
+  PoiLayerGrid: () => <div data-testid="poi-layer-grid" />,
+}))
+
+// Mock SidebarDensitySection (used in desktop sidebar)
+vi.mock('../../map/[id]/_components/sidebar-density-section', () => ({
+  SidebarDensitySection: () => <div data-testid="sidebar-density-section" />,
+}))
+
+// Mock Slider (used in desktop sidebar)
+vi.mock('@/components/ui/slider', () => ({
+  Slider: () => <input type="range" data-testid="sidebar-slider" />,
 }))
 
 // Mock LiveFiltersDrawer (Story 8.4)
@@ -112,7 +137,7 @@ vi.mock('@tanstack/react-query', () => ({
         { id: 'seg-1', name: 'S1', orderIndex: 0, cumulativeStartKm: 0, distanceKm: 50, parseStatus: 'done', waypoints: [], boundingBox: null },
       ],
     },
-    isPending: false,
+    isFetching: false,
   }),
 }))
 
@@ -128,9 +153,10 @@ vi.mock('@/lib/api-client', () => ({
   getAdventureMapData: vi.fn(),
 }))
 
-// Mock snapToTrace from gpx package
+// Mock snapToTrace + computeElevationGain from gpx package
 vi.mock('@ridenrest/gpx', () => ({
   snapToTrace: vi.fn().mockReturnValue(null),
+  computeElevationGain: vi.fn().mockReturnValue(0),
 }))
 
 import LivePage from './page'
@@ -239,7 +265,7 @@ describe('LivePage', () => {
   it('shows error banner when POI query fails and online (AC #1)', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockUseNetworkStatus.mockReturnValue({ isOnline: true })
-    mockUseLivePoisSearch.mockReturnValue({ pois: [{ id: '1' }, { id: '2' }], isPending: false, targetKm: 40, isError: true })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [{ id: '1' }, { id: '2' }], isFetching: false, targetKm: 40, isError: true })
     render(<LivePage />)
     const banner = screen.getByTestId('status-banner')
     expect(banner.getAttribute('data-variant')).toBe('error')
@@ -257,7 +283,7 @@ describe('LivePage', () => {
   it('hides banner when POI query succeeds after error (AC #2)', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockUseNetworkStatus.mockReturnValue({ isOnline: true })
-    mockUseLivePoisSearch.mockReturnValue({ pois: [], isPending: false, targetKm: 40, isError: false })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [], isFetching: false, targetKm: 40, isError: false })
     render(<LivePage />)
     expect(screen.queryByTestId('status-banner')).toBeNull()
   })
@@ -265,7 +291,7 @@ describe('LivePage', () => {
   it('shows offline banner over error banner when both apply', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockUseNetworkStatus.mockReturnValue({ isOnline: false })
-    mockUseLivePoisSearch.mockReturnValue({ pois: [], isPending: false, targetKm: 40, isError: true })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [], isFetching: false, targetKm: 40, isError: true })
     render(<LivePage />)
     const banners = screen.getAllByTestId('status-banner')
     expect(banners).toHaveLength(1)

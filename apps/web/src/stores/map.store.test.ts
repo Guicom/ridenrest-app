@@ -5,7 +5,7 @@ describe('useMapStore', () => {
   beforeEach(() => {
     useMapStore.setState({
       activeLayer: null,
-      visibleLayers: new Set(),
+      visibleLayers: new Set(['accommodations']),
       zoom: 10,
       center: null,
       fromKm: 0,
@@ -19,7 +19,7 @@ describe('useMapStore', () => {
   it('initializes with correct defaults', () => {
     const state = useMapStore.getState()
     expect(state.activeLayer).toBeNull()
-    expect(state.visibleLayers.size).toBe(0)
+    expect(state.visibleLayers.has('accommodations')).toBe(true)
     expect(state.zoom).toBe(10)
     expect(state.center).toBeNull()
     expect(state.fromKm).toBe(0)

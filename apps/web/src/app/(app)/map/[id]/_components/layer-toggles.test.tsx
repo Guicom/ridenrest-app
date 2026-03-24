@@ -122,13 +122,36 @@ describe('LayerToggles', () => {
     expect(screen.getByText('Hébergements')).toBeDefined()
   })
 
-  it('each button has min-h-[48px] class for touch target', () => {
+  it('each button has min-h-[40px] class for touch target', () => {
     render(<LayerToggles isPending={false} />)
 
     const buttons = screen.getAllByRole('button')
     expect(buttons).toHaveLength(4)
     buttons.forEach((btn) => {
-      expect(btn.className).toContain('min-h-[48px]')
+      expect(btn.className).toContain('min-h-[40px]')
     })
+  })
+
+  it('inactive layer button has border class (light mode design)', () => {
+    render(<LayerToggles isPending={false} />)
+
+    const btn = screen.getByLabelText(/Afficher les Hébergements/)
+    expect(btn.className).toContain('border')
+    expect(btn.className).toContain('bg-white')
+  })
+
+  it('inactive layer button does not have bg-muted class', () => {
+    render(<LayerToggles isPending={false} />)
+
+    const btn = screen.getByLabelText(/Afficher les Hébergements/)
+    expect(btn.className).not.toContain('bg-muted')
+  })
+
+  it('active layer button has bg-primary class', () => {
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<LayerToggles isPending={false} />)
+
+    const btn = screen.getByLabelText(/Masquer les Hébergements/)
+    expect(btn.className).toContain('bg-primary')
   })
 })

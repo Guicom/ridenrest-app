@@ -196,7 +196,7 @@ FR-054: Epic 6 — Auto-refresh weather forecasts every hour
 FR-055: Epic 6 — Fallback: show current-time weather if no speed entered
 FR-060: Epic 4 — Booking deep links to Hotels.com and Booking.com
 FR-061: Epic 4 — Affiliate links visually identified in UI (transparency)
-FR-062: Epic 4 — Track booking link clicks for analytics
+FR-062: Epic 15 — Track booking link clicks for analytics (enriched, replaces basic Epic 4 implementation)
 FR-063: Epic 4 — "Powered by Strava" attribution when Strava data is shown
 FR-070: Epic 8 — PWA install via native mechanism (Add to Home Screen)
 FR-071: Epic 8 — Last loaded GPX trace + POIs readable offline
@@ -1452,11 +1452,23 @@ So that my first interaction is reassuring and polished.
 
 **Given** a user visits any auth page (`/login`, `/register`, `/forgot-password`, `/reset-password`),
 **When** the page renders,
-**Then** background is `--background-page`, form is centered in a white card (`max-w-sm mx-auto`, `rounded-2xl shadow-sm`).
+**Then** background is a full-bleed cycling landscape photo; a white card is centered on it (`max-w-sm mx-auto`, `rounded-2xl shadow-sm`); no logo inside the card (the global header handles branding).
+
+**Given** a user visits `/register`,
+**When** the card renders,
+**Then** a short pitch text is displayed at the top of the card, above the form fields, listing 3 key benefits of creating an account (e.g. GPX import, accommodations along the route, pace-adjusted weather).
+
+**Given** a user visits `/login`,
+**When** the card renders,
+**Then** a short returning-user message is displayed at the top of the card, above the form fields (e.g. "Reprends là où tu t'es arrêté").
+
+**Given** the `/register` form renders,
+**When** the user types in the password field,
+**Then** an eye icon is visible at the end of the field; clicking it toggles between `type="password"` and `type="text"`.
 
 **Given** the auth form renders,
 **When** displayed,
-**Then** Ride'n'Rest logo above the title; primary CTA uses `--primary` bg + white text; inputs have `border-[--border]` with `focus:ring-[--primary]`.
+**Then** primary CTA uses `--primary` bg + white text; inputs have `border-[--border]` with `focus:ring-[--primary]`.
 
 **Given** a form validation error,
 **When** displayed,
@@ -2169,3 +2181,125 @@ So that there is a single source of truth and no orphaned cloud resources genera
 **Given** the existing `apps/api/Dockerfile` and `apps/api/fly.toml` are no longer needed,
 **When** migration is complete,
 **Then** they are removed from the repo (or moved to a `_deprecated/` folder for reference).
+
+---
+
+## Epic 15: Analytics & Affiliate Partnership Readiness
+
+> **Ajouté 2026-03-23** — Epic transversal visant à accumuler dès le lancement les données nécessaires pour re-candidater au programme affilié Booking.com (refusé en early stage, voir mémoire projet) et piloter le produit par les données. Stack : **Plausible CE (Community Edition)** auto-hébergé sur VPS Hostinger (Docker), accessible sur `stats.ridenrest.com` via Caddy. Tracking actif dès le go-live — chaque semaine sans données = informations perdues pour la candidature Booking.com.
+
+### Story 15.1: Plausible CE — Setup VPS & Intégration Next.js
+
+As a **developer wanting to track app usage from day one**,
+I want Plausible Community Edition running on the VPS with automatic pageview tracking in Next.js,
+So that traffic data starts accumulating immediately at launch and can be used for Booking.com affiliate application.
+
+**Acceptance Criteria:**
+
+**Given** the `docker-compose.yml` is extended with Plausible CE services,
+**When** `docker compose up -d plausible` is run on the VPS,
+**Then** Plausible CE is running with its required ClickHouse and PostgreSQL dependencies, and accessible on `localhost:8000`.
+
+**Given** Caddy is configured with a `stats.ridenrest.com` block,
+**When** Plausible is running,
+**Then** `https://stats.ridenrest.com` proxies to `localhost:8000` with automatic HTTPS via Let's Encrypt — protected by Plausible's built-in auth (admin account).
+
+**Given** the `<PlausibleProvider>` component is added to `apps/web/src/app/layout.tsx`,
+**When** any page is visited,
+**Then** a pageview is automatically recorded in Plausible for that route — no manual instrumentation needed per page.
+
+**Given** the Plausible script is loaded,
+**When** inspected in browser DevTools,
+**Then** the script is served from `stats.ridenrest.com/js/script.js` (self-hosted, not `plausible.io`) — ensuring no CORS issues and full data ownership.
+
+**Given** the site domain is configured as `ridenrest.com` in Plausible,
+**When** a user visits any page,
+**Then** the visit is attributed to the correct domain with country, device, browser, and OS metadata.
+
+---
+
+### Story 15.2: Click Tracking Enrichi — Booking Deep Links (FR-062)
+
+As a **developer building the Booking.com affiliate application**,
+I want enriched custom event tracking on every booking link click,
+So that I have granular data on which accommodations, POI types, and user segments generate the most booking intent.
+
+**Acceptance Criteria:**
+
+**Given** a user clicks a "Voir sur Booking.com" or "Voir sur Hotels.com" CTA in the POI detail sheet,
+**When** the click event fires,
+**Then** a Plausible custom event `booking_click` is sent with the following props: `{ source: 'booking.com' | 'hotels.com', poi_id: string, poi_name: string, poi_type: 'hotel' | 'hostel' | 'camp_site' | 'shelter', page: 'map' | 'live', user_tier: 'free' | 'pro' | 'team' | 'anonymous' }`.
+
+**Given** the existing FR-062 implementation in Story 4.4 (basic click tracking),
+**When** Story 15.2 is implemented,
+**Then** the basic tracking from 4.4 is replaced by this enriched event — no duplicate events fired.
+
+**Given** a `booking_click` event is fired,
+**When** checking Plausible dashboard under "Custom Events",
+**Then** the event appears with filterable props (source, poi_type, page, user_tier) — enabling segmentation for the Booking.com application report.
+
+**Given** Plausible custom events are used,
+**When** the implementation is reviewed,
+**Then** no PII (Personally Identifiable Information) is sent in event props — only anonymized metadata — compliant with GDPR (NFR-016).
+
+---
+
+### Story 15.3: Funnel Tracking Complet — Parcours Utilisateur
+
+As a **product owner wanting to understand user behavior**,
+I want the full user journey tracked from GPX upload to booking click,
+So that I can identify drop-off points and report a credible conversion funnel to Booking.com.
+
+**Acceptance Criteria:**
+
+**Given** a user uploads a GPX file successfully,
+**When** the segment parse completes,
+**Then** a Plausible custom event `gpx_uploaded` is sent with props: `{ segment_count: number, total_km: number }`.
+
+**Given** a user opens the map view for an adventure,
+**When** the map page loads with the trace displayed,
+**Then** a custom event `map_opened` is sent with props: `{ adventure_id_hash: string }` (hashed, not raw ID — no PII).
+
+**Given** a user triggers a POI search (changes km range or activates a layer),
+**When** results are returned,
+**Then** a custom event `poi_search_triggered` is sent with props: `{ mode: 'planning' | 'live', poi_categories: string[], result_count: number }`.
+
+**Given** a user taps a POI pin and the detail sheet opens,
+**When** the sheet is displayed,
+**Then** a custom event `poi_detail_opened` is sent with props: `{ poi_type: string, source: 'overpass' | 'google' }`.
+
+**Given** all funnel events are tracked,
+**When** viewing Plausible's "Funnels" feature,
+**Then** a configured funnel `gpx_uploaded → map_opened → poi_search_triggered → poi_detail_opened → booking_click` shows step-by-step conversion rates.
+
+---
+
+### Story 15.4: Dashboard Admin `/admin/analytics`
+
+As **Guillaume (admin)**,
+I want a protected `/admin/analytics` page in the app that surfaces key metrics for the Booking.com affiliate application,
+So that I can quickly generate a snapshot report without navigating Plausible's full interface.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `/admin/analytics`,
+**When** their session is checked,
+**Then** access is restricted to users with email `guillaume@ridenrest.com` (or a configurable `ADMIN_EMAILS` env var) — non-admin users receive a 403.
+
+**Given** the page loads for an admin user,
+**When** the dashboard renders,
+**Then** the following metrics are displayed for the current month and the previous month (for comparison):
+- Total unique visitors
+- Total sessions
+- Total `booking_click` events
+- Booking click rate (booking_clicks / poi_detail_opened × 100%)
+- Top 5 POI types by booking clicks
+- Breakdown by source (booking.com vs hotels.com)
+
+**Given** the metrics are displayed,
+**When** inspecting the data source,
+**Then** metrics are fetched from Plausible's Stats API (`/api/v1/stats/*`) using a `PLAUSIBLE_API_KEY` server-side environment variable — key never exposed to the browser.
+
+**Given** an admin wants to export data for the Booking.com application,
+**When** they click "Exporter CSV",
+**Then** a CSV file is downloaded containing monthly aggregates: month, unique_visitors, sessions, booking_clicks, booking_click_rate — covering all available months since launch.

@@ -1,16 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { usePoiLayers } from './use-poi-layers'
+import { usePoiLayers, POI_PIN_COLOR } from './use-poi-layers'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 let mockVisibleLayers = new Set<string>(['accommodations'])
+const mockSetSelectedPoiId = vi.fn()
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({
-    visibleLayers: mockVisibleLayers,
-    activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
-  }),
+  useMapStore: Object.assign(
+    () => ({
+      visibleLayers: mockVisibleLayers,
+      activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
+      selectedPoiId: null,
+    }),
+    { getState: () => ({ setSelectedPoiId: mockSetSelectedPoiId }) },
+  ),
 }))
 
 const mockSetSelectedPoi = vi.fn()
@@ -36,6 +41,8 @@ interface MockMap {
   getCanvas: ReturnType<typeof vi.fn>
   flyTo: ReturnType<typeof vi.fn>
   getZoom: ReturnType<typeof vi.fn>
+  setPaintProperty: ReturnType<typeof vi.fn>
+  setFilter: ReturnType<typeof vi.fn>
   on: ReturnType<typeof vi.fn>
   off: ReturnType<typeof vi.fn>
   _handlers: Map<string, EventHandler>
@@ -54,6 +61,8 @@ function createMockMap(): MockMap {
     getCanvas: vi.fn().mockReturnValue({ style: { cursor: '' } }),
     flyTo: vi.fn(),
     getZoom: vi.fn().mockReturnValue(10),
+    setPaintProperty: vi.fn(),
+    setFilter: vi.fn(),
     on: vi.fn((event: string, layerId: string, handler: EventHandler) => {
       handlers.set(`${event}:${layerId}`, handler)
     }),
@@ -85,6 +94,12 @@ const emptyPoisByLayer: Record<MapLayer, Poi[]> = {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('POI_PIN_COLOR', () => {
+  it('is unified dark forest green #1A2D22 (--poi-pin token)', () => {
+    expect(POI_PIN_COLOR).toBe('#1A2D22')
+  })
+})
 
 describe('usePoiLayers', () => {
   let mockMap: MockMap
@@ -151,6 +166,18 @@ describe('usePoiLayers', () => {
     const feature = addSourceCall[1].data.features[0]
     expect(feature.properties.id).toBe('overpass-888')
     expect(feature.properties.name).toBe('Mon Hôtel')
+  })
+
+  it('feature properties include categoryIcon for accommodations', () => {
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poi = makePoi('accommodations', { id: 'overpass-acc', externalId: 'acc' })
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [poi] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1))
+
+    const addSourceCall = (mockMap.addSource as ReturnType<typeof vi.fn>).mock.calls[0] as [string, { data: { features: Array<{ properties: Record<string, unknown> }> } }]
+    const feature = addSourceCall[1].data.features[0]
+    expect(feature.properties.categoryIcon).toBe('🏨')
   })
 
   it('registers mouseenter/mouseleave handlers on pointLayerId for cursor', () => {

@@ -40,7 +40,7 @@ export function PoiLayerGrid({ isPending }: PoiLayerGridProps) {
               'transition-colors',
               isActive
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-surface-raised',
+                : 'bg-white text-foreground border border-[--border] hover:bg-surface-raised',
             ].join(' ')}
           >
             {isPending && isActive

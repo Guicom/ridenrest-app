@@ -18,8 +18,12 @@ vi.mock('@/stores/ui.store', () => ({
 }))
 
 let mockFromKm = 0
+const mockSetSelectedPoiId = vi.fn()
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: () => ({ fromKm: mockFromKm }),
+  useMapStore: Object.assign(
+    () => ({ fromKm: mockFromKm }),
+    { getState: () => ({ setSelectedPoiId: mockSetSelectedPoiId }) },
+  ),
 }))
 
 let mockDetails: { placeId: string; displayName: string | null; formattedAddress: string | null; lat: number | null; lng: number | null; rating: number | null; isOpenNow: boolean | null; phone: string | null; website: string | null; types: string[] } | null = null

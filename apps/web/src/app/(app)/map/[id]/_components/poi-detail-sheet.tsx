@@ -90,7 +90,7 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) setSelectedPoi(null) }}>
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) { setSelectedPoi(null); useMapStore.getState().setSelectedPoiId(null) } }}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[70vh] overflow-y-auto">
         <SheetHeader className="text-left pb-2">
           <div className="flex items-center gap-2">

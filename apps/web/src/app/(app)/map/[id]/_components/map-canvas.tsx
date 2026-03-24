@@ -1,7 +1,8 @@
 'use client'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { useTheme } from 'next-themes'
 import { useMapStore } from '@/stores/map.store'
+import { usePrefsStore } from '@/stores/prefs.store'
+import { MAP_STYLES } from '@/lib/map-styles'
 import { findPointAtKm } from '@ridenrest/gpx'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { usePoiLayers } from '@/hooks/use-poi-layers'
@@ -28,12 +29,6 @@ const densityEventHandlers = new WeakMap<object, {
   mouseenter: () => void
   mouseleave: () => void
 }>()
-
-// OpenFreeMap tile styles — MIT, commercial ok, OSM attribution required
-const TILE_STYLES = {
-  light: 'https://tiles.openfreemap.org/styles/liberty',
-  dark: 'https://tiles.openfreemap.org/styles/dark',
-} as const
 
 // Trace color — uniform brand green for all segments (C8)
 const TRACE_COLOR = '#2D6A4A'
@@ -67,7 +62,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
   // Cache the Marker class after first import so crosshair updates are fully synchronous
   const MarkerClassRef = useRef<typeof maplibregl.Marker | null>(null)
   const [styleVersion, setStyleVersion] = useState(0)
-  const { resolvedTheme } = useTheme()
+  const mapStyle = usePrefsStore((s) => s.mapStyle)
+  const styleUrl = MAP_STYLES.find((s) => s.id === mapStyle)?.url ?? MAP_STYLES[0].url
   const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension, searchRangeInteracted } = useMapStore()
 
   // Refs for stale-closure-safe access inside event handlers and theme effects
@@ -113,7 +109,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
       MarkerClassRef.current = maplibreglModule.Marker  // Cache for synchronous crosshair updates
       map = new maplibreglModule.Map({
         container: mapContainerRef.current!,
-        style: resolvedTheme === 'dark' ? TILE_STYLES.dark : TILE_STYLES.light,
+        style: styleUrl,
         center: [2.3522, 46.2276],  // France fallback center
         zoom: 5,
         attributionControl: false,  // Disabled — using <OsmAttribution /> React component
@@ -246,25 +242,22 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     },
   }), []) // Stable handle — accesses latest values via refs
 
-  // Theme switching — update map style without reloading the page (AC #3)
+  // Map style switching — update tiles when user changes style in prefs (AC #6)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const newStyle = resolvedTheme === 'dark' ? TILE_STYLES.dark : TILE_STYLES.light
-    map.setStyle(newStyle)
+    map.setStyle(styleUrl)
     // Re-add layers after style change (MapLibre resets layers on setStyle)
-    // 'segments' intentionally captured from outer closure — updateTraceLayers effect
-    // will reconcile any delta if segments changed between theme switch and style.load
-    map.once('style.load', () => {
+    map.once('styledata', () => {
       addTraceLayers(map, segments)
       // Re-add density layer if active (use refs for stale-closure-safe access)
       if (densityStatusRef.current === 'success' && coverageGapsRef.current && densityColorEnabledRef.current) {
         addDensityLayer(map, segments, coverageGapsRef.current)
       }
-      setStyleVersion((v) => v + 1)  // Triggers usePoiLayers + density re-run after theme change
+      setStyleVersion((v) => v + 1)  // Triggers usePoiLayers + density re-run after style change
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTheme])
+  }, [styleUrl])
 
   return (
     <div className="relative h-full w-full">

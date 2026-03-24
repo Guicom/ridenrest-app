@@ -28,6 +28,9 @@ interface MapState {
   // Accommodation sub-type filter (Story 8.4)
   activeAccommodationTypes: Set<PoiCategory>
 
+  // Selected POI pin state (Story 9.3)
+  selectedPoiId: string | null
+
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
   toggleLayer: (layer: MapLayer) => void
@@ -37,11 +40,12 @@ interface MapState {
   setWeatherActive: (active: boolean) => void
   setWeatherDimension: (dimension: WeatherDimension) => void
   toggleAccommodationType: (type: PoiCategory) => void
+  setSelectedPoiId: (id: string | null) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
   activeLayer: null,
-  visibleLayers: new Set(),
+  visibleLayers: new Set(['accommodations'] as MapLayer[]),
   zoom: 10,
   center: null,
   fromKm: 0,
@@ -51,6 +55,7 @@ export const useMapStore = create<MapState>((set) => ({
   weatherActive: false,
   weatherDimension: 'temperature',
   activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'] as PoiCategory[]),
+  selectedPoiId: null,
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -85,4 +90,6 @@ export const useMapStore = create<MapState>((set) => ({
       }
       return { activeAccommodationTypes: next }
     }),
+
+  setSelectedPoiId: (id) => set({ selectedPoiId: id }),
 }))

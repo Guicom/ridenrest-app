@@ -1,14 +1,16 @@
 import { useEffect } from 'react'
 import { useUIStore } from '@/stores/ui.store'
+import { useMapStore } from '@/stores/map.store'
 import { CATEGORY_TO_LAYER } from '@ridenrest/shared'
+import { POI_PIN_COLOR } from './use-poi-layers'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 import type maplibregl from 'maplibre-gl'
 
-const LAYER_COLORS: Record<MapLayer, string> = {
-  accommodations: '#3B82F6',
-  restaurants:    '#EF4444',
-  supplies:       '#10B981',
-  bike:           '#F59E0B',
+const LAYER_ICONS: Record<MapLayer, string> = {
+  accommodations: '🏨',
+  restaurants:    '🍽',
+  supplies:       '🛒',
+  bike:           '🚲',
 }
 
 const ALL_LAYERS: MapLayer[] = ['accommodations', 'restaurants', 'supplies', 'bike']
@@ -25,6 +27,9 @@ export function useLivePoiLayers(
   pois: Poi[],
   mapReady: boolean,
 ) {
+  const selectedPoiId = useMapStore((s) => s.selectedPoiId)
+
+  // Main effect — creates/updates layers when POI data or map readiness changes
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
@@ -45,13 +50,20 @@ export function useLivePoiLayers(
       const clusterLayerId = `${sourceId}-clusters`
       const clusterCountId = `${sourceId}-cluster-count`
       const pointLayerId = `${sourceId}-points`
-      const color = LAYER_COLORS[layer]
+      const iconLayerId = `${sourceId}-icons`
+      const ringLayerId = `${sourceId}-selected-ring`
 
       const layerPois = poisByLayer[layer]
       const features: GeoJSON.Feature[] = layerPois.map((poi) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
-        properties: { id: poi.id, externalId: poi.externalId, name: poi.name, category: poi.category },
+        properties: {
+          id: poi.id,
+          externalId: poi.externalId,
+          name: poi.name,
+          category: poi.category,
+          categoryIcon: LAYER_ICONS[layer],
+        },
       }))
 
       if (map.getSource(sourceId)) {
@@ -77,7 +89,7 @@ export function useLivePoiLayers(
           source: sourceId,
           filter: ['has', 'point_count'],
           paint: {
-            'circle-color': color,
+            'circle-color': POI_PIN_COLOR,
             'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 28],
             'circle-opacity': 0.8,
             'circle-stroke-color': '#fff',
@@ -104,10 +116,41 @@ export function useLivePoiLayers(
           source: sourceId,
           filter: ['!', ['has', 'point_count']],
           paint: {
-            'circle-color': color,
             'circle-radius': 8,
-            'circle-stroke-color': '#fff',
+            'circle-color': POI_PIN_COLOR,
+            'circle-stroke-color': '#FFFFFF',
+            'circle-stroke-width': 1.5,
+          },
+        }, beforeLayer)
+
+        // White category icon text on top of each pin
+        map.addLayer({
+          id: iconLayerId,
+          type: 'symbol',
+          source: sourceId,
+          filter: ['!', ['has', 'point_count']],
+          layout: {
+            'text-field': ['get', 'categoryIcon'],
+            'text-size': 10,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+          },
+          paint: { 'text-color': '#FFFFFF' },
+        }, beforeLayer)
+
+        // Selected ring — initially hidden
+        map.addLayer({
+          id: ringLayerId,
+          type: 'circle',
+          source: sourceId,
+          filter: ['==', ['get', 'id'], '___none___'],
+          paint: {
+            'circle-radius': 13,
+            'circle-color': 'transparent',
+            'circle-stroke-color': '#2D6A4A',
             'circle-stroke-width': 2,
+            'circle-opacity': 0,
+            'circle-stroke-opacity': 1,
           },
         }, beforeLayer)
       }
@@ -122,6 +165,7 @@ export function useLivePoiLayers(
         if (!e.features || e.features.length === 0) return
         const props = e.features[0].properties as { id: string }
         useUIStore.getState().setSelectedPoi(props.id)
+        useMapStore.getState().setSelectedPoiId(props.id)
         e.preventDefault()
       }
       const setCursor = () => { map.getCanvas().style.cursor = 'pointer' }
@@ -146,4 +190,26 @@ export function useLivePoiLayers(
 
     return () => { cleanupFns.forEach((fn) => fn()) }
   }, [mapRef, pois, mapReady])
+
+  // Separate effect — updates selected pin visual state reactively
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const id = selectedPoiId ?? '___none___'
+    const radiusExpr = ['case', ['==', ['get', 'id'], selectedPoiId ?? ''], 9.6, 8] as unknown
+
+    for (const layer of ALL_LAYERS) {
+      const sourceId = `live-pois-${layer}`
+      const pointLayerId = `${sourceId}-points`
+      const ringLayerId = `${sourceId}-selected-ring`
+
+      if (map.getLayer(pointLayerId)) {
+        map.setPaintProperty(pointLayerId, 'circle-radius', radiusExpr)
+      }
+      if (map.getLayer(ringLayerId)) {
+        map.setFilter(ringLayerId, ['==', ['get', 'id'], id])
+      }
+    }
+  }, [mapRef, selectedPoiId, mapReady])
 }

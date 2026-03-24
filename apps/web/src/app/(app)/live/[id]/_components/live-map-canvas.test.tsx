@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
 import { LiveMapCanvas } from './live-map-canvas'
 import { useLiveStore } from '@/stores/live.store'
 import type { MapSegmentData } from '@ridenrest/shared'
@@ -7,6 +7,12 @@ import type { MapSegmentData } from '@ridenrest/shared'
 afterEach(cleanup)
 
 // Mock MapLibre — WebGL unavailable in jsdom
+const mockMarkerInstance = {
+  addTo: vi.fn().mockReturnThis(),
+  setLngLat: vi.fn().mockReturnThis(),
+  remove: vi.fn(),
+}
+
 const mockMapInstance = {
   on: vi.fn(),
   off: vi.fn(),
@@ -19,13 +25,18 @@ const mockMapInstance = {
   fitBounds: vi.fn(),
   remove: vi.fn(),
   panTo: vi.fn(),
+  easeTo: vi.fn(),
+  setStyle: vi.fn(),
   getCanvas: vi.fn().mockReturnValue({ style: {} }),
   getZoom: vi.fn().mockReturnValue(10),
   flyTo: vi.fn(),
 }
 
+const MockMarkerClass = vi.fn().mockImplementation(function () { return mockMarkerInstance })
+
 vi.mock('maplibre-gl', () => ({
   Map: vi.fn().mockImplementation(function (this: unknown) { return mockMapInstance }),
+  Marker: MockMarkerClass,
 }))
 
 // Mock findPointAtKm
@@ -33,14 +44,26 @@ vi.mock('@ridenrest/gpx', () => ({
   findPointAtKm: vi.fn().mockReturnValue({ lat: 43.3, lng: 1.3 }),
 }))
 
-// Mock next-themes
-vi.mock('next-themes', () => ({
-  useTheme: () => ({ resolvedTheme: 'light' }),
-}))
-
 // Mock OsmAttribution
 vi.mock('@/components/shared/osm-attribution', () => ({
   OsmAttribution: () => <div data-testid="osm-attribution" />,
+}))
+
+// Mock prefs store
+vi.mock('@/stores/prefs.store', () => ({
+  usePrefsStore: (sel: (s: { mapStyle: string }) => unknown) => sel({ mapStyle: 'liberty' }),
+}))
+
+// Mock map-styles
+vi.mock('@/lib/map-styles', () => ({
+  MAP_STYLES: [
+    { id: 'liberty', label: 'Liberty', description: 'Clair', url: 'https://tiles.openfreemap.org/styles/liberty' },
+  ],
+}))
+
+// Mock useLivePoiLayers
+vi.mock('@/hooks/use-live-poi-layers', () => ({
+  useLivePoiLayers: vi.fn(),
 }))
 
 function makeSegment(): MapSegmentData {
@@ -88,7 +111,7 @@ describe('LiveMapCanvas', () => {
     })
   })
 
-  it('adds trace source and gps-dot layer on map load', async () => {
+  it('adds trace, target-dot and gps-position sources/layers on map load', async () => {
     let loadCallback: (() => void) | undefined
     mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
       if (event === 'load') loadCallback = cb
@@ -106,34 +129,50 @@ describe('LiveMapCanvas', () => {
     const sourceIds = addSourceCalls.map(([id]) => id)
     expect(sourceIds).toContain('live-trace')
     expect(sourceIds).toContain('live-target-point')
-    expect(sourceIds).toContain('live-gps-position')
+    expect(sourceIds).toContain('gps-position')
 
     const addLayerCalls = mockMapInstance.addLayer.mock.calls as [{ id: string }][]
     const layerIds = addLayerCalls.map(([l]) => l.id)
     expect(layerIds).toContain('target-dot')
     expect(layerIds).toContain('gps-dot')
+    expect(layerIds).toContain('gps-halo')
   })
 
-  it('updates GPS source when currentPosition changes in store', async () => {
-    const mockGpsSource = { setData: vi.fn() }
-    mockMapInstance.getSource.mockImplementation((id: string) =>
-      id === 'live-gps-position' ? mockGpsSource : undefined,
-    )
-    mockMapInstance.isStyleLoaded.mockReturnValue(true)
-
+  it('calls flyTo when searchTrigger increments (> 0)', async () => {
     let loadCallback: (() => void) | undefined
     mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
       if (event === 'load') loadCallback = cb
     })
+    mockMapInstance.getSource.mockReturnValue({
+      setData: vi.fn(),
+    })
 
-    render(<LiveMapCanvas adventureId="adv-1" segments={[makeSegment()]} />)
-    await waitFor(() => { expect(loadCallback).toBeDefined() })
-    loadCallback?.()
+    const { rerender } = render(
+      <LiveMapCanvas
+        adventureId="adv-1"
+        segments={[makeSegment()]}
+        targetKm={40}
+        searchTrigger={0}
+      />,
+    )
 
-    useLiveStore.setState({ currentPosition: { lat: 43.3, lng: 1.2 } })
+    await waitFor(() => expect(loadCallback).toBeDefined())
+    act(() => { loadCallback?.() })
+
+    // Trigger search
+    rerender(
+      <LiveMapCanvas
+        adventureId="adv-1"
+        segments={[makeSegment()]}
+        targetKm={40}
+        searchTrigger={1}
+      />,
+    )
 
     await waitFor(() => {
-      expect(mockGpsSource.setData).toHaveBeenCalled()
+      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
+        expect.objectContaining({ zoom: 13 }),
+      )
     })
   })
 })
