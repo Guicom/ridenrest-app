@@ -109,10 +109,14 @@ describe('LiveControls', () => {
     expect(useLiveStore.getState().targetAheadKm).toBe(50)
   })
 
-  it('has lg:hidden class on container', () => {
+  it('has desktop positioning classes (left-aligned, floating, all corners rounded, no shadow)', () => {
     render(<LiveControls {...defaultProps} />)
     const container = screen.getByTestId('live-controls')
-    expect(container.className).toContain('lg:hidden')
+    expect(container.className).toContain('lg:right-auto')
+    expect(container.className).toContain('lg:w-[360px]')
+    expect(container.className).toContain('lg:bottom-4')
+    expect(container.className).toContain('lg:rounded-2xl')
+    expect(container.className).toContain('lg:shadow-none')
   })
 
   it('does not render weather panel (weather is on map overlay)', () => {

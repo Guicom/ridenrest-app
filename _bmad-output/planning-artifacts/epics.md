@@ -1516,19 +1516,23 @@ So that I can decide quickly without leaving the map.
 
 **Given** a user taps a POI pin,
 **When** the Vaul Drawer opens,
-**Then** it snaps to 40% height (name, price, rating, CTA) and 85% on pull-up (full details); map backdrop blur applied; dismisses via swipe down or tap backdrop.
+**Then** it snaps to 40% height (name, type, distance, CTA) and 85% on pull-up (full details); dismisses via swipe down or tap backdrop.
 
 **Given** the POI card renders for an accommodation,
 **When** displayed,
-**Then** shows: name (`text-lg font-semibold`), type badge (`--primary-light` chip), distance from trace (`text-sm text-[--text-secondary]`), km on route (`font-mono text-sm`), price/night (`font-mono text-xl font-bold`), star rating.
+**Then** shows: name (`text-lg font-semibold`), type badge (`--primary-light` chip), distance from trace (`text-sm text-[--text-secondary]`), km on route (`font-mono text-sm`).
 
 **Given** the Booking.com CTA renders,
 **When** displayed,
-**Then** full-width primary button "Voir sur Booking.com" with external link icon; `target="_blank" rel="noopener noreferrer"`; explicit `aria-label`.
+**Then** full-width primary button "Recherche sur Booking" with external link icon; `target="_blank" rel="noopener noreferrer"`; explicit `aria-label`.
+
+**Given** a Google Places website URL is available for an accommodation,
+**When** the card displays,
+**Then** a secondary ghost button "Site officiel" is shown below the Booking CTA, linking to the establishment's website; `target="_blank" rel="noopener noreferrer"`.
 
 **Given** a non-accommodation POI (restau, vélo) renders,
 **When** the card displays,
-**Then** Booking.com CTA replaced by "Voir sur OpenStreetMap" ghost button.
+**Then** no CTA is shown.
 
 ---
 

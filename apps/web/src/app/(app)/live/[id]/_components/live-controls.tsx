@@ -19,7 +19,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
   const etaSummary = formatEtaSummary(targetAheadKm, speedKmh)
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 lg:hidden bg-white rounded-t-2xl shadow-lg px-4 pt-5 pb-8" data-testid="live-controls">
+    <div className="absolute bottom-0 left-0 right-0 z-30 lg:right-auto lg:w-[360px] lg:bottom-4 lg:left-4 bg-white rounded-t-2xl lg:rounded-2xl shadow-lg lg:shadow-none px-4 pt-5 pb-8" data-testid="live-controls">
       {/* Header row */}
       <div className="flex items-start justify-between mb-7">
         <div>

@@ -83,19 +83,9 @@ vi.mock('./_components/live-controls', () => ({
   ),
 }))
 
-// Mock PoiLayerGrid (used in desktop sidebar)
-vi.mock('../../map/[id]/_components/poi-layer-grid', () => ({
-  PoiLayerGrid: () => <div data-testid="poi-layer-grid" />,
-}))
-
-// Mock SidebarDensitySection (used in desktop sidebar)
-vi.mock('../../map/[id]/_components/sidebar-density-section', () => ({
-  SidebarDensitySection: () => <div data-testid="sidebar-density-section" />,
-}))
-
-// Mock Slider (used in desktop sidebar)
-vi.mock('@/components/ui/slider', () => ({
-  Slider: () => <input type="range" data-testid="sidebar-slider" />,
+// Mock ElevationProfile (desktop only, full width)
+vi.mock('../../map/[id]/_components/elevation-profile', () => ({
+  ElevationProfile: () => <div data-testid="elevation-profile" />,
 }))
 
 // Mock LiveFiltersDrawer (Story 8.4)
@@ -205,28 +195,20 @@ describe('LivePage', () => {
     expect(adventuresLink).toBeUndefined()
   })
 
-  it('renders "Quitter le live" button (AC #5)', () => {
-    mockUseLiveMode.mockReturnValue(defaultLiveMode())
-    render(<LivePage />)
-    expect(screen.getByTestId('quit-live-btn')).toBeDefined()
-    expect(screen.getByTestId('quit-live-btn').textContent).toContain('Quitter le live')
-  })
-
-  it('first click on "Quitter le live" shows confirm state (AC #6)', async () => {
+  it('renders "Quitter le live" button with Undo2 icon (AC #5)', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode())
     render(<LivePage />)
     const btn = screen.getByTestId('quit-live-btn')
-    await act(async () => { fireEvent.click(btn) })
-    expect(btn.textContent).toContain('Confirmer')
+    expect(btn).toBeDefined()
+    expect(btn.getAttribute('aria-label')).toBe('Quitter le live')
   })
 
-  it('second click on "Quitter le live" calls stopWatching and navigates to /adventures (AC #6)', async () => {
+  it('single click on "Quitter le live" calls stopWatching and navigates to /adventures (AC #6)', async () => {
     const stopWatching = vi.fn()
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ stopWatching }))
     render(<LivePage />)
     const btn = screen.getByTestId('quit-live-btn')
-    await act(async () => { fireEvent.click(btn) }) // first click — confirm state
-    await act(async () => { fireEvent.click(btn) }) // second click — confirmed
+    await act(async () => { fireEvent.click(btn) })
     expect(stopWatching).toHaveBeenCalledTimes(1)
     expect(mockPush).toHaveBeenCalledWith('/adventures')
   })
@@ -296,6 +278,27 @@ describe('LivePage', () => {
     const banners = screen.getAllByTestId('status-banner')
     expect(banners).toHaveLength(1)
     expect(banners[0].getAttribute('data-variant')).toBe('offline')
+  })
+})
+
+describe('LivePage — desktop elevation profile', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders elevation profile (full-width desktop panel)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+    expect(screen.getByTestId('elevation-profile')).toBeDefined()
+  })
+
+  it('collapse button toggles elevation profile aria-label', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+    const btn = screen.getByTestId('elevation-collapse-btn')
+    expect(btn.getAttribute('aria-label')).toContain('Masquer')
+    fireEvent.click(btn)
+    expect(btn.getAttribute('aria-label')).toContain('Afficher')
   })
 })
 

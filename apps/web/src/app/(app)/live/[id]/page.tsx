@@ -15,18 +15,17 @@ import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData } from '@/lib/api-client'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
-import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
 import { LiveFiltersDrawer } from './_components/live-filters-drawer'
+import { Undo2, ChevronUp, ChevronDown } from 'lucide-react'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
 import { StatusBanner } from './_components/status-banner'
 import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
 import { ElevationStrip } from './_components/elevation-strip'
-import { PoiLayerGrid } from '../../map/[id]/_components/poi-layer-grid'
-import { SidebarDensitySection } from '../../map/[id]/_components/sidebar-density-section'
+import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
 
 const DEFAULT_RADIUS = 5
 
@@ -42,23 +41,13 @@ export default function LivePage() {
     grantConsent,
   } = useLiveMode()
 
-  const [quitPending, setQuitPending] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTrigger, setSearchTrigger] = useState(0)
-  const quitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    return () => { if (quitTimerRef.current) clearTimeout(quitTimerRef.current) }
-  }, [])
+  const [elevationCollapsed, setElevationCollapsed] = useState(false)
 
   const handleQuitRequest = () => {
-    if (quitPending) {
-      stopWatching()
-      router.push('/adventures')
-      return
-    }
-    setQuitPending(true)
-    quitTimerRef.current = setTimeout(() => setQuitPending(false), 3000)
+    stopWatching()
+    router.push('/adventures')
   }
 
   const [mounted, setMounted] = useState(false)
@@ -141,7 +130,6 @@ export default function LivePage() {
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
-  const setTargetAheadKm = useLiveStore((s) => s.setTargetAheadKm)
 
   // Elevation strip positions
   const elevationCurrentDistKm = currentKmOnRoute
@@ -205,42 +193,10 @@ export default function LivePage() {
 
   return (
     <div className="flex h-dvh w-full overflow-hidden">
-      {/* Desktop sidebar — lg only */}
-      {mounted && isLiveModeActive && (
-        <aside
-          data-testid="live-desktop-sidebar"
-          className="hidden lg:flex flex-col w-[360px] shrink-0 border-r border-[--border] bg-background overflow-y-auto"
-        >
-          <div className="flex flex-col gap-4 p-4">
-            {/* Distance cible */}
-            <div className="rounded-xl border border-[--border] p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-[--text-secondary] mb-1">Distance cible</p>
-              <p className="font-mono text-3xl font-bold text-primary">{targetAheadKm} km</p>
-              <Slider
-                value={[targetAheadKm]}
-                onValueChange={(v: number | readonly number[]) => {
-                  const val = typeof v === 'number' ? v : v[0]
-                  setTargetAheadKm(val)
-                }}
-                min={5}
-                max={100}
-                step={5}
-                className="mt-3"
-                data-testid="sidebar-slider-target"
-              />
-            </div>
-
-            {/* Calques POI */}
-            <PoiLayerGrid isPending={poisFetching} />
-
-            {/* Densité */}
-            <SidebarDensitySection />
-          </div>
-        </aside>
-      )}
-
-      {/* Map area — fills remaining space */}
-      <div className="relative flex-1 min-w-0">
+      {/* Map area + elevation profile */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      {/* Map canvas area */}
+      <div className="relative flex-1 min-h-0">
         {/* Map canvas — z-0 */}
         <LiveMapCanvas
           adventureId={adventureId}
@@ -253,14 +209,15 @@ export default function LivePage() {
           searchTrigger={searchTrigger}
         />
 
-        {/* Quitter le live — top right z-40 */}
-        <div className="absolute top-4 right-4 z-40">
+        {/* Quitter le live — top left z-40 */}
+        <div className="absolute top-4 left-4 z-40">
           <button
             data-testid="quit-live-btn"
             onClick={handleQuitRequest}
-            className="inline-flex items-center gap-1.5 rounded-md bg-background/80 px-3 py-1.5 text-sm font-medium text-foreground backdrop-blur-sm hover:bg-background/90 border border-[--border]"
+            aria-label="Quitter le live"
+            className="inline-flex items-center justify-center rounded-md bg-background/80 p-2 text-foreground backdrop-blur-sm hover:bg-background/90 border border-[--border]"
           >
-            {quitPending ? '✓ Confirmer ?' : '⏹ Quitter le live'}
+            <Undo2 className="h-5 w-5" />
           </button>
         </div>
 
@@ -286,7 +243,7 @@ export default function LivePage() {
         {mounted && (
           <>
             {isLiveModeActive && allCumulativeWaypoints.length > 0 && (
-              <div className="absolute bottom-[88px] left-0 right-0 z-20 h-[60px] bg-background/80 backdrop-blur-sm border-t border-[--border]">
+              <div className="lg:hidden absolute bottom-[88px] left-0 right-0 z-20 h-[60px] bg-background/80 backdrop-blur-sm border-t border-[--border]">
                 <ElevationStrip
                   waypoints={allCumulativeWaypoints}
                   segments={readySegments}
@@ -355,6 +312,24 @@ export default function LivePage() {
 
         {/* Map style selector — floating bottom-right (AC #6) */}
         <MapStylePicker />
+      </div>
+
+      {/* Elevation profile — desktop only, same as planning mode */}
+      <div className={`hidden lg:block relative shrink-0 border-t border-[--border] bg-background transition-all duration-200 ${elevationCollapsed ? 'h-0' : 'h-[180px]'}`}>
+        <button
+          onClick={() => setElevationCollapsed((v) => !v)}
+          className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-background border border-[--border] shadow-sm text-muted-foreground hover:text-foreground"
+          aria-label={elevationCollapsed ? "Afficher le profil d'élévation" : "Masquer le profil d'élévation"}
+          data-testid="elevation-collapse-btn"
+        >
+          {elevationCollapsed ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
+        <ElevationProfile
+          waypoints={allCumulativeWaypoints}
+          segments={readySegments}
+          className="h-full w-full"
+        />
+      </div>
       </div>
 
       {/* POI detail sheet — opens when a pin is clicked on the map */}

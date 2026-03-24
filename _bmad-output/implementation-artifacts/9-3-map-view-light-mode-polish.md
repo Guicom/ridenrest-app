@@ -99,6 +99,12 @@ So that the map is the star without visual noise from UI chrome.
   - [x] 10.4 Added X close button next to "Filtres" title (`data-testid="filters-close-btn"`)
   - [x] 10.5 Apply button: `rounded-full h-12` (was `rounded-lg h-11`)
 
+- [x] Task 13: Desktop live mode — corrections post-review (2026-03-24)
+  - [x] 13.1 Boutons RECHERCHER + FILTRER ajoutés dans sidebar desktop (précédemment uniquement dans `LiveControls` `lg:hidden`)
+  - [x] 13.2 `<ElevationProfile>` ajouté en bas de la zone carte (desktop, collapsible, identique au mode planning) — `<ElevationStrip>` devient `lg:hidden`
+  - [x] 13.3 `<AccommodationSubTypes>` ajouté dans sidebar desktop sous `<PoiLayerGrid>` quand le calque hébergements est actif
+  - [x] 13.4 Tests mis à jour : mocks `ElevationProfile` + `AccommodationSubTypes`, 9 nouveaux tests (28 total pour page.test.tsx)
+
 - [x] Task 11: Desktop live mode — sidebar iso planning mode (AC: #8)
   - [x] 11.1 Wrapped layout in `flex h-dvh`; added `hidden lg:flex flex-col w-[360px] shrink-0 border-r` sidebar
   - [x] 11.2 Sidebar: Distance cible section (targetAheadKm + Slider) + `<PoiLayerGrid>` + `<SidebarDensitySection>` — SidebarWeatherSection omitted (weather in live mode is GPS-based via LiveWeatherOverlay, not compatible with planning pace props)
@@ -624,8 +630,9 @@ N/A — no blocking errors. Minor test fixes required: `useMapStore` mock needed
 - `searchTrigger` zoom : `zoom: 12` → `zoom: 13` (ajusté par Guillaume), test mis à jour en conséquence.
 - `weatherDepartureTime` feature : champ ajouté dans `live.store.ts` (`string | null`), input `datetime-local` dans accordion Météo du `LiveFiltersDrawer`, passage à `useLiveWeather` via `page.tsx`.
 - LiveFiltersDrawer UX : Distance de la trace + Allure en haut sur même ligne, section "Je cherche" (était "Calques"), CTA "Rechercher", titres de section agrandis (`text-sm font-semibold`), `weatherDepartureTime` dans accordion Météo avec `data-testid="input-departure-time"`.
-- All 53 test files, 483 tests pass. 0 TypeScript errors.
+- All 53 test files, 484 tests pass. 0 TypeScript errors.
 - Retours UX mobile (2026-03-24): espacement bottom sheet augmenté (pt-5, pb-8, mb-5, mb-6); thumb slider agrandi (size-6, border-2) pour accessibilité mobile via prop thumbClassName sur le composant Slider partagé.
+- Bouton "Quitter le live" (2026-03-24): déplacé de top-right → top-left; texte supprimé (icône Undo2 lucide-react uniquement, aria-label conservé); confirmation deux-clics supprimée (quit immédiat). `quitPending` state + `quitTimerRef` retirés. Tests mis à jour (3 tests → 2 tests, 482 total).
 
 ### File List
 
@@ -673,3 +680,5 @@ N/A — no blocking errors. Minor test fixes required: `useMapStore` mock needed
 | 2026-03-23 | 1.3 | GPS dot : HTML Marker → GeoJSON circle layers (Tailwind JIT incompatible avec DOM dynamique); lookahead centering : GPS-movement → route-based bearing (routeBearingAtPosition, fonctionne à l'arrêt); weatherDepartureTime feature (store + drawer input + page.tsx); LiveFiltersDrawer UX polish (layout, labels, CTA) | claude-sonnet-4-6 |
 | 2026-03-23 | 1.4 | Fix zoom initial intermittent (hasInitialZoomedRef reset dans cleanup); OFFSET_PX 300 + searchTrigger zoom 13 (ajustements Guillaume); test mis à jour | claude-sonnet-4-6 |
 | 2026-03-24 | 1.5 | Retours UX mobile: espacement bottom sheet (`pt-3→pt-5`, `pb-6→pb-8`, header `mb-3→mb-5`, slider `mb-4→mb-6`); thumb slider agrandi (`size-3→size-6 border-2`) via prop `thumbClassName` sur `Slider` | claude-sonnet-4-6 |
+| 2026-03-24 | 1.6 | Bouton "Quitter le live": déplacé top-right→top-left, texte supprimé (icône Undo2 only + aria-label), confirmation deux-clics supprimée (quit immédiat) | claude-sonnet-4-6 |
+| 2026-03-24 | 1.7 | Redesign desktop live mode: sidebar supprimée; `<LiveControls>` visible sur desktop (bottom-left 360px, `lg:right-auto lg:w-[360px]`); `<ElevationProfile>` pleine largeur en bas (collapsible); `<ElevationStrip>` mobile-only (`lg:hidden`) | claude-sonnet-4-6 |
