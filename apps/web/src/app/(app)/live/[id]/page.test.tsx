@@ -335,7 +335,7 @@ describe('LivePage — Story 8.4 FILTERS button', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockMapVisibleLayers = new Set(['accommodations'])
     mockMapWeatherActive = false
-    mockMapDensityColorEnabled = true
+    mockMapDensityColorEnabled = false
     mockLiveSearchRadiusKm = 5
     render(<LivePage />)
     // Badge span only renders when activeFilterCount > 0
@@ -347,7 +347,7 @@ describe('LivePage — Story 8.4 FILTERS button', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockMapVisibleLayers = new Set(['accommodations', 'restaurants'])
     mockMapWeatherActive = false
-    mockMapDensityColorEnabled = true
+    mockMapDensityColorEnabled = false
     mockLiveSearchRadiusKm = 5
     render(<LivePage />)
     const btn = screen.getByTestId('live-filters-btn')

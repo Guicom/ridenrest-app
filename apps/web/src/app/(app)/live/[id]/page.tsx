@@ -115,7 +115,7 @@ export default function LivePage() {
     if (mapVisibleLayers.has('supplies')) count++
     if (mapVisibleLayers.has('bike')) count++
     if (mapWeatherActive) count++
-    if (!mapDensityColorEnabled) count++
+    if (mapDensityColorEnabled) count++
     if (liveSearchRadiusKm !== DEFAULT_RADIUS) count++
     return count
   }, [mapVisibleLayers, mapWeatherActive, mapDensityColorEnabled, liveSearchRadiusKm])
@@ -310,8 +310,8 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* Map style selector — floating bottom-right (AC #6) */}
-        <MapStylePicker />
+        {/* Map style selector — top-right (bottom-right hidden under LiveControls on mobile) */}
+        <MapStylePicker className="top-4 right-4 bottom-auto" />
       </div>
 
       {/* Elevation profile — desktop only, same as planning mode */}
