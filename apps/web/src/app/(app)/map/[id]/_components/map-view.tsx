@@ -8,7 +8,7 @@ import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import { MapCanvas } from './map-canvas'
 import type { MapCanvasHandle } from './map-canvas'
 import { SearchRangeControl } from './search-range-control'
-import { PoiDetailSheet } from './poi-detail-sheet'
+import { PoiPopup } from './poi-popup'
 import { WEATHER_PACE_STORAGE_KEY } from './weather-controls'
 import { SidebarWeatherSection } from './sidebar-weather-section'
 import { SidebarDensitySection } from './sidebar-density-section'
@@ -100,7 +100,7 @@ export function MapView({ adventureId }: MapViewProps) {
     ? [{ segmentId: 'adventure', weatherPoints: allWeatherPoints, waypoints: allCumulativeWaypoints }]
     : []
 
-  const { selectedPoiId } = useUIStore()
+  const { selectedPoiId, setSelectedPoi } = useUIStore()
 
   // Find the selected POI from poisByLayer (already in memory — no extra fetch needed)
   const allPois = Object.values(poisByLayer).flat()
@@ -240,11 +240,18 @@ export function MapView({ adventureId }: MapViewProps) {
             </div>
           )}
 
-          <PoiDetailSheet
-            poi={selectedPoi}
-            segments={readySegments}
-            segmentId={selectedSegmentId}
-          />
+          {selectedPoi && mapCanvasRef.current?.getMap() && (
+            <PoiPopup
+              poi={selectedPoi}
+              segments={readySegments}
+              segmentId={selectedSegmentId}
+              map={mapCanvasRef.current.getMap()!}
+              onClose={() => {
+                useUIStore.getState().setSelectedPoi(null)
+                useMapStore.getState().setSelectedPoiId(null)
+              }}
+            />
+          )}
 
           {/* Map style selector — floating bottom-right (AC #6) */}
           <MapStylePicker />

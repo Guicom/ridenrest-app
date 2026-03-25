@@ -50,16 +50,18 @@ vi.mock('@ridenrest/gpx', () => ({
   },
 }))
 
-// shadcn Sheet — render children inline
-vi.mock('@/components/ui/sheet', () => ({
-  Sheet: ({ children, onOpenChange }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => (
-    <div data-testid="sheet" onClick={() => onOpenChange?.(false)}>{children}</div>
-  ),
-  SheetContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="sheet-content">{children}</div>
-  ),
-  SheetHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SheetTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+// Vaul Drawer mock
+vi.mock('vaul', () => ({
+  Drawer: {
+    Root: ({ children, open, onOpenChange }: any) => (
+      <div data-testid="drawer" data-open={open} onClick={() => onOpenChange?.(false)}>{children}</div>
+    ),
+    Portal: ({ children }: any) => <div>{children}</div>,
+    Overlay: () => <div data-testid="drawer-overlay" />,
+    Content: ({ children }: any) => <div data-testid="drawer-content">{children}</div>,
+    Title: ({ children, className }: any) => <h2 className={className}>{children}</h2>,
+    Handle: () => <div data-testid="drawer-handle" />,
+  },
 }))
 
 vi.mock('@/components/ui/skeleton', () => ({
@@ -135,7 +137,7 @@ describe('PoiDetailSheet', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.getByText('Hôtel du Lac')).toBeDefined()
+    expect(screen.getAllByText('Hôtel du Lac').length).toBeGreaterThan(0)
   })
 
   it('renders category icon for accommodation', () => {
@@ -196,57 +198,125 @@ describe('PoiDetailSheet', () => {
     expect(screen.getByText('↑ 200 m')).toBeDefined()
   })
 
-  it('shows booking buttons for accommodation POI', () => {
+  // ── Type badge ──────────────────────────────────────────────────────────────
+
+  it('shows "Hébergement" type badge for accommodation POI', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.getByText('Rechercher sur Booking.com')).toBeDefined()
-    expect(screen.getByText('Rechercher sur Hotels.com')).toBeDefined()
+    expect(screen.getByText('Hébergement')).toBeDefined()
   })
 
-  it('does NOT show booking buttons for restaurant POI', () => {
+  it('shows "Restauration" type badge for restaurant POI', () => {
     render(
       <PoiDetailSheet poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.queryByText('Rechercher sur Booking.com')).toBeNull()
-    expect(screen.queryByText('Rechercher sur Hotels.com')).toBeNull()
+    expect(screen.getByText('Restauration')).toBeDefined()
   })
 
-  it('shows "Lien partenaire" label when booking buttons visible', () => {
+  // ── Booking CTA ─────────────────────────────────────────────────────────────
+
+  it('shows "Recherche sur Booking" button for accommodation POI', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.getByText('Lien partenaire')).toBeDefined()
+    expect(screen.getByText('Recherche sur Booking')).toBeDefined()
   })
 
-  it('booking link href contains latitude and longitude (not POI name)', () => {
+  it('does NOT show booking button for restaurant POI', () => {
+    render(
+      <PoiDetailSheet poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.queryByText('Recherche sur Booking')).toBeNull()
+  })
+
+  it('booking link href contains latitude and longitude', () => {
     const poi = makeAccommodationPoi({ lat: 43.1, lng: 1.1 })
     render(
       <PoiDetailSheet poi={poi} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    const bookingLink = screen.getByText('Rechercher sur Booking.com').closest('a')!
+    const bookingLink = screen.getByText('Recherche sur Booking').closest('a')!
     expect(bookingLink.href).toContain('latitude=43.1')
     expect(bookingLink.href).toContain('longitude=1.1')
-    const hotelsLink = screen.getByText('Rechercher sur Hotels.com').closest('a')!
-    expect(hotelsLink.href).toContain('43.1')
-    expect(hotelsLink.href).toContain('1.1')
   })
 
-  it('trackBookingClick called on Booking.com button click', () => {
+  it('trackBookingClick called with booking_com on Booking button click', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    fireEvent.click(screen.getByText('Rechercher sur Booking.com'))
+    fireEvent.click(screen.getByText('Recherche sur Booking'))
     expect(mockTrackBookingClick).toHaveBeenCalledWith('123', 'booking_com')
   })
 
-  it('trackBookingClick called on Hotels.com button click', () => {
+  it('trackBookingClick NOT called for hotels_com (Hotels.com removed)', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    fireEvent.click(screen.getByText('Rechercher sur Hotels.com'))
-    expect(mockTrackBookingClick).toHaveBeenCalledWith('123', 'hotels_com')
+    // Only Booking button exists — assert hotels_com is never tracked
+    expect(mockTrackBookingClick).not.toHaveBeenCalledWith(expect.anything(), 'hotels_com')
   })
+
+  // ── "Site officiel" ghost button ────────────────────────────────────────────
+
+  it('shows "Site officiel" button when displayWebsite available for accommodation', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { website: 'https://hotel-test.fr' } } as unknown as Poi
+    render(
+      <PoiDetailSheet poi={poi} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.getByText('Site officiel')).toBeDefined()
+    const link = screen.getByText('Site officiel').closest('a')!
+    expect(link.href).toContain('https://hotel-test.fr')
+  })
+
+  it('does NOT show "Site officiel" button when displayWebsite is null for accommodation', () => {
+    render(
+      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.queryByText('Site officiel')).toBeNull()
+  })
+
+  it('does NOT show "Site officiel" button for non-accommodation POI even if website available', () => {
+    const poi = { ...makeRestaurantPoi(), rawData: { website: 'https://restaurant-test.fr' } } as unknown as Poi
+    render(
+      <PoiDetailSheet poi={poi} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.queryByText('Site officiel')).toBeNull()
+  })
+
+  it('"Site officiel" uses Google details website when available', () => {
+    mockDetails = { placeId: 'ChIJABC', displayName: 'Hotel Test', formattedAddress: null, lat: null, lng: null, rating: null, isOpenNow: null, phone: null, website: 'https://google-website.fr', types: [] }
+    render(
+      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    const link = screen.getByText('Site officiel').closest('a')!
+    expect(link.href).toContain('https://google-website.fr')
+  })
+
+  // ── Removed elements (regression guards) ───────────────────────────────────
+
+  it('does NOT show "Lien partenaire" label', () => {
+    render(
+      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.queryByText('Lien partenaire')).toBeNull()
+  })
+
+  it('does NOT show Hotels.com button', () => {
+    render(
+      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.queryByText(/Hotels\.com/i)).toBeNull()
+  })
+
+  it('does NOT show rating block (⭐)', () => {
+    mockDetails = { placeId: 'ChIJABC', displayName: 'Hotel Test', formattedAddress: '1 Rue Test', lat: 48.8, lng: 2.3, rating: 4.2, isOpenNow: true, phone: null, website: null, types: [] }
+    render(
+      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+    )
+    expect(screen.queryByText('⭐ 4.2 / 5')).toBeNull()
+  })
+
+  // ── Google enrichment ───────────────────────────────────────────────────────
 
   it('shows <Skeleton /> when detailsPending=true', () => {
     mockDetailsPending = true
@@ -254,14 +324,6 @@ describe('PoiDetailSheet', () => {
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
     expect(screen.getAllByTestId('skeleton').length).toBeGreaterThan(0)
-  })
-
-  it('shows rating when details loaded', () => {
-    mockDetails = { placeId: 'ChIJABC', displayName: 'Hotel Test', formattedAddress: '1 Rue Test', lat: 48.8, lng: 2.3, rating: 4.2, isOpenNow: true, phone: null, website: null, types: [] }
-    render(
-      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
-    )
-    expect(screen.getByText('⭐ 4.2 / 5')).toBeDefined()
   })
 
   it('shows open/closed status when details loaded', () => {
@@ -280,12 +342,12 @@ describe('PoiDetailSheet', () => {
     expect(screen.getByText('✗ Fermé')).toBeDefined()
   })
 
-  it('setSelectedPoi(null) called when Sheet closed', () => {
+  it('setSelectedPoi(null) called when Drawer closed', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    // Simulate sheet close via onOpenChange(false)
-    fireEvent.click(screen.getByTestId('sheet'))
+    // Simulate drawer close via onOpenChange(false)
+    fireEvent.click(screen.getByTestId('drawer'))
     expect(mockSetSelectedPoi).toHaveBeenCalledWith(null)
   })
 
@@ -307,11 +369,13 @@ describe('PoiDetailSheet', () => {
     expect(screen.queryByText('+33 4 00 00 00 00')).toBeNull()
   })
 
-  it('shows OSM rawData website when Google details not available', () => {
+  it('shows "Site officiel" using OSM rawData website when Google details not available', () => {
     const poi = { ...makeAccommodationPoi(), rawData: { website: 'https://hotel-test.fr' } } as unknown as Poi
     render(
       <PoiDetailSheet poi={poi} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.getByText('https://hotel-test.fr')).toBeDefined()
+    // Accommodation: website shown via "Site officiel" ghost button, not raw URL text
+    const link = screen.getByText('Site officiel').closest('a')!
+    expect(link.href).toContain('https://hotel-test.fr')
   })
 })

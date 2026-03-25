@@ -1,5 +1,6 @@
 'use client'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Drawer } from 'vaul'
+import { ExternalLink, Globe } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUIStore } from '@/stores/ui.store'
 import { useMapStore } from '@/stores/map.store'
@@ -15,6 +16,13 @@ const LAYER_ICONS: Record<MapLayer, string> = {
   restaurants:    '🍽️',
   supplies:       '🛒',
   bike:           '🚲',
+}
+
+const LAYER_LABELS: Record<MapLayer, string> = {
+  accommodations: 'Hébergement',
+  restaurants:    'Restauration',
+  supplies:       'Alimentation',
+  bike:           'Vélo / Réparation',
 }
 
 const ACCOMMODATION_CATEGORIES = LAYER_CATEGORIES.accommodations
@@ -82,126 +90,146 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
   const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
   const bookingUrl = `https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}`
-  const hotelsUrl  = `https://www.hotels.com/search.do?q-destination=${poi.lat}%2C${poi.lng}`
 
-  const handleBookingClick = (platform: 'booking_com' | 'hotels_com') => {
+  const handleBookingClick = (platform: 'booking_com') => {
     // Fire-and-forget analytics — do NOT await
     trackBookingClick(poi.externalId, platform)
   }
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) { setSelectedPoi(null); useMapStore.getState().setSelectedPoiId(null) } }}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[70vh] overflow-y-auto">
-        <SheetHeader className="text-left pb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl" aria-hidden="true">{LAYER_ICONS[layer]}</span>
-            <SheetTitle className="text-base font-semibold leading-tight">
-              {poi.name}
-            </SheetTitle>
-          </div>
-        </SheetHeader>
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={(open) => { if (!open) { setSelectedPoi(null); useMapStore.getState().setSelectedPoiId(null) } }}
+      snapPoints={[0.4, 0.85]}
+    >
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-background rounded-t-2xl h-full max-h-[85vh] focus:outline-none">
+          <Drawer.Title className="sr-only">{poi.name}</Drawer.Title>
 
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-2 gap-2 py-3 border-y border-zinc-100 dark:border-zinc-800">
-          <StatItem label="Sur la trace" value={`km ${poiKm.toFixed(1)}`} />
-          {isLiveMode && poi.distFromTargetM != null ? (
-            <StatItem
-              label="Distance cible"
-              value={
-                poi.distFromTargetM < 1000
-                  ? `${poi.distFromTargetM} m`
-                  : `${(poi.distFromTargetM / 1000).toFixed(1)} km`
-              }
-            />
-          ) : (
-            <StatItem
-              label="Distance trace"
-              value={
-                poi.distFromTraceM < 1000
-                  ? `${Math.round(poi.distFromTraceM)} m`
-                  : `${(poi.distFromTraceM / 1000).toFixed(1)} km`
-              }
-            />
-          )}
-          {elevationGainM !== null && elevationGainM > 0 && (
-            <StatItem label="D+" value={`↑ ${elevationGainM} m`} />
-          )}
-          <StatItem
-            label="Temps estimé"
-            value={formatEta(distanceKm, speed)}
-            hint={`(à ${speed} km/h)`}
-          />
-        </div>
+          {/* Drag handle */}
+          <div className="w-12 h-1.5 bg-[--border] rounded-full mx-auto mt-3 mb-2 shrink-0" />
 
-        {/* ── Google enrichment (progressive) ── */}
-        {detailsPending ? (
-          <div className="py-3 space-y-1.5">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-        ) : details ? (
-          <div className="py-3 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {details.rating !== null && (
-              <p>⭐ {details.rating.toFixed(1)} / 5</p>
-            )}
-            {details.isOpenNow !== null && (
-              <p className={details.isOpenNow ? 'text-green-600' : 'text-red-500'}>
-                {details.isOpenNow ? '✓ Ouvert maintenant' : '✗ Fermé'}
-              </p>
-            )}
-            {details.formattedAddress && (
-              <p className="text-xs">{details.formattedAddress}</p>
-            )}
-          </div>
-        ) : null}
+          <div className="px-4 pb-8 overflow-y-auto flex-1">
+            {/* ── Header: icon + name + type badge ── */}
+            <div className="flex items-start gap-2 pb-3">
+              <span className="text-2xl mt-0.5" aria-hidden="true">{LAYER_ICONS[layer]}</span>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold leading-tight">{poi.name}</h2>
+                <span className="inline-block mt-1 bg-[--primary-light] text-[--primary] text-xs font-medium px-2 py-0.5 rounded-full">
+                  {LAYER_LABELS[layer]}
+                </span>
+              </div>
+            </div>
 
-        {/* ── Contact ── */}
-        {(displayPhone || displayWebsite) && (
-          <div className="py-2 space-y-1 text-sm">
-            {displayPhone && (
-              <a href={`tel:${displayPhone}`} className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                <span aria-hidden="true">📞</span> {displayPhone}
-              </a>
-            )}
-            {displayWebsite && (
-              <a
-                href={displayWebsite}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs truncate"
-              >
-                <span aria-hidden="true">🌐</span> {displayWebsite}
-              </a>
-            )}
-          </div>
-        )}
+            {/* ── Stats ── */}
+            <div className="grid grid-cols-2 gap-2 py-3 border-y border-zinc-100 dark:border-zinc-800">
+              <StatItem label="Sur la trace" value={<span className="font-mono text-sm">{`km ${poiKm.toFixed(1)}`}</span>} />
+              {isLiveMode && poi.distFromTargetM != null ? (
+                <StatItem
+                  label="Distance cible"
+                  value={
+                    <span className="text-sm text-[--text-secondary]">
+                      {poi.distFromTargetM < 1000
+                        ? `${poi.distFromTargetM} m`
+                        : `${(poi.distFromTargetM / 1000).toFixed(1)} km`}
+                    </span>
+                  }
+                />
+              ) : (
+                <StatItem
+                  label="Distance trace"
+                  value={
+                    <span className="text-sm text-[--text-secondary]">
+                      {poi.distFromTraceM < 1000
+                        ? `${Math.round(poi.distFromTraceM)} m`
+                        : `${(poi.distFromTraceM / 1000).toFixed(1)} km`}
+                    </span>
+                  }
+                />
+              )}
+              {elevationGainM !== null && elevationGainM > 0 && (
+                <StatItem label="D+" value={`↑ ${elevationGainM} m`} />
+              )}
+              <StatItem
+                label="Temps estimé"
+                value={formatEta(distanceKm, speed)}
+                hint={`(à ${speed} km/h)`}
+              />
+            </div>
 
-        {/* ── Booking deep links (accommodations only) ── */}
-        {isAccommodation && (
-          <div className="pt-3 space-y-2">
-            <p className="text-[10px] text-zinc-400 text-right">Lien partenaire</p>
-            <a
-              href={bookingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => handleBookingClick('booking_com')}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-            >
-              Rechercher sur Booking.com
-            </a>
-            <a
-              href={hotelsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => handleBookingClick('hotels_com')}
-              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-600 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
-            >
-              Rechercher sur Hotels.com
-            </a>
+            {/* ── Google enrichment (progressive) ── */}
+            {detailsPending ? (
+              <div className="py-3 space-y-1.5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-36" />
+              </div>
+            ) : details ? (
+              <div className="py-3 space-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {details.isOpenNow !== null && (
+                  <p className={details.isOpenNow ? 'text-green-600' : 'text-red-500'}>
+                    {details.isOpenNow ? '✓ Ouvert maintenant' : '✗ Fermé'}
+                  </p>
+                )}
+                {details.formattedAddress && (
+                  <p className="text-xs">{details.formattedAddress}</p>
+                )}
+              </div>
+            ) : null}
+
+            {/* ── Contact ── */}
+            {(displayPhone || (!isAccommodation && displayWebsite)) && (
+              <div className="py-2 space-y-1 text-sm">
+                {displayPhone && (
+                  <a href={`tel:${displayPhone}`} className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                    <span aria-hidden="true">📞</span> {displayPhone}
+                  </a>
+                )}
+                {!isAccommodation && displayWebsite && (
+                  <a
+                    href={displayWebsite}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs truncate"
+                  >
+                    <span aria-hidden="true">🌐</span> {displayWebsite}
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* ── Booking deep links (accommodations only) ── */}
+            {isAccommodation && (
+              <div className="pt-3 space-y-2">
+                <a
+                  href={bookingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => handleBookingClick('booking_com')}
+                  aria-label="Recherche sur Booking.com"
+                  className="flex items-center justify-center gap-2 w-full h-12 rounded-full bg-[--primary] text-white text-sm font-medium hover:opacity-90"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Recherche sur Booking
+                </a>
+                {displayWebsite && (
+                  <a
+                    href={displayWebsite}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Site officiel de l'établissement"
+                    className="flex items-center justify-center gap-2 w-full h-12 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface]"
+                  >
+                    <Globe className="h-4 w-4" />
+                    Site officiel
+                  </a>
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </SheetContent>
-    </Sheet>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   )
 }
 
@@ -215,12 +243,12 @@ function formatEta(distanceKm: number, speedKmh: number): string {
   return h > 0 ? `~${h}h${String(m).padStart(2, '0')}` : `~${m} min`
 }
 
-function StatItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatItem({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
   return (
     <div>
       <p className="text-[10px] text-zinc-400 uppercase tracking-wide">{label}</p>
       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-        {value}
+        {typeof value === 'string' ? value : value}
         {hint && <span className="text-xs font-normal text-zinc-400 ml-1">{hint}</span>}
       </p>
     </div>

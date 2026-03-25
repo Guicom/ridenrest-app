@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useMemo } from 'react'
 import { useLiveStore } from '@/stores/live.store'
 import { useLivePoiLayers } from '@/hooks/use-live-poi-layers'
 import { usePrefsStore } from '@/stores/prefs.store'
@@ -14,6 +14,10 @@ import type maplibregl from 'maplibre-gl'
 
 const TRACE_COLOR = '#2D6A4A'
 
+export interface LiveMapCanvasHandle {
+  getMap: () => maplibregl.Map | null
+}
+
 interface LiveMapCanvasProps {
   adventureId: string
   segments: MapSegmentData[]
@@ -25,7 +29,7 @@ interface LiveMapCanvasProps {
   searchTrigger?: number
 }
 
-export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, searchTrigger = 0 }: LiveMapCanvasProps) {
+export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, searchTrigger = 0 }: LiveMapCanvasProps, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
@@ -199,6 +203,10 @@ export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weat
   // Segment waypoints for weather layer (MapWaypoint format)
   const segmentWaypoints = segments[0]?.waypoints ?? []
 
+  useImperativeHandle(ref, () => ({
+    getMap: () => mapRef.current,
+  }), [])
+
   return (
     <div className="relative h-full w-full">
       <div
@@ -219,7 +227,7 @@ export function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weat
       )}
     </div>
   )
-}
+})
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

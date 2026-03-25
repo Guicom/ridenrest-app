@@ -17,13 +17,14 @@ import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import { Button } from '@/components/ui/button'
 import { LiveMapCanvas } from './_components/live-map-canvas'
+import type { LiveMapCanvasHandle } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
 import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { Undo2, ChevronUp, ChevronDown } from 'lucide-react'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
 import { StatusBanner } from './_components/status-banner'
-import { PoiDetailSheet } from '../../map/[id]/_components/poi-detail-sheet'
+import { PoiPopup } from '../../map/[id]/_components/poi-popup'
 import { ElevationStrip } from './_components/elevation-strip'
 import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
 
@@ -74,6 +75,7 @@ export default function LivePage() {
 
   // Always-current ref to refetchPois — queryKey changes when store state changes (radius, targetKm),
   // so we must call the *latest* refetch (post-re-render) to avoid fetching with a stale key.
+  const liveMapCanvasRef = useRef<LiveMapCanvasHandle>(null)
   const refetchPoisRef = useRef(refetchPois)
   useLayoutEffect(() => { refetchPoisRef.current = refetchPois }, [refetchPois])
   const canSearchRef = useRef(canSearch)
@@ -134,10 +136,6 @@ export default function LivePage() {
   // Elevation strip positions
   const elevationCurrentDistKm = currentKmOnRoute
   const elevationTargetDistKm = currentKmOnRoute !== null ? currentKmOnRoute + targetAheadKm : null
-  const liveContext = isLiveModeActive && currentKmOnRoute !== null
-    ? { currentKmOnRoute, speedKmh }
-    : undefined
-
   // D+ computation for LiveControls
   const elevationGain = useMemo(() => {
     if (currentKmOnRoute === null || allCumulativeWaypoints.length === 0) return null
@@ -199,6 +197,7 @@ export default function LivePage() {
       <div className="relative flex-1 min-h-0">
         {/* Map canvas — z-0 */}
         <LiveMapCanvas
+          ref={liveMapCanvasRef}
           adventureId={adventureId}
           segments={segments}
           targetKm={targetKm}
@@ -208,6 +207,21 @@ export default function LivePage() {
           weatherActive={mapWeatherActive}
           searchTrigger={searchTrigger}
         />
+
+        {/* POI popup — floating above the clicked pin */}
+        {selectedPoi && liveMapCanvasRef.current?.getMap() && (
+          <PoiPopup
+            poi={selectedPoi}
+            segments={segments}
+            segmentId={segmentId ?? null}
+            map={liveMapCanvasRef.current.getMap()!}
+            onClose={() => {
+              useUIStore.getState().setSelectedPoi(null)
+              useMapStore.getState().setSelectedPoiId(null)
+            }}
+            liveContext={isLiveModeActive && currentKmOnRoute !== null ? { currentKmOnRoute, speedKmh } : undefined}
+          />
+        )}
 
         {/* Quitter le live — top left z-40 */}
         <div className="absolute top-4 left-4 z-40">
@@ -331,14 +345,6 @@ export default function LivePage() {
         />
       </div>
       </div>
-
-      {/* POI detail sheet — opens when a pin is clicked on the map */}
-      <PoiDetailSheet
-        poi={selectedPoi}
-        segments={segments}
-        segmentId={segmentId ?? null}
-        liveContext={liveContext}
-      />
 
       {/* Live filters drawer — z-50 */}
       <LiveFiltersDrawer

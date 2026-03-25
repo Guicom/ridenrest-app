@@ -36,6 +36,8 @@ const TRACE_COLOR = '#2D6A4A'
 export interface MapCanvasHandle {
   /** Update the crosshair marker position directly — no React re-render */
   updateCrosshair: (km: number | null) => void
+  /** Expose MapLibre map instance for coordinate projection etc. */
+  getMap: () => maplibregl.Map | null
 }
 
 interface MapCanvasProps {
@@ -239,6 +241,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
       } else {
         crosshairMarkerRef.current.setLngLat([nearest.lng, nearest.lat])
       }
+    },
+    getMap() {
+      return mapRef.current
     },
   }), []) // Stable handle — accesses latest values via refs
 

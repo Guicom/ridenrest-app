@@ -11,7 +11,7 @@ export const ACCOMMODATION_SUB_TYPES: { type: PoiCategory; label: string; icon: 
 ]
 
 export function computeAccCountByType(pois?: Poi[]): Record<string, number> | null {
-  if (!pois) return null
+  if (!pois || pois.length === 0) return null
   return pois.reduce<Record<string, number>>((acc, poi) => {
     acc[poi.category] = (acc[poi.category] ?? 0) + 1
     return acc

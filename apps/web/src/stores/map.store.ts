@@ -54,7 +54,7 @@ export const useMapStore = create<MapState>((set) => ({
   densityColorEnabled: false,
   weatherActive: false,
   weatherDimension: 'temperature',
-  activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'] as PoiCategory[]),
+  activeAccommodationTypes: new Set(['hotel'] as PoiCategory[]),
   selectedPoiId: null,
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
