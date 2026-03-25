@@ -105,7 +105,6 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     }
     map.once('styledata', onStyleLoad)
     return () => { map.off('styledata', onStyleLoad) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [styleUrl])
 
   // Update trace when segments change AFTER map is ready

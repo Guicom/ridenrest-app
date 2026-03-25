@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { PoiDetailSheet } from './poi-detail-sheet'
 import type { Poi } from '@ridenrest/shared'
@@ -53,13 +54,13 @@ vi.mock('@ridenrest/gpx', () => ({
 // Vaul Drawer mock
 vi.mock('vaul', () => ({
   Drawer: {
-    Root: ({ children, open, onOpenChange }: any) => (
+    Root: ({ children, open, onOpenChange }: { children: ReactNode; open: boolean; onOpenChange?: (open: boolean) => void }) => (
       <div data-testid="drawer" data-open={open} onClick={() => onOpenChange?.(false)}>{children}</div>
     ),
-    Portal: ({ children }: any) => <div>{children}</div>,
+    Portal: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     Overlay: () => <div data-testid="drawer-overlay" />,
-    Content: ({ children }: any) => <div data-testid="drawer-content">{children}</div>,
-    Title: ({ children, className }: any) => <h2 className={className}>{children}</h2>,
+    Content: ({ children }: { children: ReactNode }) => <div data-testid="drawer-content">{children}</div>,
+    Title: ({ children, className }: { children: ReactNode; className?: string }) => <h2 className={className}>{children}</h2>,
     Handle: () => <div data-testid="drawer-handle" />,
   },
 }))

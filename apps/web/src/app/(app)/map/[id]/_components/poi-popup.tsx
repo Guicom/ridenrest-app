@@ -81,7 +81,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
       map.off('move', project)
       map.off('zoom', project)
     }
-  }, [project])
+  }, [project, map])
 
   // Reset type selection when POI changes
   useEffect(() => {
@@ -222,7 +222,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
               {/* Type chips */}
               <div>
                 <p className="text-[10px] text-[--text-secondary] uppercase tracking-wide mb-1.5">
-                  Type d'hébergement
+                  Type d&apos;hébergement
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {ACCOMMODATION_TYPES.map((type) => (

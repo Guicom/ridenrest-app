@@ -100,7 +100,7 @@ export function MapView({ adventureId }: MapViewProps) {
     ? [{ segmentId: 'adventure', weatherPoints: allWeatherPoints, waypoints: allCumulativeWaypoints }]
     : []
 
-  const { selectedPoiId, setSelectedPoi } = useUIStore()
+  const { selectedPoiId } = useUIStore()
 
   // Find the selected POI from poisByLayer (already in memory — no extra fetch needed)
   const allPois = Object.values(poisByLayer).flat()
