@@ -318,7 +318,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             <div className="flex items-center gap-2 shrink-0">
               <TooltipProvider>
                 <Tooltip>
-                  <TooltipTrigger asChild>
+                  <TooltipTrigger>
                     <span>
                       <DensityTriggerButton adventureId={adventureId} segments={segments} />
                     </span>
