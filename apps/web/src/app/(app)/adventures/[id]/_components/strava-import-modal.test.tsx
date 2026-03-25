@@ -122,6 +122,91 @@ describe('StravaImportModal', () => {
     })
   })
 
+  it('query refetches on re-open with same QueryClient (staleTime: 0)', async () => {
+    const routes = [{ id: '123', name: 'Route Test', distanceKm: 30, elevationGainM: 500 }]
+    mockListStravaRoutes.mockResolvedValue(routes)
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <StravaImportModal adventureId="adv-1" open={true} onOpenChange={vi.fn()} stravaConnected={true} />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => expect(mockListStravaRoutes).toHaveBeenCalledTimes(1))
+
+    // Close modal — query disabled
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <StravaImportModal adventureId="adv-1" open={false} onOpenChange={vi.fn()} stravaConnected={true} />
+      </QueryClientProvider>,
+    )
+
+    // Re-open — staleTime: 0 means data is immediately stale → refetch fires
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <StravaImportModal adventureId="adv-1" open={true} onOpenChange={vi.fn()} stravaConnected={true} />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => expect(mockListStravaRoutes).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows search input when routes are loaded', async () => {
+    const routes = [
+      { id: '123', name: 'Col du Tourmalet', distanceKm: 45.2, elevationGainM: 1200 },
+    ]
+    mockListStravaRoutes.mockResolvedValue(routes)
+
+    renderModal({ stravaConnected: true })
+
+    await waitFor(() => expect(screen.getByText('Col du Tourmalet')).toBeInTheDocument())
+    expect(screen.getByPlaceholderText('Rechercher une route...')).toBeInTheDocument()
+  })
+
+  it('filters route list when typing in search input', async () => {
+    const user = userEvent.setup()
+    const routes = [
+      { id: '123', name: 'Col du Tourmalet', distanceKm: 45.2, elevationGainM: 1200 },
+      { id: '456', name: 'Transcantabrique', distanceKm: 80.1, elevationGainM: null },
+    ]
+    mockListStravaRoutes.mockResolvedValue(routes)
+
+    renderModal({ stravaConnected: true })
+
+    await waitFor(() => {
+      expect(screen.getByText('Col du Tourmalet')).toBeInTheDocument()
+      expect(screen.getByText('Transcantabrique')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByPlaceholderText('Rechercher une route...')
+    await user.type(searchInput, 'tourmalet')
+
+    expect(screen.getByText('Col du Tourmalet')).toBeInTheDocument()
+    expect(screen.queryByText('Transcantabrique')).not.toBeInTheDocument()
+  })
+
+  it('shows "Aucune route trouvée pour..." when search yields no results', async () => {
+    const user = userEvent.setup()
+    const routes = [
+      { id: '123', name: 'Col du Tourmalet', distanceKm: 45.2, elevationGainM: 1200 },
+    ]
+    mockListStravaRoutes.mockResolvedValue(routes)
+
+    renderModal({ stravaConnected: true })
+
+    await waitFor(() => expect(screen.getByText('Col du Tourmalet')).toBeInTheDocument())
+
+    const searchInput = screen.getByPlaceholderText('Rechercher une route...')
+    await user.type(searchInput, 'pirénées')
+
+    expect(screen.getByText(/Aucune route trouvée pour/i)).toBeInTheDocument()
+    expect(screen.queryByText('Col du Tourmalet')).not.toBeInTheDocument()
+  })
+
   it('shows error toast when import fails', async () => {
     const user = userEvent.setup()
     const routes = [{ id: '123', name: 'Route Test', distanceKm: 30, elevationGainM: null }]

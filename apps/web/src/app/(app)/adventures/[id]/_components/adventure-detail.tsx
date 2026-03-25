@@ -33,6 +33,12 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -302,18 +308,39 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
           )}
         </div>
 
-        {/* Right: action buttons — shown when all segments are parsed */}
-        {segments.every((s) => s.parseStatus === 'done') && segments.length > 0 && (
-          <div className="flex items-center gap-2 shrink-0">
-            <DensityTriggerButton adventureId={adventureId} segments={segments} />
-            <Link href={`/map/${adventureId}`}>
-              <Button variant="default" size="lg" className="rounded-full gap-2 px-6 py-6">
-                <Map className="h-4 w-4" />
-                Voir la carte
-              </Button>
-            </Link>
-          </div>
-        )}
+        {/* Right: action buttons — shown when at least one segment exists */}
+        {segments.length > 0 && (() => {
+          const hasPendingSegments = segments.some(
+            (s) => s.parseStatus === 'pending' || s.parseStatus === 'processing'
+          )
+          const allDone = segments.every((s) => s.parseStatus === 'done')
+          return (
+            <div className="flex items-center gap-2 shrink-0">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <DensityTriggerButton adventureId={adventureId} segments={segments} />
+                    </span>
+                  </TooltipTrigger>
+                  {hasPendingSegments && (
+                    <TooltipContent>
+                      <p>En attente de l&apos;analyse des segments</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+              {allDone && (
+                <Link href={`/map/${adventureId}`}>
+                  <Button variant="default" size="lg" className="rounded-full gap-2 px-6 py-6">
+                    <Map className="h-4 w-4" />
+                    Voir la carte
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       <AlertDialog open={deleteAdventureDialogOpen} onOpenChange={setDeleteAdventureDialogOpen}>

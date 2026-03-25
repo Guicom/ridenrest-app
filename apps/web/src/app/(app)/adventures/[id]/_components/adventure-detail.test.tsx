@@ -26,6 +26,16 @@ vi.mock('./segment-card', () => ({
     <div data-testid={`seg-${segment.id}`} />
   ),
 }))
+vi.mock('./density-trigger-button', () => ({
+  DensityTriggerButton: () => <button data-testid="density-trigger-btn">Calculer la densité</button>,
+}))
+// Render TooltipContent always visible for testability
+vi.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children: React.ReactNode }) => <div role="tooltip">{children}</div>,
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
 // Mock dnd-kit — expose a simulate-drag-end button to trigger onDragEnd in tests
 vi.mock('@dnd-kit/core', () => ({
   DndContext: ({
@@ -261,6 +271,55 @@ describe('AdventureDetail — adventure rename', () => {
 
     await waitFor(() => expect(apiClient.renameAdventure).toHaveBeenCalledWith('adv-1', 'Nouveau nom'))
     await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Aventure renommée'))
+  })
+})
+
+describe('AdventureDetail — density CTA visibility', () => {
+  it('shows density button when segment is pending (not gated to all-done)', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([
+      makeSeg({ id: 'seg-1', parseStatus: 'pending' }),
+    ])
+    renderDetail()
+
+    await waitFor(() => expect(screen.getByTestId('density-trigger-btn')).toBeInTheDocument())
+  })
+
+  it('shows density button when segment is done', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([
+      makeSeg({ id: 'seg-1', parseStatus: 'done', distanceKm: 50 }),
+    ])
+    renderDetail()
+
+    await waitFor(() => expect(screen.getByTestId('density-trigger-btn')).toBeInTheDocument())
+  })
+
+  it('does NOT show density button when segments list is empty', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    expect(screen.queryByTestId('density-trigger-btn')).not.toBeInTheDocument()
+  })
+
+  it('shows tooltip with pending message when any segment is pending', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([
+      makeSeg({ id: 'seg-1', parseStatus: 'pending' }),
+    ])
+    renderDetail()
+
+    await waitFor(() =>
+      expect(screen.getByText("En attente de l'analyse des segments")).toBeInTheDocument()
+    )
+  })
+
+  it('does NOT show pending tooltip when all segments are done', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([
+      makeSeg({ id: 'seg-1', parseStatus: 'done', distanceKm: 50 }),
+    ])
+    renderDetail()
+
+    await waitFor(() => expect(screen.getByTestId('density-trigger-btn')).toBeInTheDocument())
+    expect(screen.queryByText("En attente de l'analyse des segments")).not.toBeInTheDocument()
   })
 })
 
