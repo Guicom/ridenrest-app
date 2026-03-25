@@ -1,0 +1,21 @@
+{
+  email {$ACME_EMAIL}
+}
+
+ridenrest.com {
+  reverse_proxy host.docker.internal:3011
+  header {
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  }
+}
+
+api.ridenrest.com {
+  reverse_proxy host.docker.internal:3010
+  header {
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  }
+}

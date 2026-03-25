@@ -177,17 +177,26 @@ export function WeatherLayer({ map, weatherPoints, segmentWaypoints, dimension, 
   useEffect(() => {
     return () => {
       if (!map) return
-      const handlers = handlersRef.current
-      if (handlers) {
-        map.off('click', layerLines, handlers.click)
-        map.off('mouseenter', layerLines, handlers.mouseenter)
-        map.off('mouseleave', layerLines, handlers.mouseleave)
-        map.getCanvas().style.cursor = ''
+      try {
+        // map.style may be null if map.remove() was called before cleanup runs
+        const handlers = handlersRef.current
+        if (handlers) {
+          map.off('click', layerLines, handlers.click)
+          map.off('mouseenter', layerLines, handlers.mouseenter)
+          map.off('mouseleave', layerLines, handlers.mouseleave)
+          map.getCanvas().style.cursor = ''
+        }
+        if (map.getLayer(layerArrows)) map.removeLayer(layerArrows)
+        if (map.getSource(sourceArrows)) map.removeSource(sourceArrows)
+        if (map.getLayer(layerLines)) map.removeLayer(layerLines)
+        if (map.getSource(sourceLines)) map.removeSource(sourceLines)
+      } catch (err) {
+        // Map was already removed (map.style === null) — nothing to clean up.
+        // Log in dev to catch unexpected errors (typos in layer IDs, MapLibre regressions, etc.)
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[WeatherLayer] cleanup error (map already removed?):', err)
+        }
       }
-      if (map.getLayer(layerArrows)) map.removeLayer(layerArrows)
-      if (map.getSource(sourceArrows)) map.removeSource(sourceArrows)
-      if (map.getLayer(layerLines)) map.removeLayer(layerLines)
-      if (map.getSource(sourceLines)) map.removeSource(sourceLines)
     }
   }, [map, sourceLines, sourceArrows, layerLines, layerArrows])
 
