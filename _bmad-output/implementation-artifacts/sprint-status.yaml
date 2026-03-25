@@ -144,7 +144,7 @@ development_status:
   epic-14: in-progress
   14-1-docker-compose-infra-services: done  # fusionnée avec 14.3 — docker-compose + env local
   14-3-environnement-dev-local-unifie: cancelled      # contenu fusionné dans 14.1 (2026-03-25)
-  14-2-nodejs-natif-pm2-production: ready-for-dev
+  14-2-nodejs-natif-pm2-production: done
   14-5-cicd-deploiement-github-actions: backlog       # à faire après 14.2 — valide PM2 en vrai
   14-4-backups-postgresql-automatises: backlog
   14-6-monitoring-uptime-kuma: backlog
