@@ -263,7 +263,7 @@ export const auth = betterAuth({
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
       await resend.emails.send({
-        from: 'Ride\'n\'Rest <noreply@ridenrest.com>',
+        from: 'Ride\'n\'Rest <noreply@ridenrest.app>',
         to: user.email,
         subject: 'Réinitialisation de votre mot de passe',
         html: `<a href="${url}">Réinitialiser mon mot de passe</a>`,
@@ -274,7 +274,7 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     sendVerificationEmail: async ({ user, url }) => {
       await resend.emails.send({
-        from: 'Ride\'n\'Rest <noreply@ridenrest.com>',
+        from: 'Ride\'n\'Rest <noreply@ridenrest.app>',
         to: user.email,
         subject: 'Vérifiez votre adresse email',
         html: `<a href="${url}">Vérifier mon email</a>`,

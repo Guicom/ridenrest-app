@@ -153,7 +153,7 @@ export const auth = betterAuth({
     sendOnSignUp: false,
     sendVerificationEmail: async ({ user, url }) => {
       await getResend().emails.send({
-        from: "Ride'n'Rest <noreply@ridenrest.com>",
+        from: "Ride'n'Rest <noreply@ridenrest.app>",
         to: user.email,
         subject: "Vérifiez votre adresse email — Ride'n'Rest",
         html: `<p>Bonjour,</p><p><a href="${url}">Vérifier mon email</a></p>`,

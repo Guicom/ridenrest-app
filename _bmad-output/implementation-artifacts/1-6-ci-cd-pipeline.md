@@ -456,9 +456,9 @@ Configure in GitHub repo → Settings → Secrets and variables → Actions:
 6. Vercel Dashboard → Project → Settings → Environment Variables (Production):
    ```
    BETTER_AUTH_SECRET=<same as apps/api>
-   BETTER_AUTH_URL=https://ridenrest.com (your production domain)
+   BETTER_AUTH_URL=https://ridenrest.app (your production domain)
    NEXT_PUBLIC_API_URL=https://ridenrest-api.fly.dev
-   NEXT_PUBLIC_BETTER_AUTH_URL=https://ridenrest.com
+   NEXT_PUBLIC_BETTER_AUTH_URL=https://ridenrest.app
    ```
 
 ### Fly.io First Deploy — Setup Steps
@@ -473,7 +473,7 @@ The `fly.toml` was created in story 1.4 with app name `ridenrest-api`.
      DATABASE_URL="postgresql://..." \
      UPSTASH_REDIS_URL="rediss://..." \
      BETTER_AUTH_SECRET="..." \
-     BETTER_AUTH_URL="https://ridenrest.com" \
+     BETTER_AUTH_URL="https://ridenrest.app" \
      --app ridenrest-api
    ```
 4. First deploy (from local, to verify): `flyctl deploy --app ridenrest-api`

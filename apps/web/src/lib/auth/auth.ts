@@ -88,7 +88,7 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     sendResetPassword: async ({ user, url }) => {
       await getResend().emails.send({
-        from: 'onboarding@resend.dev', // TODO: changer en "Ride'n'Rest <noreply@ridenrest.com>" après vérification domaine
+        from: 'onboarding@resend.dev', // TODO: changer en "Ride'n'Rest <noreply@ridenrest.app>" après vérification domaine
         to: user.email,
         subject: "Réinitialisation de votre mot de passe — Ride'n'Rest",
         html: `<p>Bonjour,</p><p><a href="${url}">Réinitialiser mon mot de passe</a></p><p>Ce lien expire dans 1 heure.</p>`,
@@ -97,12 +97,12 @@ export const auth = betterAuth({
   },
 
   // Email verification — MVP: sendOnSignUp: false (no Resend domain configured yet)
-  // Change to true when custom domain 'noreply@ridenrest.com' is verified in Resend
+  // Change to true when custom domain 'noreply@ridenrest.app' is verified in Resend
   emailVerification: {
     sendOnSignUp: false,
     sendVerificationEmail: async ({ user, url }) => {
       await getResend().emails.send({
-        from: "Ride'n'Rest <noreply@ridenrest.com>",
+        from: "Ride'n'Rest <noreply@ridenrest.app>",
         to: user.email,
         subject: "Vérifiez votre adresse email — Ride'n'Rest",
         html: `<p>Bonjour,</p><p><a href="${url}">Vérifier mon email</a></p>`,

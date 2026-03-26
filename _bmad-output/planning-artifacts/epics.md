@@ -527,7 +527,7 @@ So that I have full control over my credentials and data (RGPD compliance).
 
 **Given** a user clicks "Mot de passe oublié" and submits their email,
 **When** the request is sent to Better Auth,
-**Then** a password reset email is sent via **Resend** (`noreply@ridenrest.com`) et une confirmation est affichée (FR-007).
+**Then** a password reset email is sent via **Resend** (`noreply@ridenrest.app`) et une confirmation est affichée (FR-007).
 
 **Given** a user clicks the reset link in the email,
 **When** they submit a new valid password,
@@ -2012,7 +2012,7 @@ So that the infrastructure services are easy to manage both locally and on the V
 
 **Given** Caddy is configured via `Caddyfile`,
 **When** running on the VPS,
-**Then** `ridenrest.com` proxies to Next.js (`localhost:3011`), `api.ridenrest.com` proxies to NestJS (`localhost:3010`), with automatic HTTPS via Let's Encrypt.
+**Then** `ridenrest.app` proxies to Next.js (`localhost:3011`), `api.ridenrest.app` proxies to NestJS (`localhost:3010`), with automatic HTTPS via Let's Encrypt.
 
 **Given** Caddy is running locally,
 **When** in development mode,
@@ -2142,11 +2142,11 @@ So that I know immediately if the app goes down or the VPS runs out of resources
 
 **Given** Uptime Kuma is added to `docker-compose.yml`,
 **When** the container starts,
-**Then** its dashboard is accessible on a non-public port (e.g., `localhost:3001`) — exposed via Caddy on a subdomain (`status.ridenrest.com`) with basic auth.
+**Then** its dashboard is accessible on a non-public port (e.g., `localhost:3001`) — exposed via Caddy on a subdomain (`status.ridenrest.app`) with basic auth.
 
 **Given** monitors are configured,
 **When** checking status,
-**Then** Uptime Kuma monitors: HTTPS `ridenrest.com` (web), HTTPS `api.ridenrest.com/health` (API), PostgreSQL TCP `localhost:5432`, Redis TCP `localhost:6379`.
+**Then** Uptime Kuma monitors: HTTPS `ridenrest.app` (web), HTTPS `api.ridenrest.app/health` (API), PostgreSQL TCP `localhost:5432`, Redis TCP `localhost:6379`.
 
 **Given** a monitored service goes down,
 **When** 2 consecutive checks fail (60s interval),
@@ -2179,7 +2179,7 @@ So that there is a single source of truth and no orphaned cloud resources genera
 **Then** Vercel project is deleted (or downgraded), Fly.io app is destroyed, Aiven database is deleted, and Upstash instance is deleted.
 
 **Given** DNS is updated,
-**When** `ridenrest.com` resolves,
+**When** `ridenrest.app` resolves,
 **Then** it points to the VPS IP (A record) — no CNAME to Vercel or Fly.io.
 
 **Given** the existing `apps/api/Dockerfile` and `apps/api/fly.toml` are no longer needed,
@@ -2190,7 +2190,7 @@ So that there is a single source of truth and no orphaned cloud resources genera
 
 ## Epic 15: Analytics & Affiliate Partnership Readiness
 
-> **Ajouté 2026-03-23** — Epic transversal visant à accumuler dès le lancement les données nécessaires pour re-candidater au programme affilié Booking.com (refusé en early stage, voir mémoire projet) et piloter le produit par les données. Stack : **Plausible CE (Community Edition)** auto-hébergé sur VPS Hostinger (Docker), accessible sur `stats.ridenrest.com` via Caddy. Tracking actif dès le go-live — chaque semaine sans données = informations perdues pour la candidature Booking.com.
+> **Ajouté 2026-03-23** — Epic transversal visant à accumuler dès le lancement les données nécessaires pour re-candidater au programme affilié Booking.com (refusé en early stage, voir mémoire projet) et piloter le produit par les données. Stack : **Plausible CE (Community Edition)** auto-hébergé sur VPS Hostinger (Docker), accessible sur `stats.ridenrest.app` via Caddy. Tracking actif dès le go-live — chaque semaine sans données = informations perdues pour la candidature Booking.com.
 
 ### Story 15.1: Plausible CE — Setup VPS & Intégration Next.js
 
@@ -2204,9 +2204,9 @@ So that traffic data starts accumulating immediately at launch and can be used f
 **When** `docker compose up -d plausible` is run on the VPS,
 **Then** Plausible CE is running with its required ClickHouse and PostgreSQL dependencies, and accessible on `localhost:8000`.
 
-**Given** Caddy is configured with a `stats.ridenrest.com` block,
+**Given** Caddy is configured with a `stats.ridenrest.app` block,
 **When** Plausible is running,
-**Then** `https://stats.ridenrest.com` proxies to `localhost:8000` with automatic HTTPS via Let's Encrypt — protected by Plausible's built-in auth (admin account).
+**Then** `https://stats.ridenrest.app` proxies to `localhost:8000` with automatic HTTPS via Let's Encrypt — protected by Plausible's built-in auth (admin account).
 
 **Given** the `<PlausibleProvider>` component is added to `apps/web/src/app/layout.tsx`,
 **When** any page is visited,
@@ -2214,9 +2214,9 @@ So that traffic data starts accumulating immediately at launch and can be used f
 
 **Given** the Plausible script is loaded,
 **When** inspected in browser DevTools,
-**Then** the script is served from `stats.ridenrest.com/js/script.js` (self-hosted, not `plausible.io`) — ensuring no CORS issues and full data ownership.
+**Then** the script is served from `stats.ridenrest.app/js/script.js` (self-hosted, not `plausible.io`) — ensuring no CORS issues and full data ownership.
 
-**Given** the site domain is configured as `ridenrest.com` in Plausible,
+**Given** the site domain is configured as `ridenrest.app` in Plausible,
 **When** a user visits any page,
 **Then** the visit is attributed to the correct domain with country, device, browser, and OS metadata.
 
@@ -2288,7 +2288,7 @@ So that I can quickly generate a snapshot report without navigating Plausible's 
 
 **Given** a user navigates to `/admin/analytics`,
 **When** their session is checked,
-**Then** access is restricted to users with email `guillaume@ridenrest.com` (or a configurable `ADMIN_EMAILS` env var) — non-admin users receive a 403.
+**Then** access is restricted to users with email `guillaume@ridenrest.app` (or a configurable `ADMIN_EMAILS` env var) — non-admin users receive a 403.
 
 **Given** the page loads for an admin user,
 **When** the dashboard renders,
