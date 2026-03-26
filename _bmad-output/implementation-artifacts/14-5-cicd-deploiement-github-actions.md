@@ -1,6 +1,6 @@
 # Story 14.5: CI/CD — Déploiement automatisé via GitHub Actions
 
-Status: review
+Status: done
 
 ## Story
 
@@ -29,7 +29,7 @@ afin que la production soit mise à jour sans intervention manuelle après chaqu
 ### Task 1 — Mettre à jour `deploy.sh` pour inclure les migrations DB
 
 - [x] 1.1 Ajouter l'étape migrations entre le build et le `pm2 reload` (step [5/6])
-- [x] 1.2 Utiliser `pnpm --filter @ridenrest/database drizzle-kit migrate` (filtre Turborepo correct)
+- [x] 1.2 Utiliser un subshell `( cd packages/database && pnpm drizzle-kit migrate )` — approche choisie à la place du `--filter` Turborepo pour éviter les problèmes de cache et préserver le `cwd` du script parent (voir Dev Notes)
 - [x] 1.3 Mettre à jour la numérotation des steps : de [1/5] → [6/5] à [1/6] → [6/6]
 - [x] 1.4 Vérifier que `set -e` est toujours en première ligne (arrêt immédiat si erreur)
 
@@ -286,20 +286,22 @@ Push main
 Lors du premier déploiement réel (2026-03-26), PM2 ne propageait pas `BETTER_AUTH_SECRET` aux processus enfants. Cause : PM2 ne lit pas `process.env` depuis le shell SSH. Fix : chargement explicite du `.env` via `fs.readFileSync` dans `ecosystem.config.js`, et spreading dans la section `env` de chaque app.
 
 ```js
-const fs = require('fs')
-const path = require('path')
+const fs = require('fs');
+const path = require('path');
 
 function loadEnv(envPath) {
-  if (!fs.existsSync(envPath)) return {}
-  return fs.readFileSync(envPath, 'utf8').split('\n').reduce((acc, line) => {
-    const match = line.match(/^([^#=\s][^=]*)=(.*)$/)
-    if (match) acc[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, '')
-    return acc
-  }, {})
+  if (!fs.existsSync(envPath)) return {};
+  return fs.readFileSync(envPath, 'utf8')
+    .split('\n')
+    .reduce((acc, line) => {
+      const match = line.match(/^([^#=\s][^=]*)=(.*)$/);
+      if (match) acc[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, '');
+      return acc;
+    }, {});
 }
 
-const APP_DIR = '/home/deploy/ridenrest-app'
-const envVars = loadEnv(path.join(APP_DIR, '.env'))
+const APP_DIR = '/home/deploy/ridenrest-app';
+const envVars = loadEnv(path.join(APP_DIR, '.env'));
 
 module.exports = {
   apps: [
@@ -308,17 +310,31 @@ module.exports = {
       script: 'apps/web/.next/standalone/apps/web/server.js',
       cwd: APP_DIR,
       env: { ...envVars, PORT: 3011, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
-      // ... autres options PM2
+      max_memory_restart: '512M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: '/var/log/pm2/ridenrest-web-error.log',
+      out_file: '/var/log/pm2/ridenrest-web-out.log',
+      merge_logs: true,
+      restart_delay: 3000,
+      max_restarts: 10,
+      min_uptime: '5s',
     },
     {
       name: 'ridenrest-api',
       script: 'apps/api/dist/main.js',
       cwd: APP_DIR,
       env: { ...envVars, PORT: 3010, NODE_ENV: 'production' },
-      // ... autres options PM2
-    }
-  ]
-}
+      max_memory_restart: '512M',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss',
+      error_file: '/var/log/pm2/ridenrest-api-error.log',
+      out_file: '/var/log/pm2/ridenrest-api-out.log',
+      merge_logs: true,
+      restart_delay: 3000,
+      max_restarts: 10,
+      min_uptime: '5s',
+    },
+  ],
+};
 ```
 
 **Règle critique :** Ne JAMAIS utiliser `env_production:` ou compter sur `process.env` pour les secrets dans un contexte PM2+SSH. Toujours spreader l'objet `envVars` explicitement dans chaque section `env`.
@@ -403,6 +419,26 @@ claude-sonnet-4-6
 - ✅ `turbo.json` — ajout tableau `env` dans `build` task : `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`. Fix requis : sans cette déclaration, Turbo ignorait les changements d'env dans son hash de cache.
 - ℹ️ Pipeline testé et validé en production réelle le 2026-03-26 — site live à `ridenrest.app`.
 - ℹ️ Strava OAuth toujours non fonctionnel (erreur côté `strava.com/settings/api`) — problème plateforme Strava, pas notre code.
+
+### Review Follow-ups (AI)
+
+- [ ] [AI-Review][MEDIUM] M2 — Pinner `actions/checkout`, `pnpm/action-setup`, `actions/setup-node` par version exacte (ex: `@v4.2.2`) ou SHA pour cohérence avec la règle supply chain énoncée en Dev Notes section 5 [`.github/workflows/ci.yml`]
+- [ ] [AI-Review][MEDIUM] L3 — Regex `ecosystem.config.js` `loadEnv` ne gère pas les valeurs avec espaces internes dans guillemets simples ni les trailing spaces dans guillemets. Peu probable en pratique mais à surveiller si des secrets contiennent des espaces [`ecosystem.config.js:10`]
+- [ ] [AI-Review][LOW] L1 — `git pull origin main` hardcode la branche. Remplacer par `git pull` seul pour utiliser le tracking remote configuré [`deploy.sh:18`]
+
+### Completion Notes List
+
+- ✅ `deploy.sh` : 5 steps → 6 steps, ajout migrations drizzle-kit en [5/6] via subshell. `set -e` conservé. Ajouts prod : grep explicite `DATABASE_URL`, `mkdir -p /data/gpx`, `set -a; source .env` avant turbo build, `rm -rf` avant `cp -r` pour assets statiques.
+- ✅ `.github/workflows/ci.yml` : job deploy entièrement remplacé — suppression Vercel, Fly.io, DB migrations CI, Checkout/Node/pnpm/install. Remplacement par step SSH unique `appleboy/ssh-action@v1.0.3` avec secrets `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`.
+- ✅ `BETTER_AUTH_SECRET` et `BETTER_AUTH_URL` conservés dans le job CI (build Next.js).
+- ✅ Task 4 : documentation secrets/SSH présente dans Dev Notes sections 3 et 4 — validée complète.
+- ✅ `ecosystem.config.js` (story 14.2) — modifié pour charger `.env` via `fs.readFileSync` et spreader dans `env` de chaque app. Fix requis : PM2 ne propage pas `process.env` via SSH, causait `BetterAuthError` en prod.
+- ✅ `turbo.json` — ajout tableau `env` dans `build` task : `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`. Fix requis : sans cette déclaration, Turbo ignorait les changements d'env dans son hash de cache.
+- ℹ️ Pipeline testé et validé en production réelle le 2026-03-26 — site live à `ridenrest.app`.
+- ℹ️ Strava OAuth toujours non fonctionnel (erreur côté `strava.com/settings/api`) — problème plateforme Strava, pas notre code.
+- ✅ [Code Review 2026-03-26] `ci.yml` : ajout `timeout-minutes` sur les deux jobs (20min CI / 30min deploy) + `command_timeout: 25m` sur appleboy/ssh-action (M1). Ajout `NEXT_PUBLIC_API_URL` et `NEXT_PUBLIC_BETTER_AUTH_URL` dans les secrets du step Build CI (M3).
+- ✅ [Code Review 2026-03-26] `deploy.sh` : ajout warning explicite si `NEXT_PUBLIC_API_URL` vide après source .env (M5). Ajout health check port `nc -z` sur :3010/:3011 post-déploiement (L2).
+- ✅ [Code Review 2026-03-26] Story : task 1.2 description corrigée (subshell vs --filter) (M4). Dev Notes section 7 snippet mis à jour avec le vrai contenu ecosystem.config.js (L4).
 
 ### File List
 

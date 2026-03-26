@@ -25,6 +25,9 @@ set -a
 # shellcheck source=.env
 source "$APP_DIR/.env" 2>/dev/null || true
 set +a
+if [[ -z "$NEXT_PUBLIC_API_URL" ]]; then
+  echo "WARNING: NEXT_PUBLIC_API_URL not found in $APP_DIR/.env — Next.js will embed empty API URL" >&2
+fi
 pnpm turbo build
 
 echo "==> [4/6] Copy Next.js standalone static assets"
@@ -41,3 +44,8 @@ pm2 reload ecosystem.config.js --update-env || pm2 start ecosystem.config.js
 
 echo "==> Deploy done. pm2 status:"
 pm2 status
+
+echo "==> Health check (port availability)"
+sleep 3
+nc -z localhost 3010 && echo "OK  ridenrest-api  :3010" || echo "WARN ridenrest-api :3010 not responding"
+nc -z localhost 3011 && echo "OK  ridenrest-web  :3011" || echo "WARN ridenrest-web :3011 not responding"
