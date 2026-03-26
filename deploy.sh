@@ -12,6 +12,8 @@ if [[ -z "$DATABASE_URL" ]]; then
   exit 1
 fi
 
+mkdir -p /data/gpx
+
 echo "==> [1/6] git pull"
 git pull origin main
 
