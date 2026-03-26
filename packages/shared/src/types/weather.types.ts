@@ -1,11 +1,12 @@
 export interface WeatherPoint {
-  km: number         // Position along route
-  forecastAt: string // ISO 8601 — estimated passage time
+  km: number                         // Position along route (segment-relative)
+  forecastAt: string                 // ISO 8601 — estimated passage time (ETA)
   temperatureC: number | null
-  precipitationMm: number | null
+  precipitationProbability: number | null  // 0–100 %
   windSpeedKmh: number | null
-  windDirection: number | null
-  weatherCode: string | null
+  windDirection: number | null       // degrees, meteorological (0=N, clockwise)
+  weatherCode: number | null         // WMO weather code integer
+  iconEmoji: string | null           // Mapped from WMO_ICON
 }
 
 export interface WeatherForecast {

@@ -1,12 +1,17 @@
 import type { QueueOptions } from 'bullmq'
 
+const redisUrl = process.env['REDIS_URL'] ?? ''
+// Upstash uses rediss:// (TLS). Local Redis uses redis:// — Upstash-specific options
+// (maxRetriesPerRequest: null, enableReadyCheck: false) must only be set for Upstash.
+const isUpstash = redisUrl.startsWith('rediss://')
+
 export const bullmqConfig: QueueOptions = {
   connection: {
-    url: process.env['REDIS_URL']!, // rediss://... (TLS)
-    // Upstash-specific settings:
-    maxRetriesPerRequest: null, // Required for BullMQ with Upstash
-    enableReadyCheck: false,    // Required for Upstash
-    lazyConnect: false,
+    url: redisUrl,
+    ...(isUpstash && {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+    }),
   },
   defaultJobOptions: {
     attempts: 3,
@@ -14,7 +19,7 @@ export const bullmqConfig: QueueOptions = {
       type: 'exponential',
       delay: 1000,
     },
-    removeOnComplete: { count: 100 }, // Keep last 100 completed jobs
-    removeOnFail: { count: 50 },      // Keep last 50 failed jobs
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 50 },
   },
 }

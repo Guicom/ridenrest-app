@@ -1,10 +1,21 @@
+import { MarketingHeader } from './_components/marketing-header';
+import { Hero } from './_components/hero';
+import { FeatureStepOne } from './_components/feature-step-one';
+import { FeatureStepTwo } from './_components/feature-step-two';
+import { Testimonials } from './_components/testimonials';
+import { MarketingFooter } from './_components/marketing-footer';
+
 export default function LandingPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center">
-      <h1 className="text-4xl font-bold">Ride&apos;n&apos;Rest</h1>
-      <p className="mt-4 text-lg text-gray-600">
-        Find accommodation along your bikepacking route.
-      </p>
-    </main>
+    <div className="min-h-screen flex flex-col font-sans bg-earth-light text-earth-dark antialiased">
+      <MarketingHeader />
+      <main className="flex-grow">
+        <Hero />
+        <FeatureStepOne />
+        <FeatureStepTwo />
+        <Testimonials />
+      </main>
+      <MarketingFooter />
+    </div>
   );
 }

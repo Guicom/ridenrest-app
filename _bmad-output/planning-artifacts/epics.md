@@ -70,6 +70,12 @@ FR-073: Les fonctionnalités nécessitant le réseau sont désactivées offline 
 FR-080: En mode Planification, chaque fiche POI affiche le dénivelé positif cumulé (D+) entre le fromKm courant et la position du POI sur la trace
 FR-081: En mode Planification, chaque fiche POI affiche le temps estimé pour atteindre le POI depuis le fromKm, calculé selon l'allure saisie (fallback : 15 km/h si non saisie)
 FR-082: En mode Live, chaque POI dans la liste affiche le D+ et le temps estimé depuis la position GPS courante jusqu'au point cible sur la trace
+FR-083: Le mode Planning est optimisé pour desktop (≥ 1024px) — sur mobile un toast/popup informe l'utilisateur que l'expérience est meilleure sur desktop, sans bloquer l'accès
+FR-084: En mode Planning, un profil d'élévation interactif est affiché — au survol du graphique la position correspondante sur la trace est mise en évidence ; les étapes (Epic 11) y sont matérialisées
+FR-085: En mode Live, le rayon de recherche autour du point cible est configurable via un stepper (— / +) dans le drawer Filtres — pas via un slider sur la carte
+FR-086: Le drawer Filtres (Planning : panneau latéral desktop / drawer mobile ; Live : drawer "FILTERS") expose les calques à afficher : Hébergements, Restauration, Vélo, Densité, Météo — plus les sous-types d'hébergement (Overpass + Google Places)
+FR-087: En mode Live, la trace s'affiche en gris/noir foncé par défaut ; le segment entre la position GPS courante et le point de recherche s'affiche en vert dynamiquement à mesure que le slider change
+FR-088: Post-MVP — Le drawer Filtres expose : dates d'arrivée/sortie, nombre de personnes, nombre de chambres, types de lits, options (annulation sans frais, logement avec cuisine) — paramètres passés dans les deep links Booking.com
 
 ### NonFunctional Requirements
 
@@ -190,7 +196,7 @@ FR-054: Epic 6 — Auto-refresh weather forecasts every hour
 FR-055: Epic 6 — Fallback: show current-time weather if no speed entered
 FR-060: Epic 4 — Booking deep links to Hotels.com and Booking.com
 FR-061: Epic 4 — Affiliate links visually identified in UI (transparency)
-FR-062: Epic 4 — Track booking link clicks for analytics
+FR-062: Epic 15 — Track booking link clicks for analytics (enriched, replaces basic Epic 4 implementation)
 FR-063: Epic 4 — "Powered by Strava" attribution when Strava data is shown
 FR-070: Epic 8 — PWA install via native mechanism (Add to Home Screen)
 FR-071: Epic 8 — Last loaded GPX trace + POIs readable offline
@@ -241,6 +247,11 @@ Un utilisateur en mobilité peut activer le mode Live (consentement géolocalisa
 Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa dernière trace + POIs en mode offline partiel, et recevoir une notification push (opt-in) quand une analyse de densité est terminée.
 **FRs couverts :** FR-070, FR-071, FR-072, FR-073
 **NFRs couverts :** NFR-001, NFR-002, NFR-003, NFR-004, NFR-008
+
+### Epic 14: VPS Hostinger Migration & Local Docker Environment
+Migration du stack multi-plateforme (Vercel + Fly.io + Aiven + Upstash) vers un VPS Hostinger unique. Approche hybride : Docker pour infra (PostgreSQL+PostGIS, Redis, Caddy, Uptime Kuma), Node.js natif pour apps (Next.js, NestJS) via `turbo build` + `pm2`. Inclut l'environnement local unifié, backups PostgreSQL, CI/CD GitHub Actions via SSH.
+**FRs couverts :** Aucun FR direct (Infrastructure)
+**NFRs couverts :** NFR-010, NFR-014, NFR-015, NFR-020
 
 ---
 
@@ -1116,11 +1127,704 @@ So that I can still find a place to stop even when the app can't load everything
 
 ---
 
-## Epic 8: PWA & Offline Capability
+## Epic 8: App Shell & Navigation
+
+> **Ajouté 2026-03-18** — Suite aux décisions UX : implémentation du design system light mode vert sauge, navigation Planning/Live, et panneau filtres POI. Fondation visuelle et structurelle de l'application.
+
+L'utilisateur dispose d'une application visuellement cohérente avec un design system défini, une navigation claire entre ses aventures et les deux modes (Planning/Live), et un panneau de filtres permettant de sélectionner les types de POI qu'il souhaite afficher sur la carte.
+
+### Story 8.1: Design System Tokens
+
+As a **developer building the Ride'n'Rest UI**,
+I want a complete, consistent design token system configured in Tailwind and shadcn/ui,
+So that every component in the app uses the same colors, typography, and spacing — eliminating visual inconsistencies.
+
+**Acceptance Criteria:**
+
+**Given** the Tailwind config and global CSS are updated,
+**When** the app is rendered,
+**Then** all CSS custom properties are defined: `--primary: #2D6A4A`, `--primary-hover: #245740`, `--primary-light: #EBF5EE`, `--background: #FFFFFF`, `--background-page: #F5F7F5`, `--surface: #F8FAF9`, `--surface-raised: #EFF5F1`, `--border: #D4E0DA`, `--text-primary: #1A2D22`, `--text-secondary: #4D6E5A`, `--text-muted: #8EA899`.
+
+**Given** the density trace colors are defined,
+**When** referenced in components,
+**Then** `--density-high: #16a34a`, `--density-medium: #d97706`, `--density-low: #dc2626` are available as CSS vars — distinct from `--primary`.
+
+**Given** the shadcn/ui theme is configured,
+**When** shadcn components render,
+**Then** `--primary`, `--primary-foreground: #FFFFFF`, `--muted`, `--muted-foreground`, `--card`, `--border`, `--ring` all map to the corresponding design tokens above.
+
+**Given** the typography system is configured,
+**When** text renders,
+**Then** Geist Sans is the default font for all UI text; Geist Mono is used exclusively for numeric values (km, D+, ETA) — configured via `font-mono` Tailwind class.
+
+**Given** the design tokens are applied,
+**When** WCAG contrast is checked,
+**Then** all text/background combinations meet AA minimum: `text-primary`/`background` ≥ 16:1, `text-secondary`/`background` ≥ 5.5:1, `primary`/`background` ≥ 5.4:1.
+
+---
+
+### Story 8.2: Adventures List Page
+
+As a **cyclist user**,
+I want a clean, well-structured list of my adventures with clear entry points to Planning and Live modes,
+So that I can quickly find my adventure and choose the right mode for my current context.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `/adventures`,
+**When** the page renders,
+**Then** the page background is `--background-page` (`#F5F7F5`) and adventure cards are white (`--surface`) with `rounded-xl border border-[--border]`.
+
+**Given** an adventure is selected on mobile (< 1024px),
+**When** the action buttons render,
+**Then** a full-width primary button "🔴 Démarrer en Live" and a `⚙️` gear icon with dropdown are visible; the dropdown contains "Mode Planning" and "Voir les détails".
+
+**Given** an adventure is selected on desktop (≥ 1024px),
+**When** the action row renders,
+**Then** three explicit buttons display: `[🔴 Live]` (primary), `[📋 Planning]` (secondary), `[✏️ Modifier]` (ghost).
+
+**Given** the adventures list is empty,
+**When** the page renders,
+**Then** an empty state shows a bicycle icon, "Aucune aventure" title, and a primary CTA "Créer une aventure".
+
+---
+
+### Story 8.3: App Shell & Routing
+
+As a **developer building the app navigation**,
+I want a consistent app shell with proper routing between Planning and Live modes,
+So that users always know where they are and how to get back.
+
+**Acceptance Criteria:**
+
+**Given** a user enters Planning mode on mobile (< 1024px),
+**When** navigated to `/map/[id]`,
+**Then** a non-blocking toast/banner appears: "Mode Planning optimisé pour desktop — certaines fonctionnalités sont réduites sur mobile" — the map still loads but the sidebar is hidden and replaced by the "FILTERS" bottom drawer pattern.
+
+**Given** a user enters Planning mode on desktop (≥ 1024px),
+**When** navigated to `/map/[id]`,
+**Then** the map renders full-bleed (`100dvh`) with a "← Aventures" back button (top-left, `z-40`) and the sidebar visible.
+
+**Given** the desktop Planning sidebar,
+**When** rendered,
+**Then** it is 360px wide with a `◀`/`▶` collapse toggle — collapsed state hides the sidebar and gives full width to the map; the sidebar contains: fromKm/toKm slider, layer toggles (Hébergements / Restauration / Vélo / Densité / Météo), accommodation sub-type chips, and (Epic 11) stages list.
+
+**Given** a user enters Live mode at `/live/[id]`,
+**When** it's their first access,
+**Then** `GeolocationConsent` dialog appears; subsequent accesses skip it if consent was granted.
+
+**Given** the user is in Live mode,
+**When** the map renders,
+**Then** only a "⏹ Quitter le live" button is visible for navigation — all other nav intentionally hidden.
+
+**Given** a user clicks "Quitter le live",
+**When** confirmed,
+**Then** `clearWatch()` is called and the user is redirected to `/adventures`.
+
+---
+
+### Story 8.4: Filter Panel — POI Selector
+
+As a **cyclist user**,
+I want to filter which types of places are shown on my map and configure search parameters,
+So that I can focus on what I need without visual clutter.
+
+> **Décisions UX 2026-03-20 :**
+> - Planning (desktop) : filtres dans le panneau latéral — pas de drawer séparé
+> - Live (mobile) : bouton "FILTERS" ouvre un Vaul Drawer
+> - Rayon = stepper (— / +) dans le drawer Live, pas un slider sur la carte
+> - Post-MVP uniquement : dates, personnes, chambres, types de lits, options Booking
+
+**Acceptance Criteria:**
+
+**[Planning Mode — Panneau latéral desktop]**
+
+**Given** the Planning sidebar is visible,
+**When** the filter section renders,
+**Then** it shows inline (no separate drawer): layer toggles (🏨 Hébergements, 🍽️ Restauration, 🛒 Alimentation, 🚲 Vélo, 🌤️ Météo, 📊 Densité) as toggle chips — multi-selection, active = `--primary` bg + white text.
+
+**Given** 🏨 Hébergements is active in Planning sidebar,
+**When** the accommodation sub-section renders,
+**Then** sub-type chips appear for all Overpass + Google Places categories (Hôtel, Camping, Refuge, Hostel, Maison d'hôte…) — all active by default, individually toggleable.
+
+**[Live Mode — Drawer Filtres]**
+
+**Given** a user taps the "FILTERS" button in Live mode,
+**When** the drawer opens,
+**Then** it opens as a Vaul Drawer from bottom (`z-50`).
+
+**Given** the Live filters drawer is open,
+**When** rendered,
+**Then** it shows: (1) Distance de la trace — stepper `— 5 km +` (0.5–30 km, default 5 km); (2) Calques — toggle chips: 🏨 Hébergements, 🍽️ Restauration, 🛒 Alimentation, 🚲 Vélo, 🌤️ Météo, 📊 Densité; (3) Sub-types hébergement (si 🏨 actif).
+
+**Given** the "Appliquer les filtres" button is tapped (Live drawer),
+**When** applied,
+**Then** the map updates immediately; drawer closes; active filter count badge appears on the "FILTERS" button.
+
+**Given** no POI type is selected,
+**When** the user tries to apply,
+**Then** a validation message appears and the apply button stays disabled.
+
+**[Post-MVP — not in this story]**
+> Dates arrivée/sortie, nombre de personnes, nombre de chambres, types de lits, options (annulation sans frais, logement avec cuisine) — à implémenter après MVP uniquement.
+
+---
+
+### Story 8.5: Density Layer Toggle
+
+As a **cyclist user viewing the map**,
+I want to toggle the density colorization on/off independently from other layers,
+So that I can switch between a clean trace view and the density-colored view depending on my focus.
+
+**Acceptance Criteria:**
+
+**Given** the density analysis has been run on an adventure,
+**When** the density layer toggle is active (default),
+**Then** the GPX trace is rendered with the tricolor density colorization (green/orange/red per tronçon).
+
+**Given** the user toggles density off,
+**When** the toggle is inactive,
+**Then** the trace renders in a neutral color (`--text-secondary` or `#94A3B8`) — uniform, no density colors.
+
+**Given** the density toggle is in the Planning sidebar (desktop) or Live Filters drawer,
+**When** rendered,
+**Then** it appears as a chip `📊 Densité` consistent with other layer toggles.
+
+---
+
+### Story 8.6: Accommodation Type Display Filters
+
+As a **cyclist user**,
+I want to filter which accommodation sub-types are shown on the map,
+So that I can hide shelter/refuge pins if I only care about hotels, for example.
+
+**Acceptance Criteria:**
+
+**Given** the 🏨 Hébergements layer is active,
+**When** the sub-type filter section renders,
+**Then** chips are displayed for all available categories from Overpass + Google Places: Hôtel, Camping, Refuge/Shelter, Hostel, Maison d'hôte, Gîte — all active by default.
+
+**Given** the user deactivates a sub-type chip (e.g. Refuge),
+**When** applied,
+**Then** refuge/shelter pins disappear from the map immediately; other accommodation pins remain.
+
+**Given** a sub-type has no results in the current corridor,
+**When** the chip renders,
+**Then** it is displayed greyed-out with a `(0)` count badge — still tappable to pre-select for future searches.
+
+---
+
+### Story 8.7: Density Analysis Category Selection
+
+As a **cyclist user triggering a density analysis**,
+I want to choose which accommodation categories are included in the analysis,
+So that the density colorization reflects only the types I plan to use (e.g. no camping if I always sleep in hotels).
+
+**Acceptance Criteria:**
+
+**Given** a user triggers density analysis (from Epic 5 flow),
+**When** the analysis is requested,
+**Then** a pre-analysis modal appears with category chips: Hôtel, Camping, Refuge, Hostel, Maison d'hôte — all selected by default.
+
+**Given** the user deselects one or more categories,
+**When** they confirm and launch the analysis,
+**Then** the density job runs with only the selected categories; the selection is stored in `adventure.density_categories` for reference.
+
+**Given** the density analysis was run with a specific category selection,
+**When** the map displays the colorized trace,
+**Then** a small label near the density legend shows the active categories (e.g. "Hôtels + Campings").
+
+---
+
+### Story 8.8: Interactive Elevation Profile
+
+As a **cyclist planning a multi-day route**,
+I want an interactive elevation profile below the map,
+So that I can visualize the terrain, understand cumulative D+, and identify where steep sections align with accommodation scarcity.
+
+> **Note:** This story is a prerequisite for Epic 11 (Stage Planning) — stages are created by clicking on the elevation profile.
+
+**Acceptance Criteria:**
+
+**Given** a user is in Planning mode on desktop,
+**When** the map view renders,
+**Then** an elevation profile chart (Recharts or Victory) appears below the map or in the sidebar — height ~120px, displaying elevation (m) on Y-axis and distance (km) on X-axis.
+
+**Given** the user hovers over the elevation profile,
+**When** the cursor moves,
+**Then** a vertical tooltip shows: elevation at that point, cumulative distance (km), cumulative D+ from start — and a crosshair marker appears on the corresponding position on the GPX trace on the map.
+
+**Given** the adventure has multiple segments,
+**When** the profile renders,
+**Then** segment boundaries are marked with a vertical dashed line and segment name label.
+
+**Given** the user is in Live mode,
+**When** the bottom sheet is visible,
+**Then** a compact elevation strip (height ~60px, no hover interaction) shows the elevation profile with: current GPS position marked (green dot), target search point marked (white dot).
+
+**Given** the adventure has no elevation data in waypoints (missing `ele` values),
+**When** the profile would render,
+**Then** a graceful fallback message "Données d'élévation non disponibles pour cette trace" appears in the profile area — no crash.
+
+---
+
+### Story 8.9: App Header — Global Navigation Bar
+
+As a **cyclist user navigating the app**,
+I want a persistent header bar with the logo, the current adventure name, and quick links to my adventures and account settings,
+So that I always know which adventure I'm viewing and can navigate anywhere in one tap.
+
+**Acceptance Criteria:**
+
+**Given** the user is on any `(app)` page,
+**When** the header renders,
+**Then** a fixed-height header (`h-14`) is visible at the top with `bg-background border-b border-[--border]` and `z-50`.
+
+**Given** the header renders,
+**When** looking at the left section,
+**Then** the Ride'n'Rest `<Logo iconOnly />` is displayed (mobile) or full `<Logo />` (desktop ≥ 640px), clickable link to `/adventures`.
+
+**Given** the user is on an adventure map page (`/map/[id]` or `/live/[id]`),
+**When** the header renders,
+**Then** the center section displays the adventure name (`text-sm font-semibold truncate`).
+
+**Given** the user is NOT on an adventure page,
+**When** the header renders,
+**Then** the center section is empty.
+
+**Given** the header renders,
+**When** looking at the right section,
+**Then** two navigation items are visible: "Mes aventures" (→ `/adventures`) and "Mon compte" (→ `/settings` — Strava connection config).
+
+**Given** the user is in **Live mode** (`/live/[id]`),
+**When** the header renders,
+**Then** the header is **hidden** — Live mode is full-screen immersive (per Story 8.3).
+
+**Given** the viewport is mobile (< 640px),
+**When** the header renders,
+**Then** logo is icon-only, adventure name truncates, and nav links collapse into a hamburger `<DropdownMenu>`.
+
+---
+
+## Epic 9: Redesign & Landing Site
+
+> **Ajouté 2026-03-18** — Refonte visuelle complète avec le design system light mode vert sauge, et création de la landing page marketing.
+
+L'utilisateur arrive sur une landing page qui communique clairement la valeur du produit, et navigue dans une application visuellement soignée et cohérente du premier au dernier écran.
+
+### Story 9.1: Landing Page
+
+As a **potential cyclist user discovering Ride'n'Rest**,
+I want a compelling landing page that shows me what the app does immediately,
+So that I understand the value in seconds and feel motivated to sign up.
+
+**Acceptance Criteria:**
+
+**Given** a visitor arrives at `/`,
+**When** the hero renders,
+**Then** it shows a full-bleed cycling landscape photo, headline "TROUVE OÙ DORMIR LE LONG DE TA TRACE" (large white bold), subtitle, and a primary CTA "Essayer gratuitement".
+
+**Given** the "Étape 01 — Crée ton aventure" section renders,
+**When** displayed,
+**Then** it shows a phone mockup (GPX import screen) and step content on white background with "Compatible Strava" and "Analyse de relief instantanée" checkmarks.
+
+**Given** the "Étape 02 — Décide en roulant" section renders,
+**When** displayed,
+**Then** it shows the step text and map mockup on `--primary-light` (`#EBF5EE`) section background.
+
+**Given** the manifesto section renders,
+**When** displayed,
+**Then** italic centered manifesto text inside a white card, "LA COMMUNAUTÉ" overline in `--primary` uppercase.
+
+**Given** the page renders on mobile,
+**When** étape sections display,
+**Then** two-column layout stacks vertically — no horizontal scroll.
+
+---
+
+### Story 9.2: Auth Pages Polish
+
+As a **new or returning user**,
+I want auth pages cohesive with the app's identity,
+So that my first interaction is reassuring and polished.
+
+**Acceptance Criteria:**
+
+**Given** a user visits any auth page (`/login`, `/register`, `/forgot-password`, `/reset-password`),
+**When** the page renders,
+**Then** background is a full-bleed cycling landscape photo; a white card is centered on it (`max-w-sm mx-auto`, `rounded-2xl shadow-sm`); no logo inside the card (the global header handles branding).
+
+**Given** a user visits `/register`,
+**When** the card renders,
+**Then** a short pitch text is displayed at the top of the card, above the form fields, listing 3 key benefits of creating an account (e.g. GPX import, accommodations along the route, pace-adjusted weather).
+
+**Given** a user visits `/login`,
+**When** the card renders,
+**Then** a short returning-user message is displayed at the top of the card, above the form fields (e.g. "Reprends là où tu t'es arrêté").
+
+**Given** the `/register` form renders,
+**When** the user types in the password field,
+**Then** an eye icon is visible at the end of the field; clicking it toggles between `type="password"` and `type="text"`.
+
+**Given** the auth form renders,
+**When** displayed,
+**Then** primary CTA uses `--primary` bg + white text; inputs have `border-[--border]` with `focus:ring-[--primary]`.
+
+**Given** a form validation error,
+**When** displayed,
+**Then** error text in `--density-low` (`#dc2626`) below the field, `text-sm`.
+
+---
+
+### Story 9.3: Map View — Light Mode Polish
+
+As a **cyclist planning a route**,
+I want the map view to feel clean and visually consistent,
+So that the map is the star without visual noise from UI chrome.
+
+**Acceptance Criteria:**
+
+**Given** the map renders in Planning mode,
+**When** displayed,
+**Then** OpenFreeMap light tiles are used as the default base layer.
+
+**Given** POI pins render,
+**When** displayed,
+**Then** all pins use `--poi-pin` (`#1A2D22`) fill with white inner category icon; selected pin scales to 1.2× with `--primary` ring.
+
+**Given** the `<LayerToggleGroup>` renders,
+**When** displayed,
+**Then** each 40×40px toggle: inactive = white bg + `--border` border; active = `--primary` bg + white icon.
+
+**Given** the corridor slider overlay renders (mobile bottom),
+**When** displayed,
+**Then** white panel `--surface`, `rounded-t-2xl shadow-lg`; km value in `font-mono text-2xl font-bold`.
+
+**Given** the GPS indicator renders in Live mode,
+**When** displayed,
+**Then** it is a `--primary` pulsing circle (CSS keyframe) — distinct from POI pins.
+
+---
+
+### Story 9.4: POI Card & Bottom Sheet
+
+As a **cyclist browsing accommodation options**,
+I want a clear POI detail card with key info and a direct booking link,
+So that I can decide quickly without leaving the map.
+
+**Acceptance Criteria:**
+
+**Given** a user taps a POI pin,
+**When** the Vaul Drawer opens,
+**Then** it snaps to 40% height (name, type, distance, CTA) and 85% on pull-up (full details); dismisses via swipe down or tap backdrop.
+
+**Given** the POI card renders for an accommodation,
+**When** displayed,
+**Then** shows: name (`text-lg font-semibold`), type badge (`--primary-light` chip), distance from trace (`text-sm text-[--text-secondary]`), km on route (`font-mono text-sm`).
+
+**Given** the Booking.com CTA renders,
+**When** displayed,
+**Then** full-width primary button "Recherche sur Booking" with external link icon; `target="_blank" rel="noopener noreferrer"`; explicit `aria-label`.
+
+**Given** a Google Places website URL is available for an accommodation,
+**When** the card displays,
+**Then** a secondary ghost button "Site officiel" is shown below the Booking CTA, linking to the establishment's website; `target="_blank" rel="noopener noreferrer"`.
+
+**Given** a non-accommodation POI (restau, vélo) renders,
+**When** the card displays,
+**Then** no CTA is shown.
+
+---
+
+### Story 9.5: Adventure Detail Page Design
+
+As a **cyclist managing their adventure**,
+I want the adventure detail page to be well-designed,
+So that managing GPX segments feels as polished as the map experience.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `/adventures/:id`,
+**When** the page renders,
+**Then** background is `--background-page`; content centered `max-w-3xl mx-auto`; adventure name `text-2xl font-bold text-[--text-primary]`.
+
+**Given** the segment list renders,
+**When** displayed,
+**Then** each segment is a white card (`--surface`, `rounded-xl`, `border border-[--border]`) showing: drag handle, name, distance (`font-mono`), parse status badge, and actions menu.
+
+**Given** `parse_status: 'pending'`,
+**When** badge renders,
+**Then** amber pulsing "En cours..." badge (`--density-medium`, `animate-pulse`).
+
+**Given** `parse_status: 'done'`,
+**When** badge renders,
+**Then** green "Prêt" badge (`--density-high`, static).
+
+**Given** `parse_status: 'error'`,
+**When** badge renders,
+**Then** red "Erreur" badge (`--density-low`) with "Réessayer" ghost button.
+
+**Given** the "Analyser la densité" CTA,
+**When** all segments are `done`,
+**Then** it appears as a secondary button — disabled with tooltip if any segment is pending.
+
+---
+
+## Epic 10: Cache Optimization & Upstash Budget Management
+
+> **Note 2026-03-18 : renommé depuis Epic 9** — numérotation mise à jour suite à l'insertion des épics 8 (App Shell) et 9 (Redesign). Contenu inchangé.
+
+Optimiser la stratégie de cache Redis pour maximiser les performances, partager les données entre utilisateurs, contrôler la consommation Upstash (10k cmds/jour), et donner un levier d'invalidation admin en cas de mise à jour OSM.
+
+### Story 10.1: Geographic Cache Key — Cross-User POI Sharing
+
+As a **backend system**,
+I want POI query results to be cached by geographic corridor rather than by user session,
+So that two users querying the same zone benefit from the same cached data — reducing Overpass API calls and Upstash command consumption.
+
+**Acceptance Criteria:**
+
+**Given** two users query POIs for the same `(segmentId, fromKm, toKm, categories)` combination,
+**When** the second query arrives within the TTL window,
+**Then** only 1 Overpass API call is made (not 2) — the second user is served from Redis cache.
+
+**Given** the current cache key is `pois:{segmentId}:{fromKm}:{toKm}:{categories}` (segment-scoped),
+**When** a geographic key migration is implemented,
+**Then** the new key uses the geographic corridor bbox: `pois:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}:{categories}` (rounded to 3 decimal places ~111m precision) — decoupled from segment identity.
+
+**Given** the new geographic key is active,
+**When** a user with a different segment that overlaps the same geographic zone queries POIs,
+**Then** the cached result from the first segment's corridor is reused if the bboxes match within rounding — no new Overpass call.
+
+**Given** the geographic cache is active,
+**When** monitoring Upstash dashboard,
+**Then** the daily command count should decrease by an estimated 30-50% for popular bikepacking corridors.
+
+---
+
+### Story 10.2: Adaptive TTL — Density (7-30 days) vs POIs (24h) vs Weather (1h)
+
+As a **backend system**,
+I want different cache TTLs per data type based on OSM data volatility,
+So that stable data stays cached much longer — reducing redundant Upstash commands while keeping time-sensitive data fresh.
+
+**Acceptance Criteria:**
+
+**Given** the density tronçon cache currently uses 24h TTL,
+**When** the adaptive TTL is implemented,
+**Then** density tronçon counts use `TTL_DENSITY_TRONCON = 7 days` (604800s).
+
+**Given** POI search results (`pois:bbox:*`) currently use 24h TTL,
+**When** the adaptive TTL is reviewed,
+**Then** POI bbox results keep `TTL_POI_BBOX = 24h` (86400s).
+
+**Given** weather cache uses 1h TTL,
+**When** no change is needed,
+**Then** weather TTL stays at 1h — documented in `packages/shared/src/constants/api.constants.ts` as `CACHE_TTL_WEATHER_S = 3600`.
+
+**Given** all TTL constants are defined,
+**When** the codebase is audited,
+**Then** ALL cache TTL values are sourced from `packages/shared/src/constants/api.constants.ts` — no magic numbers in service files.
+
+---
+
+### Story 10.3: POI Query Cache by BBox + Category (Map Layer Requests)
+
+As a **cyclist user browsing the map**,
+I want POI layer data to be served from cache when I toggle a layer on a corridor I already searched,
+So that repeated layer toggles and re-visits to the same area are instantaneous — no redundant Overpass calls.
+
+**Acceptance Criteria:**
+
+**Given** a user has already searched accommodations on a corridor,
+**When** they toggle the accommodation layer off and back on,
+**Then** the second `GET /pois` request is served from Redis cache in <200ms — no Overpass API call made.
+
+**Given** the geographic key migration (Story 10.1) is applied to `GET /pois`,
+**When** the POI cache key is constructed,
+**Then** the key is `pois:bbox:{rounded_bbox}:{sorted_categories}` — segment-agnostic, reusable across users and adventures.
+
+**Given** lat/lng values are used to compute the cache key,
+**When** the bbox is computed,
+**Then** values are rounded to 3 decimal places (`Math.round(val * 1000) / 1000`) — prevents cache fragmentation from floating-point precision differences.
+
+---
+
+### Story 10.4: Admin Cache Invalidation by Geographic Zone
+
+As a **system administrator**,
+I want to purge the cache for a specific geographic zone (bbox),
+So that when a significant OSM data update occurs in a region, the stale cache can be invalidated without restarting the server.
+
+**Acceptance Criteria:**
+
+**Given** an admin needs to invalidate cache for a specific bbox,
+**When** they call `DELETE /admin/cache/zone?minLat=42.0&minLng=-2.0&maxLat=43.5&maxLng=3.0`,
+**Then** all Redis keys matching `pois:bbox:{keys within bbox}` and `density:troncon:{keys within bbox}` are deleted — response includes count of deleted keys.
+
+**Given** the admin endpoint is created,
+**When** accessed,
+**Then** it is protected by a static `ADMIN_SECRET` header — not exposed in Swagger, not subject to `JwtAuthGuard`.
+
+**Given** the zone invalidation runs on a large bbox,
+**When** many keys match,
+**Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB`.
+
+---
+
+### Story 10.5: Upstash Budget Monitoring & Alerting
+
+As a **solo developer operating at the free tier limit**,
+I want visibility into daily Redis command consumption with automatic alerting before quota exhaustion,
+So that I can act before hitting the 10k/day cap — avoiding silent service degradation.
+
+**Acceptance Criteria:**
+
+**Given** Upstash free tier cap is 10,000 commands/day,
+**When** the monitoring system is active,
+**Then** an email alert is sent by Upstash dashboard when daily usage exceeds 7,500 commands (75%) — configured via Upstash console.
+
+**Given** the NestJS API starts,
+**When** a health check is performed,
+**Then** `GET /health` includes a `redis` sub-check verifying connectivity — existing `HealthModule` extended with `RedisHealthIndicator`.
+
+**Given** daily usage approaches the alert threshold,
+**When** usage exceeds 7,500 cmds/day,
+**Then** the recommended action is documented: switch to Upstash Pay-as-you-go ($0.2/100k cmds) — no code migration required.
+
+---
+
+## Epic 11: Stage Planning (Étapes de planification)
+
+> **Ajouté 2026-03-20** — Fonctionnalité MVP permettant de définir des étapes jour par jour sur l'aventure. Dépend de Story 8.8 (Profil d'élévation). Les étapes sont créées depuis la carte et/ou le profil d'élévation, chaque étape a une couleur, un nom, un D+ calculé et une distance inter-étapes.
+
+L'utilisateur peut découper son aventure en étapes journalières, les visualiser sur la trace et le profil d'élévation, et organiser sa planification jour par jour avec D+ et distance par étape.
+
+### Story 11.1: Stage CRUD — Création, Renommage, Suppression
+
+As a **cyclist planning a multi-day adventure**,
+I want to create, name, and delete planning stages on my route,
+So that I can organize my adventure day by day with clear endpoints.
+
+**Acceptance Criteria:**
+
+**Given** a user clicks "Créer une étape" in Planning mode,
+**When** they click on a point on the trace or elevation profile,
+**Then** a stage endpoint marker is placed at that km position; if it's the first stage, the start is km 0; otherwise the start is the end of the previous stage.
+
+**Given** a stage endpoint is placed,
+**When** the user confirms,
+**Then** a naming dialog appears (default: "Étape 1", "Étape 2"…); the stage is saved with `start_km`, `end_km`, `name`, `color` (auto-assigned from a palette, user-changeable).
+
+**Given** stages exist in the sidebar stages list,
+**When** rendered,
+**Then** each stage shows: color swatch, name, distance (km), D+ cumulative, ETA (based on default 15 km/h if no pace set).
+
+**Given** a user wants to edit a stage,
+**When** they click the edit icon,
+**Then** they can rename it and change its color — endpoint km is not editable directly (drag on map instead, Epic 11.2).
+
+**Given** a user deletes a stage,
+**When** confirmed,
+**Then** the stage is removed; subsequent stages' start_km values are recalculated automatically.
+
+---
+
+### Story 11.2: Stage Interactive Map & Profile Placement
+
+As a **cyclist creating stages**,
+I want to place and adjust stage endpoints directly on the map or elevation profile,
+So that I can visually fine-tune where each day ends based on terrain.
+
+**Acceptance Criteria:**
+
+**Given** the user is in "Créer une étape" mode,
+**When** they hover over the map trace or the elevation profile,
+**Then** a preview shows the distance and D+ from the last stage endpoint to the cursor position in real time.
+
+**Given** a stage endpoint marker exists on the map,
+**When** the user drags it to a new position on the trace,
+**Then** the marker snaps to the nearest GPX point; `end_km` is updated and D+/distance recalculated.
+
+**Given** stages are defined,
+**When** the elevation profile renders (Story 8.8),
+**Then** each stage boundary appears as a colored vertical line on the profile, with the stage name as a label.
+
+**Given** the user toggles "Afficher les étapes" off,
+**When** the map renders,
+**Then** all stage markers and colored trace segments disappear; the density colorization (if active) takes precedence.
+
+---
+
+### Story 11.3: Stage D+ & Distance Computation
+
+As a **backend system**,
+I want to accurately compute D+ and distance for each stage,
+So that cyclists get reliable day-by-day effort estimates.
+
+**Acceptance Criteria:**
+
+**Given** a stage has `start_km` and `end_km` defined,
+**When** the stage is saved,
+**Then** the API computes: `distance_km = end_km - start_km`, `elevation_gain_m = sum of positive ele differences between waypoints in [start_km, end_km]`.
+
+**Given** waypoints have `ele` values,
+**When** D+ is computed,
+**Then** only positive elevation deltas are summed (gains only, not losses) — standard cycling D+ definition.
+
+**Given** waypoints have missing or null `ele` values,
+**When** D+ is requested,
+**Then** `elevation_gain_m` is returned as `null` with a `elevation_data_available: false` flag — no crash, graceful UI fallback.
+
+**Given** the pace is set on the adventure,
+**When** ETA is computed per stage,
+**Then** `eta_minutes = (distance_km / pace_kmh) * 60 + (elevation_gain_m / 100) * 6` (Naismith's rule approximation).
+
+---
+
+### Story 11.4: Stage-Scoped POI Search
+
+As a **cyclist with defined stages**,
+I want to search for POIs scoped to the end of each stage,
+So that I find accommodation at exactly my planned overnight stop.
+
+**Acceptance Criteria:**
+
+**Given** stages are defined and a stage is selected in the sidebar,
+**When** the user triggers a POI search for that stage,
+**Then** the corridor search uses `end_km` of the stage as the focal point (±5 km window by default, configurable via filters).
+
+**Given** the stage-scoped search returns results,
+**When** POI pins render,
+**Then** they are visually linked to the stage (matching color accent on pins).
+
+---
+
+### Story 11.5: Stage-Scoped Weather
+
+As a **cyclist planning stages**,
+I want weather forecasts aligned with my expected arrival time at each stage endpoint,
+So that I know what conditions to expect at my overnight stop.
+
+**Acceptance Criteria:**
+
+**Given** stages are defined with a departure time set on the adventure,
+**When** weather is requested for a stage,
+**Then** `eta_datetime = departure_datetime + sum of ETAs of preceding stages + this stage ETA`; weather forecast is fetched at `end_km` for `eta_datetime`.
+
+**Given** no departure time is set,
+**When** weather for a stage is requested,
+**Then** weather is shown for the current time at `end_km` — same fallback as Epic 6.
+
+---
+
+## Epic 12: PWA & Offline Capability
+
+> **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.
 
 Un utilisateur peut installer l'app sur son écran d'accueil, consulter sa dernière trace + POIs en mode offline partiel, et recevoir une notification push quand une analyse de densité est terminée.
 
-### Story 8.1: PWA Manifest & App Install
+### Story 11.1: PWA Manifest & App Install
 
 As a **cyclist user on mobile**,
 I want to install Ride'n'Rest on my home screen like a native app,
@@ -1138,7 +1842,7 @@ So that I can launch it instantly without going through the browser — especial
 
 **Given** the Web App Manifest is configured,
 **When** it is validated by Lighthouse,
-**Then** it includes: `display: standalone`, `theme_color: #1a1a2e`, `background_color`, maskable icon 512×512, standard icon 192×192, and `orientation: portrait`.
+**Then** it includes: `display: standalone`, `theme_color: #2D6A4A` (brand primary green), `background_color: #FFFFFF`, maskable icon 512×512, standard icon 192×192, and `orientation: portrait`.
 
 **Given** the app is installed and launched from the home screen,
 **When** it opens,
@@ -1150,7 +1854,7 @@ So that I can launch it instantly without going through the browser — especial
 
 ---
 
-### Story 8.2: Service Worker & Partial Offline Support
+### Story 11.2: Service Worker & Partial Offline Support
 
 As a **cyclist user with intermittent connectivity**,
 I want my last loaded trace and POIs to remain accessible when I lose signal,
@@ -1180,7 +1884,7 @@ So that I can still consult the map and POI cards I already loaded — even with
 
 ---
 
-### Story 8.3: Push Notifications for Density Analysis
+### Story 11.3: Push Notifications for Density Analysis
 
 As a **cyclist user**,
 I want to receive a push notification when my density analysis is complete,
@@ -1207,3 +1911,399 @@ So that I can trigger the analysis, close the app, and be notified when the colo
 **Given** push notifications are not supported by the browser (e.g., iOS Safari < 16.4),
 **When** the analysis completes,
 **Then** the in-app notification (via polling au prochain focus de l'app) is the only channel used — no error is thrown for missing push support.
+
+---
+
+## Epic 13: Marketing Assets & Production Polish
+
+> **Ajouté 2026-03-18** — À réaliser après Epic 12 (PWA). L'app est installable et stable : on capture les vrais écrans pour remplacer les assets marketing basés sur les mockups AI (Desertus Bikus).
+
+L'utilisateur qui découvre Ride'n'Rest voit la vraie application dans les vidéos et screenshots de la landing page — pas des mockups générés avec le mauvais nom d'app.
+
+### Story 13.1: Capture des vrais assets app
+
+As a **product owner**,
+I want real screenshots and screen recordings of the finished app,
+So that the marketing site shows the actual product experience — not AI-generated mockups.
+
+**Acceptance Criteria:**
+
+**Given** the app is in its final PWA state (Epic 12 complete),
+**When** asset capture is performed,
+**Then** screenshots are taken on iPhone (Safari) and Android (Chrome) for these key screens: liste aventures, carte avec POIs visibles, fiche hébergement ouverte, panneau filtres, mode Live avec GPS actif.
+
+**Given** screenshots are captured,
+**When** exported,
+**Then** they are exported at 2× resolution minimum, in WebP format, stored in `apps/web/public/images/app-screens/`.
+
+**Given** screen recordings are captured,
+**When** exported,
+**Then** key flows are recorded: onboarding GPX → première carte colorisée, recherche hébergement → tap pin → Booking deep link.
+
+---
+
+### Story 13.2: Mise à jour landing page avec vrais assets
+
+As a **potential user discovering Ride'n'Rest**,
+I want to see the real app in action on the landing page,
+So that what I see matches exactly what I'll use after signing up.
+
+**Acceptance Criteria:**
+
+**Given** real app assets are captured (Story 13.1),
+**When** the landing page is updated,
+**Then** all GIFs/vidéos basés sur les mockups Desertus Bikus sont remplacés par les captures réelles — aucune référence à "Desertus Bikus" comme nom d'app ne subsiste.
+
+**Given** `FeatureStepOne` and `FeatureStepTwo` are updated,
+**When** rendered,
+**Then** `feature-step-one-phone.svg` and `step2.gif` are replaced by real app screenshots/recordings — même layout, nouveaux assets.
+
+**Given** any animation shows the app header,
+**When** displayed,
+**Then** the header shows "Ride'n'Rest" and the adventure name in the correct position.
+
+---
+
+### Story 13.3: Polish final landing + SEO de base
+
+As a **user discovering Ride'n'Rest via search or social share**,
+I want the landing page to be findable and share correctly,
+So that links shared on Strava, Instagram, or WhatsApp show a preview that makes people want to click.
+
+**Acceptance Criteria:**
+
+**Given** the landing page is finalized,
+**When** `<head>` metadata is reviewed,
+**Then** the following are set: `<title>Ride'n'Rest — Trouve où dormir le long de ta trace</title>`, `<meta name="description">` (150 chars max), `og:title`, `og:description`, `og:image` (1200×630px), `og:url`, `twitter:card: summary_large_image`.
+
+**Given** the `og:image` is set,
+**When** a link is shared on WhatsApp, Strava, or Twitter/X,
+**Then** a preview card appears with a real app screenshot — not a blank preview.
+
+**Given** landing page copy is reviewed with real product in hand,
+**When** any copy feels inaccurate vs. the real experience,
+**Then** it is updated to reflect what the app actually does.
+
+---
+
+## Epic 14: VPS Hostinger Migration & Local Docker Environment
+
+> **Ajouté 2026-03-21** — Migration du stack multi-plateforme (Vercel + Fly.io + Aiven + Upstash) vers un VPS Hostinger unique. Approche **hybride** : Docker pour les services infra (PostgreSQL+PostGIS, Redis, Caddy), Node.js natif pour les apps (Next.js, NestJS) via `turbo build` + `pm2` — même workflow qu'en local. Élimine la latence inter-services (3 datacenter hops → localhost), réduit les coûts (~$8/mois vs $20+), et supprime les limites free tier.
+
+L'architecture VPS repose sur deux couches :
+- **Docker Compose** pour les services infra : PostgreSQL+PostGIS, Redis, Caddy (reverse proxy + SSL auto), Uptime Kuma (monitoring)
+- **Node.js natif** pour les apps : `pnpm install && turbo build && pm2 start` — identique au workflow de développement local
+
+### Story 14.1: Docker Compose — Services infra (PostgreSQL, Redis, Caddy)
+
+As a **developer**,
+I want a `docker-compose.yml` that runs PostgreSQL+PostGIS, Redis, and Caddy,
+So that the infrastructure services are easy to manage both locally and on the VPS, without manual installation of PostGIS or Redis.
+
+**Acceptance Criteria:**
+
+**Given** `docker compose up -d` is run (locally or on VPS),
+**When** all services start,
+**Then** PostgreSQL 16 + PostGIS 3.4 is accessible on `localhost:5432`, Redis 7 on `localhost:6379`, and Caddy on ports 80/443.
+
+**Given** the `docker-compose.yml` is configured,
+**When** inspecting service definitions,
+**Then** PostgreSQL and Redis use named volumes (`pgdata`, `redisdata`) for data persistence across container restarts.
+
+**Given** Caddy is configured via `Caddyfile`,
+**When** running on the VPS,
+**Then** `ridenrest.com` proxies to Next.js (`localhost:3011`), `api.ridenrest.com` proxies to NestJS (`localhost:3010`), with automatic HTTPS via Let's Encrypt.
+
+**Given** Caddy is running locally,
+**When** in development mode,
+**Then** Caddy is either skipped (`docker compose up db redis` only) or configured for `localhost` without SSL.
+
+**Given** environment variables are needed,
+**When** `.env.example` is copied to `.env`,
+**Then** all required variables are documented with sensible local defaults (`POSTGRES_USER=ridenrest`, `POSTGRES_PASSWORD=ridenrest`, `POSTGRES_DB=ridenrest`).
+
+---
+
+### Story 14.2: Configuration Node.js natif & PM2 — Apps en production
+
+As a **developer deploying to the VPS**,
+I want Next.js and NestJS to run as native Node.js processes managed by PM2,
+So that the deployment workflow is identical to local development (`turbo build` + `pm2 start`) — no Dockerfiles needed for the apps.
+
+**Acceptance Criteria:**
+
+**Given** Node.js 22 LTS and pnpm are installed on the VPS,
+**When** `pnpm install && turbo build` is run from the repo root,
+**Then** both `apps/web` and `apps/api` build successfully — same as on the developer's Mac.
+
+**Given** `next.config.ts` has `output: 'standalone'` configured,
+**When** `turbo build` completes for `apps/web`,
+**Then** the standalone output in `apps/web/.next/standalone/` can be started with `node apps/web/.next/standalone/server.js`.
+
+**Given** a `ecosystem.config.js` (PM2 config) exists at the repo root,
+**When** `pm2 start ecosystem.config.js` is run,
+**Then** two processes are managed: `ridenrest-web` (Next.js standalone, port 3011) and `ridenrest-api` (NestJS `dist/main.js`, port 3010), both with `restart: always` and log rotation.
+
+**Given** a Node.js process crashes,
+**When** PM2 detects the crash,
+**Then** the process is automatically restarted within 5 seconds, and the crash is logged.
+
+**Given** the VPS reboots,
+**When** the system starts,
+**Then** PM2 is configured as a systemd service (`pm2 startup`) so both apps restart automatically.
+
+---
+
+### Story 14.3: Environnement de développement local unifié
+
+As a **developer**,
+I want to start the full stack locally with two commands: `docker compose up -d db redis` + `turbo dev`,
+So that local development uses a real PostgreSQL+PostGIS and Redis instead of external services (Aiven, Upstash).
+
+**Acceptance Criteria:**
+
+**Given** `docker compose up -d db redis` is run,
+**When** containers start,
+**Then** PostgreSQL+PostGIS is accessible on `localhost:5432` and Redis on `localhost:6379` with the credentials from `.env`.
+
+**Given** `turbo dev` is run after infra services are up,
+**When** Next.js and NestJS start in dev mode,
+**Then** `DATABASE_URL` points to the local PostgreSQL (`postgresql://ridenrest:ridenrest@localhost:5432/ridenrest`) and `REDIS_URL` to local Redis (`redis://localhost:6379`).
+
+**Given** the developer modifies source code in `apps/api/` or `apps/web/`,
+**When** the file is saved,
+**Then** hot-reload works exactly as before (NestJS watch, Next.js Fast Refresh) — no Docker rebuild needed for app code.
+
+**Given** `docker compose down -v` is run,
+**When** volumes are destroyed,
+**Then** all data is wiped; `drizzle-kit migrate` re-creates the schema on next `turbo dev`.
+
+---
+
+### Story 14.4: Backups PostgreSQL automatisés
+
+As a **developer managing production data**,
+I want automated daily PostgreSQL backups stored locally and optionally externally,
+So that I can restore data in case of VPS failure or corruption.
+
+**Acceptance Criteria:**
+
+**Given** a cron job is configured on the VPS,
+**When** the schedule triggers (daily at 03:00 UTC),
+**Then** `docker exec ridenrest-db pg_dump --format=custom -U ridenrest ridenrest` creates a backup stored in `/opt/ridenrest/backups/` with the naming convention `ridenrest_YYYY-MM-DD_HH-MM.dump`.
+
+**Given** backups accumulate,
+**When** the retention script runs,
+**Then** backups older than 14 days are automatically deleted to prevent disk exhaustion.
+
+**Given** a backup exists,
+**When** `pg_restore` is run against the PostgreSQL container,
+**Then** the database is fully restored including PostGIS extensions, all tables, indexes, and data.
+
+**Given** external backup is configured (optional),
+**When** a backup is created,
+**Then** it is uploaded via `rclone` to a free-tier cloud storage (Backblaze B2 10GB free or Cloudflare R2 10GB free).
+
+---
+
+### Story 14.5: CI/CD — Déploiement automatisé via GitHub Actions
+
+As a **developer pushing to the main branch**,
+I want an automated deployment pipeline that builds and deploys to the VPS via SSH,
+So that production is updated without manual intervention.
+
+**Acceptance Criteria:**
+
+**Given** a push to `main` branch triggers the GitHub Actions workflow,
+**When** the CI job passes (lint, build, test),
+**Then** the deploy job connects to the VPS via SSH and runs: `cd /opt/ridenrest && git pull && pnpm install --frozen-lockfile && turbo build && pnpm drizzle-kit migrate && pm2 restart all`.
+
+**Given** the deployment completes,
+**When** PM2 process status is checked,
+**Then** both `ridenrest-web` and `ridenrest-api` are in `online` status with uptime > 0.
+
+**Given** the deployment fails (build error),
+**When** the error is detected,
+**Then** the workflow exits with failure status — PM2 keeps the previous running processes untouched.
+
+**Given** GitHub Secrets are configured,
+**When** the deploy job runs,
+**Then** it uses: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` — no Vercel or Fly.io tokens needed.
+
+---
+
+### Story 14.6: Monitoring — Uptime Kuma
+
+As a **developer managing a production VPS**,
+I want basic monitoring and alerting via Uptime Kuma,
+So that I know immediately if the app goes down or the VPS runs out of resources.
+
+**Acceptance Criteria:**
+
+**Given** Uptime Kuma is added to `docker-compose.yml`,
+**When** the container starts,
+**Then** its dashboard is accessible on a non-public port (e.g., `localhost:3001`) — exposed via Caddy on a subdomain (`status.ridenrest.com`) with basic auth.
+
+**Given** monitors are configured,
+**When** checking status,
+**Then** Uptime Kuma monitors: HTTPS `ridenrest.com` (web), HTTPS `api.ridenrest.com/health` (API), PostgreSQL TCP `localhost:5432`, Redis TCP `localhost:6379`.
+
+**Given** a monitored service goes down,
+**When** 2 consecutive checks fail (60s interval),
+**Then** a notification is sent (email or Telegram — at least one channel configured).
+
+**Given** the VPS is running,
+**When** disk usage exceeds 80% or RAM exceeds 90%,
+**Then** an alert is triggered.
+
+---
+
+### Story 14.7: Migration des données & Décommissionnement des anciens services
+
+As a **developer completing the VPS migration**,
+I want to migrate existing data from Aiven/Fly.io to the VPS and decommission old services,
+So that there is a single source of truth and no orphaned cloud resources generating future costs.
+
+**Acceptance Criteria:**
+
+**Given** PostgreSQL data exists on Aiven,
+**When** migration is performed,
+**Then** `pg_dump` from Aiven is restored on the VPS PostgreSQL container with all PostGIS extensions, tables, indexes, and data intact.
+
+**Given** GPX files exist on Fly.io volumes,
+**When** migration is performed,
+**Then** all GPX files are transferred to the VPS `/data/gpx/` directory via `scp` or `rsync`, and file paths in the database remain valid.
+
+**Given** the VPS is serving production traffic correctly,
+**When** all smoke tests pass (auth, GPX upload, corridor search, POI display),
+**Then** Vercel project is deleted (or downgraded), Fly.io app is destroyed, Aiven database is deleted, and Upstash instance is deleted.
+
+**Given** DNS is updated,
+**When** `ridenrest.com` resolves,
+**Then** it points to the VPS IP (A record) — no CNAME to Vercel or Fly.io.
+
+**Given** the existing `apps/api/Dockerfile` and `apps/api/fly.toml` are no longer needed,
+**When** migration is complete,
+**Then** they are removed from the repo (or moved to a `_deprecated/` folder for reference).
+
+---
+
+## Epic 15: Analytics & Affiliate Partnership Readiness
+
+> **Ajouté 2026-03-23** — Epic transversal visant à accumuler dès le lancement les données nécessaires pour re-candidater au programme affilié Booking.com (refusé en early stage, voir mémoire projet) et piloter le produit par les données. Stack : **Plausible CE (Community Edition)** auto-hébergé sur VPS Hostinger (Docker), accessible sur `stats.ridenrest.com` via Caddy. Tracking actif dès le go-live — chaque semaine sans données = informations perdues pour la candidature Booking.com.
+
+### Story 15.1: Plausible CE — Setup VPS & Intégration Next.js
+
+As a **developer wanting to track app usage from day one**,
+I want Plausible Community Edition running on the VPS with automatic pageview tracking in Next.js,
+So that traffic data starts accumulating immediately at launch and can be used for Booking.com affiliate application.
+
+**Acceptance Criteria:**
+
+**Given** the `docker-compose.yml` is extended with Plausible CE services,
+**When** `docker compose up -d plausible` is run on the VPS,
+**Then** Plausible CE is running with its required ClickHouse and PostgreSQL dependencies, and accessible on `localhost:8000`.
+
+**Given** Caddy is configured with a `stats.ridenrest.com` block,
+**When** Plausible is running,
+**Then** `https://stats.ridenrest.com` proxies to `localhost:8000` with automatic HTTPS via Let's Encrypt — protected by Plausible's built-in auth (admin account).
+
+**Given** the `<PlausibleProvider>` component is added to `apps/web/src/app/layout.tsx`,
+**When** any page is visited,
+**Then** a pageview is automatically recorded in Plausible for that route — no manual instrumentation needed per page.
+
+**Given** the Plausible script is loaded,
+**When** inspected in browser DevTools,
+**Then** the script is served from `stats.ridenrest.com/js/script.js` (self-hosted, not `plausible.io`) — ensuring no CORS issues and full data ownership.
+
+**Given** the site domain is configured as `ridenrest.com` in Plausible,
+**When** a user visits any page,
+**Then** the visit is attributed to the correct domain with country, device, browser, and OS metadata.
+
+---
+
+### Story 15.2: Click Tracking Enrichi — Booking Deep Links (FR-062)
+
+As a **developer building the Booking.com affiliate application**,
+I want enriched custom event tracking on every booking link click,
+So that I have granular data on which accommodations, POI types, and user segments generate the most booking intent.
+
+**Acceptance Criteria:**
+
+**Given** a user clicks a "Voir sur Booking.com" or "Voir sur Hotels.com" CTA in the POI detail sheet,
+**When** the click event fires,
+**Then** a Plausible custom event `booking_click` is sent with the following props: `{ source: 'booking.com' | 'hotels.com', poi_id: string, poi_name: string, poi_type: 'hotel' | 'hostel' | 'camp_site' | 'shelter', page: 'map' | 'live', user_tier: 'free' | 'pro' | 'team' | 'anonymous' }`.
+
+**Given** the existing FR-062 implementation in Story 4.4 (basic click tracking),
+**When** Story 15.2 is implemented,
+**Then** the basic tracking from 4.4 is replaced by this enriched event — no duplicate events fired.
+
+**Given** a `booking_click` event is fired,
+**When** checking Plausible dashboard under "Custom Events",
+**Then** the event appears with filterable props (source, poi_type, page, user_tier) — enabling segmentation for the Booking.com application report.
+
+**Given** Plausible custom events are used,
+**When** the implementation is reviewed,
+**Then** no PII (Personally Identifiable Information) is sent in event props — only anonymized metadata — compliant with GDPR (NFR-016).
+
+---
+
+### Story 15.3: Funnel Tracking Complet — Parcours Utilisateur
+
+As a **product owner wanting to understand user behavior**,
+I want the full user journey tracked from GPX upload to booking click,
+So that I can identify drop-off points and report a credible conversion funnel to Booking.com.
+
+**Acceptance Criteria:**
+
+**Given** a user uploads a GPX file successfully,
+**When** the segment parse completes,
+**Then** a Plausible custom event `gpx_uploaded` is sent with props: `{ segment_count: number, total_km: number }`.
+
+**Given** a user opens the map view for an adventure,
+**When** the map page loads with the trace displayed,
+**Then** a custom event `map_opened` is sent with props: `{ adventure_id_hash: string }` (hashed, not raw ID — no PII).
+
+**Given** a user triggers a POI search (changes km range or activates a layer),
+**When** results are returned,
+**Then** a custom event `poi_search_triggered` is sent with props: `{ mode: 'planning' | 'live', poi_categories: string[], result_count: number }`.
+
+**Given** a user taps a POI pin and the detail sheet opens,
+**When** the sheet is displayed,
+**Then** a custom event `poi_detail_opened` is sent with props: `{ poi_type: string, source: 'overpass' | 'google' }`.
+
+**Given** all funnel events are tracked,
+**When** viewing Plausible's "Funnels" feature,
+**Then** a configured funnel `gpx_uploaded → map_opened → poi_search_triggered → poi_detail_opened → booking_click` shows step-by-step conversion rates.
+
+---
+
+### Story 15.4: Dashboard Admin `/admin/analytics`
+
+As **Guillaume (admin)**,
+I want a protected `/admin/analytics` page in the app that surfaces key metrics for the Booking.com affiliate application,
+So that I can quickly generate a snapshot report without navigating Plausible's full interface.
+
+**Acceptance Criteria:**
+
+**Given** a user navigates to `/admin/analytics`,
+**When** their session is checked,
+**Then** access is restricted to users with email `guillaume@ridenrest.com` (or a configurable `ADMIN_EMAILS` env var) — non-admin users receive a 403.
+
+**Given** the page loads for an admin user,
+**When** the dashboard renders,
+**Then** the following metrics are displayed for the current month and the previous month (for comparison):
+- Total unique visitors
+- Total sessions
+- Total `booking_click` events
+- Booking click rate (booking_clicks / poi_detail_opened × 100%)
+- Top 5 POI types by booking clicks
+- Breakdown by source (booking.com vs hotels.com)
+
+**Given** the metrics are displayed,
+**When** inspecting the data source,
+**Then** metrics are fetched from Plausible's Stats API (`/api/v1/stats/*`) using a `PLAUSIBLE_API_KEY` server-side environment variable — key never exposed to the browser.
+
+**Given** an admin wants to export data for the Booking.com application,
+**When** they click "Exporter CSV",
+**Then** a CSV file is downloaded containing monthly aggregates: month, unique_visitors, sessions, booking_clicks, booking_click_rate — covering all available months since launch.

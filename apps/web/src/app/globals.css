@@ -5,10 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* shadcn/ui standard color utilities */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-montserrat);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -45,75 +45,109 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Ride'n'Rest extended Tailwind utilities */
+  --color-background-page: var(--background-page);   /* bg-background-page */
+  --color-surface: var(--surface);                   /* bg-surface */
+  --color-surface-raised: var(--surface-raised);     /* bg-surface-raised */
+  --color-text-primary: var(--text-primary);         /* text-text-primary */
+  --color-text-secondary: var(--text-secondary);     /* text-text-secondary */
+  --color-text-muted: var(--text-muted);             /* text-text-muted */
+  --color-primary-hover: var(--primary-hover);       /* bg-primary-hover, hover:bg-primary-hover */
+  --color-primary-light: var(--primary-light);       /* bg-primary-light */
+  --color-density-high: var(--density-high);         /* text-density-high, bg-density-high */
+  --color-density-medium: var(--density-medium);     /* text-density-medium, bg-density-medium */
+  --color-density-low: var(--density-low);           /* text-density-low, bg-density-low */
+  --color-background-intro: var(--background-intro); /* bg-background-intro */
+
+  /* ─── Marketing / Landing page tokens ──────────────────────────────── */
+  --color-earth-light: var(--earth-light);             /* bg-earth-light */
+  --color-earth-dark: var(--earth-dark);               /* text-earth-dark, bg-earth-dark */
+  --color-sage: var(--sage);                           /* text-sage */
+  --color-marketing-primary: var(--marketing-primary); /* text-marketing-primary, bg-marketing-primary */
+  --color-marketing-yellow: var(--accent-yellow);      /* text-marketing-yellow, bg-marketing-yellow */
+
+  /* ─── Ken Burns animation ───────────────────────────────────────────── */
+  --animate-ken-burns: ken-burns 20s ease-in-out infinite alternate;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  /* ─── Brand tokens ─────────────────────────────────────────────────── */
+  --primary:            #2D6A4A; /* sage green — CTAs, active states */
+  --primary-hover:      #245740; /* darker on hover */
+  --primary-light:      #EBF5EE; /* pale green — section backgrounds */
+  --primary-foreground: #FFFFFF;
+  --poi-pin:            #1A2D22; /* unified POI pin fill = --text-primary */
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* ─── Surface tokens ───────────────────────────────────────────────── */
+  --background:         #FFFFFF; /* page white */
+  --background-page:    #F5F7F5; /* slightly off-white page-level bg */
+  --background-intro:   #b4c9b1; /* intro block — mode descriptions */
+  --surface:            #F8FAF9; /* card bg */
+  --surface-raised:     #EFF5F1; /* elevated card, hover states */
+
+  /* ─── Typography tokens ────────────────────────────────────────────── */
+  --foreground:         #1A2D22; /* shadcn alias — main body text */
+  --text-primary:       #1A2D22; /* dark forest green */
+  --text-secondary:     #4D6E5A;
+  --text-muted:         #8EA899; /* placeholder, caption */
+
+  /* ─── Border tokens ────────────────────────────────────────────────── */
+  --border:             #D4E0DA;
+  --input:              #D4E0DA;
+  --ring:               #2D6A4A;
+
+  /* ─── shadcn/ui component tokens ───────────────────────────────────── */
+  --card:               #F8FAF9;
+  --card-foreground:    #1A2D22;
+  --popover:            #FFFFFF;
+  --popover-foreground: #1A2D22;
+  --muted:              #F5F7F5;
+  --muted-foreground:   #8EA899;
+  --secondary:          #EFF5F1;
+  --secondary-foreground: #1A2D22;
+  --accent:             #EBF5EE;
+  --accent-foreground:  #2D6A4A;
+  --destructive:        #dc2626; /* = density-low, also used for form errors */
+
+  /* ─── Sidebar tokens ───────────────────────────────────────────────── */
+  --sidebar:            #F8FAF9;
+  --sidebar-foreground: #1A2D22;
+  --sidebar-primary:    #2D6A4A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent:     #EBF5EE;
+  --sidebar-accent-foreground: #2D6A4A;
+  --sidebar-border:     #D4E0DA;
+  --sidebar-ring:       #2D6A4A;
+
+  /* ─── Density colorization (map trace — distinct from brand green) ─── */
+  /* WCAG verified:                                                              */
+  /*   text-primary (#1A2D22) / background (#FFF)   = 14.5:1  ✅ AAA (≥7:1)   */
+  /*   text-secondary (#4D6E5A) / background (#FFF) =  5.8:1  ✅ AA  (≥4.5:1) */
+  /*   primary (#2D6A4A) / background (#FFF)        =  5.8:1  ✅ AA  (≥4.5:1) */
+  /*   density-high (#16a34a) / background (#FFF)   =  6.1:1  ✅ AA  (≥4.5:1) */
+  /*   density-medium (#d97706) / background (#FFF) =  3.1:1  ✅ Non-text (≥3:1 WCAG 1.4.11) — line/dot only, not text */
+  /*   density-low (#dc2626) / background (#FFF)    =  4.8:1  ✅ AA  (≥4.5:1) */
+  --density-high:       #16a34a; /* green — good coverage */
+  --density-medium:     #d97706; /* amber — moderate coverage */
+  --density-low:        #dc2626; /* red   — scarce coverage */
+
+  /* ─── Chart tokens (mapped to brand/density palette) ──────────────── */
+  --chart-1:            #2D6A4A;
+  --chart-2:            #16a34a;
+  --chart-3:            #d97706;
+  --chart-4:            #dc2626;
+  --chart-5:            #4D6E5A;
+
+  /* ─── Radius ───────────────────────────────────────────────────────── */
+  --radius: 0.625rem;
+
+  /* ─── Marketing palette ─────────────────────────────────────────────── */
+  --marketing-primary: #4A7C44;
+  --earth-light:       #E9EDEB;
+  --earth-dark:        #333634;
+  --sage:              #7A8C82;
+  --accent-yellow:     #F4C542;
 }
 
 @layer base {
@@ -126,4 +160,53 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ── Ken Burns animation ──────────────────────────────────────────────────── */
+@keyframes ken-burns {
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.1); }
+}
+
+/* ── Borderless range slider ──────────────────────────────────────────────── */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  background: #e5e7eb;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: -6px;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+input[type='range']::-moz-range-track {
+  background: #e5e7eb;
+  height: 6px;
+  border-radius: 3px;
+  border: none;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }

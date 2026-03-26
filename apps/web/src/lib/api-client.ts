@@ -1,3 +1,5 @@
+import { authClient } from '@/lib/auth/client'
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3010'
 
 class ApiError extends Error {
@@ -11,19 +13,42 @@ class ApiError extends Error {
   }
 }
 
+export function invalidateAuthTokenCache(): void {
+  // No-op — authClient.getToken() handles caching internally
+}
+
+// Use Better Auth jwtClient plugin to get JWT — handles session cookie + caching
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const result = await authClient.token()
+    // Better Auth jwtClient returns either { data: { token } } or { data: tokenString }
+    const data = result?.data
+    if (typeof data === 'string') return data
+    if (data && typeof data === 'object' && 'token' in data) return (data as { token: string }).token
+    return null
+  } catch {
+    return null
+  }
+}
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  // Don't set Content-Type for FormData — browser sets it with the multipart boundary
   const isFormData = options?.body instanceof FormData
+  const token = await getAuthToken()
+
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
-    credentials: 'include', // Send cookies (Better Auth session)
+    credentials: 'include', // Send session cookies for same-site requests
   })
 
   if (!res.ok) {
+    if (res.status === 401) {
+      // Token expired — next call to getAuthToken() will fetch a fresh one
+    }
     const body = await res.json().catch(() => ({}))
     throw new ApiError(
       body?.error?.message ?? `HTTP ${res.status}`,
@@ -35,6 +60,228 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const body = await res.json()
   return body.data as T // Unwrap ResponseInterceptor { data: ... }
 }
+
+// ── Adventures ───────────────────────────────────────────────────────────────
+
+import type { AdventureResponse, AdventureSegmentResponse, AdventureMapResponse, MapSegmentData, MapWaypoint } from '@ridenrest/shared'
+
+export async function createAdventure(name: string): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>('/api/adventures', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function listAdventures(): Promise<AdventureResponse[]> {
+  return apiFetch<AdventureResponse[]>('/api/adventures')
+}
+
+export async function getAdventure(id: string): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${id}`)
+}
+
+// ── Segments ──────────────────────────────────────────────────────────────────
+
+export async function listSegments(adventureId: string): Promise<AdventureSegmentResponse[]> {
+  return apiFetch<AdventureSegmentResponse[]>(`/api/adventures/${adventureId}/segments`)
+}
+
+export async function createSegment(
+  adventureId: string,
+  file: File,
+  name?: string,
+): Promise<AdventureSegmentResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (name) formData.append('name', name)
+
+  return apiFetch<AdventureSegmentResponse>(`/api/adventures/${adventureId}/segments`, {
+    method: 'POST',
+    body: formData,
+    // Do NOT set Content-Type — browser sets it with multipart boundary
+  })
+}
+
+export async function reorderSegments(
+  adventureId: string,
+  orderedIds: string[],
+): Promise<AdventureSegmentResponse[]> {
+  return apiFetch<AdventureSegmentResponse[]>(`/api/adventures/${adventureId}/segments/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ orderedIds }),
+  })
+}
+
+export async function deleteSegment(adventureId: string, segmentId: string): Promise<void> {
+  await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}/segments/${segmentId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function renameAdventure(adventureId: string, name: string): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${adventureId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function renameSegment(
+  adventureId: string,
+  segmentId: string,
+  name: string,
+): Promise<AdventureSegmentResponse> {
+  return apiFetch<AdventureSegmentResponse>(`/api/adventures/${adventureId}/segments/${segmentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function deleteAdventure(adventureId: string): Promise<void> {
+  await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function getAdventureMapData(adventureId: string): Promise<AdventureMapResponse> {
+  return apiFetch<AdventureMapResponse>(`/api/adventures/${adventureId}/map`)
+}
+
+export type { AdventureMapResponse, MapSegmentData, MapWaypoint }
+
+// ── POIs ──────────────────────────────────────────────────────────────────────
+
+import type { Poi, PoiCategory } from '@ridenrest/shared'
+
+export interface GetPoisParams {
+  segmentId: string
+  fromKm: number
+  toKm: number
+  categories?: PoiCategory[]
+}
+
+export async function getPois(params: GetPoisParams): Promise<Poi[]> {
+  const searchParams = new URLSearchParams({
+    segmentId: params.segmentId,
+    fromKm: String(params.fromKm),
+    toKm: String(params.toKm),
+  })
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => searchParams.append('categories', c))
+  }
+  return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
+}
+
+export interface GetLivePoisParams {
+  segmentId: string
+  targetKm: number
+  radiusKm: number
+  categories?: PoiCategory[]
+}
+
+export async function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
+  const searchParams = new URLSearchParams({
+    segmentId: params.segmentId,
+    targetKm: String(params.targetKm),
+    radiusKm: String(params.radiusKm),
+  })
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => searchParams.append('categories', c))
+  }
+  return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
+}
+
+export type { Poi, PoiCategory }
+
+// ── POI Google Details ────────────────────────────────────────────────────────
+
+import type { GooglePlaceDetails } from '@ridenrest/shared'
+
+export async function getPoiGoogleDetails(
+  externalId: string,
+  segmentId: string,
+): Promise<GooglePlaceDetails | null> {
+  try {
+    return await apiFetch<GooglePlaceDetails>(
+      `/api/pois/google-details?externalId=${encodeURIComponent(externalId)}&segmentId=${encodeURIComponent(segmentId)}`,
+    )
+  } catch {
+    return null  // Enrichment is optional — never throw to caller
+  }
+}
+
+export async function trackBookingClick(
+  externalId: string,
+  platform: 'booking_com' | 'hotels_com' | 'airbnb',
+): Promise<void> {
+  // Fire-and-forget — do NOT await in the click handler
+  void apiFetch('/api/pois/booking-click', {
+    method: 'POST',
+    body: JSON.stringify({ externalId, platform }),
+  }).catch(() => {/* ignore tracking errors */})
+}
+
+export type { GooglePlaceDetails }
+
+// ── Strava ────────────────────────────────────────────────────────────────────
+
+export interface StravaRouteItem {
+  id: string          // Strava route ID (numeric as string)
+  name: string
+  distanceKm: number
+  elevationGainM: number | null
+}
+
+export async function listStravaRoutes(): Promise<StravaRouteItem[]> {
+  return apiFetch<StravaRouteItem[]>('/api/strava/routes')
+}
+
+export async function importStravaRoute(
+  stravaRouteId: string,
+  adventureId: string,
+): Promise<AdventureSegmentResponse> {
+  return apiFetch<AdventureSegmentResponse>(`/api/strava/routes/${stravaRouteId}/import`, {
+    method: 'POST',
+    body: JSON.stringify({ adventureId }),
+  })
+}
+
+// ── Density ───────────────────────────────────────────────────────────────────
+
+import type { DensityStatusResponse } from '@ridenrest/shared'
+
+export async function triggerDensityAnalysis(adventureId: string, categories: string[]): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>('/api/density/analyze', {
+    method: 'POST',
+    body: JSON.stringify({ adventureId, categories }),
+  })
+}
+
+export async function getDensityStatus(adventureId: string): Promise<DensityStatusResponse> {
+  return apiFetch<DensityStatusResponse>(`/api/density/${adventureId}/status`)
+}
+
+export type { DensityStatusResponse }
+
+// ── Weather ───────────────────────────────────────────────────────────────────
+
+import type { WeatherForecast } from '@ridenrest/shared'
+
+export interface GetWeatherParams {
+  segmentId: string
+  departureTime?: string  // ISO 8601
+  speedKmh?: number
+  fromKm?: number
+}
+
+export async function getWeatherForecast(params: GetWeatherParams): Promise<WeatherForecast> {
+  const search = new URLSearchParams({ segmentId: params.segmentId })
+  if (params.departureTime) search.set('departureTime', params.departureTime)
+  if (params.speedKmh != null) search.set('speedKmh', String(params.speedKmh))
+  if (params.fromKm != null) search.set('fromKm', String(params.fromKm))
+  return apiFetch<WeatherForecast>(`/api/weather?${search}`)
+}
+
+export type { WeatherForecast }
 
 export const apiClient = {
   get: <T>(path: string, init?: RequestInit) =>

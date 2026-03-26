@@ -8,13 +8,21 @@ import * as accommodationsCacheSchema from './schema/accommodations-cache'
 import * as weatherCacheSchema from './schema/weather-cache'
 import * as coverageGapsSchema from './schema/coverage-gaps'
 
-// SSL: Aiven uses a custom CA. Set DATABASE_CA_CERT (base64-encoded Aiven CA cert) in production
-// for full TLS verification. Without it, rejectUnauthorized: false is used as fallback —
+// SSL: localhost connections (local Docker) skip TLS entirely.
+// Production (Aiven) uses a custom CA cert (DATABASE_CA_CERT, base64-encoded) for full TLS
+// verification. Without a CA cert, NODE_TLS_REJECT_UNAUTHORIZED=0 is set as fallback —
 // acceptable for MVP but replace with CA cert before public launch.
-// Note: NODE_TLS_REJECT_UNAUTHORIZED=0 in db:migrate scripts is the same workaround for drizzle-kit.
-const sslConfig = process.env.DATABASE_CA_CERT
-  ? { rejectUnauthorized: true, ca: Buffer.from(process.env.DATABASE_CA_CERT, 'base64').toString() }
-  : { rejectUnauthorized: false }
+const databaseUrl = process.env.DATABASE_URL ?? ''
+const isLocal = databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1')
+
+const sslConfig = isLocal
+  ? false
+  : process.env.DATABASE_CA_CERT
+    ? { rejectUnauthorized: true, ca: Buffer.from(process.env.DATABASE_CA_CERT, 'base64').toString() }
+    : (() => {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+        return { rejectUnauthorized: false }
+      })()
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

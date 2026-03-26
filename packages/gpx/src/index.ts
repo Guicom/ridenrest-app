@@ -13,3 +13,5 @@ export { parseGpx, computeElevationGain } from './parser'
 
 export { snapToTrace } from './snap-to-trace'
 export type { SnapResult } from './snap-to-trace'
+
+export { findPointAtKm } from './find-point-at-km'

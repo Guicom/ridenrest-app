@@ -1,5 +1,8 @@
 import type { Config } from 'drizzle-kit'
 
+// NODE_TLS_REJECT_UNAUTHORIZED=0 bypass for self-signed certs (dev/VPS)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+
 export default {
   schema: './src/schema/*.ts',
   out: './migrations',

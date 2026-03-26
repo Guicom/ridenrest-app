@@ -10,6 +10,8 @@ describe('useLiveStore', () => {
       currentKmOnRoute: null,
       speedKmh: 15,
       targetAheadKm: 30,
+      searchRadiusKm: 3,
+      weatherDepartureTime: null,
     })
   })
 
@@ -59,5 +61,29 @@ describe('useLiveStore', () => {
   it('setTargetAheadKm updates targetAheadKm', () => {
     useLiveStore.getState().setTargetAheadKm(15)
     expect(useLiveStore.getState().targetAheadKm).toBe(15)
+  })
+
+  it('searchRadiusKm defaults to 3', () => {
+    expect(useLiveStore.getState().searchRadiusKm).toBe(3)
+  })
+
+  it('setSearchRadius updates searchRadiusKm', () => {
+    useLiveStore.getState().setSearchRadius(5)
+    expect(useLiveStore.getState().searchRadiusKm).toBe(5)
+  })
+
+  it('weatherDepartureTime defaults to null', () => {
+    expect(useLiveStore.getState().weatherDepartureTime).toBeNull()
+  })
+
+  it('setWeatherDepartureTime updates weatherDepartureTime', () => {
+    useLiveStore.getState().setWeatherDepartureTime('2026-03-24T08:00')
+    expect(useLiveStore.getState().weatherDepartureTime).toBe('2026-03-24T08:00')
+  })
+
+  it('setWeatherDepartureTime accepts null to clear', () => {
+    useLiveStore.setState({ weatherDepartureTime: '2026-03-24T08:00' })
+    useLiveStore.getState().setWeatherDepartureTime(null)
+    expect(useLiveStore.getState().weatherDepartureTime).toBeNull()
   })
 })

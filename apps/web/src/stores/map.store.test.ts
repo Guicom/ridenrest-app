@@ -5,22 +5,26 @@ describe('useMapStore', () => {
   beforeEach(() => {
     useMapStore.setState({
       activeLayer: null,
-      visibleLayers: new Set(),
+      visibleLayers: new Set(['accommodations']),
       zoom: 10,
       center: null,
       fromKm: 0,
       toKm: 30,
+      densityColorEnabled: true,
+      weatherActive: false,
+      weatherDimension: 'temperature',
     })
   })
 
   it('initializes with correct defaults', () => {
     const state = useMapStore.getState()
     expect(state.activeLayer).toBeNull()
-    expect(state.visibleLayers.size).toBe(0)
+    expect(state.visibleLayers.has('accommodations')).toBe(true)
     expect(state.zoom).toBe(10)
     expect(state.center).toBeNull()
     expect(state.fromKm).toBe(0)
     expect(state.toKm).toBe(30)
+    expect(state.densityColorEnabled).toBe(true)
   })
 
   it('setActiveLayer updates activeLayer (AC #4)', () => {
@@ -57,5 +61,49 @@ describe('useMapStore', () => {
     const state = useMapStore.getState()
     expect(state.fromKm).toBe(10)
     expect(state.toKm).toBe(40)
+  })
+
+  it('densityColorEnabled defaults to true', () => {
+    expect(useMapStore.getState().densityColorEnabled).toBe(true)
+  })
+
+  it('toggleDensityColor flips densityColorEnabled from true to false', () => {
+    useMapStore.getState().toggleDensityColor()
+    expect(useMapStore.getState().densityColorEnabled).toBe(false)
+  })
+
+  it('toggleDensityColor flips densityColorEnabled back to true', () => {
+    useMapStore.getState().toggleDensityColor()
+    useMapStore.getState().toggleDensityColor()
+    expect(useMapStore.getState().densityColorEnabled).toBe(true)
+  })
+
+  it('weatherActive defaults to false', () => {
+    expect(useMapStore.getState().weatherActive).toBe(false)
+  })
+
+  it('setWeatherActive sets weather layer active', () => {
+    useMapStore.getState().setWeatherActive(true)
+    expect(useMapStore.getState().weatherActive).toBe(true)
+  })
+
+  it('setWeatherActive deactivates weather layer', () => {
+    useMapStore.getState().setWeatherActive(true)
+    useMapStore.getState().setWeatherActive(false)
+    expect(useMapStore.getState().weatherActive).toBe(false)
+  })
+
+  it('weatherDimension defaults to temperature', () => {
+    expect(useMapStore.getState().weatherDimension).toBe('temperature')
+  })
+
+  it('setWeatherDimension updates the dimension', () => {
+    useMapStore.getState().setWeatherDimension('wind')
+    expect(useMapStore.getState().weatherDimension).toBe('wind')
+  })
+
+  it('setWeatherDimension can be set to precipitation', () => {
+    useMapStore.getState().setWeatherDimension('precipitation')
+    expect(useMapStore.getState().weatherDimension).toBe('precipitation')
   })
 })

@@ -1,3 +1,5 @@
+# OBSOLETE — Fly.io deployment only. To be removed in Story 14.7.
+# Production deployment uses Node.js natif + PM2 on VPS Hostinger (see Story 14.2).
 # Multi-stage build: Turborepo prune → pnpm install → nest build (webpack) → minimal runner
 # Context: run from repository ROOT (not apps/api/)
 # Build command: docker build -f apps/api/Dockerfile -t ridenrest-api .
@@ -6,7 +8,8 @@
 # Stage 1: base — Node.js + package managers
 # ──────────────────────────────────────────
 FROM node:22-alpine AS base
-RUN npm install -g pnpm@10.32.1 turbo@2.6.1
+# RUN npm install -g pnpm@10.32.1 turbo@2.6.1
+RUN npm install -g pnpm@10.32.1 turbo@2.3.3
 
 # ──────────────────────────────────────────
 # Stage 2: pruner — extract only API + its deps
