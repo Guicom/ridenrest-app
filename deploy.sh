@@ -19,6 +19,10 @@ echo "==> [2/6] pnpm install"
 pnpm install --frozen-lockfile
 
 echo "==> [3/6] turbo build"
+set -a
+# shellcheck source=.env
+source "$APP_DIR/.env" 2>/dev/null || true
+set +a
 pnpm turbo build
 
 echo "==> [4/6] Copy Next.js standalone static assets"
