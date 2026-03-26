@@ -22,8 +22,10 @@ echo "==> [3/6] turbo build"
 pnpm turbo build
 
 echo "==> [4/6] Copy Next.js standalone static assets"
-cp -rf apps/web/public apps/web/.next/standalone/apps/web/public
-cp -rf apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+rm -rf apps/web/.next/standalone/apps/web/public
+rm -rf apps/web/.next/standalone/apps/web/.next/static
+cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
 
 echo "==> [5/6] DB migrations (drizzle-kit)"
 ( cd packages/database && pnpm drizzle-kit migrate )
