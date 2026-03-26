@@ -4,6 +4,12 @@ set -e
 APP_DIR="/home/deploy/ridenrest-app"
 cd "$APP_DIR"
 
+# Load environment variables
+set -a
+# shellcheck source=.env
+source "$APP_DIR/.env"
+set +a
+
 echo "==> [1/6] git pull"
 git pull origin main
 
