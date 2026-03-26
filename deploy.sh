@@ -4,11 +4,13 @@ set -e
 APP_DIR="/home/deploy/ridenrest-app"
 cd "$APP_DIR"
 
-# Load environment variables
-set -a
-# shellcheck source=.env
-source "$APP_DIR/.env"
-set +a
+# Load DATABASE_URL from .env (explicit — avoids quoting/CRLF issues with source)
+export DATABASE_URL
+DATABASE_URL="$(grep '^DATABASE_URL=' "$APP_DIR/.env" | cut -d'=' -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//")"
+if [[ -z "$DATABASE_URL" ]]; then
+  echo "ERROR: DATABASE_URL not found in $APP_DIR/.env" >&2
+  exit 1
+fi
 
 echo "==> [1/6] git pull"
 git pull origin main
