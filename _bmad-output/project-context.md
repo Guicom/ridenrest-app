@@ -327,7 +327,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 Required env var: `RESEND_API_KEY` in `apps/web/.env.local`
 <!-- Ports: API → 3010, Web → 3011 (3000/3001 reserved by other projects) -->
-From address: `Ride'n'Rest <noreply@ridenrest.com>`
+From address: `Ride'n'Rest <noreply@ridenrest.app>`
 
 ---
 

@@ -70,8 +70,8 @@ export default function MentionsLegalesPage() {
               </h2>
               <p className="text-sage leading-relaxed">
                 Pour toute question relative aux présentes mentions légales ou au site, vous pouvez nous contacter à :{' '}
-                <a href="mailto:contact@ridenrest.com" className="text-[#4A7C44] hover:underline font-medium">
-                  contact@ridenrest.com
+                <a href="mailto:contact@ridenrest.app" className="text-[#4A7C44] hover:underline font-medium">
+                  contact@ridenrest.app
                 </a>
               </p>
             </section>

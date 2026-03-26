@@ -14,7 +14,7 @@ So that I have full control over my credentials and data (RGPD compliance).
 
 1. **Given** a user clicks "Mot de passe oublié?" and submits their email on `/forgot-password`,
    **When** the request is sent to Better Auth,
-   **Then** a password reset email is sent via Resend (`noreply@ridenrest.com`) and a confirmation is displayed (FR-007).
+   **Then** a password reset email is sent via Resend (`noreply@ridenrest.app`) and a confirmation is displayed (FR-007).
 
 2. **Given** a user clicks the reset link in the email and lands on `/reset-password`,
    **When** they submit a new valid password (≥ 8 chars),
@@ -123,7 +123,7 @@ emailAndPassword: {
   // ← ADD
   sendResetPassword: async ({ user, url }) => {
     await getResend().emails.send({
-      from: "Ride'n'Rest <noreply@ridenrest.com>",
+      from: "Ride'n'Rest <noreply@ridenrest.app>",
       to: user.email,
       subject: "Réinitialisation de votre mot de passe — Ride'n'Rest",
       html: `<p>Bonjour,</p><p><a href="${url}">Réinitialiser mon mot de passe</a></p><p>Ce lien expire dans 1 heure.</p>`,

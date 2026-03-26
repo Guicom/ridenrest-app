@@ -185,7 +185,7 @@ export const auth = betterAuth({
     sendOnSignUp: false,
     sendVerificationEmail: async ({ user, url }) => {
       await getResend().emails.send({
-        from: "Ride'n'Rest <noreply@ridenrest.com>",
+        from: "Ride'n'Rest <noreply@ridenrest.app>",
         to: user.email,
         subject: "Vérifiez votre adresse email — Ride'n'Rest",
         html: `<p>Bonjour,</p><p><a href="${url}">Vérifier mon email</a></p>`,
@@ -424,7 +424,7 @@ Dev: `http://localhost:3011/api/auth/callback/strava`
 
 Register in Strava API settings → **Authorization Callback Domain**: `localhost` (Strava only accepts a domain, not full URL, for dev).
 
-For production: domain must match `BETTER_AUTH_URL` (e.g., `ridenrest.com`).
+For production: domain must match `BETTER_AUTH_URL` (e.g., `ridenrest.app`).
 
 ### Required .env Variables
 

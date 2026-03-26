@@ -22,7 +22,7 @@ So that I can start the full local stack with two commands (`docker compose up -
 
 3. **Given** Caddy is defined in `docker-compose.yml` with `profiles: ["production"]`, **When** running `docker compose up -d db redis` locally, **Then** Caddy does NOT start — only db and redis containers run.
 
-4. **Given** Caddy is configured via `Caddyfile`, **When** running `docker compose --profile production up -d` on the VPS, **Then** `ridenrest.com` proxies to Next.js (`localhost:3011`), `api.ridenrest.com` proxies to NestJS (`localhost:3010`), with automatic HTTPS via Let's Encrypt.
+4. **Given** Caddy is configured via `Caddyfile`, **When** running `docker compose --profile production up -d` on the VPS, **Then** `ridenrest.app` proxies to Next.js (`localhost:3011`), `api.ridenrest.app` proxies to NestJS (`localhost:3010`), with automatic HTTPS via Let's Encrypt.
 
 5. **Given** environment variables are needed, **When** `.env.example` is copied to `.env`, **Then** all required variables are documented with sensible local defaults (`POSTGRES_USER=ridenrest`, `POSTGRES_PASSWORD=ridenrest`, `POSTGRES_DB=ridenrest`).
 
@@ -47,7 +47,7 @@ So that I can start the full local stack with two commands (`docker compose up -
   - [x] Volumes nommés déclarés : `pgdata`, `redisdata`, `caddy_data`, `caddy_config`
 
 - [x] Task 2 — Créer `Caddyfile` à la racine du repo (AC: 4)
-  - [x] Bloc VPS : `ridenrest.com` → `reverse_proxy host.docker.internal:3011`, `api.ridenrest.com` → `reverse_proxy host.docker.internal:3010`
+  - [x] Bloc VPS : `ridenrest.app` → `reverse_proxy host.docker.internal:3011`, `api.ridenrest.app` → `reverse_proxy host.docker.internal:3010`
   - [x] HTTPS automatique Let's Encrypt via `email {$ACME_EMAIL}`
   - [x] Headers sécurité : `X-Frame-Options DENY`, `X-Content-Type-Options nosniff`, `Strict-Transport-Security "max-age=31536000; includeSubDomains"`
 
@@ -201,7 +201,7 @@ Le Caddyfile doit utiliser `host.docker.internal` (pas `localhost`) :
   email {$ACME_EMAIL}
 }
 
-ridenrest.com {
+ridenrest.app {
   reverse_proxy host.docker.internal:3011
   header {
     X-Frame-Options DENY
@@ -210,7 +210,7 @@ ridenrest.com {
   }
 }
 
-api.ridenrest.com {
+api.ridenrest.app {
   reverse_proxy host.docker.internal:3010
   header {
     X-Frame-Options DENY
@@ -335,7 +335,7 @@ claude-sonnet-4-6 (2026-03-25)
 ### Completion Notes List
 
 - ✅ Task 1: `docker-compose.yml` créé — services db (postgis/postgis:16-3.4), redis (redis:7-alpine), caddy (profiles: production). Volumes nommés: pgdata, redisdata, caddy_data, caddy_config. extra_hosts pour Linux VPS.
-- ✅ Task 2: `Caddyfile` créé — reverse proxy ridenrest.com:3011 et api.ridenrest.com:3010, headers sécurité, ACME email via env var.
+- ✅ Task 2: `Caddyfile` créé — reverse proxy ridenrest.app:3011 et api.ridenrest.app:3010, headers sécurité, ACME email via env var.
 - ✅ Task 3: `.env.example` créé — variables Docker uniquement (POSTGRES_USER/PASSWORD/DB + ACME_EMAIL commenté). Note: DATABASE_URL et REDIS_URL vont dans les .env des apps, pas dans le .env Docker.
 - ⚠️ Tasks 4, 5, 6: Fichiers `.env` protégés par les permissions Claude Code — nécessitent modification manuelle (voir instructions ci-dessus dans les tasks).
 - ✅ Task 7: `packages/database/src/db.ts` et `auth-db.ts` — SSL conditionnel localhost (isLocal → ssl: false). `auth-db.ts` oublié initialement, corrigé pendant validation.

@@ -246,7 +246,7 @@ REDIS_URL=redis://localhost:6379
 
 # Better Auth
 BETTER_AUTH_SECRET=...  # générer avec: openssl rand -hex 32
-BETTER_AUTH_URL=https://ridenrest.com
+BETTER_AUTH_URL=https://ridenrest.app
 
 # OAuth
 GOOGLE_CLIENT_ID=...
@@ -255,8 +255,8 @@ STRAVA_CLIENT_ID=...
 STRAVA_CLIENT_SECRET=...
 
 # Next.js (public — embarqués dans le build)
-NEXT_PUBLIC_API_URL=https://api.ridenrest.com
-NEXT_PUBLIC_APP_URL=https://ridenrest.com
+NEXT_PUBLIC_API_URL=https://api.ridenrest.app
+NEXT_PUBLIC_APP_URL=https://ridenrest.app
 
 # Resend (emails transactionnels Better Auth — reset password, vérification email)
 RESEND_API_KEY=re_...  # générer sur resend.com, free tier 3000 emails/mois
@@ -268,7 +268,7 @@ RESEND_API_KEY=re_...  # générer sur resend.com, free tier 3000 emails/mois
 
 Par défaut, Next.js standalone sert les assets `/_next/static/*` via Node.js. Pour de meilleures performances, Caddy (configuré en story 14.1) peut les servir directement depuis le filesystem.
 
-Ajouter dans le bloc `ridenrest.com` du Caddyfile :
+Ajouter dans le bloc `ridenrest.app` du Caddyfile :
 
 ```
 # Servir les assets statiques directement (bypass Node.js)

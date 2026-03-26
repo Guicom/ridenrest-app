@@ -170,12 +170,12 @@ export const auth = betterAuth({
   },
 
   // Email verification — MVP: sendOnSignUp: false (no Resend domain configured yet)
-  // Change to true when custom domain 'noreply@ridenrest.com' is verified in Resend
+  // Change to true when custom domain 'noreply@ridenrest.app' is verified in Resend
   emailVerification: {
     sendOnSignUp: false,
     sendVerificationEmail: async ({ user, url }) => {
       await resend.emails.send({
-        from: "Ride'n'Rest <noreply@ridenrest.com>",
+        from: "Ride'n'Rest <noreply@ridenrest.app>",
         to: user.email,
         subject: 'Vérifiez votre adresse email — Ride\'n\'Rest',
         html: `<p>Bonjour,</p><p><a href="${url}">Vérifier mon email</a></p>`,
@@ -200,7 +200,7 @@ export const auth = betterAuth({
 
 > **`databaseHooks.user.create.after`**: Receives the created Better Auth `user` object. The `profiles.id` references `user.id` (cascade delete). The `onConflictDoNothing()` prevents crashes on duplicate registrations.
 >
-> **`sendOnSignUp: false`**: Email verification skipped for MVP beta (16 users). Set to `true` after Resend domain `ridenrest.com` is verified and `RESEND_API_KEY` is configured.
+> **`sendOnSignUp: false`**: Email verification skipped for MVP beta (16 users). Set to `true` after Resend domain `ridenrest.app` is verified and `RESEND_API_KEY` is configured.
 
 #### `apps/web/src/lib/auth/client.ts` (UPDATED)
 
@@ -810,7 +810,7 @@ RESEND_API_KEY=re_xxxxxxxxxxxx
 
 Get from [resend.com](https://resend.com) → API Keys. Free tier: 3000 emails/month, commercial ok.
 
-> Until `resend.com` domain verification for `ridenrest.com` is complete:
+> Until `resend.com` domain verification for `ridenrest.app` is complete:
 > - Keep `sendOnSignUp: false` in `auth.ts`
 > - In dev: use `delivered@resend.dev` as the "from" address for testing in Resend sandbox
 

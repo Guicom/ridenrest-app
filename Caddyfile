@@ -2,7 +2,7 @@
   email {$ACME_EMAIL}
 }
 
-ridenrest.com {
+ridenrest.app {
   reverse_proxy host.docker.internal:3011
   header {
     X-Frame-Options DENY
@@ -11,7 +11,7 @@ ridenrest.com {
   }
 }
 
-api.ridenrest.com {
+api.ridenrest.app {
   reverse_proxy host.docker.internal:3010
   header {
     X-Frame-Options DENY
