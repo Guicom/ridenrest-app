@@ -1,3 +1,15 @@
+const fs = require('fs');
+const path = require('path');
+
+// Load .env file into process.env (no external dependency)
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
+    const match = line.match(/^([^#=\s][^=]*)=(.*)$/);
+    if (match) process.env[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, '');
+  });
+}
+
 const APP_DIR = '/home/deploy/ridenrest-app';
 
 module.exports = {
