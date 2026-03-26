@@ -58,7 +58,7 @@ afin que la production soit mise à jour sans intervention manuelle après chaqu
 
 ## Dev Notes
 
-### 1. `deploy.sh` — Version mise à jour (avec migrations)
+### 1. `deploy.sh` — Version finale (mise en production 2026-03-26)
 
 ```bash
 #!/usr/bin/env bash
@@ -67,6 +67,16 @@ set -e
 APP_DIR="/home/deploy/ridenrest-app"
 cd "$APP_DIR"
 
+# Load DATABASE_URL from .env (explicit — avoids quoting/CRLF issues with source)
+export DATABASE_URL
+DATABASE_URL="$(grep '^DATABASE_URL=' "$APP_DIR/.env" | cut -d'=' -f2- | tr -d '\r' | sed "s/^['\"]//;s/['\"]$//")"
+if [[ -z "$DATABASE_URL" ]]; then
+  echo "ERROR: DATABASE_URL not found in $APP_DIR/.env" >&2
+  exit 1
+fi
+
+mkdir -p /data/gpx
+
 echo "==> [1/6] git pull"
 git pull origin main
 
@@ -74,11 +84,17 @@ echo "==> [2/6] pnpm install"
 pnpm install --frozen-lockfile
 
 echo "==> [3/6] turbo build"
+set -a
+# shellcheck source=.env
+source "$APP_DIR/.env" 2>/dev/null || true
+set +a
 pnpm turbo build
 
 echo "==> [4/6] Copy Next.js standalone static assets"
-cp -rf apps/web/public apps/web/.next/standalone/apps/web/public
-cp -rf apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+rm -rf apps/web/.next/standalone/apps/web/public
+rm -rf apps/web/.next/standalone/apps/web/.next/static
+cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
 
 echo "==> [5/6] DB migrations (drizzle-kit)"
 ( cd packages/database && pnpm drizzle-kit migrate )
@@ -95,6 +111,18 @@ PostgreSQL tourne sur `localhost:5432` du VPS — inaccessible depuis les runner
 
 **Pourquoi `( cd packages/database && pnpm drizzle-kit migrate )` avec les parenthèses ?**
 Les parenthèses créent un subshell — le `cd` n'affecte pas le répertoire courant du script parent. Après l'étape migrations, on reste dans `$APP_DIR`.
+
+**Pourquoi `DATABASE_URL` avec `grep/cut/tr/sed` et non `source .env` ?**
+Via SSH non-interactif, `source .env` peut échouer silencieusement ou mal parser les valeurs avec guillemets. Cette approche explicite garantit que `drizzle-kit migrate` reçoit la valeur exacte, sans CRLF ni guillemets.
+
+**Pourquoi `set -a; source .env; set +a` avant `turbo build` ?**
+`NEXT_PUBLIC_*` variables sont embeddées au moment du build. Sans `source .env`, Turbo ne les trouve pas → le build utilise des valeurs vides → erreurs CORS en prod. `set -a` exporte automatiquement toutes les variables sourcées.
+
+**Pourquoi `rm -rf` avant `cp -r` pour les static assets ?**
+Turbo conserve son cache d'outputs entre les builds. Sans suppression, les anciens chunks JS s'accumulent dans le dossier standalone. Au runtime, Next.js charge les nouveaux chunks via le manifest mais les hash ne correspondent plus aux anciens fichiers → `ChunkLoadError` en prod.
+
+**Pourquoi `mkdir -p /data/gpx` ?**
+Le dossier GPX n'existe pas sur un VPS fraîchement provisionné. Sans ce dossier, les uploads GPX échouent en `ENOENT` avec HTTP 500. `mkdir -p` est idempotent (pas d'erreur si déjà créé).
 
 **`NODE_TLS_REJECT_UNAUTHORIZED=0` supprimé intentionnellement** — Cette variable était nécessaire avec Aiven (SSL auto-signé). Avec PostgreSQL Docker local (pas de SSL, connexion localhost), elle n'est plus nécessaire et serait une vulnérabilité inutile.
 
@@ -253,7 +281,76 @@ Push main
 
 ---
 
-### 7. Ce que cette story N'inclut PAS
+### 7. `ecosystem.config.js` — Chargement `.env` via fs (correction prod)
+
+Lors du premier déploiement réel (2026-03-26), PM2 ne propageait pas `BETTER_AUTH_SECRET` aux processus enfants. Cause : PM2 ne lit pas `process.env` depuis le shell SSH. Fix : chargement explicite du `.env` via `fs.readFileSync` dans `ecosystem.config.js`, et spreading dans la section `env` de chaque app.
+
+```js
+const fs = require('fs')
+const path = require('path')
+
+function loadEnv(envPath) {
+  if (!fs.existsSync(envPath)) return {}
+  return fs.readFileSync(envPath, 'utf8').split('\n').reduce((acc, line) => {
+    const match = line.match(/^([^#=\s][^=]*)=(.*)$/)
+    if (match) acc[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, '')
+    return acc
+  }, {})
+}
+
+const APP_DIR = '/home/deploy/ridenrest-app'
+const envVars = loadEnv(path.join(APP_DIR, '.env'))
+
+module.exports = {
+  apps: [
+    {
+      name: 'ridenrest-web',
+      script: 'apps/web/.next/standalone/apps/web/server.js',
+      cwd: APP_DIR,
+      env: { ...envVars, PORT: 3011, NODE_ENV: 'production', HOSTNAME: '0.0.0.0' },
+      // ... autres options PM2
+    },
+    {
+      name: 'ridenrest-api',
+      script: 'apps/api/dist/main.js',
+      cwd: APP_DIR,
+      env: { ...envVars, PORT: 3010, NODE_ENV: 'production' },
+      // ... autres options PM2
+    }
+  ]
+}
+```
+
+**Règle critique :** Ne JAMAIS utiliser `env_production:` ou compter sur `process.env` pour les secrets dans un contexte PM2+SSH. Toujours spreader l'objet `envVars` explicitement dans chaque section `env`.
+
+---
+
+### 8. `turbo.json` — Déclaration des env vars pour invalidation cache
+
+`NEXT_PUBLIC_*` variables sont embeddées au build. Si elles ne sont pas déclarées dans `turbo.json#tasks.build.env`, Turbo les ignore pour le calcul du hash de cache → le cache n'est pas invalidé quand les valeurs changent → build stale en prod.
+
+```json
+{
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "NEXT_PUBLIC_API_URL",
+        "NEXT_PUBLIC_BETTER_AUTH_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL"
+      ]
+    }
+  }
+}
+```
+
+**Symptôme sans cette déclaration :** La prod affichait `http://localhost:3011` comme API URL (valeur de développement cachée) malgré le `.env` VPS correct avec `https://api.ridenrest.app`.
+
+---
+
+### 9. Ce que cette story N'inclut PAS
 
 - **Suppression de `apps/api/fly.toml` et `apps/api/Dockerfile`** → story 14.7 (décommissionnement)
 - **Migration des données Aiven → VPS** → story 14.7
@@ -267,13 +364,17 @@ Push main
 
 ```
 ridenrest-app/
-├── deploy.sh                         ← MODIFIÉ — ajout step migrations [5/6]
+├── deploy.sh                         ← MODIFIÉ — migrations [5/6] + fixes prod (DATABASE_URL, mkdir gpx, source .env, rm-rf static)
+├── ecosystem.config.js               ← MODIFIÉ — chargement .env via fs.readFileSync + spread dans env de chaque app
+├── turbo.json                        ← MODIFIÉ — ajout tableau env pour invalidation cache NEXT_PUBLIC_*
 └── .github/
     └── workflows/
-        └── ci.yml                    ← MODIFIÉ — job deploy remplacé (SSH VPS)
+        └── ci.yml                    ← MODIFIÉ — job deploy remplacé (SSH VPS via appleboy/ssh-action)
 ```
 
 Aucune modification au code applicatif (`apps/`, `packages/`) dans cette story.
+
+**Note sur `ecosystem.config.js` et `turbo.json` :** Ces fichiers appartiennent techniquement à la story 14.2, mais ont été modifiés lors du premier déploiement réel (story 14.5 en prod) suite à des bugs découverts en production. Les changements sont intentionnels et validés par Guillaume.
 
 ### References
 
@@ -294,13 +395,18 @@ claude-sonnet-4-6
 
 ### Completion Notes List
 
-- ✅ `deploy.sh` : 5 steps → 6 steps, ajout migrations drizzle-kit en [5/6] via subshell `( cd packages/database && pnpm drizzle-kit migrate )`. `set -e` conservé en ligne 2.
+- ✅ `deploy.sh` : 5 steps → 6 steps, ajout migrations drizzle-kit en [5/6] via subshell. `set -e` conservé. Ajouts prod : grep explicite `DATABASE_URL`, `mkdir -p /data/gpx`, `set -a; source .env` avant turbo build, `rm -rf` avant `cp -r` pour assets statiques.
 - ✅ `.github/workflows/ci.yml` : job deploy entièrement remplacé — suppression Vercel, Fly.io, DB migrations CI, Checkout/Node/pnpm/install. Remplacement par step SSH unique `appleboy/ssh-action@v1.0.3` avec secrets `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`.
 - ✅ `BETTER_AUTH_SECRET` et `BETTER_AUTH_URL` conservés dans le job CI (build Next.js).
-- ✅ Task 4 : documentation secrets/SSH déjà présente dans Dev Notes sections 3 et 4 — validée complète.
-- ℹ️ Pas de tests automatisés écrits : les fichiers `.yml` et `.sh` sont des configs CI/CD dont la validation se fait à l'exécution. Validation structurelle effectuée via script Node.js.
+- ✅ Task 4 : documentation secrets/SSH présente dans Dev Notes sections 3 et 4 — validée complète.
+- ✅ `ecosystem.config.js` (story 14.2) — modifié pour charger `.env` via `fs.readFileSync` et spreader dans `env` de chaque app. Fix requis : PM2 ne propage pas `process.env` via SSH, causait `BetterAuthError` en prod.
+- ✅ `turbo.json` — ajout tableau `env` dans `build` task : `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`. Fix requis : sans cette déclaration, Turbo ignorait les changements d'env dans son hash de cache.
+- ℹ️ Pipeline testé et validé en production réelle le 2026-03-26 — site live à `ridenrest.app`.
+- ℹ️ Strava OAuth toujours non fonctionnel (erreur côté `strava.com/settings/api`) — problème plateforme Strava, pas notre code.
 
 ### File List
 
 - `deploy.sh`
 - `.github/workflows/ci.yml`
+- `ecosystem.config.js`
+- `turbo.json`

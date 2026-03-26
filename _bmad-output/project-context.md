@@ -361,14 +361,38 @@ NEVER expose a direct public URL to `/data/gpx/*.gpx`.
 **Architecture hybride** — Docker pour infra, Node.js natif pour apps :
 
 ```
-VPS Hostinger (~$8/mois)
-├── Docker: PostgreSQL+PostGIS, Redis, Caddy, Uptime Kuma
-└── PM2:    Next.js (port 3011), NestJS (port 3010)
+VPS Hostinger KVM 2 (~$8/mois) — IP: 72.62.189.193
+├── Docker: PostgreSQL+PostGIS :5432, Redis :6379, Caddy (SSL auto)
+└── PM2:    Next.js standalone (port 3011), NestJS (port 3010)
 ```
 
-Deploy via GitHub Actions SSH : `git pull → turbo build → pm2 restart all`
+**Domaine** : `ridenrest.app` (migré depuis `ridenrest.com` le 2026-03-26)
+- `ridenrest.app` → Next.js :3011
+- `api.ridenrest.app` → NestJS :3010
 
-> ⚠️ L'ancienne config Fly.io (`apps/api/fly.toml`) et le `Dockerfile` sont obsolètes — à supprimer lors de l'Epic 14.
+**Deploy** : GitHub Actions → SSH → `deploy.sh` sur le VPS :
+```
+git pull → source .env → turbo build → copy static assets → drizzle-kit migrate → pm2 reload
+```
+
+**Fichiers clés :**
+- `deploy.sh` — script de déploiement complet (6 steps)
+- `ecosystem.config.js` — config PM2 + chargement `.env` via fs natif
+- `turbo.json` — env vars déclarées pour invalidation cache (`NEXT_PUBLIC_*`)
+- `.env` sur VPS — source de vérité des secrets (jamais commité)
+
+**GitHub Actions secrets requis** : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`
+
+**GPX storage** : `/data/gpx/` sur le VPS (créé automatiquement par `deploy.sh`)
+
+**Gotchas découverts en prod (2026-03-26) :**
+- `.env` : pas de commentaires inline (`KEY=value # comment` → la valeur inclut le commentaire)
+- Turbo cache : les `NEXT_PUBLIC_*` doivent être dans `turbo.json#env` sinon le cache ignore les changements
+- PM2 : les vars d'env doivent être dans la section `env` de l'app explicitement (pas juste `process.env`)
+- Next.js standalone static : faire `rm -rf` avant `cp` pour éviter l'accumulation de chunks entre builds
+- `deploy.sh` via SSH : `source .env` requis avant `turbo build` pour embarquer les `NEXT_PUBLIC_*`
+
+> L'ancienne config Fly.io (`apps/api/fly.toml`) et le `Dockerfile` sont obsolètes — à supprimer lors de la story 14.7.
 
 ---
 
