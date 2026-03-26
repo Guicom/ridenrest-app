@@ -1,6 +1,7 @@
 services:
   db:
     image: postgis/postgis:16-3.4
+    container_name: ridenrest-db
     platform: linux/amd64 # No native ARM64 build — Rosetta 2 on Mac, native on VPS (x86_64)
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
