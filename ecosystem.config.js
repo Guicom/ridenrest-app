@@ -1,16 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load .env file into process.env (no external dependency)
-const envPath = path.join(__dirname, '.env');
-if (fs.existsSync(envPath)) {
-  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
-    const match = line.match(/^([^#=\s][^=]*)=(.*)$/);
-    if (match) process.env[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, '');
-  });
+// Load .env file and return as object (no external dependency)
+function loadEnv(envPath) {
+  if (!fs.existsSync(envPath)) return {};
+  return fs.readFileSync(envPath, 'utf8')
+    .split('\n')
+    .reduce((acc, line) => {
+      const match = line.match(/^([^#=\s][^=]*)=(.*)$/);
+      if (match) acc[match[1].trim()] = match[2].trim().replace(/^["']|["']$/g, '');
+      return acc;
+    }, {});
 }
 
 const APP_DIR = '/home/deploy/ridenrest-app';
+const envVars = loadEnv(path.join(APP_DIR, '.env'));
 
 module.exports = {
   apps: [
@@ -19,6 +23,7 @@ module.exports = {
       script: 'apps/web/.next/standalone/apps/web/server.js',
       cwd: APP_DIR,
       env: {
+        ...envVars,
         PORT: 3011,
         NODE_ENV: 'production',
         HOSTNAME: '0.0.0.0',
@@ -37,6 +42,7 @@ module.exports = {
       script: 'apps/api/dist/main.js',
       cwd: APP_DIR,
       env: {
+        ...envVars,
         PORT: 3010,
         NODE_ENV: 'production',
       },
