@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { db } from '@ridenrest/database'
 import { adventureSegments, adventures, weatherCache } from '@ridenrest/database'
 import { eq, and, sql } from 'drizzle-orm'
+import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 
 export interface SegmentForWeather {
   id: string
@@ -51,7 +52,7 @@ export class WeatherRepository {
     if (points.length === 0) return
 
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 3600 * 1000)
+    const expiresAt = new Date(now.getTime() + WEATHER_CACHE_TTL * 1000)
 
     await db
       .insert(weatherCache)

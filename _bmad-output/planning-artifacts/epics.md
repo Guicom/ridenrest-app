@@ -1570,11 +1570,12 @@ So that managing GPX segments feels as polished as the map experience.
 
 ---
 
-## Epic 10: Cache Optimization & Upstash Budget Management
+## Epic 10: Cache Optimization & Redis VPS
 
-> **Note 2026-03-18 : renommé depuis Epic 9** — numérotation mise à jour suite à l'insertion des épics 8 (App Shell) et 9 (Redesign). Contenu inchangé.
+> **Note 2026-03-18 : renommé depuis Epic 9** — numérotation mise à jour suite à l'insertion des épics 8 (App Shell) et 9 (Redesign).
+> **Note 2026-03-27 : renommé** — "Upstash Budget Management" retiré du titre (Upstash décommissionné en Epic 14, Redis self-hosted VPS). Story 10.4 déplacée en 15.5. Story 10.5 supprimée (obsolète).
 
-Optimiser la stratégie de cache Redis pour maximiser les performances, partager les données entre utilisateurs, contrôler la consommation Upstash (10k cmds/jour), et donner un levier d'invalidation admin en cas de mise à jour OSM.
+Optimiser la stratégie de cache Redis pour maximiser les performances, partager les données entre utilisateurs (Overpass API + Google Places API), et donner un levier d'invalidation admin en cas de mise à jour OSM.
 
 ### Story 10.1: Geographic Cache Key — Cross-User POI Sharing
 
@@ -1650,49 +1651,11 @@ So that repeated layer toggles and re-visits to the same area are instantaneous 
 
 ---
 
-### Story 10.4: Admin Cache Invalidation by Geographic Zone
+<!--
+Story 10.4 déplacée → Story 15.5 (2026-03-27)
+Story 10.5 supprimée (2026-03-27) — Upstash décommissionné en Epic 14, Redis self-hosted VPS, aucun quota
+-->
 
-As a **system administrator**,
-I want to purge the cache for a specific geographic zone (bbox),
-So that when a significant OSM data update occurs in a region, the stale cache can be invalidated without restarting the server.
-
-**Acceptance Criteria:**
-
-**Given** an admin needs to invalidate cache for a specific bbox,
-**When** they call `DELETE /admin/cache/zone?minLat=42.0&minLng=-2.0&maxLat=43.5&maxLng=3.0`,
-**Then** all Redis keys matching `pois:bbox:{keys within bbox}` and `density:troncon:{keys within bbox}` are deleted — response includes count of deleted keys.
-
-**Given** the admin endpoint is created,
-**When** accessed,
-**Then** it is protected by a static `ADMIN_SECRET` header — not exposed in Swagger, not subject to `JwtAuthGuard`.
-
-**Given** the zone invalidation runs on a large bbox,
-**When** many keys match,
-**Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB`.
-
----
-
-### Story 10.5: Upstash Budget Monitoring & Alerting
-
-As a **solo developer operating at the free tier limit**,
-I want visibility into daily Redis command consumption with automatic alerting before quota exhaustion,
-So that I can act before hitting the 10k/day cap — avoiding silent service degradation.
-
-**Acceptance Criteria:**
-
-**Given** Upstash free tier cap is 10,000 commands/day,
-**When** the monitoring system is active,
-**Then** an email alert is sent by Upstash dashboard when daily usage exceeds 7,500 commands (75%) — configured via Upstash console.
-
-**Given** the NestJS API starts,
-**When** a health check is performed,
-**Then** `GET /health` includes a `redis` sub-check verifying connectivity — existing `HealthModule` extended with `RedisHealthIndicator`.
-
-**Given** daily usage approaches the alert threshold,
-**When** usage exceeds 7,500 cmds/day,
-**Then** the recommended action is documented: switch to Upstash Pay-as-you-go ($0.2/100k cmds) — no code migration required.
-
----
 
 ## Epic 11: Stage Planning (Étapes de planification)
 
@@ -2307,3 +2270,27 @@ So that I can quickly generate a snapshot report without navigating Plausible's 
 **Given** an admin wants to export data for the Booking.com application,
 **When** they click "Exporter CSV",
 **Then** a CSV file is downloaded containing monthly aggregates: month, unique_visitors, sessions, booking_clicks, booking_click_rate — covering all available months since launch.
+
+---
+
+### Story 15.5: Admin Cache Invalidation by Geographic Zone
+
+> **Déplacé depuis Story 10.4** (2026-03-27) — mieux regroupé avec les outils admin de l'Epic 15.
+
+As a **system administrator**,
+I want to purge the Redis cache for a specific geographic zone (bbox),
+So that when a significant OSM data update occurs in a region, the stale POI and density cache can be invalidated without restarting the server.
+
+**Acceptance Criteria:**
+
+**Given** an admin needs to invalidate cache for a specific bbox,
+**When** they call `DELETE /admin/cache/zone?minLat=42.0&minLng=-2.0&maxLat=43.5&maxLng=3.0`,
+**Then** all Redis keys matching `pois:bbox:{keys within bbox}` and `density:troncon:{keys within bbox}` are deleted — response includes count of deleted keys.
+
+**Given** the admin endpoint is created,
+**When** accessed,
+**Then** it is protected by a static `ADMIN_SECRET` header — not exposed in Swagger, not subject to `JwtAuthGuard`.
+
+**Given** the zone invalidation runs on a large bbox,
+**When** many keys match,
+**Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB`.

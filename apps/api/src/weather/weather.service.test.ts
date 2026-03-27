@@ -4,6 +4,7 @@ import { WeatherService } from './weather.service.js'
 import { WeatherRepository } from './weather.repository.js'
 import { OpenMeteoProvider } from './providers/open-meteo.provider.js'
 import type { GetWeatherDto } from './dto/get-weather.dto.js'
+import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 
 const mockWeatherRepo = {
   findSegmentByIdAndUserId: jest.fn(),
@@ -209,7 +210,7 @@ describe('WeatherService', () => {
       const expiresAt = new Date(result.expiresAt).getTime()
       expect(cachedAt).toBeGreaterThanOrEqual(before)
       expect(cachedAt).toBeLessThanOrEqual(after)
-      expect(expiresAt - cachedAt).toBeCloseTo(3600 * 1000, -2)
+      expect(expiresAt - cachedAt).toBeCloseTo(WEATHER_CACHE_TTL * 1000, -2)
     })
   })
 })

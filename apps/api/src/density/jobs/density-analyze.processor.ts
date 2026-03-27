@@ -27,7 +27,6 @@ interface Troncon {
 }
 
 const TRONCON_SIZE_KM = 10
-const CACHE_TTL_SECONDS = 60 * 60 * 24 // 24h
 const OVERPASS_RATE_LIMIT_MS = 1100 // ~1 req/s — Overpass fair-use policy
 
 function computeTroncons(waypoints: DbWaypoint[]): Troncon[] {
@@ -126,7 +125,8 @@ export class DensityAnalyzeProcessor extends WorkerHost {
     const googleCount = googleIds.status === 'fulfilled' ? googleIds.value.length : 0
     const count = Math.max(overpassCount, googleCount)
 
-    await redis.set(cacheKey, String(count), 'EX', CACHE_TTL_SECONDS)
+    await redis.set(cacheKey, String(count))
+    // permanent — OSM data is stable, admin cache invalidation (story 10.4) provides purge lever
     return count
   }
 }

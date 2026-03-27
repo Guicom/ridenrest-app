@@ -6,6 +6,7 @@ import { OverpassProvider } from './providers/overpass.provider.js'
 import { GooglePlacesProvider } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi } from '@ridenrest/shared'
+import { POI_BBOX_CACHE_TTL } from '@ridenrest/shared'
 
 const mockRedisClient = {
   get: jest.fn(),
@@ -232,8 +233,10 @@ describe('PoisService', () => {
 
       expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
       expect(mockRedisClient.setex).toHaveBeenCalledTimes(1)
+      // Corridor mode uses POI_BBOX_CACHE_TTL (30 days = 2592000s)
+      const [, ttl, storedJson] = mockRedisClient.setex.mock.calls[0] as [string, number, string]
+      expect(ttl).toBe(POI_BBOX_CACHE_TTL)
       // Option A: Redis must NOT contain segment-specific distances
-      const [, , storedJson] = mockRedisClient.setex.mock.calls[0] as [string, number, string]
       const stored = JSON.parse(storedJson) as Array<Record<string, unknown>>
       expect(stored[0]).not.toHaveProperty('distFromTraceM')
       expect(stored[0]).not.toHaveProperty('distAlongRouteKm')
@@ -455,7 +458,9 @@ describe('PoisService', () => {
       await service.findPois(liveDto, userId)
 
       expect(mockRedisClient.setex).toHaveBeenCalledTimes(1)
-      const [, , storedJson] = mockRedisClient.setex.mock.calls[0] as [string, number, string]
+      // Live mode uses POI_BBOX_CACHE_TTL (30 days = 2592000s)
+      const [, ttl, storedJson] = mockRedisClient.setex.mock.calls[0] as [string, number, string]
+      expect(ttl).toBe(POI_BBOX_CACHE_TTL)
       const stored = JSON.parse(storedJson) as Array<Record<string, unknown>>
       expect(stored[0]).not.toHaveProperty('distFromTraceM')
       expect(stored[0]).not.toHaveProperty('distAlongRouteKm')

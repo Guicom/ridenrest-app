@@ -1,6 +1,9 @@
 /** Overpass API cache TTL in seconds (24 hours) */
 export const OVERPASS_CACHE_TTL = 24 * 60 * 60
 
+/** POI bbox cache TTL in seconds (30 days — Overpass OSM + Google Places data is stable; avoids redundant calls to both APIs) */
+export const POI_BBOX_CACHE_TTL = 30 * 24 * 60 * 60
+
 /** Google Places cache TTL in seconds (7 days — place_ids and details are stable) */
 export const GOOGLE_PLACES_CACHE_TTL = 7 * 24 * 60 * 60
 

@@ -4,7 +4,7 @@ import { OverpassProvider } from './providers/overpass.provider.js'
 import { GooglePlacesProvider, mapGoogleTypesToCategory } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi, GooglePlaceDetails } from '@ridenrest/shared'
-import { MAX_SEARCH_RANGE_KM, CORRIDOR_WIDTH_M, OVERPASS_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL } from '@ridenrest/shared'
+import { MAX_SEARCH_RANGE_KM, CORRIDOR_WIDTH_M, POI_BBOX_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL } from '@ridenrest/shared'
 import type { FindPoisDto } from './dto/find-pois.dto.js'
 import type { Redis } from 'ioredis'
 
@@ -95,7 +95,7 @@ export class PoisService {
       this.logger.debug(`Cache HIT: ${cacheKey}`)
       // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
       const rawPois = JSON.parse(cached) as RawCacheablePoi[]
-      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
+      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
       await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
       await this.poisRepository.updatePoiDistances(segmentId)
       return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
@@ -119,7 +119,7 @@ export class PoisService {
       }
 
       // 6b. Insert into accommodations_cache
-      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
+      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
 
       // 7. Update Overpass POI distances with PostGIS
@@ -147,7 +147,7 @@ export class PoisService {
       const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category }) => ({
         externalId, source, name, lat, lng, category,
       }))
-      await redis.setex(cacheKey, OVERPASS_CACHE_TTL, JSON.stringify(rawPois))
+      await redis.setex(cacheKey, POI_BBOX_CACHE_TTL, JSON.stringify(rawPois))
     }
 
     return pois
@@ -221,7 +221,7 @@ export class PoisService {
       this.logger.debug(`Live cache HIT: ${cacheKey}`)
       // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
       const rawPois = JSON.parse(cached) as RawCacheablePoi[]
-      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
+      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
       await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
       await this.poisRepository.updatePoiDistances(segmentId)
       return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories)
@@ -234,7 +234,7 @@ export class PoisService {
       const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
       const categoryMap: Record<number, string> = {}
       for (const node of nodes) categoryMap[node.id] = resolveCategory(node.tags)
-      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
+      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
       await this.poisRepository.updatePoiDistances(segmentId)
       overpassSucceeded = true
@@ -256,7 +256,7 @@ export class PoisService {
       const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category }) => ({
         externalId, source, name, lat, lng, category,
       }))
-      await redis.setex(cacheKey, OVERPASS_CACHE_TTL, JSON.stringify(rawPois))
+      await redis.setex(cacheKey, POI_BBOX_CACHE_TTL, JSON.stringify(rawPois))
     }
     return pois
   }

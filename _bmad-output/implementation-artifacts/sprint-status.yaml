@@ -154,15 +154,13 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 10: Cache Optimization & Redis VPS
   # (renommé depuis Epic 9 — Post-MVP — à revisiter post-Epic 14)
-  # ⚠️ Stories 10-5 (upstash-budget-monitoring) devenue obsolète
-  #    après migration Redis VPS — à réévaluer lors du sprint planning
   # ─────────────────────────────────────────────────────────────
   epic-10: in-progress
   10-1-geographic-cache-key-cross-user-poi-sharing: done
-  10-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: backlog
+  10-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: done
   10-3-poi-query-cache-by-bbox-category-map-layers: backlog
-  10-4-admin-cache-invalidation-by-geographic-zone: backlog
-  10-5-upstash-budget-monitoring-alerting: backlog
+  # 10-4 déplacé → 15-5 (admin ops, mieux dans epic 15)
+  # 10-5 supprimé — Upstash décommissionné (Epic 14), Redis self-hosted VPS, pas de quota
   epic-10-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
@@ -205,4 +203,5 @@ development_status:
   15-2-click-tracking-enrichi-booking-links: backlog  # event booking_click avec poi_id, source, page, user_tier
   15-3-funnel-tracking-complet: backlog               # gpx_uploaded → map_opened → poi_search → poi_detail → booking_click
   15-4-admin-analytics-dashboard: backlog             # /admin/analytics protégé, embed Plausible, métriques affilié
+  15-5-admin-cache-invalidation-by-geographic-zone: backlog  # déplacé depuis 10-4 — DELETE /admin/cache/zone, SCAN+DEL pipeline
   epic-15-retrospective: optional

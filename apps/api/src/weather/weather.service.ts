@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { WeatherRepository } from './weather.repository.js'
 import { OpenMeteoProvider } from './providers/open-meteo.provider.js'
 import { GetWeatherDto } from './dto/get-weather.dto.js'
-import { WMO_ICON, WMO_ICON_FALLBACK } from '@ridenrest/shared'
+import { WMO_ICON, WMO_ICON_FALLBACK, WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import type { WeatherForecast, WeatherPoint } from '@ridenrest/shared'
 
 const SAMPLE_KM = 5
@@ -47,7 +47,7 @@ export class WeatherService {
         segmentId: dto.segmentId,
         waypoints: [],
         cachedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + WEATHER_CACHE_TTL * 1000).toISOString(),
       }
     }
 
@@ -76,7 +76,7 @@ export class WeatherService {
     }
 
     const now = new Date()
-    const expiresAt = new Date(now.getTime() + 3600 * 1000)
+    const expiresAt = new Date(now.getTime() + WEATHER_CACHE_TTL * 1000)
 
     // Map results to WeatherPoint[]
     const weatherPoints: WeatherPoint[] = filtered.map((wp, i) => {

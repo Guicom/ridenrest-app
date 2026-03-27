@@ -118,6 +118,24 @@ describe('DensityAnalyzeProcessor.process', () => {
     expect(mockRepo.insertGaps).toHaveBeenCalledWith([]) // 3 ≥ 2 → green zone
   })
 
+  it('cache MISS: stores count in Redis permanently — redis.set called with exactly 2 args (no EX)', async () => {
+    mockRepo.findSegmentsForAnalysis.mockResolvedValue([
+      { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
+    ])
+    mockOverpass.queryPois.mockResolvedValue([
+      { type: 'node', id: 1, lat: 43, lon: -2, tags: {} } as never,
+    ]) // count = 1
+
+    await processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'] }))
+
+    expect(mockRedisClient.set).toHaveBeenCalledTimes(1)
+    // Permanent cache: redis.set(key, value) — NO EX argument
+    const setArgs = mockRedisClient.set.mock.calls[0] as unknown[]
+    expect(setArgs).toHaveLength(2)
+    expect(typeof setArgs[0]).toBe('string') // cacheKey
+    expect(setArgs[1]).toBe('1')             // count as string
+  })
+
   it('falls back to Google count when Overpass fails', async () => {
     mockRepo.findSegmentsForAnalysis.mockResolvedValue([
       { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
@@ -130,6 +148,11 @@ describe('DensityAnalyzeProcessor.process', () => {
     // Google found 3 → green zone, no gaps
     expect(mockRepo.insertGaps).toHaveBeenCalledWith([])
     expect(mockRepo.setDensityStatus).toHaveBeenCalledWith('adv-1', 'success')
+    // Permanent cache: redis.set called with 2 args (no EX) even when count comes from Google
+    expect(mockRedisClient.set).toHaveBeenCalledTimes(1)
+    const setArgs = mockRedisClient.set.mock.calls[0] as unknown[]
+    expect(setArgs).toHaveLength(2)
+    expect(setArgs[1]).toBe('3') // Google count cached permanently
   })
 
   it('inserts critical gap and sets success when both sources fail (Promise.allSettled)', async () => {
