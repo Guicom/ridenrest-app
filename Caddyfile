@@ -21,7 +21,7 @@ api.ridenrest.app {
 }
 
 status.ridenrest.app {
-  basicauth {
+  basic_auth {
     {$STATUS_USER} {$STATUS_HASHED_PASSWORD}
   }
   reverse_proxy uptime-kuma:3001
