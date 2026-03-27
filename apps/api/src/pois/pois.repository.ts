@@ -211,7 +211,7 @@ export class PoisRepository {
     const values = pois.map((p) => ({
       segmentId,
       externalId: p.externalId,
-      source: p.source as 'overpass' | 'amadeus' | 'google',
+      source: p.source,
       category: p.category,
       name: p.name,
       lat: p.lat,
