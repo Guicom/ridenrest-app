@@ -80,16 +80,15 @@ GOOGLE_CLIENT_SECRET=
 STRAVA_CLIENT_ID=
 STRAVA_CLIENT_SECRET=
 
-# Aiven PostgreSQL
-DATABASE_URL=
+# PostgreSQL — VPS localhost (Docker)
+DATABASE_URL=postgresql://user:password@localhost:5432/ridenrest
 
-# Upstash Redis
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-
-# WeatherAPI
-WEATHER_API_KEY=
+# Redis — VPS localhost (Docker)
+REDIS_URL=redis://localhost:6379
 
 # Geoapify
 GEOAPIFY_API_KEY=
+
+# Resend (transactional emails)
+RESEND_API_KEY=
 ```

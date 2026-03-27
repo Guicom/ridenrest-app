@@ -1,6 +1,6 @@
 # Story 14.7: Decommissioning — DNS, Cloud Cleanup & Repo Hygiene
 
-Status: review
+Status: done
 
 <!-- Note: Base de test uniquement — pas de migration pg_dump ni GPX nécessaire. -->
 
@@ -82,6 +82,13 @@ So that there is a single source of truth (VPS Hostinger), no orphaned cloud res
 - [x] 5.3 Commit changes with descriptive message
 - [x] 5.4 Update `sprint-status.yaml`: `14-7-migration-donnees-decommissionnement` → `done`
 - [x] 5.5 Update `sprint-status.yaml`: `epic-14` → `done` (all stories complete)
+
+### Review Follow-ups (AI)
+
+- [x] [AI-Review][High] `docs/services.md` env vars section still referenced Aiven/Upstash/WeatherAPI — updated to VPS localhost format + Resend [docs/services.md:73-89]
+- [x] [AI-Review][Medium] `bullmq.config.ts` had dead `isUpstash`/`rediss://` code path — removed. Test case also removed. [apps/api/src/config/bullmq.config.ts:4-14]
+- [x] [AI-Review][Medium] `apps/web/README.md` had wrong port (3000→3011) and Vercel font attribution — fixed [apps/web/README.md:17,21]
+- [x] [AI-Review][Low] `_deprecated/Dockerfile.fly-api` header said "To be removed" instead of "Moved to _deprecated/" — fixed [_deprecated/Dockerfile.fly-api:1]
 
 ---
 
@@ -219,4 +226,6 @@ claude-sonnet-4-6
 - `apps/web/README.md` (updated)
 - `_bmad-output/project-context.md` (updated)
 - `_bmad-output/implementation-artifacts/14-7-migration-donnees-decommissionnement.md` (this file)
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status: ready-for-dev → in-progress)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (status: in-progress → done, epic-14 → done)
+- `apps/api/src/config/bullmq.config.ts` (removed dead Upstash/rediss:// code path)
+- `apps/api/src/config/bullmq.config.test.ts` (removed Upstash-specific test cases)
