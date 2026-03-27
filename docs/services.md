@@ -4,14 +4,28 @@ Référence rapide de tous les services externes utilisés dans le projet.
 
 ---
 
-## Hébergement & Infrastructure
+## Production Infrastructure (current — Epic 14)
 
-| Service | URL Dashboard | Description |
-|---------|--------------|-------------|
-| **Vercel** | https://vercel.com/dashboard | Déploiement Next.js (web app) — Plan Pro requis (Hobby interdit commercial) |
-| **Fly.io** | https://fly.io/dashboard | Déploiement NestJS (API) + stockage fichiers GPX (volumes 3GB free) |
-| **Aiven** | https://console.aiven.io | PostgreSQL + PostGIS managé (5GB free) — base de données principale |
-| **Upstash** | https://console.upstash.com | Redis serverless — cache POI, sessions, rate limiting (10k cmds/jour free) |
+| Service | Provider | Notes |
+|---|---|---|
+| VPS | Hostinger KVM 2 | IP: 72.62.189.193, ~$8/mo |
+| Reverse proxy + SSL | Caddy 2 (Docker) | Auto Let's Encrypt, status.ridenrest.app |
+| PostgreSQL + PostGIS | Docker on VPS | :5432, pgdata volume |
+| Redis | Docker on VPS | :6379, redisdata volume |
+| Next.js (web) | PM2 on VPS | :3011, standalone output |
+| NestJS (API) | PM2 on VPS | :3010 |
+| Monitoring | Uptime Kuma (Docker) | status.ridenrest.app |
+| Backups | VPS cron (backup.sh) | Daily, 7-day retention, /data/backups/ |
+| CI/CD | GitHub Actions → SSH | deploy.sh |
+
+## Decommissioned (Epic 14)
+
+| Service | Reason |
+|---|---|
+| Vercel | Replaced by VPS + Caddy (Next.js standalone) |
+| Fly.io | Replaced by VPS + PM2 (NestJS natif) |
+| Aiven PostgreSQL | Replaced by PostgreSQL Docker on VPS |
+| Upstash Redis | Replaced by Redis Docker on VPS |
 
 ---
 

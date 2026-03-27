@@ -141,14 +141,14 @@ development_status:
   # (ajouté 2026-03-21 — remonté après Epic 9, 2026-03-25)
   # Priorité : infra stable avant les epics finaux (13, 15)
   # ─────────────────────────────────────────────────────────────
-  epic-14: in-progress
+  epic-14: done
   14-1-docker-compose-infra-services: done  # fusionnée avec 14.3 — docker-compose + env local
   14-3-environnement-dev-local-unifie: cancelled      # contenu fusionné dans 14.1 (2026-03-25)
   14-2-nodejs-natif-pm2-production: done
   14-5-cicd-deploiement-github-actions: done
   14-4-backups-postgresql-automatises: done
   14-6-monitoring-uptime-kuma: done
-  14-7-migration-donnees-decommissionnement: backlog
+  14-7-migration-donnees-decommissionnement: done
   epic-14-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

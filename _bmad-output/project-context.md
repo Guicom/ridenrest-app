@@ -392,7 +392,7 @@ git pull → source .env → turbo build → copy static assets → drizzle-kit 
 - Next.js standalone static : faire `rm -rf` avant `cp` pour éviter l'accumulation de chunks entre builds
 - `deploy.sh` via SSH : `source .env` requis avant `turbo build` pour embarquer les `NEXT_PUBLIC_*`
 
-> L'ancienne config Fly.io (`apps/api/fly.toml`) et le `Dockerfile` sont obsolètes — à supprimer lors de la story 14.7.
+> Fly.io config moved to `_deprecated/` (14.7). `apps/api/Dockerfile` removed (14.7).
 
 ---
 
