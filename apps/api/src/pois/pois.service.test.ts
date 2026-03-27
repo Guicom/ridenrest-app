@@ -11,7 +11,6 @@ const mockRedisClient = {
   get: jest.fn(),
   setex: jest.fn(),
   exists: jest.fn(),
-  del: jest.fn(),
 }
 
 const mockRedisProvider = {
@@ -29,6 +28,7 @@ const mockPoisRepository = {
   hasNearbyPoi: jest.fn(),
   insertGooglePois: jest.fn(),
   googlePoiExistsInSegment: jest.fn(),
+  insertRawPoisForSegment: jest.fn(),
 }
 
 const mockOverpassProvider = {
@@ -111,14 +111,13 @@ describe('PoisService', () => {
     mockPoisRepository.hasNearbyPoi.mockReset()
     mockPoisRepository.insertGooglePois.mockReset()
     mockPoisRepository.googlePoiExistsInSegment.mockReset()
-    mockRedisClient.del.mockReset()
+    mockPoisRepository.insertRawPoisForSegment.mockReset()
 
     // Default: Google Places not configured
     mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
     // Default: no Redis cache
     mockRedisClient.get.mockResolvedValue(null)
     mockRedisClient.exists.mockResolvedValue(0)
-    mockRedisClient.del.mockResolvedValue(1)
     // Default: successful DB operations
     mockPoisRepository.getWaypointAtKm.mockResolvedValue(null)
     mockPoisRepository.findPoisNearPoint.mockResolvedValue([])
@@ -128,7 +127,9 @@ describe('PoisService', () => {
     mockPoisRepository.hasNearbyPoi.mockResolvedValue(false)
     mockPoisRepository.insertGooglePois.mockResolvedValue(undefined)
     mockPoisRepository.googlePoiExistsInSegment.mockResolvedValue(false)
+    mockPoisRepository.insertRawPoisForSegment.mockResolvedValue(undefined)
     mockRedisClient.setex.mockResolvedValue('OK')
+
   })
 
   describe('findPois - validation', () => {
@@ -149,15 +150,22 @@ describe('PoisService', () => {
   })
 
   describe('findPois - cache HIT', () => {
-    it('returns cached result and does not call Overpass when Redis HIT', async () => {
-      const cachedPois = [mockPoi]
-      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify(cachedPois))
+    it('re-inserts raw POIs for the segment and returns with correct distances on HIT (Option A)', async () => {
+      // Redis stores raw POIs (no distances) — Option A
+      const rawCached = [{ externalId: '123', source: 'overpass' as const, name: 'Hôtel du Lac', lat: 43.1, lng: 1.1, category: 'hotel' }]
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify(rawCached))
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
 
       const result = await service.findPois(baseDto, userId)
 
-      expect(result).toEqual(cachedPois)
+      expect(result).toEqual([mockPoi])
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-      expect(mockPoisRepository.getSegmentWaypoints).not.toHaveBeenCalled()
+      expect(mockPoisRepository.getSegmentWaypoints).toHaveBeenCalledTimes(1)
+      // Option A: re-insert + recompute + read back
+      expect(mockPoisRepository.insertRawPoisForSegment).toHaveBeenCalledTimes(1)
+      expect(mockPoisRepository.updatePoiDistances).toHaveBeenCalledWith(baseDto.segmentId)
+      expect(mockPoisRepository.findCachedPois).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -183,20 +191,56 @@ describe('PoisService', () => {
       expect(mockPoisRepository.getSegmentWaypoints).toHaveBeenCalledWith(baseDto.segmentId, userId)
     })
 
-    it('calls Overpass, stores in Redis, and returns results on cache MISS', async () => {
+    it('uses bbox-based cache key (cross-user sharing)', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+      await service.findPois(baseDto, userId)
+
+      const cacheKey = (mockRedisClient.get.mock.calls as string[][])[0][0]
+      // New format: pois:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}:{categories}
+      expect(cacheKey).toMatch(/^pois:bbox:/)
+      expect(cacheKey).not.toContain(baseDto.segmentId)
+    })
+
+    it('two different segments with same corridor bbox produce the same cache key', async () => {
+      // Same waypoints → same bbox → same cache key regardless of segmentId
+      const segmentA = '00000000-0000-0000-0000-000000000001'
+      const segmentB = '00000000-0000-0000-0000-000000000002'
+      const dtoA = { ...baseDto, segmentId: segmentA }
+      const dtoB = { ...baseDto, segmentId: segmentB }
+
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValue(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValue([])
+      mockPoisRepository.findCachedPois.mockResolvedValue([])
+
+      await service.findPois(dtoA, userId)
+      await service.findPois(dtoB, userId)
+
+      const keyA = (mockRedisClient.get.mock.calls as string[][])[0][0]
+      const keyB = (mockRedisClient.get.mock.calls as string[][])[1][0]
+      expect(keyA).toBe(keyB)
+    })
+
+    it('calls Overpass, stores raw POIs (no distances) in Redis, and returns results on cache MISS', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
-      // After Overpass + PostGIS update, service reads back from DB
       mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
 
       const result = await service.findPois(baseDto, userId)
 
       expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
       expect(mockRedisClient.setex).toHaveBeenCalledTimes(1)
+      // Option A: Redis must NOT contain segment-specific distances
+      const [, , storedJson] = mockRedisClient.setex.mock.calls[0] as [string, number, string]
+      const stored = JSON.parse(storedJson) as Array<Record<string, unknown>>
+      expect(stored[0]).not.toHaveProperty('distFromTraceM')
+      expect(stored[0]).not.toHaveProperty('distAlongRouteKm')
+      expect(stored[0]).toHaveProperty('externalId')
+      expect(stored[0]).toHaveProperty('source', 'overpass')
       expect(result).toHaveLength(1)
       expect(result[0].name).toBe('Hôtel du Lac')
-      expect(result[0].category).toBe('hotel')
-      expect(result[0].source).toBe('overpass')
     })
 
     it('calls updatePoiDistances after insertOverpassPois', async () => {
@@ -337,28 +381,48 @@ describe('PoisService', () => {
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
     })
 
-    it('uses correct live mode cache key with rounded targetKm', async () => {
+    it('uses bbox-based live mode cache key (cross-user sharing)', async () => {
       mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
 
       await service.findPois(liveDto, userId)
 
-      expect(mockRedisClient.get).toHaveBeenCalledWith(
-        expect.stringContaining('pois:live:'),
-      )
-      // Verify cache key format: pois:live:{segmentId}:{roundedKm}:{radiusKm}:{categories}
+      // New format: pois:live:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}:{categories}
       const cacheKey = (mockRedisClient.get.mock.calls as string[][])[0][0]
-      expect(cacheKey).toBe(`pois:live:${liveDto.segmentId}:42.3:3:hotel`)
+      expect(cacheKey).toMatch(/^pois:live:bbox:/)
+      expect(cacheKey).not.toContain(liveDto.segmentId)
     })
 
-    it('returns cached result on live mode cache HIT', async () => {
-      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify([mockLivePoi]))
+    it('two different users at same GPS zone produce the same live mode cache key', async () => {
+      const samePoint = { lat: 43.3, lng: 1.3 }
+      mockPoisRepository.getWaypointAtKm.mockResolvedValue(samePoint)
+      mockOverpassProvider.queryPois.mockResolvedValue([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValue([])
+
+      await service.findPois({ ...liveDto, segmentId: '00000000-0000-0000-0000-aaaaaaaaaaaa' }, 'user-A')
+      await service.findPois({ ...liveDto, segmentId: '00000000-0000-0000-0000-bbbbbbbbbbbb' }, 'user-B')
+
+      const keyA = (mockRedisClient.get.mock.calls as string[][])[0][0]
+      const keyB = (mockRedisClient.get.mock.calls as string[][])[1][0]
+      expect(keyA).toBe(keyB)
+    })
+
+    it('re-inserts raw POIs and returns with correct distances on live cache HIT (Option A)', async () => {
+      const rawCached = [{ externalId: '456', source: 'overpass' as const, name: 'Hôtel Live', lat: 43.3, lng: 1.3, category: 'hotel' }]
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockRedisClient.get.mockResolvedValueOnce(JSON.stringify(rawCached))
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([mockLivePoi])
 
       const result = await service.findPois(liveDto, userId)
 
       expect(result).toEqual([mockLivePoi])
-      expect(mockPoisRepository.getWaypointAtKm).not.toHaveBeenCalled()
+      expect(mockPoisRepository.getWaypointAtKm).toHaveBeenCalledTimes(1)
+      expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+      // Option A: re-insert + recompute + read back
+      expect(mockPoisRepository.insertRawPoisForSegment).toHaveBeenCalledTimes(1)
+      expect(mockPoisRepository.updatePoiDistances).toHaveBeenCalledWith(liveDto.segmentId)
+      expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledTimes(1)
     })
 
     it('calls findPoisNearPoint with correct radiusM', async () => {
@@ -383,6 +447,23 @@ describe('PoisService', () => {
       expect(result).toEqual([mockLivePoi])
     })
 
+    it('stores raw POIs without segment-specific distances in Redis on live mode MISS (Option A)', async () => {
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([mockLivePoi])
+
+      await service.findPois(liveDto, userId)
+
+      expect(mockRedisClient.setex).toHaveBeenCalledTimes(1)
+      const [, , storedJson] = mockRedisClient.setex.mock.calls[0] as [string, number, string]
+      const stored = JSON.parse(storedJson) as Array<Record<string, unknown>>
+      expect(stored[0]).not.toHaveProperty('distFromTraceM')
+      expect(stored[0]).not.toHaveProperty('distAlongRouteKm')
+      expect(stored[0]).not.toHaveProperty('distFromTargetM')
+      expect(stored[0]).toHaveProperty('externalId')
+      expect(stored[0]).toHaveProperty('source', 'overpass')
+    })
+
     it('calls Google Places prefetch in live mode when configured', async () => {
       mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
@@ -404,6 +485,76 @@ describe('PoisService', () => {
       mockGooglePlacesProvider.searchLayerPlaceIds.mockRejectedValue(new Error('Google API error'))
 
       await expect(service.findPois(liveDto, userId)).resolves.not.toThrow()
+    })
+  })
+
+  describe('bbox cache key — rounding precision', () => {
+    it('rounds bbox coordinates to 3 decimal places in corridor mode key', async () => {
+      // Waypoints that produce non-rounded bbox values
+      const preciseWaypoints = [
+        { lat: 43.00001, lng: 1.00001, distKm: 0 },
+        { lat: 43.50009, lng: 1.50009, distKm: 30 },
+      ]
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(preciseWaypoints)
+      mockRedisClient.get.mockResolvedValueOnce(null)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+      await service.findPois(baseDto, userId)
+
+      const cacheKey = (mockRedisClient.get.mock.calls as string[][])[0][0]
+      // Each coordinate segment must be a value with at most 3 decimal places
+      const parts = cacheKey.replace('pois:bbox:', '').split(':')
+      // parts: [minLat, minLng, maxLat, maxLng, categories]
+      for (const coord of parts.slice(0, 4)) {
+        const decimals = coord.includes('.') ? coord.split('.')[1].length : 0
+        expect(decimals).toBeLessThanOrEqual(3)
+      }
+    })
+
+    it('same bbox rounded to 3dp produces identical key regardless of floating-point drift', async () => {
+      // Two slightly different waypoint sets that round to the same bbox
+      const waypointsA = [{ lat: 43.0001, lng: 1.0001, distKm: 0 }, { lat: 43.5001, lng: 1.5001, distKm: 30 }]
+      const waypointsB = [{ lat: 43.0004, lng: 1.0004, distKm: 0 }, { lat: 43.5004, lng: 1.5004, distKm: 30 }]
+
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(waypointsA)
+      mockRedisClient.get.mockResolvedValueOnce(null)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+      await service.findPois({ ...baseDto, segmentId: 'seg-A' }, userId)
+
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(waypointsB)
+      mockRedisClient.get.mockResolvedValueOnce(null)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+      await service.findPois({ ...baseDto, segmentId: 'seg-B' }, userId)
+
+      const keyA = (mockRedisClient.get.mock.calls as string[][])[0][0]
+      const keyB = (mockRedisClient.get.mock.calls as string[][])[1][0]
+      expect(keyA).toBe(keyB)
+    })
+  })
+
+  describe('bbox cache key — rounding precision (live mode)', () => {
+    it('rounds bbox coordinates to 3 decimal places in live mode key', async () => {
+      // targetPoint with precise float → bbox coords must be rounded to 3dp
+      const precisePoint = { lat: 43.12345, lng: 1.98765 }
+      mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce(precisePoint)
+      mockRedisClient.get.mockResolvedValueOnce(null)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+
+      const liveDto = { segmentId: '00000000-0000-0000-0000-000000000001', targetKm: 10, radiusKm: 3, categories: ['hotel'] as string[] }
+      await service.findPois(liveDto, userId)
+
+      const cacheKey = (mockRedisClient.get.mock.calls as string[][])[0][0]
+      const parts = cacheKey.replace('pois:live:bbox:', '').split(':')
+      for (const coord of parts.slice(0, 4)) {
+        const decimals = coord.includes('.') ? coord.split('.')[1].length : 0
+        expect(decimals).toBeLessThanOrEqual(3)
+      }
     })
   })
 
@@ -482,6 +633,19 @@ describe('PoisService', () => {
 
       expect(mockGooglePlacesProvider.getPlaceDetails).toHaveBeenCalledWith(placeId)
       expect(result).toEqual(mockDetails)
+    })
+
+    it('returns null when getPlaceDetails rejects (graceful degradation)', async () => {
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockRedisClient.get
+        .mockResolvedValueOnce(placeId)   // placeId cached
+        .mockResolvedValueOnce(null)      // details not cached
+      mockGooglePlacesProvider.getPlaceDetails.mockRejectedValueOnce(new Error('Google API quota exceeded'))
+
+      const result = await service.getPoiGoogleDetails(externalId, segmentId)
+
+      expect(result).toBeNull()
+      expect(mockRedisClient.setex).not.toHaveBeenCalled()
     })
 
     it('caches details in Redis after fetching from Google', async () => {

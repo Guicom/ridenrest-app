@@ -196,6 +196,50 @@ export class PoisRepository {
       })
   }
 
+  /**
+   * Insert raw POIs (without distances) for cross-user cache hit hydration (Option A).
+   * On conflict, only refreshes TTL — preserves computed distances if row already exists.
+   * New rows are inserted with distances=0 so updatePoiDistances will compute them.
+   */
+  async insertRawPoisForSegment(
+    segmentId: string,
+    pois: Array<{ externalId: string; source: 'overpass' | 'amadeus' | 'google'; name: string; lat: number; lng: number; category: string }>,
+    expiresAt: Date,
+  ): Promise<void> {
+    if (pois.length === 0) return
+
+    const values = pois.map((p) => ({
+      segmentId,
+      externalId: p.externalId,
+      source: p.source as 'overpass' | 'amadeus' | 'google',
+      category: p.category,
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      distFromTraceM: 0,
+      distAlongRouteKm: 0,
+      rawData: {} as Record<string, unknown>,
+      cachedAt: new Date(),
+      expiresAt,
+    }))
+
+    await db
+      .insert(accommodationsCache)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          accommodationsCache.segmentId,
+          accommodationsCache.externalId,
+          accommodationsCache.source,
+        ],
+        set: {
+          // Only refresh TTL — preserve existing computed distances
+          cachedAt: sql`excluded.cached_at`,
+          expiresAt: sql`excluded.expires_at`,
+        },
+      })
+  }
+
   /** Find POI name and coordinates by externalId + segmentId for Google Details lookup. */
   async findByExternalId(
     externalId: string,
@@ -240,7 +284,7 @@ export class PoisRepository {
         ) AS dist_from_target_m
       FROM accommodations_cache ac
       WHERE ac.segment_id = ${segmentId}
-        AND ac.category = ANY(${`{${categories.join(',')}}`}::text[])
+        AND ac.category = ANY(ARRAY[${sql.join(categories.map((c) => sql`${c}`), sql.raw(', '))}])
         AND ac.expires_at > ${now}
         AND ST_DWithin(
           ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,

@@ -157,8 +157,8 @@ development_status:
   # ⚠️ Stories 10-5 (upstash-budget-monitoring) devenue obsolète
   #    après migration Redis VPS — à réévaluer lors du sprint planning
   # ─────────────────────────────────────────────────────────────
-  epic-10: backlog
-  10-1-geographic-cache-key-cross-user-poi-sharing: backlog
+  epic-10: in-progress
+  10-1-geographic-cache-key-cross-user-poi-sharing: done
   10-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: backlog
   10-3-poi-query-cache-by-bbox-category-map-layers: backlog
   10-4-admin-cache-invalidation-by-geographic-zone: backlog

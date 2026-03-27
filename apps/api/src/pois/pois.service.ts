@@ -4,7 +4,7 @@ import { OverpassProvider } from './providers/overpass.provider.js'
 import { GooglePlacesProvider, mapGoogleTypesToCategory } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi, GooglePlaceDetails } from '@ridenrest/shared'
-import { MAX_SEARCH_RANGE_KM, CORRIDOR_WIDTH_M } from '@ridenrest/shared'
+import { MAX_SEARCH_RANGE_KM, CORRIDOR_WIDTH_M, OVERPASS_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL } from '@ridenrest/shared'
 import type { FindPoisDto } from './dto/find-pois.dto.js'
 import type { Redis } from 'ioredis'
 
@@ -22,8 +22,17 @@ const CATEGORY_TO_OVERPASS_TAGS: Record<string, string[]> = {
   bike_repair:  ['bike_repair'],
 }
 
-const CACHE_TTL_SECONDS = 60 * 60 * 24  // 24h
-const GOOGLE_CACHE_TTL = 60 * 60 * 24 * 7  // 7 days — place_ids are stable
+const round3 = (v: number) => Math.round(v * 1000) / 1000
+
+// Stripped POI format stored in Redis — no segment-specific distances (Option A)
+type RawCacheablePoi = {
+  externalId: string
+  source: 'overpass' | 'amadeus' | 'google'
+  name: string
+  lat: number
+  lng: number
+  category: string
+}
 
 @Injectable()
 export class PoisService {
@@ -55,38 +64,46 @@ export class PoisService {
     }
 
     const activeCategories = categories ?? Object.keys(CATEGORY_TO_OVERPASS_TAGS)
-    const cacheKey = `pois:${segmentId}:${fromKm}:${toKm}:${activeCategories.sort().join(',')}`
+    const sortedCategories = [...activeCategories].sort().join(',')
 
-    // 1. Redis cache check
-    const redis = this.redisProvider.getClient()
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      this.logger.debug(`Cache HIT: ${cacheKey}`)
-      return JSON.parse(cached) as Poi[]
-    }
-
-    this.logger.debug(`Cache MISS: ${cacheKey}`)
-
-    // 2. Get segment waypoints for bbox computation (also verifies ownership)
+    // 1. Get segment waypoints for bbox computation (also verifies ownership)
     const waypoints = await this.poisRepository.getSegmentWaypoints(segmentId, userId)
     if (!waypoints || waypoints.length < 2) {
       return []  // Segment not parsed yet
     }
 
-    // 3. Extract waypoints in [fromKm, toKm] range
+    // 2. Extract waypoints in [fromKm, toKm] range
     const rangeWaypoints = waypoints.filter(
       (wp) => wp.distKm >= fromKm && wp.distKm <= toKm,
     )
     if (rangeWaypoints.length < 2) return []
 
-    // 4. Compute bbox with buffer (CORRIDOR_WIDTH_M / 111_000 degrees ≈ 0.0045°)
+    // 3. Compute bbox with buffer (CORRIDOR_WIDTH_M / 111_000 degrees ≈ 0.0045°)
     const bufferDeg = CORRIDOR_WIDTH_M / 111_000
     const minLat = Math.min(...rangeWaypoints.map((wp) => wp.lat)) - bufferDeg
     const maxLat = Math.max(...rangeWaypoints.map((wp) => wp.lat)) + bufferDeg
     const minLng = Math.min(...rangeWaypoints.map((wp) => wp.lng)) - bufferDeg
     const maxLng = Math.max(...rangeWaypoints.map((wp) => wp.lng)) + bufferDeg
 
-    // 5. Query Overpass API
+    // 4. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
+    const cacheKey = `pois:bbox:${round3(minLat)}:${round3(minLng)}:${round3(maxLat)}:${round3(maxLng)}:${sortedCategories}`
+
+    // 5. Redis cache check
+    const redis = this.redisProvider.getClient()
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      this.logger.debug(`Cache HIT: ${cacheKey}`)
+      // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
+      const rawPois = JSON.parse(cached) as RawCacheablePoi[]
+      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
+      await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
+      await this.poisRepository.updatePoiDistances(segmentId)
+      return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
+    }
+
+    this.logger.debug(`Cache MISS: ${cacheKey}`)
+
+    // 6. Query Overpass API
     let pois: Poi[] = []
     let overpassSucceeded = false
     try {
@@ -101,8 +118,8 @@ export class PoisService {
         categoryMap[node.id] = resolveCategory(node.tags)
       }
 
-      // 6. Insert into accommodations_cache
-      const expiresAt = new Date(Date.now() + CACHE_TTL_SECONDS * 1000)
+      // 6b. Insert into accommodations_cache
+      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
 
       // 7. Update Overpass POI distances with PostGIS
@@ -125,8 +142,12 @@ export class PoisService {
     }
 
     // 10. Store in Redis only after a fresh Overpass fetch — never cache stale fallback data
+    // Option A: strip segment-specific distances — geo-scoped key is cross-user, distances are not
     if (overpassSucceeded) {
-      await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(pois))
+      const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category }) => ({
+        externalId, source, name, lat, lng, category,
+      }))
+      await redis.setex(cacheKey, OVERPASS_CACHE_TTL, JSON.stringify(rawPois))
     }
 
     return pois
@@ -136,8 +157,6 @@ export class PoisService {
     if (!this.googlePlacesProvider.isConfigured()) return null
 
     const redis = this.redisProvider.getClient()
-    const PLACE_ID_TTL = 60 * 60 * 24 * 7   // 7 days
-    const DETAILS_TTL  = 60 * 60 * 24 * 7   // 7 days
 
     // 1. Look up google_place_id for this POI (may have been pre-cached by story 4.3)
     const placeIdKey = `google_place_id:${externalId}`
@@ -151,7 +170,7 @@ export class PoisService {
       placeId = await this.googlePlacesProvider.findPlaceId(poi.name, poi.lat, poi.lng)
       if (!placeId) return null
 
-      await redis.setex(placeIdKey, PLACE_ID_TTL, placeId)
+      await redis.setex(placeIdKey, GOOGLE_PLACES_CACHE_TTL, placeId)
     }
 
     // 3. Check if Place Details already cached
@@ -162,10 +181,16 @@ export class PoisService {
     }
 
     // 4. Fetch Place Details Essentials (10k/month free)
-    const details = await this.googlePlacesProvider.getPlaceDetails(placeId)
+    let details: GooglePlaceDetails
+    try {
+      details = await this.googlePlacesProvider.getPlaceDetails(placeId)
+    } catch (err) {
+      this.logger.warn(`[getPoiGoogleDetails] getPlaceDetails failed for ${placeId}: ${String(err)}`)
+      return null
+    }
 
     // 5. Cache for 7 days
-    await redis.setex(detailsKey, DETAILS_TTL, JSON.stringify(details))
+    await redis.setex(detailsKey, GOOGLE_PLACES_CACHE_TTL, JSON.stringify(details))
 
     return details
   }
@@ -174,56 +199,64 @@ export class PoisService {
     const { segmentId, targetKm, radiusKm, categories } = dto
     const radiusM = (radiusKm ?? 3) * 1000
     const activeCategories = categories ?? Object.keys(CATEGORY_TO_OVERPASS_TAGS)
+    const sortedCategories = [...activeCategories].sort().join(',')
 
-    // Cache key — round targetKm to 0.1 km to reduce fragmentation
-    const roundedKm = Math.round(targetKm! * 10) / 10
-    const cacheKey = `pois:live:${segmentId}:${roundedKm}:${radiusKm ?? 3}:${activeCategories.sort().join(',')}`
-
-    const redis = this.redisProvider.getClient()
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      this.logger.debug(`Live cache HIT: ${cacheKey}`)
-      return JSON.parse(cached) as Poi[]
-    }
-
-    this.logger.debug(`Live cache MISS: ${cacheKey}`)
-
-    // Get target point (interpolated from waypoints — no GPS sent)
+    // 1. Get target point (interpolated from waypoints — no GPS sent, also verifies ownership)
     const targetPoint = await this.poisRepository.getWaypointAtKm(segmentId, targetKm!, userId)
     if (!targetPoint) return []
 
-    // Overpass bbox around target point
+    // 2. Compute bbox around target point
     const radDeg = (radiusKm ?? 3) / 111.0
     const bbox = {
       minLat: targetPoint.lat - radDeg, maxLat: targetPoint.lat + radDeg,
       minLng: targetPoint.lng - radDeg, maxLng: targetPoint.lng + radDeg,
     }
 
+    // 3. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
+    const cacheKey = `pois:live:bbox:${round3(bbox.minLat)}:${round3(bbox.minLng)}:${round3(bbox.maxLat)}:${round3(bbox.maxLng)}:${sortedCategories}`
+
+    const redis = this.redisProvider.getClient()
+    const cached = await redis.get(cacheKey)
+    if (cached) {
+      this.logger.debug(`Live cache HIT: ${cacheKey}`)
+      // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
+      const rawPois = JSON.parse(cached) as RawCacheablePoi[]
+      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
+      await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
+      await this.poisRepository.updatePoiDistances(segmentId)
+      return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories)
+    }
+
+    this.logger.debug(`Live cache MISS: ${cacheKey}`)
+
     let overpassSucceeded = false
     try {
       const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
       const categoryMap: Record<number, string> = {}
       for (const node of nodes) categoryMap[node.id] = resolveCategory(node.tags)
-      const expiresAt = new Date(Date.now() + CACHE_TTL_SECONDS * 1000)
+      const expiresAt = new Date(Date.now() + OVERPASS_CACHE_TTL * 1000)
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
       await this.poisRepository.updatePoiDistances(segmentId)
       overpassSucceeded = true
+      // Google Places: enrich with additional POIs — only when Overpass succeeds (consistent with corridor mode)
+      await this.prefetchAndInsertGooglePois(bbox, segmentId, redis)
+        .catch((err) => this.logger.warn('Google Places prefetch failed in live mode', err))
     } catch (err) {
       this.logger.warn(`Overpass failed in live mode: ${String(err)}`)
       // Fall through — may still have cached POIs from a previous fetch
     }
-
-    // Google Places: enrich with additional POIs (same as corridor mode)
-    await this.prefetchAndInsertGooglePois(bbox, segmentId, redis)
-      .catch((err) => this.logger.warn('Google Places prefetch failed in live mode', err))
 
     const pois = await this.poisRepository.findPoisNearPoint(
       segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories,
     )
 
     // Only cache after a fresh Overpass fetch — never cache stale fallback data
+    // Option A: strip segment-specific distances before caching cross-user geo key
     if (overpassSucceeded) {
-      await redis.setex(cacheKey, CACHE_TTL_SECONDS, JSON.stringify(pois))
+      const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category }) => ({
+        externalId, source, name, lat, lng, category,
+      }))
+      await redis.setex(cacheKey, OVERPASS_CACHE_TTL, JSON.stringify(rawPois))
     }
     return pois
   }
@@ -236,7 +269,7 @@ export class PoisService {
     if (!this.googlePlacesProvider.isConfigured()) return
 
     const LAYERS = ['accommodations', 'restaurants', 'supplies', 'bike'] as const
-    const expiresAt = new Date(Date.now() + GOOGLE_CACHE_TTL * 1000)
+    const expiresAt = new Date(Date.now() + GOOGLE_PLACES_CACHE_TTL * 1000)
     let newPoiCount = 0
 
     this.logger.log(`[Google prefetch] bbox: ${JSON.stringify(bbox)}, segment: ${segmentId}`)
@@ -283,8 +316,8 @@ export class PoisService {
           )
 
           // Always cache Place Details in Redis (enrichment for any matching pin, OSM or Google)
-          await redis.setex(detailsKey, GOOGLE_CACHE_TTL, JSON.stringify(details))
-          await redis.setex(`google_place_id:${placeId}`, GOOGLE_CACHE_TTL, placeId)
+          await redis.setex(detailsKey, GOOGLE_PLACES_CACHE_TTL, JSON.stringify(details))
+          await redis.setex(`google_place_id:${placeId}`, GOOGLE_PLACES_CACHE_TTL, placeId)
 
           if (hasDuplicate) {
             this.logger.log(`[Google prefetch] ${placeId} (${details.displayName}) deduped — OSM POI within 100m`)
