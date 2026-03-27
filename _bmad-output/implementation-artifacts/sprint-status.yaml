@@ -147,7 +147,7 @@ development_status:
   14-2-nodejs-natif-pm2-production: done
   14-5-cicd-deploiement-github-actions: done
   14-4-backups-postgresql-automatises: done
-  14-6-monitoring-uptime-kuma: backlog
+  14-6-monitoring-uptime-kuma: done
   14-7-migration-donnees-decommissionnement: backlog
   epic-14-retrospective: optional
 

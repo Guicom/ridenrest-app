@@ -19,3 +19,15 @@ api.ridenrest.app {
     Strict-Transport-Security "max-age=31536000; includeSubDomains"
   }
 }
+
+status.ridenrest.app {
+  basicauth {
+    {$STATUS_USER} {$STATUS_HASHED_PASSWORD}
+  }
+  reverse_proxy uptime-kuma:3001
+  header {
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  }
+}
