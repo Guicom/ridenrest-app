@@ -2,7 +2,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useMapStore } from '@/stores/map.store'
 import { getPois } from '@/lib/api-client'
-import { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
+import { POI_BBOX_CACHE_TTL, LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 
@@ -34,15 +34,11 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
   const isSliding = storeFromKm !== debouncedFromKm || storeToKm !== debouncedToKm
 
   const readySegments = segments.filter((s) => s.parseStatus === 'done')
-  const isEnabled = visibleLayers.size > 0 && readySegments.length > 0 && !isSliding
-
-  const activeCategories = [...visibleLayers].flatMap(
-    (layer) => LAYER_CATEGORIES[layer] ?? [],
-  )
+  const activeLayers = [...visibleLayers] as MapLayer[]
 
   // Map adventure-wide [debouncedFromKm, debouncedToKm] to per-segment local km ranges
   // Empty while sliding — no queries fired until slider settles
-  const segmentQueries = isSliding ? [] : readySegments.flatMap((segment) => {
+  const segmentRanges = isSliding ? [] : readySegments.flatMap((segment) => {
     // Compute overlap of [debouncedFromKm, debouncedToKm] with this segment's km range
     const segStart = segment.cumulativeStartKm
     const segEnd = segStart + segment.distanceKm
@@ -62,22 +58,25 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
     }]
   })
 
-  const queries = segmentQueries.map(({ segment, segLocalFrom, segLocalTo }) => ({
-    queryKey: ['pois', {
-      segmentId: segment.id,
-      fromKm: segLocalFrom,
-      toKm: segLocalTo,
-      categories: [...activeCategories].sort(),
-    }] as const,
-    queryFn: () => getPois({
-      segmentId: segment.id,
-      fromKm: segLocalFrom,
-      toKm: segLocalTo,
-      categories: activeCategories,
-    }),
-    enabled: isEnabled,
-    staleTime: 1000 * 60 * 60 * 24,  // 24h — matches Redis TTL
-  }))
+  // Per-layer × per-segment queries — each layer has an independent TanStack Query cache entry
+  const queries = segmentRanges.flatMap(({ segment, segLocalFrom, segLocalTo }) =>
+    activeLayers.map((layer) => ({
+      queryKey: ['pois', {
+        segmentId: segment.id,
+        fromKm: segLocalFrom,
+        toKm: segLocalTo,
+        layer,
+      }] as const,
+      queryFn: () => getPois({
+        segmentId: segment.id,
+        fromKm: segLocalFrom,
+        toKm: segLocalTo,
+        categories: LAYER_CATEGORIES[layer] ?? [],
+      }),
+      staleTime: POI_BBOX_CACHE_TTL * 1000,  // 30 days — aligned with Redis TTL
+      gcTime: POI_BBOX_CACHE_TTL * 1000,    // 30 days — prevents GC eviction before staleTime expires
+    })),
+  )
 
   const results = useQueries({ queries })
 
@@ -98,7 +97,7 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
     poisByLayer[layer].sort((a, b) => a.distAlongRouteKm - b.distAlongRouteKm)
   }
 
-  const isPending = isSliding || (isEnabled && results.some((r) => r.isPending))
+  const isPending = isSliding || results.some((r) => r.isPending)
   const hasError = results.some((r) => r.isError)
 
   return { poisByLayer, isPending, hasError }

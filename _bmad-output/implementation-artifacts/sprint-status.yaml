@@ -158,7 +158,7 @@ development_status:
   epic-10: in-progress
   10-1-geographic-cache-key-cross-user-poi-sharing: done
   10-2-adaptive-ttl-density-7d-vs-pois-24h-vs-weather-1h: done
-  10-3-poi-query-cache-by-bbox-category-map-layers: backlog
+  10-3-poi-query-cache-by-bbox-category-map-layers: done
   # 10-4 déplacé → 15-5 (admin ops, mieux dans epic 15)
   # 10-5 supprimé — Upstash décommissionné (Epic 14), Redis self-hosted VPS, pas de quota
   epic-10-retrospective: optional

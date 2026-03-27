@@ -133,7 +133,7 @@ src/{feature}/
 ['adventures']                              // list
 ['adventures', adventureId]                 // single item
 ['adventures', adventureId, 'segments']     // sub-resource
-['pois', { segmentId, fromKm, toKm }]      // complex params → object
+['pois', { segmentId, fromKm, toKm, layer }]  // per-layer — stable cache entry per layer
 ['weather', segmentId]
 ['density', adventureId]
 ```

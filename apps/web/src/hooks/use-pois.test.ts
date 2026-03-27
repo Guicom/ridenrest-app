@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { usePois } from './use-pois'
+import { POI_BBOX_CACHE_TTL } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import type { Poi } from '@ridenrest/shared'
 
@@ -82,7 +83,7 @@ describe('usePois', () => {
     expect(result.current.hasError).toBe(false)
   })
 
-  it('queries are disabled when visibleLayers is empty', () => {
+  it('no queries generated when visibleLayers is empty', () => {
     mockUseQueries.mockReturnValue([])
     renderHook(() => usePois([makeSegment()]))
 
@@ -90,13 +91,17 @@ describe('usePois', () => {
     const lastCall = mockUseQueries.mock.calls.at(-1)
     expect(lastCall).toBeDefined()
     const { queries } = lastCall![0]
-    // All queries should have enabled: false
-    expect(queries.every((q: { enabled: boolean }) => q.enabled === false)).toBe(true)
+    // activeLayers = [] → queries array is empty, nothing passed to useQueries
+    expect(queries).toHaveLength(0)
   })
 
   it('fires queries when visibleLayers has active layers', () => {
-    mockVisibleLayers = new Set(['accommodations'])
-    mockUseQueries.mockReturnValue([{ data: [], isPending: false, isError: false }])
+    // With per-layer queries: 1 segment × 2 active layers = 2 independent queries
+    mockVisibleLayers = new Set(['accommodations', 'restaurants'])
+    mockUseQueries.mockReturnValue([
+      { data: [], isPending: false, isError: false },
+      { data: [], isPending: false, isError: false },
+    ])
 
     renderHook(() => usePois([makeSegment()]))
 
@@ -104,17 +109,25 @@ describe('usePois', () => {
     const lastCall = mockUseQueries.mock.calls.at(-1)
     expect(lastCall).toBeDefined()
     const { queries } = lastCall![0]
-    expect(queries.some((q: { enabled: boolean }) => q.enabled === true)).toBe(true)
+    // One query per active layer, not one combined query
+    expect(queries).toHaveLength(2)
+    // Each query has its own layer discriminator
+    const layers = queries.map((q: { queryKey: [string, { layer: string }] }) => q.queryKey[1].layer)
+    expect(layers).toContain('accommodations')
+    expect(layers).toContain('restaurants')
   })
 
   it('groups returned POIs by layer using CATEGORY_TO_LAYER', () => {
+    // With per-layer queries: 1 segment × 2 layers = 2 queries, each returning its own POIs
     mockVisibleLayers = new Set(['accommodations', 'bike'])
 
     const hotelPoi = makePoi('hotel')
     const bikePoi = makePoi('bike_shop')
 
+    // Two independent queries: one for 'accommodations' layer, one for 'bike' layer
     mockUseQueries.mockReturnValue([
-      { data: [hotelPoi, bikePoi], isPending: false, isError: false },
+      { data: [hotelPoi], isPending: false, isError: false },
+      { data: [bikePoi], isPending: false, isError: false },
     ])
 
     const { result } = renderHook(() => usePois([makeSegment()]))
@@ -194,12 +207,18 @@ describe('usePois', () => {
 
     const lastCall = mockUseQueries.mock.calls.at(-1)
     const { queries } = lastCall![0]
+    // 1 segment × 1 active layer = 1 query
     expect(queries).toHaveLength(1)
     expect(queries[0].queryKey[1].fromKm).toBe(10)
     expect(queries[0].queryKey[1].toKm).toBe(30)
+    // Per-layer key: uses `layer` field, not `categories` array
+    expect(queries[0].queryKey[1].layer).toBe('accommodations')
+    expect(queries[0].queryKey[1]).not.toHaveProperty('categories')
   })
 
   it('fires queries for multiple segments overlapping the range', () => {
+    // With per-layer queries: numSegments × numActiveLayers queries total
+    // 2 segments × 1 active layer = 2 queries
     mockVisibleLayers = new Set(['accommodations'])
     mockFromKm = 40
     mockToKm = 60
@@ -216,15 +235,18 @@ describe('usePois', () => {
 
     const lastCall = mockUseQueries.mock.calls.at(-1)
     const { queries } = lastCall![0]
+    // 2 segments × 1 layer = 2 queries
     expect(queries).toHaveLength(2)
     // Seg1: localFrom = max(0, 40-0) = 40, localTo = min(45, 60-0) = 45
     expect(queries[0].queryKey[1].segmentId).toBe('seg-1')
     expect(queries[0].queryKey[1].fromKm).toBe(40)
     expect(queries[0].queryKey[1].toKm).toBe(45)
+    expect(queries[0].queryKey[1].layer).toBe('accommodations')
     // Seg2: localFrom = max(0, 40-45) = 0, localTo = min(45, 60-45) = 15
     expect(queries[1].queryKey[1].segmentId).toBe('seg-2')
     expect(queries[1].queryKey[1].fromKm).toBe(0)
     expect(queries[1].queryKey[1].toKm).toBe(15)
+    expect(queries[1].queryKey[1].layer).toBe('accommodations')
   })
 
   it('computes correct local km for storeFromKm=0 toKm=30 with segment at cumulativeStart=20 distanceKm=50', () => {
@@ -291,6 +313,43 @@ describe('usePois', () => {
     expect(callAfterTimer[0].queryKey[1].toKm).toBe(35)
 
     vi.useRealTimers()
+  })
+
+  it('toggling one layer does not invalidate other layer query key', () => {
+    // Different layers produce different query keys — their TQ cache entries are independent
+    mockVisibleLayers = new Set(['accommodations', 'restaurants'])
+    mockUseQueries.mockReturnValue([
+      { data: [], isPending: false, isError: false },
+      { data: [], isPending: false, isError: false },
+    ])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const { queries } = lastCall![0]
+    expect(queries).toHaveLength(2)
+
+    // Verify the two queries have distinct layer discriminators
+    const key0 = queries[0].queryKey[1]
+    const key1 = queries[1].queryKey[1]
+    expect(key0.layer).not.toBe(key1.layer)
+
+    // Same segmentId/fromKm/toKm — only `layer` differs
+    expect(key0.segmentId).toBe(key1.segmentId)
+    expect(key0.fromKm).toBe(key1.fromKm)
+    expect(key0.toKm).toBe(key1.toKm)
+  })
+
+  it('staleTime and gcTime equal POI_BBOX_CACHE_TTL * 1000 (30 days, aligned with Redis TTL)', () => {
+    mockVisibleLayers = new Set(['accommodations'])
+    mockUseQueries.mockReturnValue([{ data: [], isPending: false, isError: false }])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const { queries } = lastCall![0]
+    expect(queries[0].staleTime).toBe(POI_BBOX_CACHE_TTL * 1000)  // 2592000000ms = 30 days
+    expect(queries[0].gcTime).toBe(POI_BBOX_CACHE_TTL * 1000)     // prevents GC eviction before staleTime expires
   })
 
   it('POIs are sorted by distAlongRouteKm in each layer', () => {
