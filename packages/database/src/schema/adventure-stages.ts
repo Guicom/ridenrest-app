@@ -10,7 +10,8 @@ export const adventureStages = pgTable('adventure_stages', {
   startKm: real('start_km').notNull(),
   endKm: real('end_km').notNull(),
   distanceKm: real('distance_km').notNull(), // = endKm - startKm (stored for easy listing)
-  // elevationGainM and etaMinutes intentionally absent — computed in Story 11.3
+  elevationGainM: real('elevation_gain_m'),   // nullable — null when no ele data in GPX
+  etaMinutes: integer('eta_minutes'),          // nullable — null until computed (should be always set)
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({

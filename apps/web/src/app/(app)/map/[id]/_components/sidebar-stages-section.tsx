@@ -24,11 +24,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { STAGE_COLORS } from '@ridenrest/shared'
 import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
-import type { MapWaypoint } from '@ridenrest/shared'
 
 interface SidebarStagesSectionProps {
   stages: AdventureStageResponse[]
-  allCumulativeWaypoints: MapWaypoint[]
   onEnterClickMode: () => void
   onExitClickMode: () => void
   isClickModeActive: boolean
@@ -177,8 +175,16 @@ export function SidebarStagesSection({
                   />
                   <span className="flex-1 truncate text-sm font-medium">{stage.name}</span>
                   <span className="text-xs text-muted-foreground">{stage.distanceKm.toFixed(1)} km</span>
-                  <span className="text-xs text-muted-foreground">D+ —</span>
-                  <span className="text-xs text-muted-foreground">— min</span>
+                  <span className="text-xs text-muted-foreground">
+                    {stage.elevationGainM !== null ? `D+ ${stage.elevationGainM} m` : 'D+ —'}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {stage.etaMinutes !== null
+                      ? stage.etaMinutes < 60
+                        ? `${stage.etaMinutes} min`
+                        : `${Math.floor(stage.etaMinutes / 60)}h${String(stage.etaMinutes % 60).padStart(2, '0')}`
+                      : '—'}
+                  </span>
                   <button
                     onClick={() => handleEditOpen(stage)}
                     aria-label={`Modifier ${stage.name}`}

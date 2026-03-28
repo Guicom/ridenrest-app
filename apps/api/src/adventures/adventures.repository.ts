@@ -56,6 +56,34 @@ export class AdventuresRepository {
     return rows.filter((r) => r.storageUrl).map((r) => r.storageUrl!)
   }
 
+  async getAdventureWaypoints(adventureId: string): Promise<MapWaypoint[]> {
+    const rows = await db
+      .select({ waypoints: adventureSegments.waypoints, cumulativeStartKm: adventureSegments.cumulativeStartKm })
+      .from(adventureSegments)
+      .where(
+        and(
+          eq(adventureSegments.adventureId, adventureId),
+          eq(adventureSegments.parseStatus, 'done'),
+        ),
+      )
+      .orderBy(asc(adventureSegments.orderIndex))
+
+    const all: MapWaypoint[] = []
+    for (const row of rows) {
+      if (!row.waypoints) continue
+      const wps = row.waypoints as Array<{ lat: number; lng: number; ele?: number | null; distKm?: number; dist_km?: number }>
+      for (const wp of wps) {
+        all.push({
+          lat: wp.lat,
+          lng: wp.lng,
+          ...(wp.ele !== undefined && wp.ele !== null ? { ele: wp.ele } : {}),
+          distKm: (wp.distKm ?? wp.dist_km ?? 0) + row.cumulativeStartKm,
+        })
+      }
+    }
+    return all
+  }
+
   async getAdventureMapData(adventureId: string, userId: string): Promise<AdventureMapResponse | null> {
     const [adventure] = await db
       .select()

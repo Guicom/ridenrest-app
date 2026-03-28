@@ -50,6 +50,13 @@
       "when": 1774680084041,
       "tag": "0006_strong_whiplash",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774688138466,
+      "tag": "0007_first_peter_quill",
+      "breakpoints": true
     }
   ]
 }

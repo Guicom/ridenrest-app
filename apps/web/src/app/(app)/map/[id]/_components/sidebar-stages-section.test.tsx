@@ -71,7 +71,6 @@ const makeStage = (overrides: Partial<AdventureStageResponse> = {}): AdventureSt
 
 const defaultProps = {
   stages: [] as AdventureStageResponse[],
-  allCumulativeWaypoints: [],
   onEnterClickMode: vi.fn(),
   onExitClickMode: vi.fn(),
   isClickModeActive: false,

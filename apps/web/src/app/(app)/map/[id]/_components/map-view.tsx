@@ -207,7 +207,6 @@ export function MapView({ adventureId }: MapViewProps) {
           {/* Stages list — Epic 11 */}
           <SidebarStagesSection
             stages={stages}
-            allCumulativeWaypoints={allCumulativeWaypoints}
             onEnterClickMode={() => setStageClickMode(true)}
             onExitClickMode={() => setStageClickMode(false)}
             isClickModeActive={stageClickMode}

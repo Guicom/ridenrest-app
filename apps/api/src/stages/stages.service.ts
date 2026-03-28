@@ -3,8 +3,43 @@ import { StagesRepository } from './stages.repository.js'
 import { AdventuresService } from '../adventures/adventures.service.js'
 import type { CreateStageDto } from './dto/create-stage.dto.js'
 import type { UpdateStageDto } from './dto/update-stage.dto.js'
-import type { AdventureStageResponse } from '@ridenrest/shared'
+import type { AdventureStageResponse, MapWaypoint } from '@ridenrest/shared'
 import type { AdventureStage } from '@ridenrest/database'
+
+/** Compute D+ (elevation gain) for waypoints in the [startKm, endKm] range.
+ *  Returns null if no waypoints in range have elevation data. */
+export function computeElevationGainForRange(
+  waypoints: MapWaypoint[],
+  startKm: number,
+  endKm: number,
+): number | null {
+  const rangeWps = waypoints
+    .filter(
+      (wp): wp is MapWaypoint & { ele: number } =>
+        wp.ele !== null &&
+        wp.ele !== undefined &&
+        wp.distKm >= startKm &&
+        wp.distKm <= endKm,
+    )
+    .sort((a, b) => a.distKm - b.distKm)
+
+  if (rangeWps.length < 2) return null  // Need at least 2 points with ele
+
+  let gain = 0
+  for (let i = 1; i < rangeWps.length; i++) {
+    const delta = rangeWps[i].ele - rangeWps[i - 1].ele
+    if (delta > 0) gain += delta
+  }
+  return Math.round(gain)  // Round to whole meters
+}
+
+/** Compute ETA in minutes using Naismith's rule approximation.
+ *  Default pace: 15 km/h flat. Elevation: +6 min per 100m D+. */
+export function computeEtaMinutes(distanceKm: number, elevationGainM: number | null): number {
+  const flatMinutes = (distanceKm / 15) * 60
+  const climbMinutes = ((elevationGainM ?? 0) / 100) * 6
+  return Math.round(flatMinutes + climbMinutes)
+}
 
 @Injectable()
 export class StagesService {
@@ -37,6 +72,10 @@ export class StagesService {
       )
     }
 
+    const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
+    const elevationGainM = computeElevationGainForRange(waypoints, startKm, dto.endKm)
+    const etaMinutes = computeEtaMinutes(distanceKm, elevationGainM)
+
     const stage = await this.stagesRepo.create({
       adventureId,
       name: dto.name,
@@ -45,6 +84,8 @@ export class StagesService {
       startKm,
       endKm: dto.endKm,
       distanceKm,
+      elevationGainM,
+      etaMinutes,
     })
 
     return this.toResponse(stage)
@@ -72,9 +113,16 @@ export class StagesService {
         throw new BadRequestException('endKm must be less than the next stage endKm')
       }
 
-      await this.stagesRepo.update(stageId, {
+      const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
+      const newDistanceKm = dto.endKm - stage.startKm
+      const elevationGainM = computeElevationGainForRange(waypoints, stage.startKm, dto.endKm)
+      const etaMinutes = computeEtaMinutes(newDistanceKm, elevationGainM)
+
+      const updated = await this.stagesRepo.update(stageId, {
         endKm: dto.endKm,
-        distanceKm: dto.endKm - stage.startKm,
+        distanceKm: newDistanceKm,
+        elevationGainM,
+        etaMinutes,
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
       })
@@ -84,15 +132,23 @@ export class StagesService {
         let prevEndKm = dto.endKm
         const updates = subsequentStages.map((s) => {
           const newStartKm = prevEndKm
-          const updated = { id: s.id, startKm: newStartKm, distanceKm: s.endKm - newStartKm, orderIndex: s.orderIndex }
+          const cascadeDistKm = s.endKm - newStartKm
+          const cascadeElevGain = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
+          const cascadeEta = computeEtaMinutes(cascadeDistKm, cascadeElevGain)
           prevEndKm = s.endKm
-          return updated
+          return {
+            id: s.id,
+            startKm: newStartKm,
+            distanceKm: cascadeDistKm,
+            orderIndex: s.orderIndex,
+            elevationGainM: cascadeElevGain,
+            etaMinutes: cascadeEta,
+          }
         })
         await this.stagesRepo.updateMany(updates)
       }
 
-      const updated = await this.stagesRepo.findByIdAndAdventureId(stageId, adventureId)
-      return this.toResponse(updated!)
+      return this.toResponse(updated)
     }
 
     const updated = await this.stagesRepo.update(stageId, {
@@ -114,13 +170,18 @@ export class StagesService {
 
     await this.stagesRepo.delete(stageId)
 
-    // Recalculate start_km and normalize orderIndex for remaining stages (cascade)
+    // Recalculate start_km, distanceKm, D+, ETA and normalize orderIndex for remaining stages (cascade)
     const remaining = await this.stagesRepo.findByAdventureId(adventureId)
-    const updates: Array<{ id: string; startKm: number; distanceKm: number; orderIndex: number }> = []
+    const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
+    const updates: Array<{ id: string; startKm: number; distanceKm: number; orderIndex: number; elevationGainM: number | null; etaMinutes: number }> = []
     let prevEndKm = 0
     for (let i = 0; i < remaining.length; i++) {
       const s = remaining[i]
-      updates.push({ id: s.id, startKm: prevEndKm, distanceKm: s.endKm - prevEndKm, orderIndex: i })
+      const newStartKm = prevEndKm
+      const newDistKm = s.endKm - newStartKm
+      const elevGain = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
+      const eta = computeEtaMinutes(newDistKm, elevGain)
+      updates.push({ id: s.id, startKm: newStartKm, distanceKm: newDistKm, orderIndex: i, elevationGainM: elevGain, etaMinutes: eta })
       prevEndKm = s.endKm
     }
     await this.stagesRepo.updateMany(updates)
@@ -138,6 +199,8 @@ export class StagesService {
       startKm: s.startKm,
       endKm: s.endKm,
       distanceKm: s.distanceKm,
+      elevationGainM: s.elevationGainM ?? null,
+      etaMinutes: s.etaMinutes ?? null,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }

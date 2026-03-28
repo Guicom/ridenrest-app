@@ -44,7 +44,7 @@ export class StagesRepository {
     return row as AdventureStage
   }
 
-  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'distanceKm'>>): Promise<AdventureStage> {
+  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'distanceKm' | 'elevationGainM' | 'etaMinutes'>>): Promise<AdventureStage> {
     const [row] = await db
       .update(adventureStages)
       .set({ ...data, updatedAt: new Date() })
@@ -65,13 +65,23 @@ export class StagesRepository {
     await db.delete(adventureStages).where(eq(adventureStages.id, id))
   }
 
-  async updateMany(stages: Array<Pick<AdventureStage, 'id' | 'startKm' | 'distanceKm' | 'orderIndex'>>): Promise<void> {
+  async updateMany(
+    stages: Array<Pick<AdventureStage, 'id' | 'startKm' | 'distanceKm' | 'orderIndex'> & {
+      elevationGainM?: number | null
+      etaMinutes?: number | null
+    }>,
+  ): Promise<void> {
     if (stages.length === 0) return
     await Promise.all(
-      stages.map(({ id, startKm, distanceKm, orderIndex }) =>
+      stages.map(({ id, startKm, distanceKm, orderIndex, elevationGainM, etaMinutes }) =>
         db
           .update(adventureStages)
-          .set({ startKm, distanceKm, orderIndex, updatedAt: new Date() })
+          .set({
+            startKm, distanceKm, orderIndex,
+            ...(elevationGainM !== undefined ? { elevationGainM } : {}),
+            ...(etaMinutes !== undefined ? { etaMinutes } : {}),
+            updatedAt: new Date(),
+          })
           .where(eq(adventureStages.id, id)),
       ),
     )

@@ -68,7 +68,8 @@ export interface AdventureStageResponse {
   startKm: number
   endKm: number
   distanceKm: number
-  // elevationGainM and etaMinutes absent until Story 11.3
+  elevationGainM: number | null   // null if GPX has no elevation data
+  etaMinutes: number | null       // null in legacy rows, always set on new rows
   createdAt: string
   updatedAt: string
 }
