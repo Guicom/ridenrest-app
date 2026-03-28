@@ -13,6 +13,7 @@ import { PoisModule } from './pois/pois.module.js'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
 import { DensityModule } from './density/density.module.js'
 import { WeatherModule } from './weather/weather.module.js'
+import { StagesModule } from './stages/stages.module.js'
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WeatherModule } from './weather/weather.module.js'
     PoisModule,
     DensityModule,
     WeatherModule,
+    StagesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -43,6 +43,13 @@
       "when": 1774200000000,
       "tag": "0005_add_density_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774680084041,
+      "tag": "0006_strong_whiplash",
+      "breakpoints": true
     }
   ]
 }

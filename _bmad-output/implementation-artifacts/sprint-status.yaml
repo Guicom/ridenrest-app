@@ -166,8 +166,8 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 11: Stage Planning (Planning Avancé & Étapes)
   # ─────────────────────────────────────────────────────────────
-  epic-11: backlog
-  11-1-stage-crud-km-input: backlog                  # CRUD étapes + module NestJS + table adventure_stages
+  epic-11: in-progress
+  11-1-stage-crud-km-input: done                     # CRUD étapes + module NestJS + table adventure_stages
   11-2-stage-interactive-map-placement: backlog      # clic trace + drag marqueur sur carte
   11-3-stage-elevation-computation: backlog          # calcul D+ depuis waypoints.ele, graceful si absent
   11-4-stage-scoped-poi-search: backlog              # POI ancrés sur end_km d'étape (dépend 11-1)

@@ -1,5 +1,5 @@
 // Types
-export type { AdventureResponse, AdventureSegmentResponse, AdventureStatus, ParseStatus, DensityStatus, DensityStatusResponse, CoverageGapSummary, MapWaypoint, MapSegmentData, AdventureMapResponse, DensityAccommodationCategory } from './types/adventure.types'
+export type { AdventureResponse, AdventureSegmentResponse, AdventureStageResponse, AdventureStatus, ParseStatus, DensityStatus, DensityStatusResponse, CoverageGapSummary, MapWaypoint, MapSegmentData, AdventureMapResponse, DensityAccommodationCategory } from './types/adventure.types'
 export { DENSITY_ACCOMMODATION_CATEGORIES } from './types/adventure.types'
 export type { Poi, PoiCategory, PoiSearchResponse, MapLayer } from './types/poi.types'
 export { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from './types/poi.types'
@@ -14,6 +14,9 @@ export type { CreateAdventureInput, UpdateAdventureInput, ReorderSegmentsInput }
 export { createSegmentSchema, replaceSegmentSchema } from './schemas/segment.schema'
 export type { CreateSegmentInput, ReplaceSegmentInput } from './schemas/segment.schema'
 
+export { createStageSchema, updateStageSchema } from './schemas/stage.schema'
+export type { CreateStageInput, UpdateStageInput } from './schemas/stage.schema'
+
 export { poiSearchSchema } from './schemas/poi-search.schema'
 export type { PoiSearchInput } from './schemas/poi-search.schema'
 
@@ -21,3 +24,4 @@ export type { PoiSearchInput } from './schemas/poi-search.schema'
 export * from './constants/gpx.constants'
 export * from './constants/api.constants'
 export * from './constants/weather.constants'
+export { STAGE_COLORS } from './constants/stages.constants'

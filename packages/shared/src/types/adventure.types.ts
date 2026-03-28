@@ -59,6 +59,20 @@ export interface DensityStatusResponse {
   densityCategories: string[]  // empty array when no analysis run yet
 }
 
+export interface AdventureStageResponse {
+  id: string
+  adventureId: string
+  name: string
+  color: string              // hex
+  orderIndex: number
+  startKm: number
+  endKm: number
+  distanceKm: number
+  // elevationGainM and etaMinutes absent until Story 11.3
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AdventureSegmentResponse {
   id: string
   adventureId: string

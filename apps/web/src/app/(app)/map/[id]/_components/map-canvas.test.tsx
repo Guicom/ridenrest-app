@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { render, screen, cleanup, act, waitFor } from '@testing-library/react'
 import { MapCanvas, buildCorridorFeatures, buildDensityColoredFeatures } from './map-canvas'
 import type { MapSegmentData } from '@/lib/api-client'
@@ -152,6 +152,124 @@ describe('MapCanvas', () => {
     const addSourceCalls = mockMapInstance.addSource.mock.calls as [string, unknown][]
     const poiSourceCalls = addSourceCalls.filter(([id]) => id.startsWith('pois-'))
     expect(poiSourceCalls).toHaveLength(0)
+  })
+})
+
+describe('MapCanvas stage props', () => {
+  const mockMarkerInstance = {
+    setLngLat: vi.fn().mockReturnThis(),
+    addTo: vi.fn().mockReturnThis(),
+    remove: vi.fn(),
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockMapInstance.on.mockImplementation(() => {})
+    mockMapInstance.getSource.mockReturnValue({ setData: vi.fn() })
+    // @ts-expect-error extending mock
+    mockMapInstance.getStyle = vi.fn().mockReturnValue({ layers: [], sources: {} })
+    // @ts-expect-error extending mock
+    mockMapInstance.getLayer = vi.fn().mockReturnValue(null)
+    // @ts-expect-error extending mock
+    mockMapInstance.off = vi.fn()
+    // @ts-expect-error extending mock
+    mockMapInstance.getCanvas = vi.fn().mockReturnValue({ style: {} })
+    // @ts-expect-error extending mock
+    mockMapInstance.removeLayer = vi.fn()
+    // @ts-expect-error extending mock
+    mockMapInstance.removeSource = vi.fn()
+    // @ts-expect-error extending mock
+    mockMapInstance.setLayoutProperty = vi.fn()
+    // @ts-expect-error extending mock
+    mockMapInstance.setPaintProperty = vi.fn()
+  })
+
+  it('renders a Marker per stage when stages prop is provided', async () => {
+    const { Marker } = await import('maplibre-gl')
+    vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(() => mockMarkerInstance)
+
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+      { id: 'st2', adventureId: 'adv-1', name: 'Stage 2', color: '#3b82f6', orderIndex: 1, startKm: 50, endKm: 100, distanceKm: 50, createdAt: '', updatedAt: '' },
+    ]
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 43.5, lng: 1.5, distKm: 50 },
+      { lat: 44.0, lng: 2.0, distKm: 100 },
+    ]
+
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stages={stages}
+        allWaypoints={waypoints}
+      />
+    )
+
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    // After stage marker effect runs, Marker should have been called once per stage (2 stages)
+    expect(vi.mocked(Marker).mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('adds a map click handler when stageClickMode changes to true after map init', async () => {
+    const onStageClick = vi.fn()
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 43.5, lng: 1.5, distKm: 50 },
+    ]
+
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    const { rerender } = render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stageClickMode={false}
+        onStageClick={onStageClick}
+        allWaypoints={waypoints}
+      />
+    )
+
+    // Wait for map to initialize
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    const clickCallsBefore = mockMapInstance.on.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'click',
+    ).length
+
+    // Enable stage click mode — triggers the effect which registers a click handler
+    await act(async () => {
+      rerender(
+        <MapCanvas
+          segments={[makeSegment()]}
+          adventureName="Test"
+          poisByLayer={emptyPoisByLayer}
+          stageClickMode={true}
+          onStageClick={onStageClick}
+          allWaypoints={waypoints}
+        />
+      )
+    })
+
+    const clickCallsAfter = mockMapInstance.on.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'click',
+    ).length
+
+    expect(clickCallsAfter).toBeGreaterThan(clickCallsBefore)
   })
 })
 

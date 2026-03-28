@@ -148,6 +148,43 @@ export async function getAdventureMapData(adventureId: string): Promise<Adventur
 
 export type { AdventureMapResponse, MapSegmentData, MapWaypoint }
 
+// ── Stages ────────────────────────────────────────────────────────────────────
+
+import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
+
+export async function getStages(adventureId: string): Promise<AdventureStageResponse[]> {
+  return apiFetch<AdventureStageResponse[]>(`/api/adventures/${adventureId}/stages`)
+}
+
+export async function createStage(
+  adventureId: string,
+  data: CreateStageInput,
+): Promise<AdventureStageResponse> {
+  return apiFetch<AdventureStageResponse>(`/api/adventures/${adventureId}/stages`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateStage(
+  adventureId: string,
+  stageId: string,
+  data: UpdateStageInput,
+): Promise<AdventureStageResponse> {
+  return apiFetch<AdventureStageResponse>(`/api/adventures/${adventureId}/stages/${stageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteStage(adventureId: string, stageId: string): Promise<void> {
+  await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}/stages/${stageId}`, {
+    method: 'DELETE',
+  })
+}
+
+export type { AdventureStageResponse, CreateStageInput, UpdateStageInput }
+
 // ── POIs ──────────────────────────────────────────────────────────────────────
 
 import type { Poi, PoiCategory } from '@ridenrest/shared'

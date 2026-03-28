@@ -16,6 +16,7 @@ export interface SegmentWeatherData {
   waypoints: MapWaypoint[]
 }
 import type maplibregl from 'maplibre-gl'
+import type { AdventureStageResponse } from '@ridenrest/shared'
 
 const DENSITY_COLORS = {
   critical: '#dc2626', // var(--density-low)
@@ -48,10 +49,13 @@ interface MapCanvasProps {
   densityStatus?: DensityStatus
   segmentsWeather?: SegmentWeatherData[]
   allWaypoints?: MapWaypoint[] | null
+  stages?: AdventureStageResponse[]
+  stageClickMode?: boolean
+  onStageClick?: (endKm: number) => void
 }
 
 export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas(
-  { segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints },
+  { segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints, stages = [], stageClickMode = false, onStageClick },
   ref,
 ) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -73,10 +77,16 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
   const coverageGapsRef = useRef(coverageGaps)
   const densityColorEnabledRef = useRef(densityColorEnabled)
   const segmentsRef = useRef(segments)
+  const stageClickModeRef = useRef(stageClickMode)
+  const onStageClickRef = useRef(onStageClick)
+  const stagesRef = useRef(stages)
   useEffect(() => { densityStatusRef.current = densityStatus }, [densityStatus])
   useEffect(() => { coverageGapsRef.current = coverageGaps }, [coverageGaps])
   useEffect(() => { densityColorEnabledRef.current = densityColorEnabled }, [densityColorEnabled])
   useEffect(() => { segmentsRef.current = segments }, [segments])
+  useEffect(() => { stageClickModeRef.current = stageClickMode }, [stageClickMode])
+  useEffect(() => { onStageClickRef.current = onStageClick }, [onStageClick])
+  useEffect(() => { stagesRef.current = stages }, [stages])
 
   // Centralized dimension update: fires for all weather layers together so none are missed.
   // React runs child effects (WeatherLayer data effect) before parent effects, so layers
@@ -126,6 +136,10 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
         if (densityStatusRef.current === 'success' && coverageGapsRef.current && densityColorEnabledRef.current) {
           addDensityLayer(map, segments, coverageGapsRef.current)
         }
+
+        // Trigger effects that guard on map.getSource('trace') (stages, corridor, etc.)
+        // so cached data renders correctly on page refresh
+        setStyleVersion((v) => v + 1)
 
         // Sync viewport to store
         map.on('moveend', () => {
@@ -214,6 +228,50 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     })
     return () => unsubscribe()
   }, [])  // Subscribe once — uses refs for latest values
+
+  // Stage click mode — cursor + map click handler
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const canvas = map.getCanvas()
+    canvas.style.cursor = stageClickMode ? 'crosshair' : ''
+
+    if (!stageClickMode) return
+
+    const handleMapClick = (e: maplibregl.MapMouseEvent) => {
+      if (!stageClickModeRef.current) return
+      const { lat, lng } = e.lngLat
+      const waypoints = allWaypointsRef.current
+      if (!waypoints || waypoints.length === 0) return
+
+      // Find nearest waypoint by Haversine to click position
+      let nearest = waypoints[0]
+      let minDist = Infinity
+      for (const wp of waypoints) {
+        const dLat = (wp.lat - lat) * (Math.PI / 180)
+        const dLng = (wp.lng - lng) * (Math.PI / 180)
+        const dist = dLat * dLat + dLng * dLng // approx squared distance (sufficient for nearest neighbor)
+        if (dist < minDist) { minDist = dist; nearest = wp }
+      }
+
+      onStageClickRef.current?.(nearest.distKm)
+    }
+
+    map.on('click', handleMapClick)
+    return () => {
+      map.off('click', handleMapClick)
+      map.getCanvas().style.cursor = ''
+    }
+  }, [stageClickMode])  // Re-attach when click mode changes
+
+  // Stage segments (colored trace) and markers — update when stages or styleVersion change
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.getSource('trace')) return
+    updateStageLayers(map, stagesRef.current, allWaypointsRef.current ?? [])
+    renderStageMarkers(map, stagesRef.current, allWaypointsRef.current ?? [], MarkerClassRef.current)
+  }, [stages, styleVersion])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Imperative crosshair handle — bypasses React state/render cycle entirely for zero-latency updates
   useImperativeHandle(ref, () => ({
@@ -633,6 +691,98 @@ function removeDensityLayer(map: maplibregl.Map) {
   if (map.getLayer('trace-line')) {
     map.setLayoutProperty('trace-line', 'visibility', 'visible')
   }
+}
+
+// ── Stage layer helpers ───────────────────────────────────────────────────────
+
+function updateStageLayers(
+  map: maplibregl.Map,
+  stages: AdventureStageResponse[],
+  allWaypoints: MapWaypoint[],
+) {
+  // Remove all existing stage segment layers/sources
+  for (const layer of [...map.getStyle().layers ?? []]) {
+    if (layer.id.startsWith('stage-segment-')) {
+      map.removeLayer(layer.id)
+    }
+  }
+  const style = map.getStyle()
+  if (style?.sources) {
+    for (const sourceId of Object.keys(style.sources)) {
+      if (sourceId.startsWith('stage-segment-')) {
+        map.removeSource(sourceId)
+      }
+    }
+  }
+
+  if (stages.length === 0 || allWaypoints.length === 0) return
+
+  for (const stage of stages) {
+    const segmentWaypoints = allWaypoints.filter(
+      (wp) => wp.distKm >= stage.startKm && wp.distKm <= stage.endKm,
+    )
+    if (segmentWaypoints.length < 2) continue
+
+    const coordinates = segmentWaypoints.map((wp) => [wp.lng, wp.lat])
+    const sourceId = `stage-segment-${stage.id}`
+    const layerId = `stage-segment-${stage.id}`
+
+    map.addSource(sourceId, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates },
+      },
+    })
+
+    // Insert above trace-line but below POI markers
+    const beforeId = map.getLayer('trace-joins-circle') ? 'trace-joins-circle' : undefined
+    map.addLayer(
+      {
+        id: layerId,
+        type: 'line',
+        source: sourceId,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': stage.color, 'line-width': 4 },
+      },
+      beforeId,
+    )
+  }
+}
+
+// Holds per-map stage marker elements for cleanup
+const stageMarkerMap = new WeakMap<object, maplibregl.Marker[]>()
+
+function renderStageMarkers(
+  map: maplibregl.Map,
+  stages: AdventureStageResponse[],
+  allWaypoints: MapWaypoint[],
+  MarkerClass: typeof maplibregl.Marker | null,
+) {
+  if (!MarkerClass) return
+
+  // Remove existing stage markers
+  const prev = stageMarkerMap.get(map) ?? []
+  for (const m of prev) m.remove()
+  stageMarkerMap.set(map, [])
+
+  if (stages.length === 0 || allWaypoints.length === 0) return
+
+  const newMarkers: maplibregl.Marker[] = []
+  for (const stage of stages) {
+    const nearest = allWaypoints.reduce((a, b) =>
+      Math.abs(b.distKm - stage.endKm) < Math.abs(a.distKm - stage.endKm) ? b : a,
+    )
+    const el = document.createElement('div')
+    el.style.cssText = `width:16px;height:16px;border-radius:50%;background:${stage.color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)`
+    el.setAttribute('data-stage-id', stage.id)
+    const marker = new MarkerClass({ element: el, anchor: 'center' })
+      .setLngLat([nearest.lng, nearest.lat])
+      .addTo(map)
+    newMarkers.push(marker)
+  }
+  stageMarkerMap.set(map, newMarkers)
 }
 
 function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {

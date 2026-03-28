@@ -23,6 +23,8 @@ import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import type { AdventureMapResponse } from '@/lib/api-client'
 import { ElevationProfile } from './elevation-profile'
 import { MapStylePicker } from './map-style-picker'
+import { SidebarStagesSection } from './sidebar-stages-section'
+import { useStages } from '@/hooks/use-stages'
 
 interface MapViewProps {
   adventureId: string
@@ -31,6 +33,10 @@ interface MapViewProps {
 export function MapView({ adventureId }: MapViewProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [elevationCollapsed, setElevationCollapsed] = useState(false)
+  const [stageClickMode, setStageClickMode] = useState(false)
+  const [pendingEndKm, setPendingEndKm] = useState<number | null>(null)
+  const [showNamingDialog, setShowNamingDialog] = useState(false)
+  const [stagesVisible, setStagesVisible] = useState(false)
   // Ref-based crosshair — bypasses React state to avoid re-renders on every mouse move
   const mapCanvasRef = useRef<MapCanvasHandle>(null)
   const handleHoverKm = useCallback((km: number | null) => {
@@ -117,6 +123,8 @@ export function MapView({ adventureId }: MapViewProps) {
       })?.id ?? null
     : null
 
+  const { stages, createStage, updateStage, deleteStage } = useStages(adventureId)
+
   const queryClient = useQueryClient()
 
   // Retry handler — invalidates all POI queries for the current adventure segments
@@ -172,6 +180,24 @@ export function MapView({ adventureId }: MapViewProps) {
           <SidebarDensitySection />
 
           {/* Stages list — Epic 11 */}
+          <SidebarStagesSection
+            stages={stages}
+            allCumulativeWaypoints={allCumulativeWaypoints}
+            onEnterClickMode={() => setStageClickMode(true)}
+            onExitClickMode={() => setStageClickMode(false)}
+            isClickModeActive={stageClickMode}
+            pendingEndKm={pendingEndKm}
+            showNamingDialog={showNamingDialog}
+            onNamingDialogClose={() => {
+              setShowNamingDialog(false)
+              setPendingEndKm(null)
+            }}
+            stagesVisible={stagesVisible}
+            onStagesVisibilityChange={setStagesVisible}
+            onCreateStage={createStage}
+            onUpdateStage={updateStage}
+            onDeleteStage={deleteStage}
+          />
         </div>
       </aside>
 
@@ -225,6 +251,13 @@ export function MapView({ adventureId }: MapViewProps) {
             densityStatus={densityStatus}
             segmentsWeather={segmentsWeather}
             allWaypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
+            stages={stagesVisible ? stages : []}
+            stageClickMode={stageClickMode}
+            onStageClick={(endKm) => {
+              setPendingEndKm(endKm)
+              setShowNamingDialog(true)
+              setStageClickMode(false)
+            }}
           />
 
 
