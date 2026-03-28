@@ -186,7 +186,8 @@ describe('MapCanvas stage props', () => {
 
   it('renders a Marker per stage when stages prop is provided', async () => {
     const { Marker } = await import('maplibre-gl')
-    vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(() => mockMarkerInstance)
+    // Arrow functions can't be used as constructors — must use regular function
+    vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(function() { return mockMarkerInstance })
 
     const stages = [
       { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
