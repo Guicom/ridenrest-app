@@ -238,9 +238,7 @@ describe('updateStage', () => {
     mockAdventuresService.verifyOwnership.mockResolvedValue(undefined)
     const stage = makeStage('s1', 0, 0, 50)
     const updated = makeStage('s1', 0, 0, 10, 150, 49)
-    mockStagesRepo.findByIdAndAdventureId
-      .mockResolvedValueOnce(stage)
-      .mockResolvedValueOnce(updated)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValueOnce(stage)
     mockStagesRepo.findSubsequent.mockResolvedValue([])
     mockStagesRepo.update.mockResolvedValue(updated)
 
@@ -267,9 +265,7 @@ describe('updateStage', () => {
     const stage2 = makeStage('s2', 1, 50, 100)
     const stage3 = makeStage('s3', 2, 100, 150)
     const updatedStage1 = makeStage('s1', 0, 0, 10, 150, 49)
-    mockStagesRepo.findByIdAndAdventureId
-      .mockResolvedValueOnce(stage1)
-      .mockResolvedValueOnce(updatedStage1)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValueOnce(stage1)
     mockStagesRepo.update.mockResolvedValue(updatedStage1)
     mockStagesRepo.findSubsequent.mockResolvedValue([stage2, stage3])
     mockStagesRepo.updateMany.mockResolvedValue(undefined)
