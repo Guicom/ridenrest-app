@@ -211,6 +211,11 @@ Then `stagesVisible` is automatically set to `true` in `map-view.tsx` so the col
 ### Review Follow-ups (AI)
 
 - [ ] [AI-Review][MEDIUM] AC7 (`stagesVisible` auto-show) n'a pas de couverture test — `map-view.tsx:69`. Nécessite un test RTL avec mocks `useMapStore` + `useStages` + `useQuery` pour vérifier que sélectionner un stage appelle `setStagesVisible(true)`. [map-view.tsx:69]
+- [x] [AI-Review][HIGH] `selectedStageId` jamais reset en quittant `/map/[id]` — ajout cleanup dans le `useEffect` unmount de `map-view.tsx` (H1 fix). [map-view.tsx:64-67]
+- [x] [AI-Review][MEDIUM] `handleRangeInputBlur` clear stage même sans changement de valeur — ajout guard `parsed !== rangeKm` (M1 fix). [search-range-control.tsx:101-107]
+- [x] [AI-Review][MEDIUM] `rangeKm` local drift en fin de trace — sync `rangeKm`/`rangeInput` quand la plage est clampée par `totalDistanceKm` (M3 fix). [search-range-control.tsx:75-84,91-96]
+- [ ] [AI-Review][LOW] D+ montre placeholder "↑ — m D+" au lieu de "0m D+" à la sélection initiale d'un stage (`fromKm === stageEndKm` → `computeElevationInRange` retourne null car < 2 points). [search-range-control.tsx:29-34]
+- [ ] [AI-Review][LOW] `sidebar-stages-section.test.tsx` dans le File List sans modification substantielle (+1 ligne newline EOF). Documentation trompeuse. [story file]
 
 ### Phase 10 — Sprint status update
 
@@ -423,11 +428,13 @@ None — implementation went smoothly.
 - Amendement 2026-03-28 (Phase 13 — référentiel relatif complet): `sliderAtStart` supprimé. `handleStageSelect` utilise `from = stage.endKm` (plus de STAGE_WINDOW_KM). Slider, km display et D+ opèrent tous en référentiel relatif à `stage.endKm`. Nouvelle fonction `computeElevationInRange(waypoints, fromKm, toKm)` pour D+ depuis stage endpoint. 594/594 tests passent.
 - Aucune erreur TypeScript dans les fichiers sources modifiés
 - AI Code Review fixes: `selectedStageColor` retiré des deps de l'effet principal de `use-poi-layers.ts` (perf — évite les `setData` inutiles sur sélection de stage, remplacé par ref); `setStagesVisible` ajouté aux deps du `useEffect` AC7 dans `map-view.tsx`; test ajouté pour le blur de l'input range → `setSelectedStageId(null)`
+- AI Code Review #2 fixes (2026-03-28): [H1] cleanup `selectedStageId` au démontage de MapView; [M1] blur input range sans changement ne clear plus le stage; [M3] `rangeKm` display synced quand clampé en fin de trace. 597/597 tests passent (+3 nouveaux).
 
 ### File List
 
 - `apps/web/src/stores/map.store.ts`
 - `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx`
+- `apps/web/src/app/(app)/map/[id]/_components/map-view.test.tsx`
 - `apps/web/src/app/(app)/map/[id]/_components/search-range-control.tsx`
 - `apps/web/src/hooks/use-poi-layers.ts`
 - `apps/web/src/app/(app)/map/[id]/_components/map-canvas.tsx`

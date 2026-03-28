@@ -76,7 +76,14 @@ export function SearchRangeControl({
     const sliderValue = Number(e.target.value)
     // En mode étape : sliderValue est relatif à stageEndKm → convertir en absolu
     const newFrom = stageEndKm != null ? stageEndKm + sliderValue : sliderValue
-    setSearchRange(newFrom, Math.min(newFrom + rangeKm, totalDistanceKm))
+    const newTo = Math.min(newFrom + rangeKm, totalDistanceKm)
+    // Sync rangeKm display when clamped at end of trace (M3 fix)
+    const effectiveRange = Math.round(newTo - newFrom)
+    if (effectiveRange < rangeKm) {
+      setRangeKm(effectiveRange)
+      setRangeInput(String(effectiveRange))
+    }
+    setSearchRange(newFrom, newTo)
   }
 
   const handleStageSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -90,6 +97,12 @@ export function SearchRangeControl({
     // Le slider démarre à 0 (= stage.endKm en absolu) — pas de décalage ±5
     const from = stage.endKm
     const to = Math.min(totalDistanceKm, stage.endKm + rangeKm)
+    // Sync rangeKm display when clamped at end of trace (M3 fix)
+    const effectiveRange = Math.round(to - from)
+    if (effectiveRange < rangeKm) {
+      setRangeKm(effectiveRange)
+      setRangeInput(String(effectiveRange))
+    }
     setSelectedStageId(stageId)
     setSearchRange(from, to)
   }
@@ -100,7 +113,7 @@ export function SearchRangeControl({
 
   const handleRangeInputBlur = () => {
     const parsed = parseInt(rangeInput, 10)
-    if (!isNaN(parsed)) {
+    if (!isNaN(parsed) && parsed !== rangeKm) {
       applyRange(parsed)
     } else {
       setRangeInput(String(rangeKm))

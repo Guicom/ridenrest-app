@@ -56,6 +56,8 @@ vi.mock('@/stores/map.store', () => ({
     searchRangeInteracted: false,
     activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
     toggleAccommodationType: vi.fn(),
+    selectedStageId: null,
+    setSelectedStageId: vi.fn(),
   }),
 }))
 

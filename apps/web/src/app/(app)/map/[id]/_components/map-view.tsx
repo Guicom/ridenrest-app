@@ -57,12 +57,15 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId } = useMapStore()
 
-  // Reset weatherActive when leaving the map (SPA navigation keeps Zustand alive)
+  // Reset transient map state when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
-    return () => { setWeatherActive(false) }
-  }, [setWeatherActive])
+    return () => {
+      setWeatherActive(false)
+      setSelectedStageId(null)
+    }
+  }, [setWeatherActive, setSelectedStageId])
 
   // Auto-show stage segments when a stage is selected from the search panel
   useEffect(() => {

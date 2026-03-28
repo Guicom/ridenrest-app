@@ -249,6 +249,32 @@ describe('SearchRangeControl', () => {
     expect(mockSetSelectedStageId).not.toHaveBeenCalled()
   })
 
+  it('range input blur with same value does NOT clear stage selection — M1 fix', () => {
+    mockSelectedStageId = 's1'
+    render(<SearchRangeControl totalDistanceKm={200} waypoints={null} isPoisPending={false} stages={[makeStage({ endKm: 80 })]} />)
+    const input = screen.getByTestId('range-value') as HTMLInputElement
+    // Blur without changing the value (still '15')
+    fireEvent.blur(input)
+    expect(mockSetSelectedStageId).not.toHaveBeenCalled()
+    expect(mockSetSearchRange).not.toHaveBeenCalled()
+  })
+
+  it('range display syncs to effective range when clamped at end of trace — M3 fix', () => {
+    // stage.endKm=190, totalDistance=200, rangeKm=15 → effective range = 10
+    mockSelectedStageId = 's1'
+    render(<SearchRangeControl totalDistanceKm={200} waypoints={null} isPoisPending={false} stages={[makeStage({ endKm: 190 })]} />)
+    // Selecting the stage triggers handleStageSelect → from=190, to=min(200,205)=200, effective=10
+    fireEvent.change(screen.getByTestId('stage-select'), { target: { value: 's1' } })
+    expect((screen.getByTestId('range-value') as HTMLInputElement).value).toBe('10')
+  })
+
+  it('slider at end of trace syncs range display to clamped value — M3 fix', () => {
+    // totalDistance=100, rangeKm=15, slide to 90 → to=min(105,100)=100, effective=10
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+    fireEvent.change(screen.getByTestId('from-km-slider'), { target: { value: '90' } })
+    expect((screen.getByTestId('range-value') as HTMLInputElement).value).toBe('10')
+  })
+
   it('in stage mode, D+ is computed from stageEndKm to fromKm (not from km 0)', () => {
     // waypoints: ele 100 at km 0, 200 at km 5, 150 at km 10, 300 at km 20
     // Stage endKm = 5, fromKm = 20 → D+ in [5, 20]: from 200→150 (loss) then 150→300 (+150) = 150m
