@@ -160,6 +160,8 @@ describe('MapCanvas stage props', () => {
     setLngLat: vi.fn().mockReturnThis(),
     addTo: vi.fn().mockReturnThis(),
     remove: vi.fn(),
+    on: vi.fn().mockReturnThis(),
+    getLngLat: vi.fn().mockReturnValue({ lat: 43.0, lng: 1.0 }),
   }
 
   beforeEach(() => {
@@ -271,6 +273,262 @@ describe('MapCanvas stage props', () => {
     ).length
 
     expect(clickCallsAfter).toBeGreaterThan(clickCallsBefore)
+  })
+
+  it('registers mousemove handler when stageClickMode=true and NOT when stageClickMode=false', async () => {
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 43.5, lng: 1.5, distKm: 50 },
+    ]
+
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    const { rerender } = render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stageClickMode={false}
+        allWaypoints={waypoints}
+      />
+    )
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    const moveBefore = mockMapInstance.on.mock.calls.filter((c: unknown[]) => c[0] === 'mousemove').length
+    expect(moveBefore).toBe(0)  // no mousemove when stageClickMode=false
+
+    await act(async () => {
+      rerender(
+        <MapCanvas
+          segments={[makeSegment()]}
+          adventureName="Test"
+          poisByLayer={emptyPoisByLayer}
+          stageClickMode={true}
+          allWaypoints={waypoints}
+        />
+      )
+    })
+
+    const moveAfter = mockMapInstance.on.mock.calls.filter((c: unknown[]) => c[0] === 'mousemove').length
+    expect(moveAfter).toBeGreaterThan(0)  // mousemove registered when stageClickMode=true
+  })
+
+  it('mousemove calls onStageHoverKm with nearest waypoint distKm', async () => {
+    const onStageHoverKm = vi.fn()
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 43.5, lng: 1.5, distKm: 50 },
+    ]
+
+    let loadCallback: (() => void) | undefined
+    const mouseMoveHandlers: ((e: unknown) => void)[] = []
+    mockMapInstance.on.mockImplementation((event: string, cb: (e: unknown) => void) => {
+      if (event === 'load') loadCallback = cb as () => void
+      if (event === 'mousemove') mouseMoveHandlers.push(cb)
+    })
+
+    const { rerender } = render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stageClickMode={false}
+        onStageHoverKm={onStageHoverKm}
+        allWaypoints={waypoints}
+      />
+    )
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    // Switch to stageClickMode=true — registers mousemove handler
+    await act(async () => {
+      rerender(
+        <MapCanvas
+          segments={[makeSegment()]}
+          adventureName="Test"
+          poisByLayer={emptyPoisByLayer}
+          stageClickMode={true}
+          onStageHoverKm={onStageHoverKm}
+          allWaypoints={waypoints}
+        />
+      )
+    })
+
+    expect(mouseMoveHandlers.length).toBeGreaterThan(0)
+
+    // Simulate mousemove near first waypoint (lat=43.0, lng=1.0 → distKm=0)
+    await act(async () => {
+      for (const handler of mouseMoveHandlers) {
+        handler({ lngLat: { lat: 43.05, lng: 1.05 } })
+      }
+    })
+
+    expect(onStageHoverKm).toHaveBeenCalledWith(expect.any(Number))
+  })
+
+  it('drag event on stage marker calls onStageDragHoverKm with stageId and snapped distKm', async () => {
+    const onStageDragHoverKm = vi.fn()
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 43.5, lng: 1.5, distKm: 50 },
+      { lat: 44.0, lng: 2.0, distKm: 100 },
+    ]
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+    ]
+
+    const dragHandlers: Array<() => void> = []
+    const mockMarkerWithDragEvents = {
+      setLngLat: vi.fn().mockReturnThis(),
+      addTo: vi.fn().mockReturnThis(),
+      remove: vi.fn(),
+      on: vi.fn().mockImplementation(function(event: string, cb: () => void) {
+        if (event === 'drag') dragHandlers.push(cb)
+        return this
+      }),
+      getLngLat: vi.fn().mockReturnValue({ lat: 44.0, lng: 2.0 }),
+    }
+
+    const { Marker } = await import('maplibre-gl')
+    vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(function() { return mockMarkerWithDragEvents })
+
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stages={stages}
+        allWaypoints={waypoints}
+        onStageDragHoverKm={onStageDragHoverKm}
+      />
+    )
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    // Simulate drag — marker at lat=44.0, lng=2.0 → nearest waypoint distKm=100
+    await act(async () => {
+      for (const handler of dragHandlers) handler()
+    })
+
+    expect(onStageDragHoverKm).toHaveBeenCalledWith('st1', 100)
+  })
+
+  it('dragend clears onStageDragHoverKm (null) before calling onStageDragEnd', async () => {
+    const onStageDragHoverKm = vi.fn()
+    const onStageDragEnd = vi.fn()
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 44.0, lng: 2.0, distKm: 100 },
+    ]
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+    ]
+
+    const dragendHandlers2: Array<() => void> = []
+    const mockMarkerWithDragHover = {
+      setLngLat: vi.fn().mockReturnThis(),
+      addTo: vi.fn().mockReturnThis(),
+      remove: vi.fn(),
+      on: vi.fn().mockImplementation(function(event: string, cb: () => void) {
+        if (event === 'dragend') dragendHandlers2.push(cb)
+        return this
+      }),
+      getLngLat: vi.fn().mockReturnValue({ lat: 44.0, lng: 2.0 }),
+    }
+
+    const { Marker } = await import('maplibre-gl')
+    vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(function() { return mockMarkerWithDragHover })
+
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stages={stages}
+        allWaypoints={waypoints}
+        onStageDragHoverKm={onStageDragHoverKm}
+        onStageDragEnd={onStageDragEnd}
+      />
+    )
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    await act(async () => {
+      for (const handler of dragendHandlers2) handler()
+    })
+
+    // Overlay cleared first, then drag end fired
+    expect(onStageDragHoverKm).toHaveBeenCalledWith('st1', null)
+    expect(onStageDragEnd).toHaveBeenCalledWith('st1', 100)
+  })
+
+  it('onDragEnd on a stage marker calls onStageDragEnd with correct stageId and snapped distKm', async () => {
+    const onStageDragEnd = vi.fn()
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 0 },
+      { lat: 43.5, lng: 1.5, distKm: 50 },
+      { lat: 44.0, lng: 2.0, distKm: 100 },
+    ]
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+    ]
+
+    // Track dragend handlers per marker
+    const dragendHandlers: Array<() => void> = []
+    const markerGetLngLat = vi.fn().mockReturnValue({ lat: 44.0, lng: 2.0 })
+
+    const mockMarkerWithDrag = {
+      setLngLat: vi.fn().mockReturnThis(),
+      addTo: vi.fn().mockReturnThis(),
+      remove: vi.fn(),
+      on: vi.fn().mockImplementation(function(event: string, cb: () => void) {
+        if (event === 'dragend') dragendHandlers.push(cb)
+        return this
+      }),
+      getLngLat: markerGetLngLat,
+    }
+
+    const { Marker } = await import('maplibre-gl')
+    vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(function() { return mockMarkerWithDrag })
+
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    render(
+      <MapCanvas
+        segments={[makeSegment()]}
+        adventureName="Test"
+        poisByLayer={emptyPoisByLayer}
+        stages={stages}
+        allWaypoints={waypoints}
+        onStageDragEnd={onStageDragEnd}
+      />
+    )
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    await act(async () => { loadCallback?.() })
+
+    // Simulate dragend — marker position is at lat=44.0, lng=2.0 → nearest waypoint distKm=100
+    await act(async () => {
+      for (const handler of dragendHandlers) handler()
+    })
+
+    expect(onStageDragEnd).toHaveBeenCalledWith('st1', 100)
   })
 })
 

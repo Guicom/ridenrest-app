@@ -71,14 +71,16 @@ vi.mock('./poi-detail-sheet', () => ({
 
 // Mock MapCanvas to avoid WebGL in tests
 vi.mock('./map-canvas', () => ({
-  MapCanvas: ({ segments }: { segments: unknown[] }) => (
-    <div data-testid="map-canvas" data-segments={segments.length} />
+  MapCanvas: ({ segments, stages }: { segments: unknown[]; stages?: unknown[] }) => (
+    <div data-testid="map-canvas" data-segments={segments.length} data-stage-count={stages?.length ?? 0} />
   ),
 }))
 
 // Mock ElevationProfile to avoid Recharts in map-view integration tests
 vi.mock('./elevation-profile', () => ({
-  ElevationProfile: () => <div data-testid="elevation-profile" />,
+  ElevationProfile: ({ stagesVisible }: { stagesVisible?: boolean }) => (
+    <div data-testid="elevation-profile" data-stages-visible={String(stagesVisible ?? false)} />
+  ),
 }))
 
 // Mock PoiLayerGrid
@@ -94,6 +96,31 @@ vi.mock('./sidebar-weather-section', () => ({
 // Mock SidebarDensitySection
 vi.mock('./sidebar-density-section', () => ({
   SidebarDensitySection: () => <div data-testid="sidebar-density-section" />,
+}))
+
+// Mock useStages
+vi.mock('@/hooks/use-stages', () => ({
+  useStages: () => ({
+    stages: [
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+    ],
+    isPending: false,
+    createStage: vi.fn(),
+    updateStage: vi.fn(),
+    deleteStage: vi.fn(),
+  }),
+}))
+
+// Mock useElevationProfile
+vi.mock('@/hooks/use-elevation-profile', () => ({
+  useElevationProfile: () => ({ points: [], boundaries: [], hasElevationData: false, totalDPlus: 0 }),
+}))
+
+// Mock SidebarStagesSection with a toggle button for testing stagesVisible
+vi.mock('./sidebar-stages-section', () => ({
+  SidebarStagesSection: ({ onStagesVisibilityChange }: { onStagesVisibilityChange?: (v: boolean) => void }) => (
+    <button data-testid="toggle-stages" onClick={() => onStagesVisibilityChange?.(true)}>Toggle Stages</button>
+  ),
 }))
 
 // Mock AccommodationSubTypes
@@ -356,5 +383,45 @@ describe('MapView — elevation profile collapse (Story 8.8, AC #1, AC #6)', () 
     fireEvent.click(screen.getByRole('button', { name: /Masquer le profil/i }))
     fireEvent.click(screen.getByRole('button', { name: /Afficher le profil/i }))
     expect(screen.getByRole('button', { name: /Masquer le profil/i })).toBeInTheDocument()
+  })
+})
+
+describe('MapView — stagesVisible toggle (Story 11.2, AC4)', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
+  })
+
+  function renderWithData() {
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+  }
+
+  it('MapCanvas receives empty stages when stagesVisible=false (default)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const canvas = screen.getByTestId('map-canvas')
+    expect(canvas.getAttribute('data-stage-count')).toBe('0')
+  })
+
+  it('ElevationProfile receives stagesVisible=false by default', async () => {
+    renderWithData()
+    await screen.findByTestId('elevation-profile')
+    const profile = screen.getByTestId('elevation-profile')
+    expect(profile.getAttribute('data-stages-visible')).toBe('false')
+  })
+
+  it('toggling stagesVisible on passes stages to MapCanvas and stagesVisible=true to ElevationProfile', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+
+    fireEvent.click(screen.getByTestId('toggle-stages'))
+
+    const canvas = screen.getByTestId('map-canvas')
+    expect(canvas.getAttribute('data-stage-count')).toBe('1')
+
+    const profile = screen.getByTestId('elevation-profile')
+    expect(profile.getAttribute('data-stages-visible')).toBe('true')
   })
 })

@@ -30,8 +30,8 @@ vi.mock('recharts', () => ({
       payload: [{ payload: { distKm: 42, ele: 500, cumulativeDPlus: 100, slope: 5.2 } }],
     })
   },
-  ReferenceLine: ({ x, label }: { x: number; label?: { value?: string } }) => (
-    <div data-testid={`ref-line-${x}`}>{label?.value}</div>
+  ReferenceLine: ({ x, stroke, label }: { x: number; stroke?: string; label?: { value?: string; position?: string } }) => (
+    <div data-testid={`ref-line-${x}`} data-stroke={stroke} data-position={label?.position}>{label?.value}</div>
   ),
 }))
 
@@ -100,5 +100,42 @@ describe('ElevationProfile', () => {
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} onHoverKm={onHoverKm} />)
     // Tooltip mock always renders as active — ElevationTooltip calls onHoverKm(42) via useEffect
     await waitFor(() => expect(onHoverKm).toHaveBeenCalledWith(42))
+  })
+
+  it('renders stage ReferenceLine with stage color when stagesVisible=true', () => {
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, createdAt: '', updatedAt: '' },
+    ]
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={true} />)
+    const stageLine = screen.getByTestId('ref-line-10')
+    expect(stageLine).toBeInTheDocument()
+    expect(stageLine.getAttribute('data-stroke')).toBe('#f97316')
+    expect(screen.getByText('Étape 1')).toBeInTheDocument()
+  })
+
+  it('does not render stage ReferenceLine when stagesVisible=false', () => {
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, createdAt: '', updatedAt: '' },
+    ]
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={false} />)
+    expect(screen.queryByTestId('ref-line-10')).not.toBeInTheDocument()
+  })
+
+  it('stage label uses insideTopLeft position — distinct from segment boundary insideTopRight', () => {
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, createdAt: '', updatedAt: '' },
+    ]
+    const segments: MapSegmentData[] = [
+      makeSegment('s1', 'Seg 1', 0, 10),
+      makeSegment('s2', 'Seg 2', 10, 10),  // boundary at km 10
+    ]
+    const waypoints = [makeWaypoint(0, 100), makeWaypoint(10, 200), makeWaypoint(20, 150)]
+    render(<ElevationProfile waypoints={waypoints} segments={segments} stages={stages} stagesVisible={true} />)
+    // Stage line at km 7 — position insideTopLeft
+    const stageLine = screen.getByTestId('ref-line-7')
+    expect(stageLine.getAttribute('data-position')).toBe('insideTopLeft')
+    // Segment boundary at km 10 — position insideTopRight
+    const segBoundary = screen.getByTestId('ref-line-10')
+    expect(segBoundary.getAttribute('data-position')).toBe('insideTopRight')
   })
 })

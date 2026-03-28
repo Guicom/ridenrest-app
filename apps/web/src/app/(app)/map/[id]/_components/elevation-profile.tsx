@@ -3,13 +3,15 @@ import { useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import type { ElevationPoint } from '@/hooks/use-elevation-profile'
-import type { MapWaypoint, MapSegmentData } from '@ridenrest/shared'
+import type { MapWaypoint, MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
 
 interface ElevationProfileProps {
   waypoints: MapWaypoint[]
   segments: MapSegmentData[]
   onHoverKm?: (distKm: number | null) => void
   className?: string
+  stages?: AdventureStageResponse[]
+  stagesVisible?: boolean
 }
 
 interface TooltipEntry {
@@ -41,7 +43,7 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
   )
 }
 
-export function ElevationProfile({ waypoints, segments, onHoverKm, className }: ElevationProfileProps) {
+export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false }: ElevationProfileProps) {
   const { points, boundaries, hasElevationData } = useElevationProfile(waypoints, segments)
 
   if (!hasElevationData) {
@@ -92,6 +94,15 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className }: 
               stroke="var(--border)"
               strokeDasharray="3 3"
               label={{ value: b.name, position: 'insideTopRight', fontSize: 9, fill: 'var(--text-muted)' }}
+            />
+          ))}
+          {stagesVisible && stages?.map((stage) => (
+            <ReferenceLine
+              key={`stage-${stage.id}`}
+              x={stage.endKm}
+              stroke={stage.color}
+              strokeWidth={1.5}
+              label={{ value: stage.name, position: 'insideTopLeft', fontSize: 9, fill: stage.color }}
             />
           ))}
         </AreaChart>

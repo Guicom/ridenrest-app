@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
@@ -25,6 +25,7 @@ import { ElevationProfile } from './elevation-profile'
 import { MapStylePicker } from './map-style-picker'
 import { SidebarStagesSection } from './sidebar-stages-section'
 import { useStages } from '@/hooks/use-stages'
+import { useElevationProfile } from '@/hooks/use-elevation-profile'
 
 interface MapViewProps {
   adventureId: string
@@ -124,6 +125,30 @@ export function MapView({ adventureId }: MapViewProps) {
     : null
 
   const { stages, createStage, updateStage, deleteStage } = useStages(adventureId)
+
+  // Hover preview overlay during stageClickMode (AC1)
+  const [hoverKmPreview, setHoverKmPreview] = useState<number | null>(null)
+  // Drag hover overlay during stage marker drag
+  const [dragHoverState, setDragHoverState] = useState<{ stageId: string; distKm: number } | null>(null)
+  const { points: elevationPoints } = useElevationProfile(allCumulativeWaypoints, readySegments)
+
+  // Reset hover preview when exiting click mode
+  useEffect(() => {
+    if (!stageClickMode) setHoverKmPreview(null)
+  }, [stageClickMode])
+
+  // Compute overlay values — works for both click mode (hoverKmPreview) and drag (dragHoverState)
+  const overlayKm = dragHoverState?.distKm ?? hoverKmPreview
+  const overlayFromKm = dragHoverState
+    ? (stages.find((s) => s.id === dragHoverState.stageId)?.startKm ?? 0)
+    : (stages.length > 0 ? stages[stages.length - 1].endKm : 0)
+  const previewDeltaKm = overlayKm !== null ? Math.max(0, overlayKm - overlayFromKm) : null
+  const previewDPlus = useMemo(() => {
+    if (overlayKm === null || elevationPoints.length === 0) return null
+    const fromPt = elevationPoints.find((p) => p.distKm >= overlayFromKm) ?? elevationPoints[0]
+    const toPt = [...elevationPoints].reverse().find((p) => p.distKm <= overlayKm) ?? elevationPoints[0]
+    return Math.max(0, toPt.cumulativeDPlus - fromPt.cumulativeDPlus)
+  }, [overlayKm, overlayFromKm, elevationPoints])
 
   const queryClient = useQueryClient()
 
@@ -258,6 +283,19 @@ export function MapView({ adventureId }: MapViewProps) {
               setShowNamingDialog(true)
               setStageClickMode(false)
             }}
+            onStageDragEnd={async (stageId, newEndKm) => {
+              try {
+                await updateStage(stageId, { endKm: newEndKm })
+              } catch (err) {
+                console.error('Failed to update stage position:', err)
+                // TODO: show user-visible error and reset marker to previous position
+              }
+            }}
+            onStageHoverKm={setHoverKmPreview}
+            onStageDragHoverKm={(stageId, distKm) => {
+              if (stageId === null || distKm === null) setDragHoverState(null)
+              else setDragHoverState({ stageId, distKm })
+            }}
           />
 
 
@@ -289,6 +327,16 @@ export function MapView({ adventureId }: MapViewProps) {
           {/* Map style selector — floating bottom-right (AC #6) */}
           <MapStylePicker />
 
+          {/* Hover preview overlay: click mode (AC1) + drag marker */}
+          {(stageClickMode || dragHoverState !== null) && overlayKm !== null && previewDeltaKm !== null && (
+            <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-md bg-background/90 px-9 py-4 text-base shadow-md backdrop-blur-sm border border-[--border]">
+              <span className="font-mono font-semibold">+{previewDeltaKm.toFixed(1)} km</span>
+              {previewDPlus !== null && (
+                <span className="ml-6 text-muted-foreground">D+ <span className="font-mono font-semibold">{previewDPlus.toFixed(0)} m</span></span>
+              )}
+            </div>
+          )}
+
           {/* Mobile corridor range pill — visible on mobile only when user has interacted (AC #4) */}
           {searchRangeInteracted && (
             <div className="lg:hidden absolute bottom-0 left-0 right-0 z-20 flex justify-center bg-[--surface] rounded-t-2xl shadow-lg px-6 py-3">
@@ -314,6 +362,8 @@ export function MapView({ adventureId }: MapViewProps) {
             segments={readySegments}
             onHoverKm={handleHoverKm}
             className="h-full w-full"
+            stages={stages}
+            stagesVisible={stagesVisible}
           />
         </div>
       </div>

@@ -26,6 +26,7 @@ const mockStagesRepo = {
   update: jest.fn(),
   delete: jest.fn(),
   updateMany: jest.fn(),
+  findSubsequent: jest.fn(),
 }
 
 const mockAdventuresService = {
@@ -119,6 +120,74 @@ describe('updateStage', () => {
     await expect(
       service.updateStage('adv-1', 's-unknown', 'user-1', { name: 'X' }),
     ).rejects.toThrow(NotFoundException)
+    expect(mockStagesRepo.update).not.toHaveBeenCalled()
+  })
+
+  it('updateStage with endKm updates distanceKm correctly', async () => {
+    mockAdventuresService.verifyOwnership.mockResolvedValue(undefined)
+    const stage = makeStage('s1', 0, 0, 50)
+    const updated = makeStage('s1', 0, 0, 60)
+    mockStagesRepo.findByIdAndAdventureId
+      .mockResolvedValueOnce(stage)    // first call: find stage to update
+      .mockResolvedValueOnce(updated)  // second call: return updated stage
+    mockStagesRepo.findSubsequent.mockResolvedValue([])  // no subsequent → validation passes
+    mockStagesRepo.update.mockResolvedValue(updated)
+
+    const result = await service.updateStage('adv-1', 's1', 'user-1', { endKm: 60 })
+
+    expect(mockStagesRepo.update).toHaveBeenCalledWith('s1', expect.objectContaining({
+      endKm: 60,
+      distanceKm: 60,  // 60 - 0
+    }))
+    expect(result.endKm).toBe(60)
+    expect(result.distanceKm).toBe(60)
+  })
+
+  it('updateStage with endKm cascades startKm to subsequent stages', async () => {
+    mockAdventuresService.verifyOwnership.mockResolvedValue(undefined)
+    const stage1 = makeStage('s1', 0, 0, 50)
+    const stage2 = makeStage('s2', 1, 50, 100)
+    const stage3 = makeStage('s3', 2, 100, 150)
+    const updatedStage1 = makeStage('s1', 0, 0, 60)
+    mockStagesRepo.findByIdAndAdventureId
+      .mockResolvedValueOnce(stage1)     // first call: find stage to update
+      .mockResolvedValueOnce(updatedStage1)  // second call: return updated stage
+    mockStagesRepo.update.mockResolvedValue(updatedStage1)
+    mockStagesRepo.findSubsequent.mockResolvedValue([stage2, stage3])
+    mockStagesRepo.updateMany.mockResolvedValue(undefined)
+
+    await service.updateStage('adv-1', 's1', 'user-1', { endKm: 60 })
+
+    // stage2: startKm=60, distanceKm=100-60=40, orderIndex unchanged
+    // stage3: startKm=100, distanceKm=150-100=50, orderIndex unchanged
+    expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
+      { id: 's2', startKm: 60, distanceKm: 40, orderIndex: 1 },
+      { id: 's3', startKm: 100, distanceKm: 50, orderIndex: 2 },
+    ])
+  })
+
+  it('updateStage throws BadRequestException if endKm <= stage.startKm', async () => {
+    mockAdventuresService.verifyOwnership.mockResolvedValue(undefined)
+    const stage = makeStage('s1', 0, 20, 50)  // startKm=20
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValue(stage)
+    mockStagesRepo.findSubsequent.mockResolvedValue([])
+
+    await expect(
+      service.updateStage('adv-1', 's1', 'user-1', { endKm: 10 }),  // 10 <= 20
+    ).rejects.toThrow(BadRequestException)
+    expect(mockStagesRepo.update).not.toHaveBeenCalled()
+  })
+
+  it('updateStage throws BadRequestException if endKm >= next stage endKm', async () => {
+    mockAdventuresService.verifyOwnership.mockResolvedValue(undefined)
+    const stage1 = makeStage('s1', 0, 0, 50)
+    const stage2 = makeStage('s2', 1, 50, 100)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValue(stage1)
+    mockStagesRepo.findSubsequent.mockResolvedValue([stage2])  // stage2.endKm=100
+
+    await expect(
+      service.updateStage('adv-1', 's1', 'user-1', { endKm: 100 }),  // 100 >= stage2.endKm=100
+    ).rejects.toThrow(BadRequestException)
     expect(mockStagesRepo.update).not.toHaveBeenCalled()
   })
 })

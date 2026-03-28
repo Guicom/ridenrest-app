@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { db, adventureStages } from '@ridenrest/database'
 import type { AdventureStage, NewAdventureStage } from '@ridenrest/database'
-import { eq, asc, desc, and, sql } from 'drizzle-orm'
+import { eq, asc, desc, and, gt, sql } from 'drizzle-orm'
 
 @Injectable()
 export class StagesRepository {
@@ -44,13 +44,21 @@ export class StagesRepository {
     return row as AdventureStage
   }
 
-  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color'>>): Promise<AdventureStage> {
+  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'distanceKm'>>): Promise<AdventureStage> {
     const [row] = await db
       .update(adventureStages)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(adventureStages.id, id))
       .returning()
     return row as AdventureStage
+  }
+
+  async findSubsequent(adventureId: string, orderIndex: number): Promise<AdventureStage[]> {
+    return db
+      .select()
+      .from(adventureStages)
+      .where(and(eq(adventureStages.adventureId, adventureId), gt(adventureStages.orderIndex, orderIndex)))
+      .orderBy(asc(adventureStages.orderIndex))
   }
 
   async delete(id: string): Promise<void> {

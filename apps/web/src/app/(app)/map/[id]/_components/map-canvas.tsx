@@ -1,5 +1,5 @@
 'use client'
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type RefObject } from 'react'
 import { useMapStore } from '@/stores/map.store'
 import { usePrefsStore } from '@/stores/prefs.store'
 import { MAP_STYLES } from '@/lib/map-styles'
@@ -52,10 +52,13 @@ interface MapCanvasProps {
   stages?: AdventureStageResponse[]
   stageClickMode?: boolean
   onStageClick?: (endKm: number) => void
+  onStageDragEnd?: (stageId: string, newEndKm: number) => void
+  onStageHoverKm?: (distKm: number | null) => void
+  onStageDragHoverKm?: (stageId: string | null, distKm: number | null) => void
 }
 
 export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function MapCanvas(
-  { segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints, stages = [], stageClickMode = false, onStageClick },
+  { segments, adventureName, poisByLayer, coverageGaps, densityStatus, segmentsWeather, allWaypoints, stages = [], stageClickMode = false, onStageClick, onStageDragEnd, onStageHoverKm, onStageDragHoverKm },
   ref,
 ) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -80,6 +83,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
   const stageClickModeRef = useRef(stageClickMode)
   const onStageClickRef = useRef(onStageClick)
   const stagesRef = useRef(stages)
+  const onStageDragEndRef = useRef(onStageDragEnd)
+  const onStageHoverKmRef = useRef(onStageHoverKm)
+  const onStageDragHoverKmRef = useRef(onStageDragHoverKm)
   useEffect(() => { densityStatusRef.current = densityStatus }, [densityStatus])
   useEffect(() => { coverageGapsRef.current = coverageGaps }, [coverageGaps])
   useEffect(() => { densityColorEnabledRef.current = densityColorEnabled }, [densityColorEnabled])
@@ -87,6 +93,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
   useEffect(() => { stageClickModeRef.current = stageClickMode }, [stageClickMode])
   useEffect(() => { onStageClickRef.current = onStageClick }, [onStageClick])
   useEffect(() => { stagesRef.current = stages }, [stages])
+  useEffect(() => { onStageDragEndRef.current = onStageDragEnd }, [onStageDragEnd])
+  useEffect(() => { onStageHoverKmRef.current = onStageHoverKm }, [onStageHoverKm])
+  useEffect(() => { onStageDragHoverKmRef.current = onStageDragHoverKm }, [onStageDragHoverKm])
 
   // Centralized dimension update: fires for all weather layers together so none are missed.
   // React runs child effects (WeatherLayer data effect) before parent effects, so layers
@@ -229,7 +238,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     return () => unsubscribe()
   }, [])  // Subscribe once — uses refs for latest values
 
-  // Stage click mode — cursor + map click handler
+  // Stage click mode — cursor + map click + mousemove preview handler
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -258,9 +267,27 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
       onStageClickRef.current?.(nearest.distKm)
     }
 
+    const handleMouseMove = (e: maplibregl.MapMouseEvent) => {
+      const waypoints = allWaypointsRef.current
+      if (!waypoints || waypoints.length === 0) return
+      const { lat, lng } = e.lngLat
+      const nearest = waypoints.reduce((best, wp) => {
+        const d = (wp.lat - lat) ** 2 + (wp.lng - lng) ** 2
+        const dBest = (best.lat - lat) ** 2 + (best.lng - lng) ** 2
+        return d < dBest ? wp : best
+      })
+      onStageHoverKmRef.current?.(nearest.distKm)
+    }
+
+    const handleMouseOut = () => onStageHoverKmRef.current?.(null)
+
     map.on('click', handleMapClick)
+    map.on('mousemove', handleMouseMove)
+    map.on('mouseout', handleMouseOut)
     return () => {
       map.off('click', handleMapClick)
+      map.off('mousemove', handleMouseMove)
+      map.off('mouseout', handleMouseOut)
       map.getCanvas().style.cursor = ''
     }
   }, [stageClickMode])  // Re-attach when click mode changes
@@ -270,8 +297,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     const map = mapRef.current
     if (!map || !map.getSource('trace')) return
     updateStageLayers(map, stagesRef.current, allWaypointsRef.current ?? [])
-    renderStageMarkers(map, stagesRef.current, allWaypointsRef.current ?? [], MarkerClassRef.current)
-  }, [stages, styleVersion])  // eslint-disable-line react-hooks/exhaustive-deps
+    renderStageMarkers(map, stagesRef.current, allWaypointsRef.current ?? [], MarkerClassRef.current, onStageDragEndRef, onStageDragHoverKmRef)
+  }, [stages, styleVersion])
 
   // Imperative crosshair handle — bypasses React state/render cycle entirely for zero-latency updates
   useImperativeHandle(ref, () => ({
@@ -759,6 +786,8 @@ function renderStageMarkers(
   stages: AdventureStageResponse[],
   allWaypoints: MapWaypoint[],
   MarkerClass: typeof maplibregl.Marker | null,
+  onStageDragEndRef: RefObject<((stageId: string, newEndKm: number) => void) | undefined>,
+  onStageDragHoverKmRef: RefObject<((stageId: string | null, distKm: number | null) => void) | undefined>,
 ) {
   if (!MarkerClass) return
 
@@ -769,17 +798,50 @@ function renderStageMarkers(
 
   if (stages.length === 0 || allWaypoints.length === 0) return
 
+  // Inject box-shadow pulse styles once (no children needed — avoids layout interference with MapLibre positioning)
+  if (!document.getElementById('stage-marker-hover-style')) {
+    const style = document.createElement('style')
+    style.id = 'stage-marker-hover-style'
+    style.textContent = '@keyframes stage-pulse{0%{box-shadow:0 1px 3px rgba(0,0,0,.3),0 0 0 0 rgba(var(--scr),.6)}100%{box-shadow:0 1px 3px rgba(0,0,0,.3),0 0 0 10px rgba(var(--scr),0)}}.stage-marker:hover{animation:stage-pulse 1.1s ease-out infinite}'
+    document.head.appendChild(style)
+  }
+
   const newMarkers: maplibregl.Marker[] = []
   for (const stage of stages) {
     const nearest = allWaypoints.reduce((a, b) =>
       Math.abs(b.distKm - stage.endKm) < Math.abs(a.distKm - stage.endKm) ? b : a,
     )
+    // Single flat div — same structure as original so MapLibre anchor works correctly
+    const [r, g, b2] = [stage.color.slice(1,3), stage.color.slice(3,5), stage.color.slice(5,7)].map((h) => parseInt(h, 16))
     const el = document.createElement('div')
-    el.style.cssText = `width:16px;height:16px;border-radius:50%;background:${stage.color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3)`
+    el.className = 'stage-marker'
+    el.style.cssText = `width:16px;height:16px;border-radius:50%;background:${stage.color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:grab`
+    el.style.setProperty('--scr', `${r},${g},${b2}`)
     el.setAttribute('data-stage-id', stage.id)
-    const marker = new MarkerClass({ element: el, anchor: 'center' })
+    // Change map canvas cursor on hover
+    el.addEventListener('mouseenter', () => { map.getCanvas().style.cursor = 'grab' })
+    el.addEventListener('mouseleave', () => { map.getCanvas().style.cursor = '' })
+    const stageId = stage.id
+    const marker = new MarkerClass({ element: el, anchor: 'center', draggable: true })
       .setLngLat([nearest.lng, nearest.lat])
       .addTo(map)
+    const snapNearest = (lat: number, lng: number) => allWaypoints.reduce((best, wp) => {
+      const d = (wp.lat - lat) ** 2 + (wp.lng - lng) ** 2
+      const dBest = (best.lat - lat) ** 2 + (best.lng - lng) ** 2
+      return d < dBest ? wp : best
+    })
+    marker.on('drag', () => {
+      const { lat, lng } = marker.getLngLat()
+      if (!allWaypoints.length) return
+      onStageDragHoverKmRef.current?.(stageId, snapNearest(lat, lng).distKm)
+    })
+    marker.on('dragend', () => {
+      const { lat, lng } = marker.getLngLat()
+      if (!allWaypoints.length) return
+      const snapped = snapNearest(lat, lng)
+      onStageDragHoverKmRef.current?.(stageId, null)  // clear overlay
+      onStageDragEndRef.current?.(stageId, snapped.distKm)
+    })
     newMarkers.push(marker)
   }
   stageMarkerMap.set(map, newMarkers)

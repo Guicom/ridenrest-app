@@ -61,11 +61,44 @@ export class StagesService {
     const stage = await this.stagesRepo.findByIdAndAdventureId(stageId, adventureId)
     if (!stage) throw new NotFoundException('Stage not found')
 
+    if (dto.endKm !== undefined) {
+      if (dto.endKm <= stage.startKm) {
+        throw new BadRequestException('endKm must be > startKm')
+      }
+
+      // Fetch subsequent stages before update to validate and cascade
+      const subsequentStages = await this.stagesRepo.findSubsequent(adventureId, stage.orderIndex)
+      if (subsequentStages.length > 0 && dto.endKm >= subsequentStages[0].endKm) {
+        throw new BadRequestException('endKm must be less than the next stage endKm')
+      }
+
+      await this.stagesRepo.update(stageId, {
+        endKm: dto.endKm,
+        distanceKm: dto.endKm - stage.startKm,
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.color !== undefined ? { color: dto.color } : {}),
+      })
+
+      // Cascade: update subsequent stages' startKm (endKm stays unchanged)
+      if (subsequentStages.length > 0) {
+        let prevEndKm = dto.endKm
+        const updates = subsequentStages.map((s) => {
+          const newStartKm = prevEndKm
+          const updated = { id: s.id, startKm: newStartKm, distanceKm: s.endKm - newStartKm, orderIndex: s.orderIndex }
+          prevEndKm = s.endKm
+          return updated
+        })
+        await this.stagesRepo.updateMany(updates)
+      }
+
+      const updated = await this.stagesRepo.findByIdAndAdventureId(stageId, adventureId)
+      return this.toResponse(updated!)
+    }
+
     const updated = await this.stagesRepo.update(stageId, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.color !== undefined ? { color: dto.color } : {}),
     })
-
     return this.toResponse(updated)
   }
 

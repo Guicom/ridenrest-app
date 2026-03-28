@@ -1,4 +1,4 @@
-import { IsString, IsOptional, Matches, MinLength, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsNumber, Min, Matches, MinLength, MaxLength } from 'class-validator'
 
 export class UpdateStageDto {
   @IsString()
@@ -12,4 +12,8 @@ export class UpdateStageDto {
   @Matches(/^#[0-9a-fA-F]{6}$/)
   color?: string
 
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  endKm?: number
 }
