@@ -206,7 +206,7 @@ export function SidebarStagesSection({
       <Dialog open={showNamingDialog} onOpenChange={handleNamingDialogOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nommer l'étape</DialogTitle>
+            <DialogTitle>{"Nommer l'étape"}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
@@ -238,7 +238,7 @@ export function SidebarStagesSection({
       <Dialog open={!!editStage} onOpenChange={(open) => !open && setEditStage(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Modifier l'étape</DialogTitle>
+            <DialogTitle>{"Modifier l'étape"}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
@@ -279,9 +279,9 @@ export function SidebarStagesSection({
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer l'étape ?</AlertDialogTitle>
+            <AlertDialogTitle>{"Supprimer l'étape ?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              Supprimer l'étape &laquo;{deleteTarget?.name}&raquo; ? Les étapes suivantes seront recalculées.
+              {"Supprimer l'étape"} &laquo;{deleteTarget?.name}&raquo; ? Les étapes suivantes seront recalculées.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
