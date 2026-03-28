@@ -31,6 +31,9 @@ interface MapState {
   // Selected POI pin state (Story 9.3)
   selectedPoiId: string | null
 
+  // Selected stage for POI scoping (Story 11.4)
+  selectedStageId: string | null
+
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
   toggleLayer: (layer: MapLayer) => void
@@ -41,6 +44,7 @@ interface MapState {
   setWeatherDimension: (dimension: WeatherDimension) => void
   toggleAccommodationType: (type: PoiCategory) => void
   setSelectedPoiId: (id: string | null) => void
+  setSelectedStageId: (id: string | null) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -56,6 +60,7 @@ export const useMapStore = create<MapState>((set) => ({
   weatherDimension: 'temperature',
   activeAccommodationTypes: new Set(['hotel'] as PoiCategory[]),
   selectedPoiId: null,
+  selectedStageId: null,
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -92,4 +97,6 @@ export const useMapStore = create<MapState>((set) => ({
     }),
 
   setSelectedPoiId: (id) => set({ selectedPoiId: id }),
+
+  setSelectedStageId: (id) => set({ selectedStageId: id }),
 }))

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
 import type { Poi, MapLayer } from '@ridenrest/shared'
@@ -24,8 +24,14 @@ export function usePoiLayers(
   mapRef: React.RefObject<maplibregl.Map | null>,
   poisByLayer: Record<MapLayer, Poi[]>,
   styleVersion: number,  // Forces re-run after theme/style change
+  selectedStageColor: string | null = null,
 ) {
   const { visibleLayers, activeAccommodationTypes, selectedPoiId } = useMapStore()
+
+  // Ref keeps selectedStageColor current for the main effect without adding it to deps
+  // (avoids unnecessary setData calls on stage selection — reactive stroke effect handles updates)
+  const selectedStageColorRef = useRef(selectedStageColor)
+  selectedStageColorRef.current = selectedStageColor
 
   // Main effect — creates/updates layers when data, visibility, or style version changes
   useEffect(() => {
@@ -125,7 +131,7 @@ export function usePoiLayers(
           paint: {
             'circle-radius': 8,
             'circle-color': POI_PIN_COLOR,
-            'circle-stroke-color': '#FFFFFF',
+            'circle-stroke-color': selectedStageColorRef.current ?? '#FFFFFF',
             'circle-stroke-width': 1.5,
           },
         })
@@ -226,4 +232,18 @@ export function usePoiLayers(
       }
     }
   }, [mapRef, selectedPoiId, styleVersion])
+
+  // Separate effect — updates POI pin stroke color reactively when stage selection changes
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+
+    const strokeColor = selectedStageColor ?? '#FFFFFF'
+    for (const layer of ALL_LAYERS) {
+      const pointLayerId = `pois-${layer}-points`
+      if (map.getLayer(pointLayerId)) {
+        map.setPaintProperty(pointLayerId, 'circle-stroke-color', strokeColor)
+      }
+    }
+  }, [mapRef, selectedStageColor, styleVersion])
 }

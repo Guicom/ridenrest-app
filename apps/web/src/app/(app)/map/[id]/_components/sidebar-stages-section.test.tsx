@@ -153,4 +153,5 @@ describe('SidebarStagesSection', () => {
     expect(screen.getByTestId('alert-dialog')).toBeDefined()
     expect(screen.getByText("Supprimer l'étape ?")).toBeDefined()
   })
+
 })

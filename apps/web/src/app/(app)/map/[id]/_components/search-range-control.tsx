@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
 import { computeElevationGain } from '@ridenrest/gpx'
-import type { MapWaypoint, Poi } from '@ridenrest/shared'
+import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
 
@@ -14,9 +14,10 @@ interface SearchRangeControlProps {
   waypoints: MapWaypoint[] | null
   isPoisPending: boolean
   accommodationPois?: Poi[]
+  stages?: AdventureStageResponse[]
 }
 
-// D+ cumulé de km 0 jusqu'au point de départ (fromKm) — pas la plage
+// D+ cumulé de km 0 jusqu'au point fromKm
 function computeElevationToStart(waypoints: MapWaypoint[], fromKm: number): number | null {
   const toStart = waypoints.filter((w) => w.distKm <= fromKm)
   if (toStart.length < 2) return null
@@ -24,9 +25,19 @@ function computeElevationToStart(waypoints: MapWaypoint[], fromKm: number): numb
   return computeElevationGain(toStart.map((w) => ({ lat: w.lat, lng: w.lng, elevM: w.ele ?? undefined })))
 }
 
-export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, accommodationPois }: SearchRangeControlProps) {
+// D+ sur la plage [fromKm, toKm] — pour le mode étape (référentiel relatif)
+function computeElevationInRange(waypoints: MapWaypoint[], fromKm: number, toKm: number): number | null {
+  const inRange = waypoints.filter((w) => w.distKm >= fromKm && w.distKm <= toKm)
+  if (inRange.length < 2) return null
+  if (inRange.every((w) => w.ele == null)) return null
+  return computeElevationGain(inRange.map((w) => ({ lat: w.lat, lng: w.lng, elevM: w.ele ?? undefined })))
+}
+
+export function SearchRangeControl({
+  totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages,
+}: SearchRangeControlProps) {
   const [expanded, setExpanded] = useState(true)
-  const { fromKm, toKm, setSearchRange, visibleLayers } = useMapStore()
+  const { fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId } = useMapStore()
 
   // rangeKm local state — default 15 km when store is at initial values (0, 30)
   const [rangeKm, setRangeKm] = useState(() =>
@@ -36,22 +47,51 @@ export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, 
     fromKm === 0 && toKm === 30 ? '15' : String(toKm - fromKm),
   )
 
-  // toKm intentionnellement absent — le D+ ne change que quand fromKm change
-  const elevationGain = useMemo(
-    () => (waypoints && waypoints.length >= 2 ? computeElevationToStart(waypoints, fromKm) : null),
-    [waypoints, fromKm],
+  // Derive selected stage — drives the relative coordinate mode
+  const selectedStage = useMemo(
+    () => (selectedStageId && stages ? (stages.find((s) => s.id === selectedStageId) ?? null) : null),
+    [selectedStageId, stages],
   )
+  const stageEndKm = selectedStage?.endKm ?? null
+
+  // km relatif depuis le début de l'étape (0 au stage endpoint, croît vers la droite)
+  const relativeKm = stageEndKm != null ? Math.max(0, fromKm - stageEndKm) : null
+
+  // D+ : depuis km 0 en mode normal, depuis stageEndKm en mode étape
+  const elevationGain = useMemo(() => {
+    if (!waypoints || waypoints.length < 2) return null
+    if (stageEndKm != null) return computeElevationInRange(waypoints, stageEndKm, fromKm)
+    return computeElevationToStart(waypoints, fromKm)
+  }, [waypoints, fromKm, stageEndKm])
 
   const applyRange = (newRange: number) => {
     const clamped = Math.min(MAX_RANGE_KM, Math.max(1, newRange))
     setRangeKm(clamped)
     setRangeInput(String(clamped))
+    setSelectedStageId(null)  // AC5 — manual range change clears stage mode
     setSearchRange(fromKm, Math.min(fromKm + clamped, totalDistanceKm))
   }
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newFrom = Number(e.target.value)
+    const sliderValue = Number(e.target.value)
+    // En mode étape : sliderValue est relatif à stageEndKm → convertir en absolu
+    const newFrom = stageEndKm != null ? stageEndKm + sliderValue : sliderValue
     setSearchRange(newFrom, Math.min(newFrom + rangeKm, totalDistanceKm))
+  }
+
+  const handleStageSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const stageId = e.target.value
+    if (!stageId) {
+      setSelectedStageId(null)
+      return
+    }
+    const stage = stages?.find((s) => s.id === stageId)
+    if (!stage) return
+    // Le slider démarre à 0 (= stage.endKm en absolu) — pas de décalage ±5
+    const from = stage.endKm
+    const to = Math.min(totalDistanceKm, stage.endKm + rangeKm)
+    setSelectedStageId(stageId)
+    setSearchRange(from, to)
   }
 
   const handleRangeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -70,6 +110,11 @@ export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, 
   const handleRangeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
   }
+
+  // Valeurs affichées selon le mode
+  const displayKm = relativeKm != null ? Math.round(relativeKm) : Math.round(fromKm)
+  const sliderMax = stageEndKm != null ? Math.max(0, totalDistanceKm - stageEndKm) : totalDistanceKm
+  const sliderValue = relativeKm != null ? relativeKm : fromKm
 
   return (
     <div className="rounded-xl border border-[--border] overflow-hidden">
@@ -90,10 +135,28 @@ export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, 
 
       {expanded && (
         <div className="px-4 pb-4 flex flex-col gap-4">
+          {/* Stage select — visible uniquement si des étapes existent */}
+          {stages && stages.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground shrink-0">À partir :</span>
+              <select
+                value={selectedStageId ?? ''}
+                onChange={handleStageSelect}
+                data-testid="stage-select"
+                className="flex-1 rounded-md border border-[--border] bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:border-primary"
+              >
+                <option value="">Début</option>
+                {stages.map((stage) => (
+                  <option key={stage.id} value={stage.id}>{stage.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Position + D+ dynamiques */}
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span data-testid="current-position" className="font-mono font-bold text-foreground">
-              {Math.round(fromKm).toLocaleString('fr')} km
+              {displayKm.toLocaleString('fr')} km
             </span>
             {elevationGain != null ? (
               <span data-testid="elevation-gain" className="font-mono">
@@ -109,16 +172,20 @@ export function SearchRangeControl({ totalDistanceKm, waypoints, isPoisPending, 
             <input
               type="range"
               min={0}
-              max={totalDistanceKm}
+              max={sliderMax}
               step={1}
-              value={fromKm}
+              value={sliderValue}
               onChange={handleSliderChange}
               data-testid="from-km-slider"
               className="w-full"
             />
             <div className="flex justify-between">
               <span className="text-[10px] text-muted-foreground">0 km</span>
-              <span className="text-[10px] text-muted-foreground">{Math.round(totalDistanceKm)} km</span>
+              <span className="text-[10px] text-muted-foreground">
+                {stageEndKm != null
+                  ? `${Math.round(totalDistanceKm - stageEndKm)} km`
+                  : `${Math.round(totalDistanceKm)} km`}
+              </span>
             </div>
           </div>
 

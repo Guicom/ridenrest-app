@@ -73,7 +73,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
   const [styleVersion, setStyleVersion] = useState(0)
   const mapStyle = usePrefsStore((s) => s.mapStyle)
   const styleUrl = MAP_STYLES.find((s) => s.id === mapStyle)?.url ?? MAP_STYLES[0].url
-  const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension, searchRangeInteracted } = useMapStore()
+  const { setViewport, fromKm, toKm, densityColorEnabled, weatherActive, weatherDimension, searchRangeInteracted, selectedStageId } = useMapStore()
 
   // Refs for stale-closure-safe access inside event handlers and theme effects
   const densityStatusRef = useRef(densityStatus)
@@ -115,7 +115,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     }
   }, [weatherDimension, segmentsWeather])
 
-  usePoiLayers(mapRef, poisByLayer, styleVersion)
+  const selectedStageColor = stages.find((s) => s.id === selectedStageId)?.color ?? null
+  usePoiLayers(mapRef, poisByLayer, styleVersion, selectedStageColor)
 
   // Init MapLibre map
   useEffect(() => {

@@ -1753,13 +1753,17 @@ So that I find accommodation at exactly my planned overnight stop.
 
 **Acceptance Criteria:**
 
-**Given** stages are defined and a stage is selected in the sidebar,
-**When** the user triggers a POI search for that stage,
-**Then** the corridor search uses `end_km` of the stage as the focal point (±5 km window by default, configurable via filters).
+**Given** stages are defined and a stage is selected in the "À partir :" dropdown,
+**When** the stage is first selected,
+**Then** the corridor search starts from `stage.endKm` (slider at far left = 0 km from stage). The km display shows 0 km, D+ shows 0 m, and slider is at the far left. As the user moves the slider right, km and D+ increment relative to the stage endpoint. POI pins show the stage color accent.
 
-**Given** the stage-scoped search returns results,
-**When** POI pins render,
-**Then** they are visually linked to the stage (matching color accent on pins).
+**Given** a stage is selected and the user moves the slider,
+**When** the slider is dragged,
+**Then** km display shows distance from stage endpoint, D+ shows elevation gain from stage endpoint to current position, search range moves forward from stage endpoint. Stage selection is **preserved** in the dropdown (select still shows stage name, POI pins keep stage color). Only selecting "Début" or using the range stepper clears the stage selection.
+
+**Given** a stage is selected and POI pins render,
+**When** results are shown on the map,
+**Then** POI pin stroke color matches the selected stage color.
 
 ---
 

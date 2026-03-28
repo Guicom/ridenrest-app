@@ -196,4 +196,53 @@ describe('usePoiLayers', () => {
     expect(mouseEnterCalls.length).toBeGreaterThan(0)
     expect(mouseLeaveCalls.length).toBeGreaterThan(0)
   })
+
+  it('initial circle stroke color in addLayer uses selectedStageColor when provided', () => {
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [makePoi('accommodations')] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1, '#E07B39'))
+
+    const addLayerCalls = (mockMap.addLayer as ReturnType<typeof vi.fn>).mock.calls as Array<[{ id: string; paint: Record<string, unknown> }]>
+    const pointLayerCall = addLayerCalls.find(([layer]) => layer.id === 'pois-accommodations-points')
+    expect(pointLayerCall).toBeDefined()
+    expect(pointLayerCall![0].paint['circle-stroke-color']).toBe('#E07B39')
+  })
+
+  it('initial circle stroke color in addLayer defaults to #FFFFFF when selectedStageColor is null', () => {
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [makePoi('accommodations')] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1, null))
+
+    const addLayerCalls = (mockMap.addLayer as ReturnType<typeof vi.fn>).mock.calls as Array<[{ id: string; paint: Record<string, unknown> }]>
+    const pointLayerCall = addLayerCalls.find(([layer]) => layer.id === 'pois-accommodations-points')
+    expect(pointLayerCall).toBeDefined()
+    expect(pointLayerCall![0].paint['circle-stroke-color']).toBe('#FFFFFF')
+  })
+
+  it('setPaintProperty called with stage color stroke when selectedStageColor is provided', () => {
+    // Make getLayer return truthy so setPaintProperty is called in the stroke effect
+    mockMap.getLayer.mockReturnValue(true)
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [makePoi('accommodations')] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1, '#E07B39'))
+
+    const setPaintCalls = (mockMap.setPaintProperty as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string, unknown]>
+    const strokeCalls = setPaintCalls.filter(([, prop, value]) => prop === 'circle-stroke-color' && value === '#E07B39')
+    expect(strokeCalls.length).toBeGreaterThan(0)
+  })
+
+  it('setPaintProperty called with #FFFFFF stroke when selectedStageColor is null', () => {
+    mockMap.getLayer.mockReturnValue(true)
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [makePoi('accommodations')] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1, null))
+
+    const setPaintCalls = (mockMap.setPaintProperty as ReturnType<typeof vi.fn>).mock.calls as Array<[string, string, unknown]>
+    const strokeCalls = setPaintCalls.filter(([, prop, value]) => prop === 'circle-stroke-color' && value === '#FFFFFF')
+    expect(strokeCalls.length).toBeGreaterThan(0)
+  })
 })

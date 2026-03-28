@@ -170,7 +170,7 @@ development_status:
   11-1-stage-crud-km-input: done                     # CRUD étapes + module NestJS + table adventure_stages
   11-2-stage-interactive-map-placement: done # clic trace + drag marqueur sur carte
   11-3-stage-elevation-computation: done              # calcul D+ depuis waypoints.ele, graceful si absent
-  11-4-stage-scoped-poi-search: backlog              # POI ancrés sur end_km d'étape (dépend 11-1)
+  11-4-stage-scoped-poi-search: review  # POI ancrés sur stage.endKm — référentiel relatif complet (km/D+/slider depuis endKm, amendement 2026-03-28)
   11-5-stage-scoped-weather: backlog                 # météo par étape avec heure départ (dépend 11-1 + epic-6)
   epic-11-retrospective: optional
 

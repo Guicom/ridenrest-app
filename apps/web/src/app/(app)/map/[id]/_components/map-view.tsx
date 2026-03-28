@@ -57,12 +57,17 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId } = useMapStore()
 
   // Reset weatherActive when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
     return () => { setWeatherActive(false) }
   }, [setWeatherActive])
+
+  // Auto-show stage segments when a stage is selected from the search panel
+  useEffect(() => {
+    if (selectedStageId) setStagesVisible(true)
+  }, [selectedStageId, setStagesVisible])
 
   const { data, isPending, error } = useQuery<AdventureMapResponse>({
     queryKey: ['adventures', adventureId, 'map'],
@@ -189,6 +194,7 @@ export function MapView({ adventureId }: MapViewProps) {
             waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
             isPoisPending={poisPending}
             accommodationPois={poisByLayer.accommodations}
+            stages={stages.length > 0 ? stages : undefined}
           />
 
           {/* Météo section — collapsible accordion (Story 8.4 correction) */}
