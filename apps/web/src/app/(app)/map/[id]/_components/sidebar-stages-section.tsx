@@ -183,7 +183,7 @@ export function SidebarStagesSection({
                       ? stage.etaMinutes < 60
                         ? `${stage.etaMinutes} min`
                         : `${Math.floor(stage.etaMinutes / 60)}h${String(stage.etaMinutes % 60).padStart(2, '0')}`
-                      : '—'}
+                      : '— min'}
                   </span>
                   <button
                     onClick={() => handleEditOpen(stage)}
