@@ -108,7 +108,7 @@ describe('AdventureList', () => {
     expect(screen.getByText('720.0 km')).toBeInTheDocument()
   })
 
-  it('desktop action buttons are always visible (no selection required)', () => {
+  it('all action buttons are always visible (no tap required)', () => {
     vi.mocked(tanstackQuery.useQuery).mockReturnValue({
       data: [makeAdventure({ id: 'adv-1' })],
       isPending: false,
@@ -118,14 +118,15 @@ describe('AdventureList', () => {
     renderList()
 
     // Desktop buttons always in DOM (CSS-hidden on mobile but present)
-    expect(screen.getByText('Planning')).toBeInTheDocument()
-    expect(screen.getByText('Modifier')).toBeInTheDocument()
     expect(screen.getByText('Live')).toBeInTheDocument()
-    // Mobile action row NOT visible until card is tapped
-    expect(screen.queryByText('Démarrer en Live')).not.toBeInTheDocument()
+    // Mobile buttons also always in DOM (AC #1 fix — no tap required)
+    expect(screen.getByText('Démarrer en Live')).toBeInTheDocument()
+    // Both desktop + mobile Planning/Modifier buttons in DOM
+    expect(screen.getAllByText('Planning')).toHaveLength(2)
+    expect(screen.getAllByText('Modifier')).toHaveLength(2)
   })
 
-  it('tapping a card on mobile reveals the mobile action row', () => {
+  it('tapping a card applies selection ring but mobile buttons are already visible', () => {
     vi.mocked(tanstackQuery.useQuery).mockReturnValue({
       data: [makeAdventure({ id: 'adv-1' })],
       isPending: false,
@@ -134,12 +135,15 @@ describe('AdventureList', () => {
 
     renderList()
 
-    expect(screen.queryByText('Démarrer en Live')).not.toBeInTheDocument()
+    // Mobile buttons visible before any tap
+    expect(screen.getByText('Démarrer en Live')).toBeInTheDocument()
+    expect(screen.getAllByText('Planning')).toHaveLength(2)
+    expect(screen.getAllByText('Modifier')).toHaveLength(2)
 
+    // Tapping the card does not change the button count
     fireEvent.click(screen.getByText('Transcantabrique'))
 
     expect(screen.getByText('Démarrer en Live')).toBeInTheDocument()
-    // Now 2 Planning buttons (desktop + mobile)
     expect(screen.getAllByText('Planning')).toHaveLength(2)
     expect(screen.getAllByText('Modifier')).toHaveLength(2)
   })
@@ -166,7 +170,7 @@ describe('AdventureList', () => {
 
     renderList()
 
-    fireEvent.click(screen.getByText('Planning'))
+    fireEvent.click(screen.getAllByText('Planning')[0])  // desktop button (first in DOM)
     expect(mockPush).toHaveBeenCalledWith('/map/adv-1?mode=planning')
   })
 
@@ -179,11 +183,11 @@ describe('AdventureList', () => {
 
     renderList()
 
-    fireEvent.click(screen.getByText('Modifier'))
+    fireEvent.click(screen.getAllByText('Modifier')[0])  // desktop button (first in DOM)
     expect(mockPush).toHaveBeenCalledWith('/adventures/adv-1')
   })
 
-  it('Démarrer en Live button (mobile) navigates to /live/:id after card selection', () => {
+  it('Démarrer en Live button (mobile) navigates to /live/:id', () => {
     vi.mocked(tanstackQuery.useQuery).mockReturnValue({
       data: [makeAdventure({ id: 'adv-1' })],
       isPending: false,
@@ -192,8 +196,7 @@ describe('AdventureList', () => {
 
     renderList()
 
-    // Select the card first to reveal mobile action row
-    fireEvent.click(screen.getByText('Transcantabrique'))
+    // Mobile button always visible — no card tap required
     fireEvent.click(screen.getByText('Démarrer en Live'))
     expect(mockPush).toHaveBeenCalledWith('/live/adv-1')
   })

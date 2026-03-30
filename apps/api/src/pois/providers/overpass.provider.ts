@@ -32,7 +32,7 @@ const CATEGORY_FILTERS: Record<string, string[]> = {
 const OVERPASS_INSTANCES = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter',
 ]
 
 @Injectable()
@@ -86,7 +86,7 @@ out center;`
             continue
           }
 
-          if (response.status === 503 || response.status === 504) {
+          if (response.status === 403 || response.status === 503 || response.status === 504) {
             this.logger.warn(`Overpass ${response.status} on ${url} — switching instance`)
             break // Try next instance
           }

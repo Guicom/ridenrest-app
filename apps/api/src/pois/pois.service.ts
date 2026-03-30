@@ -48,7 +48,7 @@ export class PoisService {
   async findPois(dto: FindPoisDto, userId: string): Promise<Poi[]> {
     // Live mode branch — radius-based search around interpolated point
     if (dto.targetKm !== undefined) {
-      return this.findLiveModePois(dto, userId)
+      return this.findLiveModePois(dto, userId, dto.overpassEnabled ?? false)
     }
 
     const { segmentId, categories } = dto
@@ -85,10 +85,15 @@ export class PoisService {
     const minLng = Math.min(...rangeWaypoints.map((wp) => wp.lng)) - bufferDeg
     const maxLng = Math.max(...rangeWaypoints.map((wp) => wp.lng)) + bufferDeg
 
-    // 4. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
+    // 4. Overpass opt-in gate — when disabled, return DB cache directly (no Redis, no Overpass)
+    if (!dto.overpassEnabled) {
+      return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
+    }
+
+    // 5. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
     const cacheKey = `pois:bbox:${round3(minLat)}:${round3(minLng)}:${round3(maxLat)}:${round3(maxLng)}:${sortedCategories}`
 
-    // 5. Redis cache check
+    // 6. Redis cache check
     const redis = this.redisProvider.getClient()
     const cached = await redis.get(cacheKey)
     if (cached) {
@@ -103,7 +108,7 @@ export class PoisService {
 
     this.logger.debug(`Cache MISS: ${cacheKey}`)
 
-    // 6. Query Overpass API
+    // 7. Query Overpass API
     let pois: Poi[] = []
     let overpassSucceeded = false
     try {
@@ -195,7 +200,7 @@ export class PoisService {
     return details
   }
 
-  private async findLiveModePois(dto: FindPoisDto, userId: string): Promise<Poi[]> {
+  private async findLiveModePois(dto: FindPoisDto, userId: string, overpassEnabled: boolean): Promise<Poi[]> {
     const { segmentId, targetKm, radiusKm, categories } = dto
     const radiusM = (radiusKm ?? 3) * 1000
     const activeCategories = categories ?? Object.keys(CATEGORY_TO_OVERPASS_TAGS)
@@ -205,14 +210,19 @@ export class PoisService {
     const targetPoint = await this.poisRepository.getWaypointAtKm(segmentId, targetKm!, userId)
     if (!targetPoint) return []
 
-    // 2. Compute bbox around target point
+    // 2. Overpass opt-in gate — when disabled, return DB cache directly (no Redis, no Overpass)
+    if (!overpassEnabled) {
+      return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories)
+    }
+
+    // 3. Compute bbox around target point
     const radDeg = (radiusKm ?? 3) / 111.0
     const bbox = {
       minLat: targetPoint.lat - radDeg, maxLat: targetPoint.lat + radDeg,
       minLng: targetPoint.lng - radDeg, maxLng: targetPoint.lng + radDeg,
     }
 
-    // 3. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
+    // 4. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
     const cacheKey = `pois:live:bbox:${round3(bbox.minLat)}:${round3(bbox.minLng)}:${round3(bbox.maxLat)}:${round3(bbox.maxLng)}:${sortedCategories}`
 
     const redis = this.redisProvider.getClient()

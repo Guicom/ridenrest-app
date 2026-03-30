@@ -2,6 +2,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useMapStore } from '@/stores/map.store'
 import { getPois } from '@/lib/api-client'
+import { useProfile } from './use-profile'
 import { POI_BBOX_CACHE_TTL, LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import type { Poi, MapLayer } from '@ridenrest/shared'
@@ -15,7 +16,9 @@ interface UsePoisResult {
 const DEBOUNCE_MS = 400
 
 export function usePois(segments: MapSegmentData[]): UsePoisResult {
-  const { visibleLayers, fromKm: storeFromKm, toKm: storeToKm } = useMapStore()
+  const { visibleLayers, fromKm: storeFromKm, toKm: storeToKm, searchCommitted } = useMapStore()
+  const { data: profile } = useProfile()
+  const overpassEnabled = profile?.overpassEnabled ?? false
 
   // Debounce km range to avoid firing a query on every 1km slider step
   const [debouncedFromKm, setDebouncedFromKm] = useState(storeFromKm)
@@ -37,8 +40,8 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
   const activeLayers = [...visibleLayers] as MapLayer[]
 
   // Map adventure-wide [debouncedFromKm, debouncedToKm] to per-segment local km ranges
-  // Empty while sliding — no queries fired until slider settles
-  const segmentRanges = isSliding ? [] : readySegments.flatMap((segment) => {
+  // Empty while sliding or before user explicitly commits the search
+  const segmentRanges = (isSliding || !searchCommitted) ? [] : readySegments.flatMap((segment) => {
     // Compute overlap of [debouncedFromKm, debouncedToKm] with this segment's km range
     const segStart = segment.cumulativeStartKm
     const segEnd = segStart + segment.distanceKm
@@ -66,12 +69,14 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
         fromKm: segLocalFrom,
         toKm: segLocalTo,
         layer,
+        overpassEnabled,
       }] as const,
       queryFn: () => getPois({
         segmentId: segment.id,
         fromKm: segLocalFrom,
         toKm: segLocalTo,
         categories: LAYER_CATEGORIES[layer] ?? [],
+        overpassEnabled,
       }),
       staleTime: POI_BBOX_CACHE_TTL * 1000,  // 30 days — aligned with Redis TTL
       gcTime: POI_BBOX_CACHE_TTL * 1000,    // 30 days — prevents GC eviction before staleTime expires
@@ -97,7 +102,9 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
     poisByLayer[layer].sort((a, b) => a.distAlongRouteKm - b.distAlongRouteKm)
   }
 
-  const isPending = isSliding || results.some((r) => r.isPending)
+  // isPending = true only when HTTP queries are actually in-flight — NOT when merely sliding
+  // (isSliding clears the map pins immediately, but shouldn't trigger the layer button spinner)
+  const isPending = results.some((r) => r.isPending)
   const hasError = results.some((r) => r.isError)
 
   return { poisByLayer, isPending, hasError }

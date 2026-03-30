@@ -58,6 +58,8 @@ vi.mock('@/stores/map.store', () => ({
     toggleAccommodationType: vi.fn(),
     selectedStageId: null,
     setSelectedStageId: vi.fn(),
+    searchCommitted: false,
+    setSearchCommitted: vi.fn(),
   }),
 }))
 

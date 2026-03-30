@@ -171,8 +171,26 @@ development_status:
   11-2-stage-interactive-map-placement: done # clic trace + drag marqueur sur carte
   11-3-stage-elevation-computation: done              # calcul D+ depuis waypoints.ele, graceful si absent
   11-4-stage-scoped-poi-search: done  # POI ancrés sur stage.endKm — référentiel relatif complet (km/D+/slider depuis endKm, amendement 2026-03-28)
-  11-5-stage-scoped-weather: backlog                 # météo par étape avec heure départ (dépend 11-1 + epic-6)
+  11-5-stage-scoped-weather: review                   # météo par étape avec heure départ (dépend 11-1 + epic-6)
   epic-11-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 16: User Acceptance Feedback — UX Polish & Quality Sprint
+  # (ajouté 2026-03-30 — issu de user-acceptance-feedback.md)
+  # PRIORITÉ : immédiatement après Epic 11
+  # ─────────────────────────────────────────────────────────────
+  epic-16: in-progress
+  16-1-critical-bug-fixes: done                       # mobile boutons + auto-search + flèches vent + overpass opt-in
+  16-2-adventures-list-timeline-ux: backlog           # D+ card + date début + tri + aventures passées
+  16-3-map-interaction-ux: backlog                    # zoom auto + reset zoom + clic-trace + loader
+  16-4-density-analysis-ux: backlog                   # état bouton densité + CTA sidebar + popin
+  16-5-strava-import-enhancements: backlog            # multi-select + pagination activités
+  16-6-ui-polish-modals-settings-tooltips: backlog    # popins + settings + tooltips + badge mode
+  16-7-help-and-feedback-system: backlog              # page aide + formulaire feedback
+  16-8-advanced-stage-management-speed: backlog       # split étape + placement profil + avg_speed_kmh
+  16-9-live-mode-stage-layer: backlog                 # layer étapes live + update GPS
+  16-10-observability-logging-kuma: backlog           # nestjs-pino structured logs + kuma alerts
+  epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
   # Epic 12: PWA & Offline Capability

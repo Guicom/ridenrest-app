@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, pgEnum } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core'
 import { user } from './auth'
 
 export const tierEnum = pgEnum('tier', ['free', 'pro', 'team'])
@@ -11,6 +11,7 @@ export const profiles = pgTable('profiles', {
   unitPref: unitPrefEnum('unit_pref').notNull().default('km'),
   currency: currencyEnum('currency').notNull().default('EUR'),
   stravaAthleteId: text('strava_athlete_id').unique(),
+  overpassEnabled: boolean('overpass_enabled').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 })

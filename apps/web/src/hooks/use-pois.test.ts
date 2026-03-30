@@ -9,13 +9,20 @@ import type { Poi } from '@ridenrest/shared'
 let mockVisibleLayers = new Set<string>()
 let mockFromKm = 0
 let mockToKm = 30
+let mockSearchCommitted = true  // default true so existing tests are unaffected
 
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
     visibleLayers: mockVisibleLayers,
     fromKm: mockFromKm,
     toKm: mockToKm,
+    searchCommitted: mockSearchCommitted,
   }),
+}))
+
+// Mock useProfile — default overpassEnabled=false so tests control it explicitly
+vi.mock('./use-profile', () => ({
+  useProfile: () => ({ data: { overpassEnabled: false } }),
 }))
 
 // Mock getPois
@@ -62,6 +69,7 @@ describe('usePois', () => {
     mockVisibleLayers = new Set()
     mockFromKm = 0
     mockToKm = 30
+    mockSearchCommitted = true
     mockGetPois.mockReset()
     mockUseQueries.mockReset()
     mockUseQueries.mockReturnValue([])
@@ -338,6 +346,39 @@ describe('usePois', () => {
     expect(key0.segmentId).toBe(key1.segmentId)
     expect(key0.fromKm).toBe(key1.fromKm)
     expect(key0.toKm).toBe(key1.toKm)
+  })
+
+  it('no queries fired when searchCommitted=false (AC #2 — explicit trigger gate)', () => {
+    mockVisibleLayers = new Set(['accommodations'])
+    mockSearchCommitted = false
+    mockUseQueries.mockReturnValue([])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const { queries } = lastCall![0]
+    expect(queries).toHaveLength(0)
+  })
+
+  it('queries fire when searchCommitted=true', () => {
+    mockVisibleLayers = new Set(['accommodations'])
+    mockSearchCommitted = true
+    mockUseQueries.mockReturnValue([{ data: [], isPending: false, isError: false }])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const { queries } = lastCall![0]
+    expect(queries).toHaveLength(1)
+  })
+
+  it('isPending=false when searchCommitted=false (no pending queries launched)', () => {
+    mockVisibleLayers = new Set(['accommodations'])
+    mockSearchCommitted = false
+    mockUseQueries.mockReturnValue([])
+
+    const { result } = renderHook(() => usePois([makeSegment()]))
+    expect(result.current.isPending).toBe(false)
   })
 
   it('staleTime and gcTime equal POI_BBOX_CACHE_TTL * 1000 (30 days, aligned with Redis TTL)', () => {

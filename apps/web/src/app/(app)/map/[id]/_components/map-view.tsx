@@ -26,6 +26,7 @@ import { MapStylePicker } from './map-style-picker'
 import { SidebarStagesSection } from './sidebar-stages-section'
 import { useStages } from '@/hooks/use-stages'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
+import { getStoredWeatherPace } from '@/lib/weather-pace'
 
 interface MapViewProps {
   adventureId: string
@@ -57,15 +58,16 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted } = useMapStore()
 
   // Reset transient map state when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
     return () => {
       setWeatherActive(false)
       setSelectedStageId(null)
+      setSearchCommitted(false)  // prevent auto-search on return navigation
     }
-  }, [setWeatherActive, setSelectedStageId])
+  }, [setWeatherActive, setSelectedStageId, setSearchCommitted])
 
   // Auto-show stage segments when a stage is selected from the search panel
   useEffect(() => {
@@ -133,6 +135,9 @@ export function MapView({ adventureId }: MapViewProps) {
     : null
 
   const { stages, createStage, updateStage, deleteStage } = useStages(adventureId)
+
+  // Read pace from localStorage once on mount — not reactive (acceptable per story dev notes)
+  const stagePace = getStoredWeatherPace()
 
   // Hover preview overlay during stageClickMode (AC1)
   const [hoverKmPreview, setHoverKmPreview] = useState<number | null>(null)
@@ -230,6 +235,9 @@ export function MapView({ adventureId }: MapViewProps) {
             onCreateStage={createStage}
             onUpdateStage={updateStage}
             onDeleteStage={deleteStage}
+            weatherActive={weatherActive}
+            departureTime={stagePace.departureTime}
+            speedKmh={stagePace.speedKmh}
           />
         </div>
       </aside>

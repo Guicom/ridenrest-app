@@ -48,6 +48,7 @@ const baseDto = {
   fromKm: 0,
   toKm: 30,
   categories: ['hotel'],
+  overpassEnabled: true,
 }
 
 const userId = 'user-001'
@@ -330,6 +331,28 @@ describe('PoisService', () => {
       expect(mockRedisClient.setex).not.toHaveBeenCalled()
       expect(result).toEqual([mockPoi])
     })
+
+    it('skips Overpass entirely when overpassEnabled=false, returns DB cache directly', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
+
+      const result = await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
+
+      expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+      expect(mockRedisClient.get).not.toHaveBeenCalled()
+      expect(mockRedisClient.setex).not.toHaveBeenCalled()
+      expect(result).toEqual([mockPoi])
+    })
+
+    it('calls Overpass when overpassEnabled=true', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
+
+      await service.findPois({ ...baseDto, overpassEnabled: true }, userId)
+
+      expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('findPois - live mode', () => {
@@ -338,6 +361,7 @@ describe('PoisService', () => {
       targetKm: 42.3,
       radiusKm: 3,
       categories: ['hotel'] as string[],
+      overpassEnabled: true,
     }
 
     const mockLivePoi: Poi = {
@@ -551,7 +575,7 @@ describe('PoisService', () => {
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
 
-      const liveDto = { segmentId: '00000000-0000-0000-0000-000000000001', targetKm: 10, radiusKm: 3, categories: ['hotel'] as string[] }
+      const liveDto = { segmentId: '00000000-0000-0000-0000-000000000001', targetKm: 10, radiusKm: 3, categories: ['hotel'] as string[], overpassEnabled: true }
       await service.findPois(liveDto, userId)
 
       const cacheKey = (mockRedisClient.get.mock.calls as string[][])[0][0]

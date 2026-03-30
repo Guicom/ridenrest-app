@@ -147,10 +147,10 @@ export function WeatherLayer({ map, weatherPoints, segmentWaypoints, dimension, 
           layout: {
             'text-field': '→',
             'text-size': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
-              0,  8,   // calm
-              20, 12,  // light breeze
-              40, 18,  // strong breeze
-              60, 24,  // storm
+              0,  16,  // calm
+              20, 24,  // light breeze
+              40, 36,  // strong breeze
+              60, 48,  // storm
             ] as maplibregl.ExpressionSpecification,
             'text-rotate': ['coalesce', ['get', 'windDirectionMaplibre'], 0],
             'text-rotation-alignment': 'map',

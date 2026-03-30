@@ -26,6 +26,11 @@ vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
 }))
 
+// Mock useProfile
+vi.mock('./use-profile', () => ({
+  useProfile: () => ({ data: { overpassEnabled: false } }),
+}))
+
 describe('useLivePoisSearch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -59,7 +64,7 @@ describe('useLivePoisSearch', () => {
     const lastCall = mockUseQuery.mock.calls[mockUseQuery.mock.calls.length - 1][0]
     // targetKm = Math.round((10.15 + 30) * 10) / 10 = 40.2
     expect(lastCall.queryKey).toEqual([
-      'pois', 'live', { segmentId: 'seg-1', targetKm: 40.2, radiusKm: 3 },
+      'pois', 'live', { segmentId: 'seg-1', targetKm: 40.2, radiusKm: 3, overpassEnabled: false },
     ])
   })
 

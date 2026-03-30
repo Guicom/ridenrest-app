@@ -55,37 +55,35 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
         </button>
       </div>
 
-      {/* Mobile action rows — < 1024px, visible only when card is selected */}
-      {isSelected && (
-        <div
-          className="block lg:hidden mt-3 space-y-2"
-          onClick={(e) => e.stopPropagation()}
+      {/* Mobile action rows — < 1024px, always visible */}
+      <div
+        className="block lg:hidden mt-3 space-y-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="w-full px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
+          onClick={() => onNavigate(`/live/${adventure.id}`)}
         >
+          Démarrer en Live
+        </button>
+        <div className="flex gap-2">
           <button
             type="button"
-            className="w-full px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
-            onClick={() => onNavigate(`/live/${adventure.id}`)}
+            className="flex-1 px-5 py-2 bg-[var(--surface-raised)] text-text-primary rounded-lg text-sm font-medium transition-colors hover:bg-[var(--border)]"
+            onClick={() => onNavigate(`/map/${adventure.id}?mode=planning`)}
           >
-            Démarrer en Live
+            Planning
           </button>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="flex-1 px-5 py-2 bg-[var(--surface-raised)] text-text-primary rounded-lg text-sm font-medium transition-colors hover:bg-[var(--border)]"
-              onClick={() => onNavigate(`/map/${adventure.id}?mode=planning`)}
-            >
-              Planning
-            </button>
-            <button
-              type="button"
-              className="flex-1 px-5 py-2 border border-[--border] text-text-primary bg-transparent rounded-lg text-sm font-medium transition-colors hover:bg-[var(--surface-raised)]"
-              onClick={() => onNavigate(`/adventures/${adventure.id}`)}
-            >
-              Modifier
-            </button>
-          </div>
+          <button
+            type="button"
+            className="flex-1 px-5 py-2 border border-[--border] text-text-primary bg-transparent rounded-lg text-sm font-medium transition-colors hover:bg-[var(--surface-raised)]"
+            onClick={() => onNavigate(`/adventures/${adventure.id}`)}
+          >
+            Modifier
+          </button>
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -185,6 +185,16 @@ export async function deleteStage(adventureId: string, stageId: string): Promise
 
 export type { AdventureStageResponse, CreateStageInput, UpdateStageInput }
 
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+export interface ProfileResponse {
+  overpassEnabled: boolean
+}
+
+export async function getProfile(): Promise<ProfileResponse> {
+  return apiFetch<ProfileResponse>('/api/profile')
+}
+
 // ── POIs ──────────────────────────────────────────────────────────────────────
 
 import type { Poi, PoiCategory } from '@ridenrest/shared'
@@ -194,6 +204,7 @@ export interface GetPoisParams {
   fromKm: number
   toKm: number
   categories?: PoiCategory[]
+  overpassEnabled?: boolean
 }
 
 export async function getPois(params: GetPoisParams): Promise<Poi[]> {
@@ -205,6 +216,9 @@ export async function getPois(params: GetPoisParams): Promise<Poi[]> {
   if (params.categories && params.categories.length > 0) {
     params.categories.forEach((c) => searchParams.append('categories', c))
   }
+  if (params.overpassEnabled) {
+    searchParams.set('overpassEnabled', 'true')
+  }
   return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
 }
 
@@ -213,6 +227,7 @@ export interface GetLivePoisParams {
   targetKm: number
   radiusKm: number
   categories?: PoiCategory[]
+  overpassEnabled?: boolean
 }
 
 export async function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
@@ -223,6 +238,9 @@ export async function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
   })
   if (params.categories && params.categories.length > 0) {
     params.categories.forEach((c) => searchParams.append('categories', c))
+  }
+  if (params.overpassEnabled) {
+    searchParams.set('overpassEnabled', 'true')
   }
   return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
 }
@@ -319,6 +337,26 @@ export async function getWeatherForecast(params: GetWeatherParams): Promise<Weat
 }
 
 export type { WeatherForecast }
+
+// ── Stage Weather ─────────────────────────────────────────────────────────────
+
+import type { StageWeatherPoint } from '@ridenrest/shared'
+
+export interface GetStageWeatherParams {
+  stageId: string
+  departureTime?: string
+  speedKmh?: number
+}
+
+export async function getStageWeather(params: GetStageWeatherParams): Promise<StageWeatherPoint | null> {
+  const search = new URLSearchParams()
+  if (params.departureTime) search.set('departureTime', params.departureTime)
+  if (params.speedKmh != null) search.set('speedKmh', String(params.speedKmh))
+  const qs = search.toString()
+  return apiFetch<StageWeatherPoint | null>(`/api/stages/${params.stageId}/weather${qs ? `?${qs}` : ''}`)
+}
+
+export type { StageWeatherPoint }
 
 export const apiClient = {
   get: <T>(path: string, init?: RequestInit) =>

@@ -101,7 +101,7 @@ Attendu: Ajouter une page d'aide, presente dans le menu à gauche de mon compte,
 
 Écran / fonctionnalité : PLanning / Gestion des étapes
 Priorité 🟡 amélioration
-Attendu: Ajouter le possibilité d'ajouter une étapeà l'intérier d'une étape existante. Placer cette étape au bon endroit dans le sidebar
+Attendu: Ajouter le possibilité d'ajouter une étape à l'intérier d'une étape existante. Placer cette étape au bon endroit dans le sidebar
 
 Écran / fonctionnalité : Live / Gestion des étapes
 Priorité 🟡 amélioration
@@ -111,7 +111,7 @@ Attendu: Ajouter un layer affichant les étapes. Le switche de trouvera dans le 
 Priorité 🟡 amélioration
 Attendu: Ajouter une option en mode live pour mettre à jour la fin d’une étape avec ma position et qui recalcule les autres étapes
 
-Écran / fonctionnalité : Live / Gestion des étapes
+Écran / fonctionnalité : Planning / Gestion des étapes
 Priorité 🟡 amélioration
 Attendu: Ajouter la possiblite d'ajouter et de déplacer des étapes depuis la partie profil de l'aventure
 
@@ -126,3 +126,7 @@ Attendu: Ajouter à côté du nom de l'aventure dans quel mode on est, planning 
 Écran / fonctionnalité : Log
 Priorité 🟡 amélioration
 Attendu: Ajouter une gestion des logs pour facilement débug
+
+Écran / fonctionnalité : Planning / Gestion des étapes / météo
+Priorité 🟡 amélioration
+Attendu: Ajouter une date de départ pour chaque étape, et se baser sur cette date pour calculer la météo par étape. Ajouter un badge quelque part pou indiquer que la météo est calculé par étape

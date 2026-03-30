@@ -280,8 +280,8 @@ describe('WeatherLayer', () => {
     )
     const textSize = addLayerCall?.[0]?.layout?.['text-size'] as unknown[]
     expect(textSize[0]).toBe('interpolate')
-    expect(textSize).toContain(8)   // calm stop
-    expect(textSize).toContain(24)  // storm stop (capped)
+    expect(textSize).toContain(16)  // calm stop (2× increase from AC #3)
+    expect(textSize).toContain(48)  // storm stop (2× increase from AC #3)
   })
 
   it('mounts wind arrows layer with text-opacity 0.4 at calm and coalesce guard (AC #2)', () => {

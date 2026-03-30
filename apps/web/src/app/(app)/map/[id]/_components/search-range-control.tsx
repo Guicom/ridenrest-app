@@ -3,11 +3,12 @@ import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
 import { computeElevationGain } from '@ridenrest/gpx'
+import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
 
-const MAX_RANGE_KM = 50
+const MAX_RANGE_KM = MAX_SEARCH_RANGE_KM
 
 interface SearchRangeControlProps {
   totalDistanceKm: number
@@ -37,7 +38,10 @@ export function SearchRangeControl({
   totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages,
 }: SearchRangeControlProps) {
   const [expanded, setExpanded] = useState(true)
-  const { fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId } = useMapStore()
+  const {
+    fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId,
+    searchCommitted, setSearchCommitted,
+  } = useMapStore()
 
   // rangeKm local state — default 15 km when store is at initial values (0, 30)
   const [rangeKm, setRangeKm] = useState(() =>
@@ -246,6 +250,17 @@ export function SearchRangeControl({
               </button>
             </div>
           </div>
+
+          {/* Search CTA — explicit trigger (AC #2) */}
+          <button
+            type="button"
+            data-testid="search-commit-btn"
+            onClick={() => setSearchCommitted(true)}
+            disabled={fromKm >= toKm || totalDistanceKm === 0}
+            className="w-full py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            Rechercher
+          </button>
         </div>
       )}
     </div>

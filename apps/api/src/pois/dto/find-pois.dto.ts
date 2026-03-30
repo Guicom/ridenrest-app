@@ -1,4 +1,4 @@
-import { IsUUID, IsNumber, IsOptional, IsArray, IsIn, Min, Max, ValidateIf } from 'class-validator'
+import { IsUUID, IsNumber, IsOptional, IsArray, IsIn, IsBoolean, Min, Max, ValidateIf } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
 import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import type { PoiCategory } from '@ridenrest/shared'
@@ -41,6 +41,11 @@ export class FindPoisDto {
   @IsArray()
   @IsIn(POI_CATEGORIES, { each: true })
   categories?: PoiCategory[]
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => value === 'true' || value === true)
+  @IsBoolean()
+  overpassEnabled?: boolean
 }
 
 // Export the constant for use in service validation

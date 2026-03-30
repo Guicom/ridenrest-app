@@ -17,6 +17,7 @@ interface MapState {
   fromKm: number
   toKm: number
   searchRangeInteracted: boolean
+  searchCommitted: boolean
 
   // Density colorization toggle
   densityColorEnabled: boolean
@@ -39,6 +40,7 @@ interface MapState {
   toggleLayer: (layer: MapLayer) => void
   setViewport: (zoom: number, center: [number, number]) => void
   setSearchRange: (fromKm: number, toKm: number) => void
+  setSearchCommitted: (v: boolean) => void
   toggleDensityColor: () => void
   setWeatherActive: (active: boolean) => void
   setWeatherDimension: (dimension: WeatherDimension) => void
@@ -55,6 +57,7 @@ export const useMapStore = create<MapState>((set) => ({
   fromKm: 0,
   toKm: 30,
   searchRangeInteracted: false,
+  searchCommitted: false,
   densityColorEnabled: false,
   weatherActive: false,
   weatherDimension: 'temperature',
@@ -77,7 +80,9 @@ export const useMapStore = create<MapState>((set) => ({
 
   setViewport: (zoom, center) => set({ zoom, center }),
 
-  setSearchRange: (fromKm, toKm) => set({ fromKm, toKm, searchRangeInteracted: true }),
+  setSearchRange: (fromKm, toKm) => set({ fromKm, toKm, searchRangeInteracted: true, searchCommitted: false }),
+
+  setSearchCommitted: (v) => set(v ? { searchCommitted: true, searchRangeInteracted: true } : { searchCommitted: false }),
 
   toggleDensityColor: () => set((state) => ({ densityColorEnabled: !state.densityColorEnabled })),
 

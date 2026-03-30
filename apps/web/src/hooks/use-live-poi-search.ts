@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useLiveStore } from '@/stores/live.store'
 import { getLivePois } from '@/lib/api-client'
+import { useProfile } from './use-profile'
 import type { Poi } from '@ridenrest/shared'
 
 export function useLivePoisSearch(segmentId: string | undefined) {
@@ -8,6 +9,8 @@ export function useLivePoisSearch(segmentId: string | undefined) {
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
+  const { data: profile } = useProfile()
+  const overpassEnabled = profile?.overpassEnabled ?? false
 
   // Always computed from current GPS position — used as queryKey and returned for map target dot
   const targetKm = currentKmOnRoute !== null
@@ -16,11 +19,12 @@ export function useLivePoisSearch(segmentId: string | undefined) {
 
   // enabled: false — only fetches when refetch() is called explicitly (RECHERCHER button)
   const { data: pois = [], isFetching, isError, refetch } = useQuery<Poi[]>({
-    queryKey: ['pois', 'live', { segmentId, targetKm, radiusKm: searchRadiusKm }],
+    queryKey: ['pois', 'live', { segmentId, targetKm, radiusKm: searchRadiusKm, overpassEnabled }],
     queryFn: () => getLivePois({
       segmentId: segmentId!,
       targetKm: targetKm!,
       radiusKm: searchRadiusKm,
+      overpassEnabled,
     }),
     enabled: false,
     staleTime: Infinity,

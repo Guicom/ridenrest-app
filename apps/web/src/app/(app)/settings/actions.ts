@@ -7,6 +7,18 @@ import { auth } from '@/lib/auth/auth'
 import { authDb, profiles, account } from '@ridenrest/database'
 import { eq, and } from 'drizzle-orm'
 
+export async function updateOverpassEnabled(enabled: boolean): Promise<void> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) redirect('/login')
+
+  await authDb
+    .update(profiles)
+    .set({ overpassEnabled: enabled })
+    .where(eq(profiles.id, session.user.id))
+
+  revalidatePath('/settings')
+}
+
 export async function deleteAccount(confirmedEmail: string): Promise<{ error?: string } | void> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect('/login')

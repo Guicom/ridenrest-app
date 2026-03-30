@@ -10,10 +10,15 @@ describe('useMapStore', () => {
       center: null,
       fromKm: 0,
       toKm: 30,
+      searchRangeInteracted: false,
+      searchCommitted: false,
       densityColorEnabled: true,
       weatherActive: false,
       weatherDimension: 'temperature',
-    })
+      activeAccommodationTypes: new Set(['hotel']),
+      selectedPoiId: null,
+      selectedStageId: null,
+    }, true)
   })
 
   it('initializes with correct defaults', () => {
@@ -56,11 +61,33 @@ describe('useMapStore', () => {
     expect(state.center).toEqual([48.8566, 2.3522])
   })
 
-  it('setSearchRange updates fromKm and toKm', () => {
+  it('setSearchRange updates fromKm, toKm, searchRangeInteracted and resets searchCommitted', () => {
+    useMapStore.setState({ searchCommitted: true })
     useMapStore.getState().setSearchRange(10, 40)
     const state = useMapStore.getState()
     expect(state.fromKm).toBe(10)
     expect(state.toKm).toBe(40)
+    expect(state.searchRangeInteracted).toBe(true)
+    expect(state.searchCommitted).toBe(false)
+  })
+
+  it('searchCommitted defaults to false', () => {
+    useMapStore.setState({ searchCommitted: false })
+    expect(useMapStore.getState().searchCommitted).toBe(false)
+  })
+
+  it('setSearchCommitted(true) sets searchCommitted and searchRangeInteracted to true', () => {
+    useMapStore.setState({ searchCommitted: false, searchRangeInteracted: false })
+    useMapStore.getState().setSearchCommitted(true)
+    const state = useMapStore.getState()
+    expect(state.searchCommitted).toBe(true)
+    expect(state.searchRangeInteracted).toBe(true)
+  })
+
+  it('setSearchCommitted(false) sets searchCommitted to false', () => {
+    useMapStore.setState({ searchCommitted: true })
+    useMapStore.getState().setSearchCommitted(false)
+    expect(useMapStore.getState().searchCommitted).toBe(false)
   })
 
   it('densityColorEnabled defaults to true', () => {
