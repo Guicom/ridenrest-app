@@ -40,7 +40,7 @@ export function SearchRangeControl({
   const [expanded, setExpanded] = useState(true)
   const {
     fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId,
-    searchCommitted, setSearchCommitted,
+    setSearchCommitted,
   } = useMapStore()
 
   // rangeKm local state — default 15 km when store is at initial values (0, 30)
