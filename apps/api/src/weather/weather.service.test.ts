@@ -98,7 +98,8 @@ describe('WeatherService', () => {
       expect(callLng).toBe(lng)
 
       // ETA: 08:00 + 4.75h = 12:45:00
-      const callDate = (mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0] as [number, number, Date])[2]      expect(callDate.toISOString()).toBe('2026-03-22T12:45:00.000Z')
+      const callDate = (mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0] as [number, number, Date])[2]
+      expect(callDate.toISOString()).toBe('2026-03-22T12:45:00.000Z')
     })
 
     it('falls back to Date.now() when no departureTime', async () => {
@@ -109,7 +110,8 @@ describe('WeatherService', () => {
       await service.getWeatherAtKm('adv-1', 95)
 
       const after = Date.now()
-      const callDate = (mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0] as [number, number, Date])[2]      expect(callDate.getTime()).toBeGreaterThanOrEqual(before)
+      const callDate = (mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0] as [number, number, Date])[2]
+      expect(callDate.getTime()).toBeGreaterThanOrEqual(before)
       expect(callDate.getTime()).toBeLessThanOrEqual(after)
     })
 
@@ -146,7 +148,8 @@ describe('WeatherService', () => {
       // targetKm=75: etaMs with speed=15 = 08:00 + (75/15)*3600s = 08:00 + 5h = 13:00
       await service.getWeatherAtKm('adv-1', 75, departureTime)  // no speedKmh = default 15
 
-      const callDate = (mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0] as [number, number, Date])[2]      expect(callDate.toISOString()).toBe('2026-03-22T13:00:00.000Z')
+      const callDate = (mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0] as [number, number, Date])[2]
+      expect(callDate.toISOString()).toBe('2026-03-22T13:00:00.000Z')
     })
   })
 
@@ -219,7 +222,8 @@ describe('WeatherService', () => {
 
       // First waypoint: adventureKm = 10 + 0 = 10km, eta = 08:00 + (10/20)*3600s = 08:00 + 30min = 08:30
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const firstCallDate = mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0][2]      expect(firstCallDate.toISOString()).toBe('2026-03-22T08:30:00.000Z')
+      const firstCallDate = mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0][2] as Date
+      expect(firstCallDate.toISOString()).toBe('2026-03-22T08:30:00.000Z')
     })
 
     it('falls back to current time when no pace provided (FR-055)', async () => {
@@ -232,7 +236,8 @@ describe('WeatherService', () => {
 
       const afterCall = Date.now()
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      const callDate = mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0][2]      expect(callDate.getTime()).toBeGreaterThanOrEqual(beforeCall)
+      const callDate = mockOpenMeteoProvider.fetchHourlyForecast.mock.calls[0][2] as Date
+      expect(callDate.getTime()).toBeGreaterThanOrEqual(beforeCall)
       expect(callDate.getTime()).toBeLessThanOrEqual(afterCall)
     })
 
