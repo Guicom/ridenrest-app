@@ -1,3 +1,12 @@
+export interface StageWeatherPoint {
+  forecastAt: string           // ISO 8601 — ETA at stage endpoint
+  temperatureC: number
+  precipitationMmH: number     // mm/h (Open-Meteo precipitation field)
+  windSpeedKmh: number
+  windDirectionDeg: number     // degrees, meteorological (0=N, clockwise)
+  iconEmoji: string | null
+}
+
 export interface WeatherPoint {
   km: number                         // Position along route (segment-relative)
   forecastAt: string                 // ISO 8601 — estimated passage time (ETA)

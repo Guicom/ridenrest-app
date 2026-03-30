@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { STAGE_COLORS } from '@ridenrest/shared'
 import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
+import { StageWeatherBadge } from './stage-weather-badge'
 
 interface SidebarStagesSectionProps {
   stages: AdventureStageResponse[]
@@ -38,6 +39,9 @@ interface SidebarStagesSectionProps {
   onCreateStage: (data: CreateStageInput) => Promise<void>
   onUpdateStage: (stageId: string, data: UpdateStageInput) => Promise<void>
   onDeleteStage: (stageId: string) => Promise<void>
+  weatherActive?: boolean
+  departureTime?: string
+  speedKmh?: number
 }
 
 export function SidebarStagesSection({
@@ -53,6 +57,9 @@ export function SidebarStagesSection({
   onCreateStage: createStage,
   onUpdateStage: updateStage,
   onDeleteStage: deleteStage,
+  weatherActive = false,
+  departureTime,
+  speedKmh,
 }: SidebarStagesSectionProps) {
 
   const [expanded, setExpanded] = useState(false)
@@ -185,6 +192,13 @@ export function SidebarStagesSection({
                         : `${Math.floor(stage.etaMinutes / 60)}h${String(stage.etaMinutes % 60).padStart(2, '0')}`
                       : '— min'}
                   </span>
+                  {weatherActive && (
+                    <StageWeatherBadge
+                      stageId={stage.id}
+                      departureTime={departureTime}
+                      speedKmh={speedKmh}
+                    />
+                  )}
                   <button
                     onClick={() => handleEditOpen(stage)}
                     aria-label={`Modifier ${stage.name}`}

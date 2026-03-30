@@ -7,6 +7,7 @@ export interface OpenMeteoHour {
   windSpeedKmh: number
   windDirection: number
   precipitationProbability: number
+  precipitationMmH: number  // mm accumulated over the hour slot (≈ mm/h)
   weatherCode: number
 }
 
@@ -17,6 +18,7 @@ interface OpenMeteoResponse {
     wind_speed_10m: number[]
     wind_direction_10m: number[]
     precipitation_probability: number[]
+    precipitation: number[]
     weather_code: number[]
   }
 }
@@ -55,7 +57,7 @@ export class OpenMeteoProvider {
     const params = new URLSearchParams({
       latitude: String(lat),
       longitude: String(lng),
-      hourly: 'temperature_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,weather_code',
+      hourly: 'temperature_2m,wind_speed_10m,wind_direction_10m,precipitation_probability,precipitation,weather_code',
       start_date: dateStr,
       end_date: dateStr,
       timezone: 'UTC',
@@ -89,6 +91,7 @@ export class OpenMeteoProvider {
           windSpeedKmh: data.hourly.wind_speed_10m[idx],
           windDirection: data.hourly.wind_direction_10m[idx],
           precipitationProbability: data.hourly.precipitation_probability[idx],
+          precipitationMmH: data.hourly.precipitation[idx] ?? 0,
           weatherCode: data.hourly.weather_code[idx],
         }
       }

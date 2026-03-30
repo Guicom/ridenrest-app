@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { db, adventureStages } from '@ridenrest/database'
+import { db, adventureStages, adventures } from '@ridenrest/database'
 import type { AdventureStage, NewAdventureStage } from '@ridenrest/database'
 import { eq, asc, desc, and, gt, sql } from 'drizzle-orm'
 
@@ -59,6 +59,28 @@ export class StagesRepository {
       .from(adventureStages)
       .where(and(eq(adventureStages.adventureId, adventureId), gt(adventureStages.orderIndex, orderIndex)))
       .orderBy(asc(adventureStages.orderIndex))
+  }
+
+  /** Find a stage by id with ownership check via adventures.user_id. */
+  async findByIdWithAdventureUserId(
+    id: string,
+    userId: string,
+  ): Promise<{ id: string; adventureId: string; endKm: number } | null> {
+    const [row] = await db
+      .select({
+        id: adventureStages.id,
+        adventureId: adventureStages.adventureId,
+        endKm: adventureStages.endKm,
+      })
+      .from(adventureStages)
+      .innerJoin(adventures, eq(adventureStages.adventureId, adventures.id))
+      .where(
+        and(
+          eq(adventureStages.id, id),
+          eq(adventures.userId, userId),
+        ),
+      )
+    return row ?? null
   }
 
   async delete(id: string): Promise<void> {

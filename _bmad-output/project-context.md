@@ -411,6 +411,29 @@ Documents to keep in sync:
 
 ---
 
+### POI Search — Explicit Trigger Gate (`searchCommitted`)
+
+POI searches (planning mode) are **never fired automatically**. The user must click "Rechercher".
+
+- `useMapStore.searchCommitted: boolean` — gate, default `false`
+- `setSearchRange()` resets `searchCommitted: false` on every slider move
+- `setSearchCommitted(true)` also sets `searchRangeInteracted: true` (corridor highlight + weather panel)
+- `use-pois.ts` returns empty `segmentRanges` when `!searchCommitted` → no TanStack Query fires
+- `isPending` in `usePois` reflects **only real HTTP requests** (not slider movement)
+- Button label is always **"Rechercher"** (never changes to "Mettre à jour")
+- On SPA unmount (`map-view.tsx` cleanup): `setSearchCommitted(false)` prevents auto-search on back-navigation
+
+### Overpass Opt-in (`overpassEnabled`)
+
+Overpass API calls are **opt-in** — disabled by default for all users.
+
+- `profiles.overpass_enabled boolean DEFAULT false` — persisted in DB
+- NestJS: `GET /api/profile` + `PATCH /api/profile` — `ProfileModule`
+- Frontend: `useProfile()` hook reads the flag, passes it to `getPois()` and `getLivePois()`
+- Gate applies to **both planning and live mode**: `PoisService.findPois()` early-returns DB cache (no Redis, no Overpass) when `overpassEnabled=false`
+- TQ query keys include `overpassEnabled` to avoid cache sharing between opt-in/opt-out
+- Settings page: `OverpassToggle` component, section "Recherche de points d'intérêt"
+
 ### Corridor Search — 30 km Max Range
 
 POI search range is capped at **30 km max** (`toKm - fromKm ≤ 30`).

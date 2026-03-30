@@ -7,5 +7,6 @@ import { OpenMeteoProvider } from './providers/open-meteo.provider.js'
 @Module({
   controllers: [WeatherController],
   providers: [WeatherService, WeatherRepository, OpenMeteoProvider],
+  exports: [WeatherService],
 })
 export class WeatherModule {}

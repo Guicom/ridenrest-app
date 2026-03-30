@@ -3,7 +3,7 @@ import { WeatherRepository } from './weather.repository.js'
 import { OpenMeteoProvider } from './providers/open-meteo.provider.js'
 import { GetWeatherDto } from './dto/get-weather.dto.js'
 import { WMO_ICON, WMO_ICON_FALLBACK, WEATHER_CACHE_TTL } from '@ridenrest/shared'
-import type { WeatherForecast, WeatherPoint } from '@ridenrest/shared'
+import type { WeatherForecast, WeatherPoint, StageWeatherPoint } from '@ridenrest/shared'
 
 const SAMPLE_KM = 5
 
@@ -100,6 +100,7 @@ export class WeatherService {
     })
 
     // Fire-and-forget DB upsert (non-blocking)
+
     const dbPoints = weatherPoints.map((wp) => ({
       segmentId: dto.segmentId,
       waypointKm: wp.km,
@@ -119,6 +120,42 @@ export class WeatherService {
       waypoints: weatherPoints,
       cachedAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
+    }
+  }
+
+  /** Fetch a single weather point at adventure-wide `targetKm`.
+   *  Used by the stage weather endpoint. Returns null if waypoints unavailable. */
+  async getWeatherAtKm(
+    adventureId: string,
+    targetKm: number,
+    departureTime?: string,
+    speedKmh?: number,
+  ): Promise<StageWeatherPoint | null> {
+    const segment = await this.weatherRepo.findSegmentContainingKm(adventureId, targetKm)
+    if (!segment || segment.waypoints.length === 0) return null
+
+    const relativeKm = targetKm - segment.cumulativeStartKm
+    const closestWp = segment.waypoints.reduce((best, wp) => {
+      return Math.abs(wp.dist_km - relativeKm) < Math.abs(best.dist_km - relativeKm) ? wp : best
+    })
+
+    const speed = speedKmh ?? 15  // default 15 km/h (consistent with story 11.1)
+    const etaMs = departureTime
+      ? new Date(departureTime).getTime() + (targetKm / speed) * 3_600_000
+      : Date.now()
+
+    const data = await this.openMeteoProvider.fetchHourlyForecast(closestWp.lat, closestWp.lng, new Date(etaMs))
+    if (!data) return null
+
+    const iconEmoji = WMO_ICON[data.weatherCode] ?? WMO_ICON_FALLBACK
+
+    return {
+      forecastAt: new Date(etaMs).toISOString(),
+      temperatureC: data.temperatureC,
+      precipitationMmH: data.precipitationMmH,
+      windSpeedKmh: data.windSpeedKmh,
+      windDirectionDeg: data.windDirection,
+      iconEmoji,
     }
   }
 }

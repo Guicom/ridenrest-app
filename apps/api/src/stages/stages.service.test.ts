@@ -2,6 +2,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common'
 import { StagesService, computeElevationGainForRange, computeEtaMinutes } from './stages.service.js'
 import type { StagesRepository } from './stages.repository.js'
 import type { AdventuresService } from '../adventures/adventures.service.js'
+import type { WeatherService } from '../weather/weather.service.js'
 import type { AdventureStage } from '@ridenrest/database'
 import type { MapWaypoint } from '@ridenrest/shared'
 
@@ -45,6 +46,7 @@ const mockStagesRepo = {
   delete: jest.fn(),
   updateMany: jest.fn(),
   findSubsequent: jest.fn(),
+  findByIdWithAdventureUserId: jest.fn(),
 }
 
 const mockAdventuresService = {
@@ -52,14 +54,74 @@ const mockAdventuresService = {
   getAdventureWaypoints: jest.fn().mockResolvedValue(defaultWaypoints),
 }
 
+const mockWeatherService = {
+  getWeatherAtKm: jest.fn(),
+}
+
 const service = new StagesService(
   mockStagesRepo as unknown as StagesRepository,
   mockAdventuresService as unknown as AdventuresService,
+  mockWeatherService as unknown as WeatherService,
 )
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockAdventuresService.getAdventureWaypoints.mockResolvedValue(defaultWaypoints)
+})
+
+// ─── getStageWeather ─────────────────────────────────────────────────────────
+
+const SAMPLE_STAGE_FOR_WEATHER = {
+  id: 'stage-1',
+  adventureId: 'adv-1',
+  endKm: 95.4,
+}
+
+const SAMPLE_WEATHER_POINT = {
+  forecastAt: '2026-03-22T12:00:00.000Z',
+  temperatureC: 14,
+  precipitationMmH: 0,
+  windSpeedKmh: 12,
+  windDirectionDeg: 270,
+  iconEmoji: '☁️',
+}
+
+describe('getStageWeather', () => {
+  it('calls stagesRepo and weatherService with correct args', async () => {
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(SAMPLE_STAGE_FOR_WEATHER)
+    mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    const result = await service.getStageWeather('stage-1', 'user-1', {
+      departureTime: '2026-03-22T08:00:00.000Z',
+      speedKmh: 15,
+    })
+
+    expect(mockStagesRepo.findByIdWithAdventureUserId).toHaveBeenCalledWith('stage-1', 'user-1')
+    expect(mockWeatherService.getWeatherAtKm).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      '2026-03-22T08:00:00.000Z',
+      15,
+    )
+    expect(result).toEqual(SAMPLE_WEATHER_POINT)
+  })
+
+  it('throws NotFoundException when stage not found', async () => {
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(null)
+
+    await expect(
+      service.getStageWeather('stage-unknown', 'user-1', {}),
+    ).rejects.toThrow(NotFoundException)
+    expect(mockWeatherService.getWeatherAtKm).not.toHaveBeenCalled()
+  })
+
+  it('returns null when weatherService returns null (no waypoints)', async () => {
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(SAMPLE_STAGE_FOR_WEATHER)
+    mockWeatherService.getWeatherAtKm.mockResolvedValue(null)
+
+    const result = await service.getStageWeather('stage-1', 'user-1', {})
+    expect(result).toBeNull()
+  })
 })
 
 // ─── computeElevationGainForRange unit tests ───────────────────────────────

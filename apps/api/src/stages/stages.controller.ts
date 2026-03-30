@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestjs/common'
+import { ParseUUIDPipe } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { StagesService } from './stages.service.js'
 import { CreateStageDto } from './dto/create-stage.dto.js'
 import { UpdateStageDto } from './dto/update-stage.dto.js'
+import { GetStageWeatherDto } from './dto/get-stage-weather.dto.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator.js'
 
@@ -49,5 +51,21 @@ export class StagesController {
     @Param('stageId') stageId: string,
   ) {
     return this.stagesService.deleteStage(adventureId, stageId, user.id)
+  }
+}
+
+@ApiTags('stages')
+@Controller('stages')
+export class StagesWeatherController {
+  constructor(private readonly stagesService: StagesService) {}
+
+  @Get(':id/weather')
+  @ApiOperation({ summary: 'Get weather forecast for a stage endpoint (ETA-adjusted)' })
+  getStageWeather(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() dto: GetStageWeatherDto,
+  ) {
+    return this.stagesService.getStageWeather(id, user.id, dto)
   }
 }

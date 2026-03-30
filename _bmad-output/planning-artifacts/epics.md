@@ -1785,6 +1785,256 @@ So that I know what conditions to expect at my overnight stop.
 
 ---
 
+## Epic 16: User Acceptance Feedback — UX Polish & Quality Sprint
+
+> **Ajouté 2026-03-30** — Epic consolidant l'ensemble des retours utilisateur (user-acceptance-feedback.md) recueillis lors de la recette de Guillaume. **Priorité d'exécution : immédiatement après Epic 11.** Inclut bugs bloquants (🔴), améliorations UX (🟡), et nouvelles fonctionnalités demandées.
+
+Transformer tous les feedbacks de recette en stories implémentables, ordonnées par sévérité et logique fonctionnelle.
+
+### Story 16.1: Critical Bug Fixes
+
+As a **user on mobile or desktop**,
+I want all critical UI bugs fixed,
+So that the core workflow functions correctly without workarounds.
+
+**Acceptance Criteria:**
+
+**Given** the user views the adventures list on mobile,
+**When** the page renders,
+**Then** all action buttons (edit, delete, open map) are visible without requiring any tap or hover interaction first.
+
+**Given** the user is on the Planning map page,
+**When** the page loads or the km range changes,
+**Then** the hotel/POI search does NOT trigger automatically; search only launches when the user explicitly clicks the search button.
+
+**Given** weather data with wind information is displayed on the map,
+**When** wind arrows are rendered,
+**Then** their size is 2× to 3× larger than the current implementation, making them clearly visible at typical zoom levels.
+
+---
+
+### Story 16.2: Adventures List & Timeline UX
+
+As a **cyclist managing multiple adventures**,
+I want richer information on my adventures list and better chronological management,
+So that I can quickly identify upcoming trips and archive past ones.
+
+**Acceptance Criteria:**
+
+**Given** the adventures list renders,
+**When** an adventure card is displayed,
+**Then** the D+ (elevation gain in meters) is shown below the total distance in the card (format: "↑ 4 200 m").
+
+**Given** an adventure,
+**When** the user accesses the adventure detail or edit form,
+**Then** a start date field is available (date picker — ISO 8601, stored as `start_date` on the adventure).
+
+**Given** adventures have a start date,
+**When** the list renders,
+**Then** adventures are sorted: upcoming (by ascending start date) first, then undated, then past. Past adventures are hidden in a collapsible "Aventures passées" section at the bottom of the list.
+
+**Given** an adventure's start date has passed AND the adventure status is not `active`,
+**When** displayed,
+**Then** it appears in the "Aventures passées" section; if `status = active`, it stays in the main list regardless of start date.
+
+---
+
+### Story 16.3: Map Interaction UX
+
+As a **cyclist using the planning map**,
+I want more intuitive map interactions,
+So that I can navigate search results and control the viewport efficiently.
+
+**Acceptance Criteria:**
+
+**Given** a POI search completes,
+**When** results are returned,
+**Then** the map auto-zooms to fit the search corridor (the km range segment + ~10% padding around the bounding box).
+
+**Given** the user has panned or zoomed the map manually,
+**When** they click a "Reset zoom" button (persistent in the map controls, e.g., bottom-right corner),
+**Then** the map recenters and zooms to fit the full adventure trace.
+
+**Given** the user clicks on a point on the GPX trace,
+**When** the click is on or within 10px of the trace line,
+**Then** a "Rechercher depuis ici" CTA appears (tooltip or floating button) that sets `fromKm` to the clicked km position and opens the search panel.
+
+**Given** a POI search is in progress,
+**When** results are loading,
+**Then** a centered loading overlay (spinner + "Recherche en cours…") is displayed over the map. Any previous inline "Recherche en cours" text style is removed. The overlay disappears as soon as results are rendered.
+
+---
+
+### Story 16.4: Density Analysis UX
+
+As a **cyclist using density analysis**,
+I want clearer state feedback on the analysis button and an informed consent popup,
+So that I know whether analysis is current and understand what the calculation represents.
+
+**Acceptance Criteria:**
+
+**Given** no density analysis has been run on an adventure,
+**When** the Planning sidebar renders,
+**Then** a CTA "Lancer l'analyse de densité" is visible in the sidebar (below the stages section), in addition to the button in the map controls area.
+
+**Given** a density analysis has been completed and no segment has been modified/added/deleted since,
+**When** the density trigger button renders,
+**Then** the button appears in a "done" state (distinct color — e.g., green tint — checkmark icon, label: "Densité analysée") and is disabled.
+
+**Given** a segment is added, modified, or deleted after a density analysis was run,
+**When** the button renders next time,
+**Then** the button reverts to its "launch" state (re-enabled), prompting the user to re-run analysis.
+
+**Given** the user clicks the density analysis trigger (in any state that allows triggering),
+**When** the click is registered,
+**Then** an explanatory modal appears before launching with the text: "L'analyse se base sur la présence d'hébergements et non leur disponibilité réelle. L'application peut rester ouverte ou être fermée pendant le calcul." — with a "Lancer l'analyse" CTA and a "Annuler" button.
+
+---
+
+### Story 16.5: Strava Import Enhancements
+
+As a **cyclist importing activities from Strava**,
+I want a richer import experience,
+So that I can select multiple activities and browse beyond the first page of results.
+
+**Acceptance Criteria:**
+
+**Given** the Strava activity import dialog is open,
+**When** the activity list renders,
+**Then** a "Charger plus" button (or infinite scroll trigger) loads the next page of Strava activities (Strava API `per_page=30`, incrementing `page` parameter on each load).
+
+**Given** the Strava activity list is displayed,
+**When** the user browses activities,
+**Then** each activity row has a checkbox for multi-selection; a "Importer X segment(s)" CTA at the bottom is enabled when ≥ 1 activity is checked and shows the count.
+
+**Given** the user confirms multi-import,
+**When** import is triggered,
+**Then** all selected activities are imported as individual segments, each going through the same BullMQ `parse-segment` pipeline as a single import; segments are added in the order they were selected.
+
+---
+
+### Story 16.6: UI Polish — Modals, Settings & Contextual Tooltips
+
+As a **user of the application**,
+I want a more polished and informative UI,
+So that interactions feel comfortable on mobile and the interface communicates its mode clearly.
+
+**Acceptance Criteria:**
+
+**Given** any modal/dialog in the app (create adventure, rename, delete confirm, import Strava, etc.),
+**When** it renders on mobile or desktop,
+**Then** the modal is larger (min-width: 360px on mobile, 480px on desktop) and all CTA buttons have min-height: 44px (WCAG touch target compliance).
+
+**Given** the Settings page,
+**When** rendered,
+**Then** the layout uses the same card-list design language as the adventures list page (shadcn `Card` components, section headers with labels, consistent padding and spacing).
+
+**Given** the Planning mode sidebar section headers (e.g., "Recherche de POIs", "Étapes", "Météo", "Analyse de densité"),
+**When** the user hovers (desktop) or long-presses (mobile) on a section header,
+**Then** a tooltip appears with a 1–2 sentence explanation of the section's purpose and how to use it.
+
+**Given** the Planning or Live map header area,
+**When** rendered,
+**Then** the current mode is displayed as a small badge next to or below the adventure name (e.g., "Planning" in blue, "Live" in green).
+
+---
+
+### Story 16.7: Help & In-App Feedback System
+
+As a **new or returning user**,
+I want a help page and an easy way to submit feedback,
+So that I can discover features and report issues without leaving the app.
+
+**Acceptance Criteria:**
+
+**Given** the left navigation menu (app shell),
+**When** rendered,
+**Then** an "Aide" link is present (between the adventures list and the account section).
+
+**Given** the user clicks "Aide",
+**When** the page loads (`/help`),
+**Then** a structured help page is displayed covering all major features: Auth, Adventures & GPX import, Planning mode, Density analysis, Weather, Live mode, Stages — each section with a brief description and optional screenshots.
+
+**Given** the landing page (`/`),
+**When** rendered,
+**Then** a visible link to `/help` is accessible from the main navigation or footer.
+
+**Given** an authenticated user is on any app page,
+**When** they open a "Feedback" entry (floating button or menu item in the nav),
+**Then** a form modal appears with: category selector (Bug / Amélioration / Idée), screen/feature field (text), description textarea (required), email pre-filled from profile (read-only). On submit, feedback is persisted in a `feedbacks` DB table (NestJS endpoint `POST /feedbacks`) and triggers a Resend notification email to the admin address.
+
+---
+
+### Story 16.8: Advanced Stage Management & Global Average Speed
+
+As a **cyclist doing detailed stage planning**,
+I want more control over stage positioning and a global speed setting,
+So that my ETAs, weather forecasts, and elevation estimates are as accurate as possible.
+
+**Acceptance Criteria:**
+
+**Given** stages exist and the user creates a new stage with an `end_km` value falling inside an existing stage's `[start_km, end_km]`,
+**When** the new stage is saved,
+**Then** the existing stage is split at the new `end_km`: the original stage keeps `[original_start_km, new_end_km]`, and a new remainder stage covers `[new_end_km, original_end_km]`. All subsequent stages' `start_km` values are recalculated automatically.
+
+**Given** the elevation profile is displayed (Story 8.8) and the user is in "Créer une étape" mode,
+**When** the user clicks a point on the elevation profile,
+**Then** a stage endpoint is placed at the corresponding km on the trace (same behavior as clicking the map trace).
+
+**Given** the adventure settings or profile page,
+**When** the user sets a "Vitesse moyenne" field (km/h, numeric input, default: 15, range: 5–50),
+**Then** this value is stored as `avg_speed_kmh` on the `adventures` table and used globally for: stage ETA calculations, weather `eta_datetime` forecasts (Epic 11.5), and pace-adjusted weather (Epic 6).
+
+**Given** the user updates `avg_speed_kmh`,
+**When** the value is saved,
+**Then** all stage ETAs and weather forecasts are re-queried and the UI re-renders the updated values without a full page reload (TanStack Query invalidation on `['adventures', id]` and `['weather', *]`).
+
+---
+
+### Story 16.9: Live Mode Stage Layer
+
+As a **cyclist in Live mode**,
+I want to see my planning stages on the map and update them dynamically as I ride,
+So that I can track progress against my planned day stages in real time.
+
+**Acceptance Criteria:**
+
+**Given** stages have been defined in Planning mode and the user activates Live mode,
+**When** the Live map renders,
+**Then** an "Étapes" toggle is available in the Filters panel (`<FilterPanel />`); when active, stage endpoint markers appear on the map with their assigned color and name label.
+
+**Given** the stages layer is active in Live mode,
+**When** the user's GPS `currentKm` passes a stage `end_km`,
+**Then** that stage is visually marked as "passed" (muted/desaturated color, checkmark overlay icon on the marker).
+
+**Given** the user wants to update a stage endpoint to their current GPS position,
+**When** they long-press a stage marker in Live mode and select "Mettre à jour avec ma position" from a context menu,
+**Then** a confirmation modal appears ("Mettre à jour la fin de l'Étape X à votre position actuelle ?") — on confirm, `end_km` is updated to the current `currentKm`; all subsequent stages are recalculated (same algorithm as map drag in Story 11.2).
+
+---
+
+### Story 16.10: Observability — Structured Logging & Uptime Kuma Alerts
+
+As a **developer maintaining the production system**,
+I want structured logs and proactive monitoring alerts,
+So that I can debug issues quickly and be notified before users report them.
+
+**Acceptance Criteria:**
+
+**Given** any NestJS service, controller, or processor,
+**When** a significant event occurs (request in/out, BullMQ job start/complete/fail, cache hit/miss, unhandled error),
+**Then** it is logged via a structured logger (e.g., `nestjs-pino` with JSON output) with at minimum: `level`, `timestamp`, `context` (module name), `message`, and `traceId` (correlation UUID propagated from request headers or auto-generated).
+
+**Given** structured logging is in place,
+**When** logs are written on the VPS,
+**Then** they are accessible via `pm2 logs api` in JSON format; no external logging service is required for MVP.
+
+**Given** Uptime Kuma is running on the VPS (Epic 14 done),
+**When** alerts are configured,
+**Then** monitors exist for: `https://api.ridenrest.app/health` (HTTP 200), `https://ridenrest.app` (HTTP 200), PostgreSQL TCP check (localhost:5432), Redis TCP check (localhost:6379) — with email or Telegram notification on status change to "down".
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

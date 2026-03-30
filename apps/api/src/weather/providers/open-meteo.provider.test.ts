@@ -18,6 +18,7 @@ const SAMPLE_RESPONSE = {
     wind_speed_10m: [20.0, 22.0, 18.0],
     wind_direction_10m: [270, 280, 260],
     precipitation_probability: [10, 5, 0],
+    precipitation: [0.5, 1.0, 0.0],
     weather_code: [2, 1, 0],
   },
 }
@@ -59,6 +60,7 @@ describe('OpenMeteoProvider', () => {
         windSpeedKmh: 22.0,
         windDirection: 280,
         precipitationProbability: 5,
+        precipitationMmH: 1.0,
         weatherCode: 1,
       })
       expect(mockRedis.set).toHaveBeenCalledWith(
@@ -155,6 +157,7 @@ describe('OpenMeteoProvider', () => {
 
       expect(result).not.toBeNull()
       expect(result?.temperatureC).toBe(12.5)
+      expect(result?.precipitationMmH).toBe(0.5)
     })
   })
 })

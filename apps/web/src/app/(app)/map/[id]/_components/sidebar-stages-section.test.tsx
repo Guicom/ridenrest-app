@@ -33,6 +33,13 @@ vi.mock('@/components/ui/alert-dialog', () => ({
   AlertDialogCancel: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
 }))
 
+// Mock StageWeatherBadge
+vi.mock('./stage-weather-badge', () => ({
+  StageWeatherBadge: ({ stageId }: { stageId: string }) => (
+    <span data-testid={`weather-badge-${stageId}`}>weather</span>
+  ),
+}))
+
 // Mock shadcn Switch
 vi.mock('@/components/ui/switch', () => ({
   Switch: ({ checked, onCheckedChange, ...props }: { checked?: boolean; onCheckedChange?: (v: boolean) => void; [key: string]: unknown }) =>
@@ -154,4 +161,45 @@ describe('SidebarStagesSection', () => {
     expect(screen.getByText("Supprimer l'étape ?")).toBeDefined()
   })
 
+  it('renders StageWeatherBadge per stage when weatherActive=true', () => {
+    const stages = [
+      makeStage({ id: 's1', name: 'Jour 1' }),
+      makeStage({ id: 's2', name: 'Jour 2', orderIndex: 1 }),
+    ]
+    render(
+      <SidebarStagesSection
+        {...defaultProps}
+        stages={stages}
+        weatherActive={true}
+        departureTime="2026-03-22T08:00:00.000Z"
+        speedKmh={15}
+      />,
+    )
+    expand()
+
+    expect(screen.getByTestId('weather-badge-s1')).toBeDefined()
+    expect(screen.getByTestId('weather-badge-s2')).toBeDefined()
+  })
+
+  it('does not render StageWeatherBadge when weatherActive=false', () => {
+    const stages = [makeStage({ id: 's1' })]
+    render(
+      <SidebarStagesSection
+        {...defaultProps}
+        stages={stages}
+        weatherActive={false}
+      />,
+    )
+    expand()
+
+    expect(screen.queryByTestId('weather-badge-s1')).toBeNull()
+  })
+
+  it('does not render StageWeatherBadge when weatherActive is not provided (default)', () => {
+    const stages = [makeStage({ id: 's1' })]
+    render(<SidebarStagesSection {...defaultProps} stages={stages} />)
+    expand()
+
+    expect(screen.queryByTestId('weather-badge-s1')).toBeNull()
+  })
 })

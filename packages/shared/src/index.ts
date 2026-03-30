@@ -3,7 +3,7 @@ export type { AdventureResponse, AdventureSegmentResponse, AdventureStageRespons
 export { DENSITY_ACCOMMODATION_CATEGORIES } from './types/adventure.types'
 export type { Poi, PoiCategory, PoiSearchResponse, MapLayer } from './types/poi.types'
 export { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from './types/poi.types'
-export type { WeatherForecast, WeatherPoint } from './types/weather.types'
+export type { WeatherForecast, WeatherPoint, StageWeatherPoint } from './types/weather.types'
 export type { UserProfile, Tier, UnitPref, Currency } from './types/user.types'
 export type { GooglePlaceDetails } from './types/google-place.types'
 

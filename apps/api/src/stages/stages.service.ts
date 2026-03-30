@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { StagesRepository } from './stages.repository.js'
 import { AdventuresService } from '../adventures/adventures.service.js'
+import { WeatherService } from '../weather/weather.service.js'
 import type { CreateStageDto } from './dto/create-stage.dto.js'
 import type { UpdateStageDto } from './dto/update-stage.dto.js'
-import type { AdventureStageResponse, MapWaypoint } from '@ridenrest/shared'
+import type { GetStageWeatherDto } from './dto/get-stage-weather.dto.js'
+import type { AdventureStageResponse, MapWaypoint, StageWeatherPoint } from '@ridenrest/shared'
 import type { AdventureStage } from '@ridenrest/database'
 
 /** Compute D+ (elevation gain) for waypoints in the [startKm, endKm] range.
@@ -46,6 +48,7 @@ export class StagesService {
   constructor(
     private readonly stagesRepo: StagesRepository,
     private readonly adventuresService: AdventuresService,
+    private readonly weatherService: WeatherService,
   ) {}
 
   async listStages(adventureId: string, userId: string): Promise<AdventureStageResponse[]> {
@@ -187,6 +190,21 @@ export class StagesService {
     await this.stagesRepo.updateMany(updates)
 
     return { deleted: true }
+  }
+
+  async getStageWeather(
+    stageId: string,
+    userId: string,
+    dto: GetStageWeatherDto,
+  ): Promise<StageWeatherPoint | null> {
+    const stage = await this.stagesRepo.findByIdWithAdventureUserId(stageId, userId)
+    if (!stage) throw new NotFoundException('Stage not found')
+    return this.weatherService.getWeatherAtKm(
+      stage.adventureId,
+      stage.endKm,
+      dto.departureTime,
+      dto.speedKmh,
+    )
   }
 
   private toResponse(s: AdventureStage): AdventureStageResponse {
