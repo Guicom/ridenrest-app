@@ -18,7 +18,7 @@ describe('useMapStore', () => {
       activeAccommodationTypes: new Set(['hotel']),
       selectedPoiId: null,
       selectedStageId: null,
-    }, true)
+    })
   })
 
   it('initializes with correct defaults', () => {
