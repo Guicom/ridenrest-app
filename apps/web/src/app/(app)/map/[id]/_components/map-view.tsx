@@ -23,6 +23,9 @@ import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import type { AdventureMapResponse } from '@/lib/api-client'
 import { ElevationProfile } from './elevation-profile'
 import { MapStylePicker } from './map-style-picker'
+import { ResetZoomButton } from './reset-zoom-button'
+import { TraceClickCta } from './trace-click-cta'
+import { MapSearchOverlay } from './map-search-overlay'
 import { SidebarStagesSection } from './sidebar-stages-section'
 import { useStages } from '@/hooks/use-stages'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
@@ -58,7 +61,7 @@ export function MapView({ adventureId }: MapViewProps) {
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
     speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers } = useMapStore()
 
   // Reset transient map state when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
@@ -89,7 +92,11 @@ export function MapView({ adventureId }: MapViewProps) {
   })
 
   // useDensity + usePois must be called unconditionally (Rules of Hooks)
-  const readySegments = data?.segments.filter((s) => s.parseStatus === 'done') ?? []
+  // useMemo — stable reference prevents spurious re-renders and effect re-runs
+  const readySegments = useMemo(
+    () => data?.segments.filter((s) => s.parseStatus === 'done') ?? [],
+    [data],
+  )
   const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
   const { coverageGaps, densityStatus, densityCategories } = useDensity(adventureId)
 
@@ -149,6 +156,41 @@ export function MapView({ adventureId }: MapViewProps) {
   useEffect(() => {
     if (!stageClickMode) setHoverKmPreview(null)
   }, [stageClickMode])
+
+  // Auto-zoom to corridor after POI search completes (AC #1, Story 16.3)
+  // NOTE: mapFromKm, mapToKm, readySegments intentionally excluded from deps —
+  // they are stable during an active search, and including them would cause the
+  // cleanup to reset prevIsPendingRef before the transition fires.
+  const prevIsPendingRef = useRef(false)
+  const mapFromKmRef = useRef(mapFromKm)
+  const mapToKmRef = useRef(mapToKm)
+  const readySegmentsRef = useRef(readySegments)
+  useEffect(() => { mapFromKmRef.current = mapFromKm }, [mapFromKm])
+  useEffect(() => { mapToKmRef.current = mapToKm }, [mapToKm])
+  useEffect(() => { readySegmentsRef.current = readySegments }, [readySegments])
+  useEffect(() => {
+    if (searchCommitted && prevIsPendingRef.current && !poisPending) {
+      mapCanvasRef.current?.fitToCorridorRange(mapFromKmRef.current, mapToKmRef.current, readySegmentsRef.current)
+    }
+    prevIsPendingRef.current = poisPending
+    return () => { prevIsPendingRef.current = false }
+  }, [poisPending, searchCommitted])
+
+  // Clear trace CTA when search is committed (AC #3, Story 16.3)
+  useEffect(() => {
+    if (searchCommitted) {
+      setTraceClickedKm(null)
+    }
+  }, [searchCommitted, setTraceClickedKm])
+
+  // Close trace CTA on Escape key (AC #3, Story 16.3)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setTraceClickedKm(null)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [setTraceClickedKm])
 
   // Compute overlay values — works for both click mode (hoverKmPreview) and drag (dragHoverState)
   const overlayKm = dragHoverState?.distKm ?? hoverKmPreview
@@ -314,6 +356,19 @@ export function MapView({ adventureId }: MapViewProps) {
             }}
           />
 
+          {/* Loading overlay while POI search is pending (AC #4, Story 16.3) */}
+          <MapSearchOverlay visible={searchCommitted && poisPending} />
+
+          {/* No-results banner — orange, centered, shown after a committed search returns nothing */}
+          {searchCommitted && !poisPending && !poisError && allPois.length === 0 && readySegments.length > 0 && visibleLayers.size > 0 && (
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 whitespace-nowrap rounded-lg bg-orange-500/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+              Aucun résultat dans cette zone
+            </div>
+          )}
+
+          {/* Trace click CTA — centered above elevation profile (AC #3, Story 16.3) */}
+          <TraceClickCta />
+
 
           {poisError && (
             <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1">
@@ -340,7 +395,12 @@ export function MapView({ adventureId }: MapViewProps) {
             />
           )}
 
-          {/* Map style selector — floating bottom-right (AC #6) */}
+          {/* Reset zoom button — above style picker (AC #2, Story 16.3) */}
+          <div className="absolute bottom-20 right-4 z-10">
+            <ResetZoomButton onClick={() => mapCanvasRef.current?.resetZoom()} />
+          </div>
+
+          {/* Map style selector — floating bottom-right */}
           <MapStylePicker />
 
           {/* Hover preview overlay: click mode (AC1) + drag marker */}

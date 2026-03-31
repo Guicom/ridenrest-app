@@ -31,6 +31,14 @@ const densityEventHandlers = new WeakMap<object, {
   mouseleave: () => void
 }>()
 
+// Stores trace click event handler references per map instance for proper cleanup
+const traceClickHandlers = new WeakMap<object, {
+  click: (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => void
+  mapClick: () => void
+  mouseenter: () => void
+  mouseleave: () => void
+}>()
+
 // Trace color — uniform brand green for all segments (C8)
 const TRACE_COLOR = '#2D6A4A'
 
@@ -39,6 +47,10 @@ export interface MapCanvasHandle {
   updateCrosshair: (km: number | null) => void
   /** Expose MapLibre map instance for coordinate projection etc. */
   getMap: () => maplibregl.Map | null
+  /** Re-fit map to full adventure trace with animation (Story 16.3) */
+  resetZoom: () => void
+  /** Fit map to search corridor range with animation (Story 16.3) */
+  fitToCorridorRange: (fromKm: number, toKm: number, segments: MapSegmentData[]) => void
 }
 
 interface MapCanvasProps {
@@ -301,6 +313,74 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     renderStageMarkers(map, stagesRef.current, allWaypointsRef.current ?? [], MarkerClassRef.current, onStageDragEndRef, onStageDragHoverKmRef)
   }, [stages, styleVersion])
 
+  // Trace click-to-search CTA — register handlers after map/style loads (Story 16.3)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.getSource('trace')) return
+
+    // Remove previous handlers (re-registered on style change via styleVersion)
+    const existingHandlers = traceClickHandlers.get(map)
+    if (existingHandlers) {
+      map.off('click', 'trace-line-click-target', existingHandlers.click)
+      map.off('click', existingHandlers.mapClick)
+      map.off('mouseenter', 'trace-line-click-target', existingHandlers.mouseenter)
+      map.off('mouseleave', 'trace-line-click-target', existingHandlers.mouseleave)
+      traceClickHandlers.delete(map)
+    }
+
+    // Flag: set to true when the trace-line layer was clicked, reset in mapClickHandler
+    let traceClickedThisEvent = false
+
+    const clickHandler = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+      if (stageClickModeRef.current) return  // stage placement active — disable trace CTA
+      traceClickedThisEvent = true
+      const { lat, lng } = e.lngLat
+      const waypoints = allWaypointsRef.current
+      if (!waypoints || waypoints.length === 0) return
+      let nearest = waypoints[0]
+      let minDist = Infinity
+      for (const wp of waypoints) {
+        const d = (wp.lat - lat) ** 2 + (wp.lng - lng) ** 2
+        if (d < minDist) { minDist = d; nearest = wp }
+      }
+      if (nearest) {
+        useMapStore.getState().setTraceClickedKm(nearest.distKm)
+      }
+    }
+    // Fires for every map click (after layer-specific handlers). If the trace was not clicked,
+    // close the CTA so clicking anywhere outside the panel closes it (AC #3).
+    const mapClickHandler = () => {
+      if (!stageClickModeRef.current && !traceClickedThisEvent) {
+        useMapStore.getState().setTraceClickedKm(null)
+      }
+      traceClickedThisEvent = false
+    }
+    const mouseenterHandler = () => { map.getCanvas().style.cursor = 'crosshair' }
+    // M1 fix: only reset cursor if stage click mode is not active, to avoid
+    // overriding the 'crosshair' cursor set by the stageClickMode effect.
+    const mouseleaveHandler = () => {
+      if (!stageClickModeRef.current) map.getCanvas().style.cursor = ''
+    }
+
+    traceClickHandlers.set(map, { click: clickHandler, mapClick: mapClickHandler, mouseenter: mouseenterHandler, mouseleave: mouseleaveHandler })
+    map.on('click', 'trace-line-click-target', clickHandler)
+    map.on('click', mapClickHandler)
+    map.on('mouseenter', 'trace-line-click-target', mouseenterHandler)
+    map.on('mouseleave', 'trace-line-click-target', mouseleaveHandler)
+
+    return () => {
+      const handlers = traceClickHandlers.get(map)
+      if (handlers) {
+        map.off('click', 'trace-line-click-target', handlers.click)
+        map.off('click', handlers.mapClick)
+        map.off('mouseenter', 'trace-line-click-target', handlers.mouseenter)
+        map.off('mouseleave', 'trace-line-click-target', handlers.mouseleave)
+        traceClickHandlers.delete(map)
+      }
+      useMapStore.getState().setTraceClickedKm(null)
+    }
+  }, [styleVersion])  // Re-register after style change
+
   // Imperative crosshair handle — bypasses React state/render cycle entirely for zero-latency updates
   useImperativeHandle(ref, () => ({
     updateCrosshair(km: number | null) {
@@ -330,6 +410,49 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     },
     getMap() {
       return mapRef.current
+    },
+    resetZoom() {
+      const map = mapRef.current
+      if (!map) return
+      fitToTrace(map, segmentsRef.current, true)
+    },
+    fitToCorridorRange(fromKm: number, toKm: number, segments: MapSegmentData[]) {
+      const map = mapRef.current
+      if (!map) return
+
+      const inRange: Array<{ lat: number; lng: number }> = []
+      for (const segment of segments) {
+        if (!segment.waypoints) continue
+        const segStart = segment.cumulativeStartKm
+        const segEnd = segStart + segment.distanceKm
+        if (toKm <= segStart || fromKm >= segEnd) continue
+        const localFrom = Math.max(0, fromKm - segStart)
+        const localTo = Math.min(segment.distanceKm, toKm - segStart)
+        const filtered = segment.waypoints.filter(
+          (wp) => wp.distKm >= localFrom && wp.distKm <= localTo,
+        )
+        inRange.push(...filtered)
+      }
+
+      if (inRange.length === 0) {
+        fitToTrace(map, segments, true)
+        return
+      }
+
+      const lats = inRange.map((wp) => wp.lat)
+      const lngs = inRange.map((wp) => wp.lng)
+      const minLat = Math.min(...lats)
+      const maxLat = Math.max(...lats)
+      const minLng = Math.min(...lngs)
+      const maxLng = Math.max(...lngs)
+
+      const dLat = Math.max(maxLat - minLat, 0.001)
+      const dLng = Math.max(maxLng - minLng, 0.001)
+
+      map.fitBounds(
+        [[minLng - dLng * 0.1, minLat - dLat * 0.1], [maxLng + dLng * 0.1, maxLat + dLat * 0.1]],
+        { padding: 60, maxZoom: 16, animate: true, duration: 600 },
+      )
     },
   }), []) // Stable handle — accesses latest values via refs
 
@@ -420,6 +543,19 @@ function addTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
       'line-color': TRACE_COLOR,
       'line-width': 3,
       'line-opacity': 0.9,
+    },
+  })
+
+  // Invisible wider click-target layer for easier trace interaction (Story 16.3)
+  map.addLayer({
+    id: 'trace-line-click-target',
+    type: 'line',
+    source: 'trace',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': 'rgba(0,0,0,0)',
+      'line-width': 16,
+      'line-opacity': 0,
     },
   })
 
@@ -848,7 +984,7 @@ function renderStageMarkers(
   stageMarkerMap.set(map, newMarkers)
 }
 
-function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {
+function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[], animate = false) {
   const allBounds = segments
     .filter((s) => s.boundingBox !== null)
     .map((s) => s.boundingBox!)
@@ -862,6 +998,6 @@ function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {
 
   map.fitBounds(
     [[minLng, minLat], [maxLng, maxLat]],
-    { padding: 40, maxZoom: 14, animate: false },
+    { padding: 40, maxZoom: 14, animate },
   )
 }

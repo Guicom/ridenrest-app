@@ -47,7 +47,10 @@ vi.mock('@/stores/map.store', () => ({
       weatherDimension: 'temperature',
       searchRangeInteracted: false,
     }),
-    { subscribe: vi.fn(() => vi.fn()) },  // subscribe returns unsubscribe fn
+    {
+      subscribe: vi.fn(() => vi.fn()),  // subscribe returns unsubscribe fn
+      getState: vi.fn(() => ({ setTraceClickedKm: vi.fn(), setSearchRange: vi.fn() })),
+    },
   ),
 }))
 

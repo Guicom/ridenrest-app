@@ -35,6 +35,9 @@ interface MapState {
   // Selected stage for POI scoping (Story 11.4)
   selectedStageId: string | null
 
+  // Trace click CTA (Story 16.3)
+  traceClickedKm: number | null
+
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
   toggleLayer: (layer: MapLayer) => void
@@ -47,6 +50,7 @@ interface MapState {
   toggleAccommodationType: (type: PoiCategory) => void
   setSelectedPoiId: (id: string | null) => void
   setSelectedStageId: (id: string | null) => void
+  setTraceClickedKm: (km: number | null) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -55,7 +59,7 @@ export const useMapStore = create<MapState>((set) => ({
   zoom: 10,
   center: null,
   fromKm: 0,
-  toKm: 30,
+  toKm: 15,
   searchRangeInteracted: false,
   searchCommitted: false,
   densityColorEnabled: false,
@@ -64,6 +68,7 @@ export const useMapStore = create<MapState>((set) => ({
   activeAccommodationTypes: new Set(['hotel'] as PoiCategory[]),
   selectedPoiId: null,
   selectedStageId: null,
+  traceClickedKm: null,
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -104,4 +109,6 @@ export const useMapStore = create<MapState>((set) => ({
   setSelectedPoiId: (id) => set({ selectedPoiId: id }),
 
   setSelectedStageId: (id) => set({ selectedStageId: id }),
+
+  setTraceClickedKm: (km) => set({ traceClickedKm: km }),
 }))

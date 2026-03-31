@@ -16,6 +16,7 @@ const TRACE_COLOR = '#2D6A4A'
 
 export interface LiveMapCanvasHandle {
   getMap: () => maplibregl.Map | null
+  resetZoom: () => void
 }
 
 interface LiveMapCanvasProps {
@@ -204,6 +205,10 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
 
   useImperativeHandle(ref, () => ({
     getMap: () => mapRef.current,
+    resetZoom: () => {
+      if (!mapRef.current) return
+      fitToTrace(mapRef.current, segmentsRef.current, true)
+    },
   }), [])
 
   return (
@@ -353,7 +358,7 @@ function routeBearingAtPosition(waypoints: KmWaypoint[], position: { lat: number
   return Math.atan2(to.lng - from.lng, to.lat - from.lat)
 }
 
-function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {
+function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[], animate = false) {
   const allBounds = segments
     .filter((s) => s.boundingBox !== null)
     .map((s) => s.boundingBox!)
@@ -367,6 +372,6 @@ function fitToTrace(map: maplibregl.Map, segments: MapSegmentData[]) {
 
   map.fitBounds(
     [[minLng, minLat], [maxLng, maxLat]],
-    { padding: 40, maxZoom: 14, animate: false },
+    { padding: 40, maxZoom: 14, animate },
   )
 }

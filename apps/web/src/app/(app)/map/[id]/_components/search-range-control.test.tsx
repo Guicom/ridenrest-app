@@ -13,7 +13,7 @@ let mockSelectedStageId: string | null = null
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
     fromKm: mockFromKm,
-    toKm: 30,
+    toKm: 15,
     setSearchRange: mockSetSearchRange,
     visibleLayers: new Set(),
     selectedStageId: mockSelectedStageId,
@@ -103,7 +103,7 @@ describe('SearchRangeControl', () => {
     expect(screen.getByText('↑ — m D+')).toBeDefined()
   })
 
-  it('defaults rangeKm to 15 when store is at initial values (0, 30)', () => {
+  it('defaults rangeKm to 15 (from store initial values toKm - fromKm = 15 - 0)', () => {
     render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
     expect((screen.getByTestId('range-value') as HTMLInputElement).value).toBe('15')
   })

@@ -9,7 +9,7 @@ describe('useMapStore', () => {
       zoom: 10,
       center: null,
       fromKm: 0,
-      toKm: 30,
+      toKm: 15,
       searchRangeInteracted: false,
       searchCommitted: false,
       densityColorEnabled: true,
@@ -18,6 +18,7 @@ describe('useMapStore', () => {
       activeAccommodationTypes: new Set(['hotel']),
       selectedPoiId: null,
       selectedStageId: null,
+      traceClickedKm: null,
     })
   })
 
@@ -28,7 +29,7 @@ describe('useMapStore', () => {
     expect(state.zoom).toBe(10)
     expect(state.center).toBeNull()
     expect(state.fromKm).toBe(0)
-    expect(state.toKm).toBe(30)
+    expect(state.toKm).toBe(15)
     expect(state.densityColorEnabled).toBe(true)
   })
 
@@ -132,5 +133,20 @@ describe('useMapStore', () => {
   it('setWeatherDimension can be set to precipitation', () => {
     useMapStore.getState().setWeatherDimension('precipitation')
     expect(useMapStore.getState().weatherDimension).toBe('precipitation')
+  })
+
+  it('traceClickedKm initializes to null', () => {
+    expect(useMapStore.getState().traceClickedKm).toBeNull()
+  })
+
+  it('setTraceClickedKm(42.5) updates traceClickedKm', () => {
+    useMapStore.getState().setTraceClickedKm(42.5)
+    expect(useMapStore.getState().traceClickedKm).toBe(42.5)
+  })
+
+  it('setTraceClickedKm(null) clears traceClickedKm', () => {
+    useMapStore.getState().setTraceClickedKm(42.5)
+    useMapStore.getState().setTraceClickedKm(null)
+    expect(useMapStore.getState().traceClickedKm).toBeNull()
   })
 })

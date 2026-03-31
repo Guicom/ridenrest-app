@@ -43,13 +43,9 @@ export function SearchRangeControl({
     setSearchCommitted,
   } = useMapStore()
 
-  // rangeKm local state — default 15 km when store is at initial values (0, 30)
-  const [rangeKm, setRangeKm] = useState(() =>
-    fromKm === 0 && toKm === 30 ? 15 : toKm - fromKm,
-  )
-  const [rangeInput, setRangeInput] = useState(() =>
-    fromKm === 0 && toKm === 30 ? '15' : String(toKm - fromKm),
-  )
+  // rangeKm local state — initialized from store values
+  const [rangeKm, setRangeKm] = useState(() => toKm - fromKm)
+  const [rangeInput, setRangeInput] = useState(() => String(toKm - fromKm))
 
   // Derive selected stage — drives the relative coordinate mode
   const selectedStage = useMemo(

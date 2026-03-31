@@ -23,6 +23,8 @@ import { LiveControls } from './_components/live-controls'
 import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { Undo2, ChevronUp, ChevronDown } from 'lucide-react'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
+import { MapSearchOverlay } from '@/app/(app)/map/[id]/_components/map-search-overlay'
+import { ResetZoomButton } from '@/app/(app)/map/[id]/_components/reset-zoom-button'
 import { StatusBanner } from './_components/status-banner'
 import { PoiPopup } from '../../map/[id]/_components/poi-popup'
 import { ElevationStrip } from './_components/elevation-strip'
@@ -71,7 +73,7 @@ export default function LivePage() {
   const { isOnline } = useNetworkStatus()
 
   // Live POI search
-  const { pois, isFetching: poisFetching, targetKm, isError: poisError, refetch: refetchPois, canSearch } = useLivePoisSearch(segmentId)
+  const { pois, hasFetched: poisHasFetched, isFetching: poisFetching, targetKm, isError: poisError, refetch: refetchPois, canSearch } = useLivePoisSearch(segmentId)
 
   // Always-current ref to refetchPois — queryKey changes when store state changes (radius, targetKm),
   // so we must call the *latest* refetch (post-re-render) to avoid fetching with a stale key.
@@ -93,6 +95,7 @@ export default function LivePage() {
   // Banner state
   const showOfflineBanner = !isOnline && isLiveModeActive
   const showErrorBanner = isOnline && poisError && isLiveModeActive && !poisFetching
+  const showNoResultsBanner = isLiveModeActive && !poisFetching && !poisError && poisHasFetched && pois.length === 0
 
   // Live weather — data still fetched for map layer (toggle removed)
   const weatherDepartureTime = useLiveStore((s) => s.weatherDepartureTime)
@@ -252,6 +255,11 @@ export default function LivePage() {
             message={`Connexion instable — ${pois.length} résultat${pois.length !== 1 ? 's' : ''} chargé${pois.length !== 1 ? 's' : ''}`}
           />
         )}
+        {mounted && showNoResultsBanner && !showOfflineBanner && !showErrorBanner && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 whitespace-nowrap rounded-lg bg-orange-500/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
+            Aucun résultat dans cette zone
+          </div>
+        )}
 
         {/* Bottom overlay — z-30 (only render after mount to avoid hydration mismatch) */}
         {mounted && (
@@ -314,15 +322,13 @@ export default function LivePage() {
           </div>
         )}
 
-        {/* POI search loading indicator */}
-        {poisFetching && isLiveModeActive && (
-          <div className="absolute top-14 right-4 z-40">
-            <div className="flex items-center gap-2 rounded-md bg-background/80 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur-sm">
-              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Recherche POIs…
-            </div>
-          </div>
-        )}
+        {/* POI search loading overlay (same as planning mode) */}
+        <MapSearchOverlay visible={poisFetching && isLiveModeActive} />
+
+        {/* Reset zoom button — below style picker */}
+        <div className="absolute top-14 right-4 z-10">
+          <ResetZoomButton onClick={() => liveMapCanvasRef.current?.resetZoom()} />
+        </div>
 
         {/* Map style selector — top-right (bottom-right hidden under LiveControls on mobile) */}
         <MapStylePicker className="top-4 right-4 bottom-auto" />

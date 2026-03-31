@@ -103,4 +103,26 @@ describe('useLivePoisSearch', () => {
     const { result } = renderHook(() => useLivePoisSearch('seg-1'))
     expect(result.current.isError).toBe(false)
   })
+
+  it('hasFetched is false when data is undefined (never fetched)', () => {
+    mockUseQuery.mockReturnValue({ data: undefined, isFetching: false, isError: false })
+    const { result } = renderHook(() => useLivePoisSearch('seg-1'))
+    expect(result.current.hasFetched).toBe(false)
+    expect(result.current.pois).toEqual([])
+  })
+
+  it('hasFetched is true when data is [] (fetched, zero results)', () => {
+    mockUseQuery.mockReturnValue({ data: [], isFetching: false, isError: false })
+    const { result } = renderHook(() => useLivePoisSearch('seg-1'))
+    expect(result.current.hasFetched).toBe(true)
+    expect(result.current.pois).toEqual([])
+  })
+
+  it('hasFetched is true when data has results', () => {
+    const poi = { id: 'p1', name: 'Hotel A' }
+    mockUseQuery.mockReturnValue({ data: [poi], isFetching: false, isError: false })
+    const { result } = renderHook(() => useLivePoisSearch('seg-1'))
+    expect(result.current.hasFetched).toBe(true)
+    expect(result.current.pois).toEqual([poi])
+  })
 })
