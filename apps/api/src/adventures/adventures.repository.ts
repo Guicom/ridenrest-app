@@ -44,6 +44,24 @@ export class AdventuresRepository {
     return row as Adventure
   }
 
+  async updateStartDate(id: string, startDate: string | null): Promise<Adventure> {
+    const [row] = await db
+      .update(adventures)
+      .set({ startDate, updatedAt: new Date() })
+      .where(eq(adventures.id, id))
+      .returning()
+    return row as Adventure
+  }
+
+  async updateEndDate(id: string, endDate: string | null): Promise<Adventure> {
+    const [row] = await db
+      .update(adventures)
+      .set({ endDate, updatedAt: new Date() })
+      .where(eq(adventures.id, id))
+      .returning()
+    return row as Adventure
+  }
+
   async deleteById(id: string): Promise<void> {
     await db.delete(adventures).where(eq(adventures.id, id))
   }

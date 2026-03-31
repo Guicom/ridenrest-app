@@ -23,6 +23,8 @@ const makeAdventure = (overrides: Partial<AdventureResponse> = {}): AdventureRes
   userId: 'user-1',
   name: 'Transcantabrique',
   totalDistanceKm: 850.5,
+  startDate: null,
+  endDate: null,
   status: 'planning',
   densityStatus: 'idle',
   densityProgress: 0,
@@ -199,5 +201,87 @@ describe('AdventureList', () => {
     // Mobile button always visible — no card tap required
     fireEvent.click(screen.getByText('Démarrer en Live'))
     expect(mockPush).toHaveBeenCalledWith('/live/adv-1')
+  })
+
+  it('adventure with future startDate appears before undated adventure in main list', () => {
+    const futureDate = new Date(Date.now() + 86400_000 * 7).toISOString().slice(0, 10)
+    vi.mocked(tanstackQuery.useQuery).mockReturnValue({
+      data: [
+        makeAdventure({ id: 'adv-undated', name: 'Sans date', startDate: null }),
+        makeAdventure({ id: 'adv-future', name: 'Futur', startDate: futureDate }),
+      ],
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof tanstackQuery.useQuery>)
+
+    renderList()
+
+    const cards = screen.getAllByText(/Futur|Sans date/)
+    // "Futur" (dated) should appear before "Sans date" (undated)
+    expect(cards[0].textContent).toBe('Futur')
+    expect(cards[1].textContent).toBe('Sans date')
+    // Both in main list, no "Aventures passées"
+    expect(screen.queryByText(/Aventures passées/)).toBeNull()
+  })
+
+  it('adventure with past startDate and non-active status goes into "Aventures passées" section (collapsed by default)', () => {
+    const pastDate = '2025-01-01'
+    vi.mocked(tanstackQuery.useQuery).mockReturnValue({
+      data: [
+        makeAdventure({ id: 'adv-past', name: 'Passée', startDate: pastDate, status: 'planning' }),
+        makeAdventure({ id: 'adv-current', name: 'Actuelle', startDate: null }),
+      ],
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof tanstackQuery.useQuery>)
+
+    renderList()
+
+    // Past adventure not in main list
+    expect(screen.queryByText('Passée')).toBeNull()
+    // "Aventures passées" button present
+    expect(screen.getByText(/Aventures passées \(1\)/)).toBeInTheDocument()
+    // Current adventure visible
+    expect(screen.getByText('Actuelle')).toBeInTheDocument()
+  })
+
+  it('clicking "Aventures passées" toggle expands and shows past adventure', () => {
+    const pastDate = '2025-01-01'
+    vi.mocked(tanstackQuery.useQuery).mockReturnValue({
+      data: [
+        makeAdventure({ id: 'adv-past', name: 'Passée', startDate: pastDate, status: 'planning' }),
+      ],
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof tanstackQuery.useQuery>)
+
+    renderList()
+
+    // Collapsed by default — past adventure hidden
+    expect(screen.queryByText('Passée')).toBeNull()
+
+    // Click toggle
+    fireEvent.click(screen.getByText(/Aventures passées/))
+
+    // Now expanded — past adventure visible
+    expect(screen.getByText('Passée')).toBeInTheDocument()
+  })
+
+  it('adventure with past startDate but status active stays in main list', () => {
+    const pastDate = '2025-01-01'
+    vi.mocked(tanstackQuery.useQuery).mockReturnValue({
+      data: [
+        makeAdventure({ id: 'adv-active-past', name: 'Active passée', startDate: pastDate, status: 'active' }),
+      ],
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof tanstackQuery.useQuery>)
+
+    renderList()
+
+    // Active adventure always in main list despite past date
+    expect(screen.getByText('Active passée')).toBeInTheDocument()
+    // No "Aventures passées" section
+    expect(screen.queryByText(/Aventures passées/)).toBeNull()
   })
 })

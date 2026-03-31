@@ -3,6 +3,7 @@ import * as fs from 'node:fs/promises'
 import { AdventuresRepository } from './adventures.repository.js'
 import type { AdventureResponse, AdventureMapResponse, MapWaypoint } from '@ridenrest/shared'
 import type { Adventure } from '@ridenrest/database'
+import type { UpdateAdventureDto } from './dto/update-adventure.dto.js'
 
 @Injectable()
 export class AdventuresService {
@@ -37,9 +38,25 @@ export class AdventuresService {
     await this.adventuresRepo.updateTotals(id, totalDistanceKm, totalElevationGainM)
   }
 
-  async renameAdventure(id: string, userId: string, name: string): Promise<AdventureResponse> {
+  async updateAdventure(id: string, userId: string, dto: UpdateAdventureDto): Promise<AdventureResponse> {
     await this.verifyOwnership(id, userId)
-    return this.toResponse(await this.adventuresRepo.updateName(id, name))
+    let adventure: Adventure | undefined
+
+    if (dto.name !== undefined) {
+      adventure = await this.adventuresRepo.updateName(id, dto.name)
+    }
+    if (dto.startDate !== undefined) {
+      adventure = await this.adventuresRepo.updateStartDate(id, dto.startDate)
+    }
+    if (dto.endDate !== undefined) {
+      adventure = await this.adventuresRepo.updateEndDate(id, dto.endDate)
+    }
+
+    if (!adventure) {
+      adventure = (await this.adventuresRepo.findByIdAndUserId(id, userId))!
+    }
+
+    return this.toResponse(adventure)
   }
 
   async getMapData(adventureId: string, userId: string): Promise<AdventureMapResponse> {
@@ -63,6 +80,8 @@ export class AdventuresService {
       name: a.name,
       totalDistanceKm: a.totalDistanceKm,
       totalElevationGainM: a.totalElevationGainM ?? null,
+      startDate: a.startDate ?? null,
+      endDate: a.endDate ?? null,
       status: a.status,
       densityStatus: a.densityStatus,
       densityProgress: a.densityProgress,

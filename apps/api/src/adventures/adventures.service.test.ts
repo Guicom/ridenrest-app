@@ -3,6 +3,7 @@ import type { AdventuresRepository } from './adventures.repository.js'
 import { NotFoundException } from '@nestjs/common'
 import * as fsPromises from 'node:fs/promises'
 import type { AdventureMapResponse } from '@ridenrest/shared'
+import type { UpdateAdventureDto } from './dto/update-adventure.dto.js'
 
 jest.mock('node:fs/promises', () => ({
   unlink: jest.fn().mockResolvedValue(undefined),
@@ -14,6 +15,8 @@ const mockRepo = {
   findByIdAndUserId: jest.fn(),
   updateTotalDistance: jest.fn(),
   updateName: jest.fn(),
+  updateStartDate: jest.fn(),
+  updateEndDate: jest.fn(),
   deleteById: jest.fn(),
   findSegmentStorageUrlsByAdventureId: jest.fn(),
   getAdventureMapData: jest.fn(),
@@ -26,6 +29,8 @@ const makeAdventure = (overrides = {}) => ({
   userId: 'user-1',
   name: 'Test',
   totalDistanceKm: 0,
+  startDate: null as string | null,
+  endDate: null as string | null,
   status: 'planning' as const,
   createdAt: new Date('2026-03-15T00:00:00Z'),
   updatedAt: new Date('2026-03-15T00:00:00Z'),
@@ -79,23 +84,67 @@ describe('listAdventures', () => {
   })
 })
 
-describe('renameAdventure', () => {
-  it('calls verifyOwnership and updateName, returns updated AdventureResponse', async () => {
+describe('updateAdventure', () => {
+  it('throws NotFoundException when ownership fails', async () => {
+    mockRepo.findByIdAndUserId.mockResolvedValue(null)
+    const dto: UpdateAdventureDto = { startDate: '2026-06-01' }
+    await expect(service.updateAdventure('adv-1', 'user-1', dto)).rejects.toThrow(NotFoundException)
+  })
+
+  it('updates startDate and returns response with startDate', async () => {
+    const adventure = makeAdventure({ startDate: '2026-06-01' })
     mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure())
-    mockRepo.updateName.mockResolvedValue(makeAdventure({ name: 'Renamed' }))
+    mockRepo.updateStartDate.mockResolvedValue(adventure)
 
-    const result = await service.renameAdventure('adv-1', 'user-1', 'Renamed')
+    const dto: UpdateAdventureDto = { startDate: '2026-06-01' }
+    const result = await service.updateAdventure('adv-1', 'user-1', dto)
 
-    expect(mockRepo.findByIdAndUserId).toHaveBeenCalledWith('adv-1', 'user-1')
+    expect(mockRepo.updateStartDate).toHaveBeenCalledWith('adv-1', '2026-06-01')
+    expect(result.startDate).toBe('2026-06-01')
+  })
+
+  it('clears startDate when null is passed', async () => {
+    const adventure = makeAdventure({ startDate: null })
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure({ startDate: '2026-06-01' }))
+    mockRepo.updateStartDate.mockResolvedValue(adventure)
+
+    const dto: UpdateAdventureDto = { startDate: null }
+    const result = await service.updateAdventure('adv-1', 'user-1', dto)
+
+    expect(mockRepo.updateStartDate).toHaveBeenCalledWith('adv-1', null)
+    expect(result.startDate).toBeNull()
+  })
+
+  it('updates name without touching startDate when only name provided', async () => {
+    const adventure = makeAdventure({ name: 'Renamed' })
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure())
+    mockRepo.updateName.mockResolvedValue(adventure)
+
+    const dto: UpdateAdventureDto = { name: 'Renamed' }
+    const result = await service.updateAdventure('adv-1', 'user-1', dto)
+
     expect(mockRepo.updateName).toHaveBeenCalledWith('adv-1', 'Renamed')
+    expect(mockRepo.updateStartDate).not.toHaveBeenCalled()
     expect(result.name).toBe('Renamed')
   })
 
-  it('throws NotFoundException when ownership fails', async () => {
-    mockRepo.findByIdAndUserId.mockResolvedValue(null)
+  it('updates endDate and returns response with endDate', async () => {
+    const adventure = makeAdventure({ endDate: '2026-06-10' })
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure())
+    mockRepo.updateEndDate.mockResolvedValue(adventure)
 
-    await expect(service.renameAdventure('adv-1', 'user-1', 'Renamed')).rejects.toThrow(NotFoundException)
-    expect(mockRepo.updateName).not.toHaveBeenCalled()
+    const dto: UpdateAdventureDto = { endDate: '2026-06-10' }
+    const result = await service.updateAdventure('adv-1', 'user-1', dto)
+
+    expect(mockRepo.updateEndDate).toHaveBeenCalledWith('adv-1', '2026-06-10')
+    expect(result.endDate).toBe('2026-06-10')
+  })
+
+  it('toResponse includes startDate and endDate fields', async () => {
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure({ startDate: '2026-07-01', endDate: '2026-07-14' }))
+    const result = await service.getAdventure('adv-1', 'user-1')
+    expect(result.startDate).toBe('2026-07-01')
+    expect(result.endDate).toBe('2026-07-14')
   })
 })
 

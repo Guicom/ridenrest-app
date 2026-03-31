@@ -308,7 +308,7 @@ describe('AdventureDetail — density CTA visibility', () => {
     renderDetail()
 
     await waitFor(() =>
-      expect(screen.getByText("En attente de l'analyse des segments")).toBeInTheDocument()
+      expect(screen.getByText("Segments en cours d'analyse")).toBeInTheDocument()
     )
   })
 
@@ -319,7 +319,99 @@ describe('AdventureDetail — density CTA visibility', () => {
     renderDetail()
 
     await waitFor(() => expect(screen.getByTestId('density-trigger-btn')).toBeInTheDocument())
-    expect(screen.queryByText("En attente de l'analyse des segments")).not.toBeInTheDocument()
+    expect(screen.queryByText("Segments en cours d'analyse")).not.toBeInTheDocument()
+  })
+})
+
+describe('AdventureDetail — date pickers', () => {
+  it('calls updateAdventureStartDate with the selected date on start date change', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    const updateStartDate = vi.spyOn(apiClient, 'updateAdventureStartDate').mockResolvedValue({
+      id: 'adv-1',
+      name: 'Tour test',
+      totalDistanceKm: 0,
+      startDate: '2026-06-15',
+    } as Awaited<ReturnType<typeof apiClient.getAdventure>>)
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    const input = screen.getByLabelText('Date de départ :')
+    fireEvent.change(input, { target: { value: '2026-06-15' } })
+
+    await waitFor(() => expect(updateStartDate).toHaveBeenCalledWith('adv-1', '2026-06-15'))
+  })
+
+  it('calls updateAdventureStartDate with null when start date is cleared', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    vi.spyOn(apiClient, 'getAdventure').mockResolvedValue({
+      id: 'adv-1',
+      name: 'Tour test',
+      totalDistanceKm: 0,
+      startDate: '2026-06-15',
+    } as Awaited<ReturnType<typeof apiClient.getAdventure>>)
+    const updateStartDate = vi.spyOn(apiClient, 'updateAdventureStartDate').mockResolvedValue({
+      id: 'adv-1',
+      name: 'Tour test',
+      totalDistanceKm: 0,
+      startDate: null,
+    } as Awaited<ReturnType<typeof apiClient.getAdventure>>)
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={qc}>
+        <AdventureDetail adventureId="adv-1" />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => screen.getByText('Tour test'))
+    const input = screen.getByLabelText('Date de départ :')
+    fireEvent.change(input, { target: { value: '' } })
+
+    await waitFor(() => expect(updateStartDate).toHaveBeenCalledWith('adv-1', null))
+  })
+
+  it('calls updateAdventureEndDate with the selected date on end date change', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    const updateEndDate = vi.spyOn(apiClient, 'updateAdventureEndDate').mockResolvedValue({
+      id: 'adv-1',
+      name: 'Tour test',
+      totalDistanceKm: 0,
+      endDate: '2026-06-30',
+    } as Awaited<ReturnType<typeof apiClient.getAdventure>>)
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    const input = screen.getByLabelText('Date de fin :')
+    fireEvent.change(input, { target: { value: '2026-06-30' } })
+
+    await waitFor(() => expect(updateEndDate).toHaveBeenCalledWith('adv-1', '2026-06-30'))
+  })
+
+  it('shows error toast when start date mutation fails', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    vi.spyOn(apiClient, 'updateAdventureStartDate').mockRejectedValue(new Error('Network error'))
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    const input = screen.getByLabelText('Date de départ :')
+    fireEvent.change(input, { target: { value: '2026-06-15' } })
+
+    await waitFor(() =>
+      expect(toastError).toHaveBeenCalledWith('Erreur lors de la mise à jour de la date de départ'),
+    )
+  })
+
+  it('start date input is disabled while mutation is pending', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    // Never resolves — simulates pending state
+    vi.spyOn(apiClient, 'updateAdventureStartDate').mockReturnValue(new Promise(() => {}))
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    const input = screen.getByLabelText('Date de départ :') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '2026-06-15' } })
+
+    await waitFor(() => expect(input.disabled).toBe(true))
   })
 })
 

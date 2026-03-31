@@ -125,6 +125,20 @@ export async function renameAdventure(adventureId: string, name: string): Promis
   })
 }
 
+export async function updateAdventureStartDate(id: string, startDate: string | null): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ startDate }),
+  })
+}
+
+export async function updateAdventureEndDate(id: string, endDate: string | null): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ endDate }),
+  })
+}
+
 export async function renameSegment(
   adventureId: string,
   segmentId: string,

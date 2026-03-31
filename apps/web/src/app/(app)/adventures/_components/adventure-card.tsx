@@ -17,14 +17,23 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
     >
       <div className="flex items-center justify-between">
         <span className="text-text-primary font-semibold">{adventure.name}</span>
-        <span className="text-text-secondary text-sm">
-          {adventure.totalDistanceKm > 0
-            ? `${adventure.totalDistanceKm.toFixed(1)} km`
-            : '—'}
-        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-text-secondary text-sm">
+            {adventure.totalDistanceKm > 0 ? `${adventure.totalDistanceKm.toFixed(1)} km` : '—'}
+          </span>
+          {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
+            <span className="text-text-secondary text-sm">
+              ↑ {Math.round(adventure.totalElevationGainM).toLocaleString('fr-FR')} m
+            </span>
+          )}
+        </div>
       </div>
       <div className="text-text-muted text-sm mt-1">
-        {new Date(adventure.createdAt).toLocaleDateString('fr-FR')}
+        {adventure.startDate
+          ? adventure.endDate
+            ? `${new Date(adventure.startDate + 'T00:00:00').toLocaleDateString('fr-FR')} → ${new Date(adventure.endDate + 'T00:00:00').toLocaleDateString('fr-FR')}`
+            : new Date(adventure.startDate + 'T00:00:00').toLocaleDateString('fr-FR')
+          : new Date(adventure.createdAt).toLocaleDateString('fr-FR')}
       </div>
 
       {/* Desktop action row — ≥ 1024px, always visible */}

@@ -38,6 +38,8 @@ export interface AdventureResponse {
   name: string
   totalDistanceKm: number
   totalElevationGainM?: number | null
+  startDate?: string | null
+  endDate?: string | null
   status: AdventureStatus
   densityStatus: DensityStatus
   densityProgress: number  // 0–100

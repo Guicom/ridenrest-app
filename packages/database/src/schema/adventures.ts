@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, real, integer, pgEnum, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, real, integer, pgEnum, index, date } from 'drizzle-orm/pg-core'
 import { user } from './auth'
 
 export const adventureStatusEnum = pgEnum('adventure_status', ['planning', 'active', 'completed'])
@@ -14,6 +14,8 @@ export const adventures = pgTable('adventures', {
   densityStatus: densityStatusEnum('density_status').notNull().default('idle'),
   densityProgress: integer('density_progress').notNull().default(0),
   densityCategories: text('density_categories').array().notNull().default([]),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({

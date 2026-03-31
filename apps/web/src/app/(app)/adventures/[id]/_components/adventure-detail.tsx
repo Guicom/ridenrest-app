@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Trash2, Map, Route, TrendingUp } from 'lucide-react'
+import { Trash2, Map, Route, TrendingUp, Info } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -28,16 +28,12 @@ import {
   renameAdventure,
   renameSegment,
   deleteAdventure,
+  updateAdventureStartDate,
+  updateAdventureEndDate,
 } from '@/lib/api-client'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -154,6 +150,24 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
       setIsRenamingAdventure(false)
       toast.error('Erreur lors du renommage')
     },
+  })
+
+  const startDateMutation = useMutation({
+    mutationFn: (date: string | null) => updateAdventureStartDate(adventureId, date),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adventures'] })
+      queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
+    },
+    onError: () => toast.error('Erreur lors de la mise à jour de la date de départ'),
+  })
+
+  const endDateMutation = useMutation({
+    mutationFn: (date: string | null) => updateAdventureEndDate(adventureId, date),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adventures'] })
+      queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
+    },
+    onError: () => toast.error('Erreur lors de la mise à jour de la date de fin'),
   })
 
   const deleteAdventureMutation = useMutation({
@@ -292,6 +306,36 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
               {adventure.name}
             </h1>
           )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+            <div className="flex items-center gap-2">
+              <label htmlFor="start-date-input" className="text-sm text-text-muted whitespace-nowrap">Date de départ :</label>
+              <input
+                id="start-date-input"
+                type="date"
+                className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
+                value={adventure.startDate ?? ''}
+                disabled={startDateMutation.isPending}
+                onChange={(e) => {
+                  const val = e.target.value || null
+                  startDateMutation.mutate(val)
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="end-date-input" className="text-sm text-text-muted whitespace-nowrap">Date de fin :</label>
+              <input
+                id="end-date-input"
+                type="date"
+                className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
+                value={adventure.endDate ?? ''}
+                disabled={endDateMutation.isPending}
+                onChange={(e) => {
+                  const val = e.target.value || null
+                  endDateMutation.mutate(val)
+                }}
+              />
+            </div>
+          </div>
           {adventure.totalDistanceKm > 0 && (
             <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -316,20 +360,13 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
           const allDone = segments.every((s) => s.parseStatus === 'done')
           return (
             <div className="flex items-center gap-2 shrink-0">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span>
-                      <DensityTriggerButton adventureId={adventureId} segments={segments} />
-                    </span>
-                  </TooltipTrigger>
-                  {hasPendingSegments && (
-                    <TooltipContent>
-                      <p>En attente de l&apos;analyse des segments</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
+              <DensityTriggerButton adventureId={adventureId} segments={segments} />
+              {hasPendingSegments && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Info className="h-3 w-3 shrink-0" />
+                  Segments en cours d&apos;analyse
+                </span>
+              )}
               {allDone && (
                 <Link href={`/map/${adventureId}`}>
                   <Button variant="default" size="lg" className="rounded-full gap-2 px-6 py-6">

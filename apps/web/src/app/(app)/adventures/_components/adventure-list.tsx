@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Bike } from 'lucide-react'
+import { Bike, ChevronDown } from 'lucide-react'
 import { listAdventures } from '@/lib/api-client'
 import { CreateAdventureButton } from './create-adventure-button'
 import { AdventureCard } from './adventure-card'
@@ -21,6 +21,7 @@ export function AdventureListSkeleton() {
 export function AdventureList() {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [isPastExpanded, setIsPastExpanded] = useState(false)
   const { data: adventures = [], isPending, isError } = useQuery({
     queryKey: ['adventures'],
     queryFn: listAdventures,
@@ -50,17 +51,75 @@ export function AdventureList() {
     )
   }
 
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Parse YYYY-MM-DD as local midnight (not UTC) to avoid off-by-one-day for UTC- users
+  const parseLocalDate = (d: string) => new Date(d + 'T00:00:00')
+
+  const upcoming = adventures
+    .filter((a) =>
+      a.status === 'active' ||
+      !a.startDate ||
+      parseLocalDate(a.startDate) >= today,
+    )
+    .sort((a, b) => {
+      if (a.status === 'active' && b.status !== 'active') return -1
+      if (b.status === 'active' && a.status !== 'active') return 1
+      if (!a.startDate && !b.startDate) return 0
+      if (!a.startDate) return 1
+      if (!b.startDate) return -1
+      return parseLocalDate(a.startDate).getTime() - parseLocalDate(b.startDate).getTime()
+    })
+
+  const past = adventures
+    .filter((a) =>
+      a.status !== 'active' &&
+      !!a.startDate &&
+      parseLocalDate(a.startDate) < today,
+    )
+    .sort((a, b) =>
+      parseLocalDate(b.startDate!).getTime() - parseLocalDate(a.startDate!).getTime(),
+    )
+
   return (
-    <div className="space-y-3">
-      {adventures.map((adventure) => (
-        <AdventureCard
-          key={adventure.id}
-          adventure={adventure}
-          isSelected={adventure.id === selectedId}
-          onSelect={(id) => setSelectedId((prev) => (prev === id ? null : id))}
-          onNavigate={(path) => router.push(path)}
-        />
-      ))}
+    <div>
+      <div className="space-y-3">
+        {upcoming.map((adventure) => (
+          <AdventureCard
+            key={adventure.id}
+            adventure={adventure}
+            isSelected={adventure.id === selectedId}
+            onSelect={(id) => setSelectedId((prev) => (prev === id ? null : id))}
+            onNavigate={(path) => router.push(path)}
+          />
+        ))}
+      </div>
+      {past.length > 0 && (
+        <div className="mt-4">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm text-text-muted mb-2 w-full"
+            onClick={() => setIsPastExpanded((v) => !v)}
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${isPastExpanded ? 'rotate-180' : ''}`} />
+            Aventures passées ({past.length})
+          </button>
+          {isPastExpanded && (
+            <div className="space-y-3 opacity-75">
+              {past.map((adventure) => (
+                <AdventureCard
+                  key={adventure.id}
+                  adventure={adventure}
+                  isSelected={adventure.id === selectedId}
+                  onSelect={(id) => setSelectedId((prev) => (prev === id ? null : id))}
+                  onNavigate={(path) => router.push(path)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
