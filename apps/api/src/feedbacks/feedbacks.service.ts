@@ -7,7 +7,7 @@ export class FeedbacksService {
   private readonly resend: Resend | null =
     process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-  async create(dto: CreateFeedbackDto, user: { id: string; email: string }): Promise<void> {
+  create(dto: CreateFeedbackDto, user: { id: string; email: string }): void {
     if (!this.resend) {
       console.log('[FeedbacksService] No RESEND_API_KEY — feedback logged only:', { ...dto, userId: user.id, email: user.email })
       return
