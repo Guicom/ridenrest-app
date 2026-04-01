@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useParams } from 'next/navigation'
 import { Menu } from 'lucide-react'
@@ -15,11 +16,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { useSession } from '@/lib/auth/client'
+import { FeedbackModal } from '@/components/shared/feedback-modal'
 
 export function AppHeader() {
   const pathname = usePathname()
   const router = useRouter()
   const params = useParams()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const { data: session } = useSession()
 
   const isMapPage = pathname.startsWith('/map/')
   const adventureId = isMapPage ? (params.id as string) : null
@@ -37,8 +42,10 @@ export function AppHeader() {
   const isAdventuresActive =
     pathname === '/adventures' || pathname.startsWith('/adventures/')
   const isSettingsActive = pathname.startsWith('/settings')
+  const isHelpActive = pathname === '/help'
 
   return (
+    <>
     <header className="sticky top-0 z-50 h-14 bg-background border-b border-[--border] flex items-center px-4">
       <div className={cn('flex items-center w-full', !isMapPage && 'max-w-[1400px] mx-auto')}>
       {/* Left: Logo — icon-only on mobile, full logo on sm+ (AC #2, #8) */}
@@ -88,6 +95,17 @@ export function AppHeader() {
             Mes aventures
           </Link>
           <Link
+            href="/help"
+            className={cn(
+              'text-sm',
+              isHelpActive
+                ? 'text-text-primary font-medium'
+                : 'text-text-secondary hover:text-text-primary',
+            )}
+          >
+            Aide
+          </Link>
+          <Link
             href="/settings"
             className={cn(
               'text-sm',
@@ -98,6 +116,13 @@ export function AppHeader() {
           >
             Mon compte
           </Link>
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="text-sm text-text-secondary hover:text-text-primary"
+          >
+            Feedback
+          </button>
         </nav>
 
         {/* Mobile hamburger — visible below sm (AC #8) */}
@@ -117,11 +142,22 @@ export function AppHeader() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className={cn(
+                  isHelpActive && 'text-text-primary font-medium',
+                )}
+                onClick={() => router.push('/help')}
+              >
+                Aide
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={cn(
                   isSettingsActive && 'text-text-primary font-medium',
                 )}
                 onClick={() => router.push('/settings')}
               >
                 Mon compte
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setFeedbackOpen(true) }}>
+                Feedback
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -129,5 +165,11 @@ export function AppHeader() {
       </div>
       </div>
     </header>
+    <FeedbackModal
+      open={feedbackOpen}
+      onOpenChange={setFeedbackOpen}
+      userEmail={session?.user?.email ?? ''}
+    />
+    </>
   )
 }

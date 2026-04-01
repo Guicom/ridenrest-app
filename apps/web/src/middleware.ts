@@ -9,7 +9,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/adventures') ||
     pathname.startsWith('/map') ||
     pathname.startsWith('/live') ||
-    pathname.startsWith('/settings')
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/help')
 
   if (!isAppRoute) return NextResponse.next()
 

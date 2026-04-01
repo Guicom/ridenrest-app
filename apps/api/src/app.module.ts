@@ -15,6 +15,7 @@ import { DensityModule } from './density/density.module.js'
 import { WeatherModule } from './weather/weather.module.js'
 import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
+import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ProfileModule } from './profile/profile.module.js'
     WeatherModule,
     StagesModule,
     ProfileModule,
+    FeedbacksModule,
   ],
   controllers: [AppController],
   providers: [

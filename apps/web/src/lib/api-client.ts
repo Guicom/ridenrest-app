@@ -393,3 +393,17 @@ export const apiClient = {
   delete: <T>(path: string, init?: RequestInit) =>
     apiFetch<T>(path, { ...init, method: 'DELETE' }),
 }
+
+
+// ── Feedbacks ─────────────────────────────────────────────────────────────────
+
+export async function submitFeedback(data: {
+  category: string
+  screen?: string
+  description: string
+}): Promise<void> {
+  await apiFetch('/api/feedbacks', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}

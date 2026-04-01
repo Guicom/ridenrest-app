@@ -12,6 +12,12 @@ export function MarketingFooter() {
           </div>
           <div className="flex flex-wrap gap-x-8 gap-y-3 sm:gap-x-10 sm:gap-y-4 text-[10px] font-semibold uppercase tracking-[0.2em]">
             <Link
+              href="/help"
+              className="hover:text-accent transition-colors hover:underline decoration-accent underline-offset-4"
+            >
+              Aide
+            </Link>
+            <Link
               href="/contact"
               className="hover:text-accent transition-colors hover:underline decoration-accent underline-offset-4"
             >

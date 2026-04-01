@@ -28,6 +28,20 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 
 vi.mock('@/lib/api-client', () => ({
   getAdventure: vi.fn(),
+  submitFeedback: vi.fn(),
+}))
+
+// ── Auth mock ─────────────────────────────────────────────────────────────────
+
+vi.mock('@/lib/auth/client', () => ({
+  useSession: vi.fn().mockReturnValue({ data: { user: { email: 'test@example.com' } } }),
+}))
+
+// ── FeedbackModal mock ────────────────────────────────────────────────────────
+
+vi.mock('@/components/shared/feedback-modal', () => ({
+  FeedbackModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="feedback-modal" /> : null,
 }))
 
 afterEach(() => {
@@ -189,6 +203,40 @@ describe('AppHeader', () => {
       renderHeader()
 
       expect(screen.queryByText('Planning')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('16.7 — "Aide" link and "Feedback" button in desktop nav', () => {
+    it('renders "Aide" link to /help in desktop nav', () => {
+      mockQueryIdle()
+      renderHeader()
+
+      const links = screen.getAllByRole('link', { name: 'Aide' })
+      expect(links.length).toBeGreaterThan(0)
+      const helpLink = links.find((l) => l.getAttribute('href') === '/help')
+      expect(helpLink).toBeInTheDocument()
+    })
+
+    it('renders "Feedback" button in desktop nav', () => {
+      mockQueryIdle()
+      renderHeader()
+
+      const feedbackBtn = screen.getAllByRole('button', { name: 'Feedback' })
+      expect(feedbackBtn.length).toBeGreaterThan(0)
+    })
+
+    it('opens FeedbackModal when "Feedback" button is clicked', async () => {
+      const { userEvent } = await import('@testing-library/user-event')
+      const ue = userEvent.setup()
+      mockQueryIdle()
+      renderHeader()
+
+      expect(screen.queryByTestId('feedback-modal')).not.toBeInTheDocument()
+
+      const buttons = screen.getAllByRole('button', { name: 'Feedback' })
+      await ue.click(buttons[0])
+
+      expect(screen.getByTestId('feedback-modal')).toBeInTheDocument()
     })
   })
 
