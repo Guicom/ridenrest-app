@@ -88,7 +88,7 @@ describe('DensityAnalyzeProcessor.process', () => {
     await processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'] }))
 
     const successCallOrder = mockRepo.setDensityStatus.mock.invocationCallOrder.at(-1)!
-    const analyzedAtCallOrder = mockRepo.setDensityAnalyzedAt.mock.invocationCallOrder[0]!
+    const analyzedAtCallOrder = mockRepo.setDensityAnalyzedAt.mock.invocationCallOrder[0]
     expect(analyzedAtCallOrder).toBeGreaterThan(successCallOrder)
   })
 
@@ -99,8 +99,7 @@ describe('DensityAnalyzeProcessor.process', () => {
     mockOverpass.queryPois.mockRejectedValue(new Error('Overpass unavailable'))
     mockRedisClient.get.mockResolvedValue(null)
     // Google also fails to ensure error path
-    const mockGoogle = mockGooglePlaces as jest.Mocked<Pick<GooglePlacesProvider, 'searchLayerPlaceIds'>>
-    mockGoogle.searchLayerPlaceIds.mockRejectedValue(new Error('Google unavailable'))
+    mockGooglePlaces.searchLayerPlaceIds.mockRejectedValue(new Error('Google unavailable'))
 
     // Promise.allSettled means both failing → count=0 → critical gap → success (not error)
     // To trigger the catch block we need insertGaps to throw
