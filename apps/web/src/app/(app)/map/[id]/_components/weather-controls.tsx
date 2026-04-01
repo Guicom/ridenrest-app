@@ -9,11 +9,10 @@ export const WEATHER_PACE_STORAGE_KEY = 'ridenrest:weather-pace'
 
 interface WeatherControlsProps {
   isPending: boolean
-  onPaceSubmit: (departureTime: string | null, speedKmh: number | null) => void
+  onPaceSubmit: (departureTime: string | null) => void
   dimension: WeatherDimension
   onDimensionChange: (dim: WeatherDimension) => void
   initialDepartureTime?: string
-  initialSpeedKmh?: string
 }
 
 const DIMENSIONS: { id: WeatherDimension; label: string; icon: LucideIcon }[] = [
@@ -23,16 +22,12 @@ const DIMENSIONS: { id: WeatherDimension; label: string; icon: LucideIcon }[] = 
 ]
 
 
-export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensionChange, initialDepartureTime = '', initialSpeedKmh = '' }: WeatherControlsProps) {
+export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensionChange, initialDepartureTime = '' }: WeatherControlsProps) {
   const [departureTime, setDepartureTime] = useState(initialDepartureTime)
-  const [speedKmh, setSpeedKmh] = useState(initialSpeedKmh)
 
-  const submitPace = (dt: string, sp: string) => {
-    try { localStorage.setItem(WEATHER_PACE_STORAGE_KEY, JSON.stringify({ departureTime: dt, speedKmh: sp })) } catch { /* ignore */ }
-    onPaceSubmit(
-      dt ? new Date(dt).toISOString() : null,
-      sp ? Number(sp) : null,
-    )
+  const submitPace = (dt: string) => {
+    try { localStorage.setItem(WEATHER_PACE_STORAGE_KEY, JSON.stringify({ departureTime: dt })) } catch { /* ignore */ }
+    onPaceSubmit(dt ? new Date(dt).toISOString() : null)
   }
 
   return (
@@ -68,26 +63,9 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
           type="datetime-local"
           value={departureTime}
           onChange={(e) => setDepartureTime(e.target.value)}
-          onBlur={(e) => submitPace(e.target.value, speedKmh)}
+          onBlur={(e) => submitPace(e.target.value)}
           className="bg-transparent text-sm text-foreground w-full outline-none"
         />
-      </div>
-
-      {/* Speed — même style que le champ date */}
-      <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
-        <span className="text-sm text-muted-foreground shrink-0">Vitesse moyenne</span>
-        <input
-          id="speed"
-          type="number"
-          min="1"
-          max="100"
-          placeholder="20"
-          value={speedKmh}
-          onChange={(e) => setSpeedKmh(e.target.value)}
-          onBlur={(e) => submitPace(departureTime, e.target.value)}
-          className="bg-transparent text-sm text-foreground w-full outline-none text-right"
-        />
-        <span className="text-muted-foreground text-sm shrink-0">km/h</span>
       </div>
 
       {isPending && <Skeleton className="h-2 w-full" data-testid="weather-submit" />}

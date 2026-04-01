@@ -176,7 +176,7 @@ describe('SegmentCard — error state', () => {
   it('shows fallback name "Segment sans nom" when name is null in error state', () => {
     render(
       <SegmentCard
-        segment={makeSegment({ parseStatus: 'error', name: null })}
+        segment={makeSegment({ parseStatus: 'error', name: null as unknown as string })}
         onRetry={vi.fn()}
       />,
     )

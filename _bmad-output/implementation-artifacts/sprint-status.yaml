@@ -187,7 +187,7 @@ development_status:
   16-5-strava-import-enhancements: done               # multi-select + pagination activités
   16-6-ui-polish-modals-settings-tooltips: done       # popins + settings + tooltips + badge mode
   16-7-help-and-feedback-system: done                 # page aide + formulaire feedback
-  16-8-advanced-stage-management-speed: backlog       # split étape + placement profil + avg_speed_kmh
+  16-8-advanced-stage-management-speed: done
   16-9-live-mode-stage-layer: backlog                 # layer étapes live + update GPS
   16-10-observability-logging-kuma: backlog           # nestjs-pino structured logs + kuma alerts
   epic-16-retrospective: optional

@@ -195,8 +195,8 @@ describe('MapCanvas stage props', () => {
     vi.mocked(Marker as unknown as (...args: unknown[]) => unknown).mockImplementation(function() { return mockMarkerInstance })
 
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
-      { id: 'st2', adventureId: 'adv-1', name: 'Stage 2', color: '#3b82f6', orderIndex: 1, startKm: 50, endKm: 100, distanceKm: 50, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'st2', adventureId: 'adv-1', name: 'Stage 2', color: '#3b82f6', orderIndex: 1, startKm: 50, endKm: 100, distanceKm: 50, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
     const waypoints = [
       { lat: 43.0, lng: 1.0, distKm: 0 },
@@ -381,7 +381,7 @@ describe('MapCanvas stage props', () => {
       { lat: 44.0, lng: 2.0, distKm: 100 },
     ]
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
 
     const dragHandlers: Array<() => void> = []
@@ -433,7 +433,7 @@ describe('MapCanvas stage props', () => {
       { lat: 44.0, lng: 2.0, distKm: 100 },
     ]
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
 
     const dragendHandlers2: Array<() => void> = []
@@ -487,7 +487,7 @@ describe('MapCanvas stage props', () => {
       { lat: 44.0, lng: 2.0, distKm: 100 },
     ]
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Stage 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 50, distanceKm: 50, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
 
     // Track dragend handlers per marker

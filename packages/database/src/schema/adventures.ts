@@ -15,6 +15,7 @@ export const adventures = pgTable('adventures', {
   densityProgress: integer('density_progress').notNull().default(0),
   densityCategories: text('density_categories').array().notNull().default([]),
   densityAnalyzedAt: timestamp('density_analyzed_at'),
+  avgSpeedKmh: real('avg_speed_kmh').notNull().default(15),
   startDate: date('start_date'),
   endDate: date('end_date'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

@@ -15,6 +15,7 @@ export { adventureStages } from './schema/adventure-stages'
 export { accommodationsCache } from './schema/accommodations-cache'
 export { weatherCache } from './schema/weather-cache'
 export { coverageGaps } from './schema/coverage-gaps'
+export { feedbacks } from './schema/feedbacks'
 
 // Database instances
 export { db } from './db'

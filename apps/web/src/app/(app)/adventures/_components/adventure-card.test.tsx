@@ -20,6 +20,7 @@ const makeAdventure = (overrides: Partial<AdventureResponse> = {}): AdventureRes
   status: 'planning',
   densityStatus: 'idle',
   densityProgress: 0,
+  avgSpeedKmh: 15,
   createdAt: '2026-03-15T00:00:00.000Z',
   updatedAt: '2026-03-15T00:00:00.000Z',
   ...overrides,

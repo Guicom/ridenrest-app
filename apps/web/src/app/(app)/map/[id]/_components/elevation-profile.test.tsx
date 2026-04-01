@@ -104,7 +104,7 @@ describe('ElevationProfile', () => {
 
   it('renders stage ReferenceLine with stage color when stagesVisible=true', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={true} />)
     const stageLine = screen.getByTestId('ref-line-10')
@@ -115,7 +115,7 @@ describe('ElevationProfile', () => {
 
   it('does not render stage ReferenceLine when stagesVisible=false', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={false} />)
     expect(screen.queryByTestId('ref-line-10')).not.toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('ElevationProfile', () => {
 
   it('stage label uses insideTopLeft position — distinct from segment boundary insideTopRight', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
     ]
     const segments: MapSegmentData[] = [
       makeSegment('s1', 'Seg 1', 0, 10),
@@ -137,5 +137,66 @@ describe('ElevationProfile', () => {
     // Segment boundary at km 10 — position insideTopRight
     const segBoundary = screen.getByTestId('ref-line-10')
     expect(segBoundary.getAttribute('data-position')).toBe('insideTopRight')
+  })
+})
+
+describe('ElevationProfile — click mode', () => {
+  const validWaypoints: MapWaypoint[] = [
+    { lat: 0, lng: 0, distKm: 0, ele: 100 },
+    { lat: 0, lng: 0, distKm: 25, ele: 200 },
+  ]
+
+  it('calls onClickKm with last hovered km when isClickModeActive=true and profile is clicked', async () => {
+    // The Tooltip mock always renders active with distKm=42 → wrappedOnHoverKm(42) fires via
+    // ElevationTooltip useEffect → lastKmRef is set → container click uses that value.
+    const onClickKm = vi.fn()
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        isClickModeActive={true}
+        onClickKm={onClickKm}
+      />,
+    )
+    // Wait for ElevationTooltip useEffect to fire onHoverKm(42) → updates lastKmRef
+    await waitFor(() => {})
+    fireEvent.click(screen.getByTestId('elevation-profile'))
+    expect(onClickKm).toHaveBeenCalledWith(42)
+  })
+
+  it('does NOT call onClickKm when isClickModeActive=false', () => {
+    const onClickKm = vi.fn()
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        isClickModeActive={false}
+        onClickKm={onClickKm}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('elevation-profile'))
+    expect(onClickKm).not.toHaveBeenCalled()
+  })
+
+  it('applies cursor:crosshair style when isClickModeActive=true', () => {
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        isClickModeActive={true}
+      />,
+    )
+    expect(screen.getByTestId('elevation-profile')).toHaveStyle({ cursor: 'crosshair' })
+  })
+
+  it('does NOT apply cursor:crosshair when isClickModeActive=false', () => {
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        isClickModeActive={false}
+      />,
+    )
+    expect(screen.getByTestId('elevation-profile')).not.toHaveStyle({ cursor: 'crosshair' })
   })
 })

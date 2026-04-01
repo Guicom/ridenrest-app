@@ -1,13 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common'
 import * as fs from 'node:fs/promises'
 import { AdventuresRepository } from './adventures.repository.js'
+import { StagesService } from '../stages/stages.service.js'
 import type { AdventureResponse, AdventureMapResponse, MapWaypoint } from '@ridenrest/shared'
 import type { Adventure } from '@ridenrest/database'
 import type { UpdateAdventureDto } from './dto/update-adventure.dto.js'
 
 @Injectable()
 export class AdventuresService {
-  constructor(private readonly adventuresRepo: AdventuresRepository) {}
+  constructor(
+    private readonly adventuresRepo: AdventuresRepository,
+    @Inject(forwardRef(() => StagesService)) private readonly stagesService: StagesService,
+  ) {}
 
   async createAdventure(userId: string, name: string): Promise<AdventureResponse> {
     const adventure = await this.adventuresRepo.create({ userId, name })
@@ -52,6 +56,11 @@ export class AdventuresService {
       adventure = await this.adventuresRepo.updateEndDate(id, dto.endDate)
     }
 
+    if (dto.avgSpeedKmh !== undefined) {
+      adventure = await this.adventuresRepo.updateAvgSpeedKmh(id, dto.avgSpeedKmh)
+      await this.stagesService.recomputeAllEtasForAdventure(id, dto.avgSpeedKmh)
+    }
+
     if (!adventure) {
       adventure = (await this.adventuresRepo.findByIdAndUserId(id, userId))!
     }
@@ -85,6 +94,7 @@ export class AdventuresService {
       status: a.status,
       densityStatus: a.densityStatus,
       densityProgress: a.densityProgress,
+      avgSpeedKmh: a.avgSpeedKmh,
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
     }

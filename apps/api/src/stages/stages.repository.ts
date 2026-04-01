@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { db, adventureStages, adventures } from '@ridenrest/database'
 import type { AdventureStage, NewAdventureStage } from '@ridenrest/database'
-import { eq, asc, desc, and, gt, sql } from 'drizzle-orm'
+import { eq, asc, desc, and, gt, lt, sql } from 'drizzle-orm'
 
 @Injectable()
 export class StagesRepository {
@@ -44,13 +44,76 @@ export class StagesRepository {
     return row as AdventureStage
   }
 
-  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'distanceKm' | 'elevationGainM' | 'etaMinutes'>>): Promise<AdventureStage> {
+  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'startKm' | 'orderIndex' | 'distanceKm' | 'elevationGainM' | 'etaMinutes'>>): Promise<AdventureStage> {
     const [row] = await db
       .update(adventureStages)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(adventureStages.id, id))
       .returning()
     return row as AdventureStage
+  }
+
+  async findContaining(adventureId: string, endKm: number): Promise<AdventureStage | undefined> {
+    const [row] = await db
+      .select()
+      .from(adventureStages)
+      .where(
+        and(
+          eq(adventureStages.adventureId, adventureId),
+          lt(adventureStages.startKm, endKm),
+          gt(adventureStages.endKm, endKm),
+        ),
+      )
+      .limit(1)
+    return row
+  }
+
+  async incrementOrderIndexGt(adventureId: string, orderIndex: number): Promise<void> {
+    await db
+      .update(adventureStages)
+      .set({ orderIndex: sql`${adventureStages.orderIndex} + 1` })
+      .where(
+        and(
+          eq(adventureStages.adventureId, adventureId),
+          gt(adventureStages.orderIndex, orderIndex),
+        ),
+      )
+  }
+
+  /** Atomically split an existing stage into two via a single DB transaction.
+   *  Increments orderIndex for all stages after the split point, inserts the new
+   *  stage, and updates the remainder — all-or-nothing. */
+  async createWithSplit(params: {
+    adventureId: string
+    splitTargetId: string
+    splitTargetOrderIndex: number
+    newStageData: NewAdventureStage
+    remainderUpdate: Partial<Pick<AdventureStage, 'orderIndex' | 'startKm' | 'distanceKm' | 'elevationGainM' | 'etaMinutes'>>
+  }): Promise<AdventureStage> {
+    const { adventureId, splitTargetId, splitTargetOrderIndex, newStageData, remainderUpdate } = params
+    return db.transaction(async (tx) => {
+      await tx
+        .update(adventureStages)
+        .set({ orderIndex: sql`${adventureStages.orderIndex} + 1` })
+        .where(
+          and(
+            eq(adventureStages.adventureId, adventureId),
+            gt(adventureStages.orderIndex, splitTargetOrderIndex),
+          ),
+        )
+
+      const [newStage] = await tx
+        .insert(adventureStages)
+        .values(newStageData)
+        .returning()
+
+      await tx
+        .update(adventureStages)
+        .set({ ...remainderUpdate, updatedAt: new Date() })
+        .where(eq(adventureStages.id, splitTargetId))
+
+      return newStage as AdventureStage
+    })
   }
 
   async findSubsequent(adventureId: string, orderIndex: number): Promise<AdventureStage[]> {

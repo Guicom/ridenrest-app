@@ -12,7 +12,7 @@ import { useLiveWeather } from '@/hooks/use-live-weather'
 import { useLiveStore } from '@/stores/live.store'
 import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
-import { getAdventureMapData } from '@/lib/api-client'
+import { getAdventureMapData, getAdventure } from '@/lib/api-client'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,12 @@ export default function LivePage() {
 
   const [mounted, setMounted] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
+
+  const { data: adventure } = useQuery({
+    queryKey: ['adventures', adventureId],
+    queryFn: () => getAdventure(adventureId),
+    staleTime: 30_000,
+  })
 
   const { data: mapData, isPending } = useQuery({
     queryKey: ['adventures', adventureId, 'map'],
@@ -365,6 +371,7 @@ export default function LivePage() {
         onOpenChange={setFiltersOpen}
         accommodationPois={accommodationPois}
         onSearch={handleSearch}
+        defaultSpeedKmh={adventure?.avgSpeedKmh}
       />
     </div>
   )

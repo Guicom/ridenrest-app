@@ -1,9 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueries, useQueryClient, useMutation } from '@tanstack/react-query'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
-import { getAdventureMapData, getWeatherForecast } from '@/lib/api-client'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil } from 'lucide-react'
+import { getAdventure, getAdventureMapData, getWeatherForecast, updateAdventureAvgSpeedKmh } from '@/lib/api-client'
 import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import { MapCanvas } from './map-canvas'
 import type { MapCanvasHandle } from './map-canvas'
@@ -49,18 +49,17 @@ export function MapView({ adventureId }: MapViewProps) {
     mapCanvasRef.current?.updateCrosshair(km)
   }, [])
 
-  // Read saved pace params from localStorage (lazy init — runs once on mount)
-  const [savedPace] = useState<{ departureTime: string; speedKmh: string }>(() => {
+  // Read saved departure time from localStorage (lazy init — runs once on mount)
+  const [savedPace] = useState<{ departureTime: string }>(() => {
     try {
       const raw = typeof window !== 'undefined' ? localStorage.getItem(WEATHER_PACE_STORAGE_KEY) : null
-      return raw ? (JSON.parse(raw) as { departureTime: string; speedKmh: string }) : { departureTime: '', speedKmh: '' }
-    } catch { return { departureTime: '', speedKmh: '' } }
+      return raw ? (JSON.parse(raw) as { departureTime: string }) : { departureTime: '' }
+    } catch { return { departureTime: '' } }
   })
 
-  // Weather pace state — only updated on form submit
-  const [paceParams, setPaceParams] = useState<{ departureTime: string | null; speedKmh: number | null }>(() => ({
+  // Weather departure time state — only updated on form submit (speed comes from adventure.avgSpeedKmh)
+  const [paceParams, setPaceParams] = useState<{ departureTime: string | null }>(() => ({
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
-    speedKmh: savedPace.speedKmh ? Number(savedPace.speedKmh) : null,
   }))
   const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers } = useMapStore()
 
@@ -77,6 +76,12 @@ export function MapView({ adventureId }: MapViewProps) {
   useEffect(() => {
     if (selectedStageId) setStagesVisible(true)
   }, [selectedStageId, setStagesVisible])
+
+  const { data: adventure } = useQuery({
+    queryKey: ['adventures', adventureId],
+    queryFn: () => getAdventure(adventureId),
+    staleTime: 30_000,
+  })
 
   const { data, isPending, error } = useQuery<AdventureMapResponse>({
     queryKey: ['adventures', adventureId, 'map'],
@@ -105,11 +110,11 @@ export function MapView({ adventureId }: MapViewProps) {
   const weatherEnabled = weatherActive
   const weatherQueries = useQueries({
     queries: (weatherEnabled ? readySegments : []).map((segment) => ({
-      queryKey: ['weather', { segmentId: segment.id, departureTime: paceParams.departureTime ?? null, speedKmh: paceParams.speedKmh ?? null }],
+      queryKey: ['weather', { segmentId: segment.id, departureTime: paceParams.departureTime ?? null, speedKmh: adventure?.avgSpeedKmh ?? 15 }],
       queryFn: () => getWeatherForecast({
         segmentId: segment.id,
         departureTime: paceParams.departureTime ?? undefined,
-        speedKmh: paceParams.speedKmh ?? undefined,
+        speedKmh: adventure?.avgSpeedKmh ?? 15,
       }),
       staleTime: WEATHER_CACHE_TTL * 1000,
     })),
@@ -146,6 +151,21 @@ export function MapView({ adventureId }: MapViewProps) {
 
   // Read pace from localStorage once on mount — not reactive (acceptable per story dev notes)
   const stagePace = getStoredWeatherPace()
+
+  const queryClient = useQueryClient()
+
+  // Avg speed inline edit
+  const [isEditingSpeed, setIsEditingSpeed] = useState(false)
+  const [speedInput, setSpeedInput] = useState('')
+  const avgSpeedMutation = useMutation({
+    mutationFn: (speed: number) => updateAdventureAvgSpeedKmh(adventureId, speed),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
+      void queryClient.invalidateQueries({ queryKey: ['stages', adventureId] })
+      void queryClient.invalidateQueries({ queryKey: ['weather'] })
+      setIsEditingSpeed(false)
+    },
+  })
 
   // Hover preview overlay during stageClickMode (AC1)
   const [hoverKmPreview, setHoverKmPreview] = useState<number | null>(null)
@@ -206,8 +226,6 @@ export function MapView({ adventureId }: MapViewProps) {
     return Math.max(0, toPt.cumulativeDPlus - fromPt.cumulativeDPlus)
   }, [overlayKm, overlayFromKm, elevationPoints])
 
-  const queryClient = useQueryClient()
-
   // Retry handler — invalidates all POI queries for the current adventure segments
   const handlePoiRetry = () => {
     readySegments.forEach((s) => {
@@ -239,6 +257,47 @@ export function MapView({ adventureId }: MapViewProps) {
         }`}
       >
         <div className="flex flex-col gap-4 p-4">
+          {/* Vitesse moyenne — inline edit */}
+          <div className="flex items-center justify-between rounded-xl border border-[--border] px-4 py-3">
+            <span className="text-sm font-medium">Vitesse moyenne</span>
+            {isEditingSpeed ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={5}
+                  max={50}
+                  value={speedInput}
+                  onChange={(e) => setSpeedInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const v = Number(speedInput)
+                      if (v >= 5 && v <= 50) avgSpeedMutation.mutate(v)
+                    }
+                    if (e.key === 'Escape') setIsEditingSpeed(false)
+                  }}
+                  onBlur={() => {
+                    const v = Number(speedInput)
+                    if (v >= 5 && v <= 50) avgSpeedMutation.mutate(v)
+                    else setIsEditingSpeed(false)
+                  }}
+                  className="w-14 rounded-md border border-[--border] bg-muted px-2 py-1 text-sm text-center font-mono"
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                />
+                <span className="text-sm text-muted-foreground">km/h</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setSpeedInput(String(adventure?.avgSpeedKmh ?? 15)); setIsEditingSpeed(true) }}
+                className="flex items-center gap-1.5 text-sm font-mono text-foreground hover:text-primary"
+                aria-label="Modifier la vitesse moyenne"
+              >
+                {adventure?.avgSpeedKmh ?? 15} km/h
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
           {/* Search range slider */}
           <SearchRangeControl
             totalDistanceKm={data.totalDistanceKm}
@@ -252,10 +311,7 @@ export function MapView({ adventureId }: MapViewProps) {
           <SidebarWeatherSection
             isPending={weatherPending}
             initialDepartureTime={savedPace.departureTime}
-            initialSpeedKmh={savedPace.speedKmh}
-            onPaceSubmit={(departureTime, speedKmh) => {
-              setPaceParams({ departureTime, speedKmh })
-            }}
+            onPaceSubmit={(departureTime) => setPaceParams({ departureTime })}
           />
 
           {/* Densité section — collapsible with legend (Story 8.4 correction / 8.5 merge) */}
@@ -280,7 +336,7 @@ export function MapView({ adventureId }: MapViewProps) {
             onDeleteStage={deleteStage}
             weatherActive={weatherActive}
             departureTime={stagePace.departureTime}
-            speedKmh={stagePace.speedKmh}
+            speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
           />
 
           {/* Density CTA — shown when idle or stale, below Stages (AC #1, Story 16.4) */}
@@ -444,6 +500,8 @@ export function MapView({ adventureId }: MapViewProps) {
             className="h-full w-full"
             stages={stages}
             stagesVisible={stagesVisible}
+            isClickModeActive={stageClickMode}
+            onClickKm={(km) => { setPendingEndKm(km); setShowNamingDialog(true); setStageClickMode(false) }}
           />
         </div>
       </div>

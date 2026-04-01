@@ -33,23 +33,13 @@ describe('WeatherControls', () => {
     expect(screen.getByTestId('weather-dim-temperature').getAttribute('aria-pressed')).toBe('false')
   })
 
-  it('calls onPaceSubmit with null when speed field is blurred without values', () => {
+  it('calls onPaceSubmit with null when departure time is blurred without value', () => {
     const onPaceSubmit = vi.fn()
-    render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
+    const { container } = render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
 
-    fireEvent.blur(screen.getByPlaceholderText('20'))
-    expect(onPaceSubmit).toHaveBeenCalledWith(null, null)
-  })
-
-  it('calls onPaceSubmit with speed when speed is entered and blurred', () => {
-    const onPaceSubmit = vi.fn()
-    render(<WeatherControls {...defaultProps} onPaceSubmit={onPaceSubmit} />)
-
-    const speedInput = screen.getByPlaceholderText('20')
-    fireEvent.change(speedInput, { target: { value: '20' } })
-    fireEvent.blur(speedInput)
-
-    expect(onPaceSubmit).toHaveBeenCalledWith(null, 20)
+    const input = container.querySelector('#departure-time') as HTMLElement
+    fireEvent.blur(input)
+    expect(onPaceSubmit).toHaveBeenCalledWith(null)
   })
 
   it('shows loading skeleton when isPending', () => {

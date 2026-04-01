@@ -43,6 +43,7 @@ export interface AdventureResponse {
   status: AdventureStatus
   densityStatus: DensityStatus
   densityProgress: number  // 0–100
+  avgSpeedKmh: number
   createdAt: string  // ISO 8601
   updatedAt: string
 }

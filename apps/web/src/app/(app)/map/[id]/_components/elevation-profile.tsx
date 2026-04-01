@@ -1,5 +1,5 @@
 'use client'
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import type { ElevationPoint } from '@/hooks/use-elevation-profile'
@@ -12,6 +12,8 @@ interface ElevationProfileProps {
   className?: string
   stages?: AdventureStageResponse[]
   stagesVisible?: boolean
+  isClickModeActive?: boolean
+  onClickKm?: (km: number) => void
 }
 
 interface TooltipEntry {
@@ -43,8 +45,25 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
   )
 }
 
-export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false }: ElevationProfileProps) {
+export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false, isClickModeActive, onClickKm }: ElevationProfileProps) {
   const { points, boundaries, hasElevationData } = useElevationProfile(waypoints, segments)
+
+  // Track last hovered km — recharts onClick is unreliable (activePayload can be null).
+  // We update this ref via the wrapped onHoverKm which is called from ElevationTooltip
+  // on every hover (this already drives the map crosshair, so it's definitely reliable).
+  const lastKmRef = useRef<number | null>(null)
+
+  // Wrap onHoverKm to capture last valid km before forwarding to parent
+  const wrappedOnHoverKm = useCallback((km: number | null) => {
+    if (km !== null) lastKmRef.current = km
+    onHoverKm?.(km)
+  }, [onHoverKm])
+
+  // Native div click — more reliable than recharts onClick
+  const handleContainerClick = () => {
+    if (!isClickModeActive || !onClickKm || lastKmRef.current === null) return
+    onClickKm(lastKmRef.current)
+  }
 
   if (!hasElevationData) {
     return (
@@ -55,12 +74,17 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
   }
 
   return (
-    <div data-testid="elevation-profile" className={className}>
+    <div
+      data-testid="elevation-profile"
+      className={className}
+      onClick={handleContainerClick}
+      style={isClickModeActive ? { cursor: 'crosshair' } : undefined}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={points}
           margin={{ top: 4, right: 8, bottom: 16, left: 32 }}
-          onMouseLeave={() => onHoverKm?.(null)}
+          onMouseLeave={() => wrappedOnHoverKm(null)}
         >
           <XAxis
             dataKey="distKm"
@@ -78,7 +102,7 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
             width={28}
             tickFormatter={(v: number) => `${v.toFixed(0)}`}
           />
-          <Tooltip content={<ElevationTooltip onHoverKm={onHoverKm} />} isAnimationActive={false} />
+          <Tooltip content={<ElevationTooltip onHoverKm={wrappedOnHoverKm} />} isAnimationActive={false} />
           <Area
             dataKey="ele"
             fill="var(--primary-light, hsl(var(--primary) / 0.2))"

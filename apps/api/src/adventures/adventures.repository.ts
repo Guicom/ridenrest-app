@@ -62,6 +62,15 @@ export class AdventuresRepository {
     return row as Adventure
   }
 
+  async updateAvgSpeedKmh(id: string, avgSpeedKmh: number): Promise<Adventure> {
+    const [row] = await db
+      .update(adventures)
+      .set({ avgSpeedKmh, updatedAt: new Date() })
+      .where(eq(adventures.id, id))
+      .returning()
+    return row as Adventure
+  }
+
   async deleteById(id: string): Promise<void> {
     await db.delete(adventures).where(eq(adventures.id, id))
   }

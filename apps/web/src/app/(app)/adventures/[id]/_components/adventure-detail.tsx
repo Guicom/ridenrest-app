@@ -69,7 +69,6 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   const [adventureNameInput, setAdventureNameInput] = useState('')
   const [deleteAdventureDialogOpen, setDeleteAdventureDialogOpen] = useState(false)
   const [deleteConfirmName, setDeleteConfirmName] = useState('')
-
   const segmentsQueryKey = ['adventures', adventureId, 'segments'] as const
 
   const { data: adventure, isPending: adventureLoading } = useQuery({

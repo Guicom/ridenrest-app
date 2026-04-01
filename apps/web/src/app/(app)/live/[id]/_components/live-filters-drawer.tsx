@@ -21,9 +21,10 @@ interface LiveFiltersDrawerProps {
   onOpenChange: (open: boolean) => void
   accommodationPois?: Poi[]
   onSearch?: () => void
+  defaultSpeedKmh?: number
 }
 
-export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch }: LiveFiltersDrawerProps) {
+export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch, defaultSpeedKmh }: LiveFiltersDrawerProps) {
   const {
     visibleLayers,
     weatherActive, weatherDimension,
@@ -40,7 +41,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
 
   // Local state — only radius, speed, and departure time require Apply (layer/weather/density toggles are immediate)
   const [localRadius,        setLocalRadius]        = useState(searchRadiusKm)
-  const [localSpeed,         setLocalSpeed]         = useState(speedKmh)
+  const [localSpeed,         setLocalSpeed]         = useState(defaultSpeedKmh ?? speedKmh)
   const [localDepartureTime, setLocalDepartureTime] = useState(weatherDepartureTime ?? '')
 
   // Accordion expansion state
@@ -51,7 +52,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
   useEffect(() => {
     if (open) {
       setLocalRadius(searchRadiusKm)
-      setLocalSpeed(speedKmh)
+      setLocalSpeed(defaultSpeedKmh ?? speedKmh)
       setLocalDepartureTime(weatherDepartureTime ?? '')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,48 +94,47 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             </button>
           </div>
 
-          {/* Section 1: Distance de la trace + Allure — same line */}
-          <div className="flex items-start gap-4 mb-4">
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground mb-2">Distance de la trace</p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setLocalRadius((r) => Math.max(0.5, r - 0.5))}
-                  className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center"
-                  aria-label="Diminuer le rayon"
-                >
-                  —
-                </button>
-                <span className="font-mono text-lg font-bold whitespace-nowrap min-w-[4.5rem] text-center">
-                  {localRadius} km
-                </span>
-                <button
-                  onClick={() => setLocalRadius((r) => Math.min(30, r + 0.5))}
-                  className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center"
-                  aria-label="Augmenter le rayon"
-                >
-                  +
-                </button>
-              </div>
+          {/* Section 1: Vitesse moyenne */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold text-foreground">Vitesse moyenne</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={5}
+                max={50}
+                value={localSpeed}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  if (v >= 5 && v <= 50) setLocalSpeed(v)
+                }}
+                data-testid="input-speed"
+                className="h-9 w-16 rounded-lg border border-[--border] bg-white px-2 text-sm text-center font-mono"
+              />
+              <span className="text-sm text-[--text-secondary]">km/h</span>
             </div>
-            <div className="w-px self-stretch bg-[--border] my-1" />
-            <div>
-              <p className="text-sm font-semibold text-foreground mb-2">Allure</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={5}
-                  max={50}
-                  value={localSpeed}
-                  onChange={(e) => {
-                    const v = Number(e.target.value)
-                    if (v >= 5 && v <= 50) setLocalSpeed(v)
-                  }}
-                  data-testid="input-speed"
-                  className="h-9 w-16 rounded-lg border border-[--border] bg-white px-2 text-sm text-center font-mono"
-                />
-                <span className="text-sm text-[--text-secondary]">km/h</span>
-              </div>
+          </div>
+
+          {/* Section 2: Distance de la trace */}
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-foreground mb-2">Distance de la trace</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setLocalRadius((r) => Math.max(0.5, r - 0.5))}
+                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center"
+                aria-label="Diminuer le rayon"
+              >
+                —
+              </button>
+              <span className="font-mono text-lg font-bold whitespace-nowrap min-w-[4.5rem] text-center">
+                {localRadius} km
+              </span>
+              <button
+                onClick={() => setLocalRadius((r) => Math.min(30, r + 0.5))}
+                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center"
+                aria-label="Augmenter le rayon"
+              >
+                +
+              </button>
             </div>
           </div>
 

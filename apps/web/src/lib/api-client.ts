@@ -139,6 +139,13 @@ export async function updateAdventureEndDate(id: string, endDate: string | null)
   })
 }
 
+export async function updateAdventureAvgSpeedKmh(id: string, avgSpeedKmh: number): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ avgSpeedKmh }),
+  })
+}
+
 export async function renameSegment(
   adventureId: string,
   segmentId: string,

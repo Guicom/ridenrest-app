@@ -9,11 +9,10 @@ import { SectionTooltip } from '@/components/shared/section-tooltip'
 interface SidebarWeatherSectionProps {
   isPending: boolean
   initialDepartureTime?: string
-  initialSpeedKmh?: string
-  onPaceSubmit: (departureTime: string | null, speedKmh: number | null) => void
+  onPaceSubmit: (departureTime: string | null) => void
 }
 
-export function SidebarWeatherSection({ isPending, initialDepartureTime, initialSpeedKmh, onPaceSubmit }: SidebarWeatherSectionProps) {
+export function SidebarWeatherSection({ isPending, initialDepartureTime, onPaceSubmit }: SidebarWeatherSectionProps) {
   const [expanded, setExpanded] = useState(false)
   const { weatherActive, weatherDimension, setWeatherActive, setWeatherDimension } = useMapStore()
 
@@ -50,7 +49,6 @@ export function SidebarWeatherSection({ isPending, initialDepartureTime, initial
             dimension={weatherDimension}
             onDimensionChange={setWeatherDimension}
             initialDepartureTime={initialDepartureTime}
-            initialSpeedKmh={initialSpeedKmh}
             onPaceSubmit={onPaceSubmit}
           />
         </div>

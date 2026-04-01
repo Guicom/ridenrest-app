@@ -1,0 +1,1 @@
+ALTER TABLE "adventures" ADD COLUMN "avg_speed_kmh" real DEFAULT 15 NOT NULL;
