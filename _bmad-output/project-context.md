@@ -434,6 +434,107 @@ Overpass API calls are **opt-in** — disabled by default for all users.
 - TQ query keys include `overpassEnabled` to avoid cache sharing between opt-in/opt-out
 - Settings page: `OverpassToggle` component, section "Recherche de points d'intérêt"
 
+### Map Interaction UX — Story 16.3 Patterns
+
+#### `traceClickedKm` — Click-on-trace CTA
+
+`useMapStore.traceClickedKm: number | null` stores the km position of a click on the GPX trace line. When non-null, `<TraceClickCta />` renders a floating mini-panel.
+
+- Set by a click handler on layer `'trace-line-click-target'` (invisible 16px-wide line on top of `'trace-line'`) in `map-canvas.tsx`
+- Guard: if `stageClickModeRef.current` is active, the click handler is a no-op
+- Cleared on: ✕ button, Escape key, `searchCommitted` becoming `true`
+- `TraceClickCta` uses `setSearchRange(clickedKm, clickedKm + rangeWidth)` — preserves the current range width from the store (`toKm - fromKm`)
+
+**WeakMap cleanup pattern** — trace click handlers use the same `WeakMap<maplibregl.Map, handler>` pattern as `densityEventHandlers` for proper cleanup on style reload (keyed by `styleVersion`).
+
+#### `MapCanvasHandle` / `LiveMapCanvasHandle` — Imperative Methods
+
+`MapCanvasHandle` (planning, `map-canvas.tsx`) and `LiveMapCanvasHandle` (live, `live-map-canvas.tsx`) both expose zoom methods:
+
+```typescript
+// Both handles
+resetZoom(): void           // fitToTrace with animate: true — called by ResetZoomButton
+
+// Planning only
+fitToCorridorRange(fromKm: number, toKm: number, segments: MapSegmentData[]): void
+  // Zooms to waypoints in [fromKm, toKm] with 10% padding; fallback to fitToTrace if none found
+```
+
+Both `fitToTrace()` functions accept an optional `animate = false` parameter — always pass `true` for user-triggered zoom resets.
+
+`<ResetZoomButton>` is rendered in **both** planning and live modes:
+- Planning: `absolute bottom-20 right-4 z-10` (above `MapStylePicker` at `bottom-6`)
+- Live: `absolute top-14 right-4 z-10` (below `MapStylePicker` at `top-4`; bottom-right is hidden under `LiveControls`)
+
+#### Auto-zoom after POI search
+
+In `map-view.tsx`, a `useEffect` detects the `isPending: true → false` transition (via `prevIsPendingRef`) while `searchCommitted === true`, then calls `mapRef.current?.fitToCorridorRange(mapFromKm, mapToKm, readySegments)`.
+
+- `readySegments` is wrapped in `useMemo` (not computed inline) to avoid spurious re-renders
+- `prevIsPendingRef` MUST be reset to `false` in the effect cleanup (React Strict Mode safety)
+- The auto-zoom fires **once per search commit**, not on re-renders
+
+#### MapSearchOverlay — Loading indicator
+
+`<MapSearchOverlay visible={searchCommitted && poisPending} />` renders a centered semi-transparent overlay over the map canvas (not the full viewport).
+
+- Uses `absolute inset-0` inside the relatively-positioned map wrapper → scoped to map, never covers sidebar
+- `pointer-events-none` — no interaction blocking
+- `z-20` — above map canvas, below sidebar (`z-10`) and POI popup (`z-40`)
+- Do NOT use `fixed` positioning — that would cover the sidebar
+
+#### `useMapStore` — Initial Range State
+
+Store initializes `fromKm: 0, toKm: 15` (range = 15 km). The sidebar `<SearchRangeControl />` derives `rangeKm` directly from `toKm - fromKm`.
+
+**Never use `toKm: 30` as initial value** — that was a legacy artifact that caused `TraceClickCta` to compute a 30km range width instead of 15km.
+
+#### "Aucun résultat" — No-Results Banner
+
+After a committed search returns zero POIs, an orange banner (`bg-orange-500/90 text-white backdrop-blur-sm`) is shown inside the map container.
+
+**Planning mode** (`map-view.tsx`) — condition:
+```ts
+searchCommitted && !poisPending && !poisError
+  && allPois.length === 0
+  && readySegments.length > 0
+  && visibleLayers.size > 0
+```
+Positioned `absolute bottom-20 left-1/2 -translate-x-1/2 z-30` — centered above map controls, below `TraceClickCta`.
+
+**Live mode** (`live/[id]/page.tsx`) — condition:
+```ts
+isLiveModeActive && !poisFetching && !poisError
+  && poisHasFetched      // data !== undefined — a real fetch completed at this queryKey
+  && pois.length === 0
+```
+Positioned `absolute top-16 left-1/2 -translate-x-1/2 z-40` — above LiveControls panel (`bottom-0`, ~200px height). Not shown if offline or error banner is already visible.
+
+**Why `hasFetched` instead of `searchTrigger > 0`**: With TanStack Query `enabled: false`, `data` stays `undefined` until the first fetch for that queryKey. Using `?? []` collapses `undefined` and `[]` into the same value, making it impossible to distinguish "never searched here" from "searched here, got nothing". `hasFetched = data !== undefined` is the correct gate. It also auto-resets when `targetKm` changes (new queryKey → new cache entry → `data = undefined`), so the banner hides correctly when the user moves the slider before re-searching.
+
+**NEVER use `pois.length === 0` alone as a no-results indicator in live mode** — it's true before the first search too.
+
+#### Icons — lucide-react usage in map controls
+
+| Element | Icon |
+|---|---|
+| Reset zoom button | `ZoomOut` |
+| TraceClickCta km position | `MapPin` |
+| MapSearchOverlay spinner | `Loader2` |
+
+#### z-index Stack (map area)
+
+| Element | z-index |
+|---|---|
+| Map canvas | base (z-0) |
+| Map controls (ResetZoom, StylePicker) | z-10 |
+| MapSearchOverlay | z-20 |
+| Sidebar collapse toggle | z-20 |
+| TraceClickCta | z-30 |
+| POI popup | z-40 |
+
+---
+
 ### Corridor Search — 30 km Max Range
 
 POI search range is capped at **30 km max** (`toKm - fromKm ≤ 30`).
@@ -443,3 +544,35 @@ Enforced at two levels:
 2. **UI**: `<SearchRangeSlider />` caps the range programmatically
 
 **Why 30 km**: beyond this, Overpass bbox becomes too large (OOM/timeout risk on fair-use), Redis cache covers too wide a zone (stale at 24h), and planning UX loses precision. 30 km matches a realistic bikepacking daily stage.
+
+---
+
+### Button Component — Tailles réelles (custom, pas shadcn standard)
+
+Le composant `Button` dans ce projet a des tailles différentes du shadcn/ui standard :
+
+| size | height | usage |
+|------|--------|-------|
+| `default` | `h-8` (32px) | Usage général UI |
+| `sm` | `h-7` (28px) | Petits boutons inline |
+| `lg` | `h-11` (44px) | **WCAG touch target** — dialogs, CTAs principaux |
+
+**Règles dialog** :
+- Tous les boutons dans un `DialogFooter` (CTA primaire ET "Annuler") → `size="lg"`
+- `DialogFooter` a `[&_button]:min-h-[44px]` comme filet de sécurité automatique
+- Ne jamais utiliser `className="rounded-full px-6 py-6"` sur des boutons dialog — crée une incohérence visuelle avec les autres dialogs
+
+### UI Components — Card (story 16.6)
+
+`Card`, `CardHeader`, `CardContent` disponibles dans `@/components/ui/card` :
+- Usage : pages settings, listes avec sections (même design language que adventures list)
+- `Card` accepte `className` pour override (ex: `className="border-destructive"`)
+- Composants internes (StravaConnectionCard, OverpassToggle…) ne doivent PAS avoir leur propre `rounded-lg border` wrapper si wrappés dans une Card
+
+### SectionTooltip — Tooltips sidebar (story 16.6)
+
+`SectionTooltip` dans `@/components/shared/section-tooltip` :
+- Hover desktop → tooltip immédiat
+- Long-press mobile (≥500ms, `pointerType === 'touch'`) → tooltip
+- Affiche automatiquement un `Info` icon (lucide) pour indiquer qu'une tooltip existe
+- Pattern : wrapper le div icon+titre uniquement, pas le chevron collapse

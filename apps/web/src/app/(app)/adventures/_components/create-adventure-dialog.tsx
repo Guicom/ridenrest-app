@@ -64,11 +64,12 @@ export function CreateAdventureDialog({ onSubmit, isPending }: Props) {
             <Button
               type="button"
               variant="outline"
+              size="lg"
               onClick={() => { setOpen(false); reset() }}
             >
               Annuler
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" size="lg" disabled={isPending}>
               {isPending ? 'Création...' : 'Créer'}
             </Button>
           </div>

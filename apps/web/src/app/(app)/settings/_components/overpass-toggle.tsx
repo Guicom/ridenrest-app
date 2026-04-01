@@ -23,7 +23,7 @@ export function OverpassToggle({ initialEnabled }: OverpassToggleProps) {
   }
 
   return (
-    <div className="flex items-start justify-between rounded-lg border p-4 gap-4">
+    <div className="flex items-start justify-between gap-4">
       <div className="flex-1">
         <p className="font-medium">Recherche étendue (Overpass)</p>
         <p className="text-sm text-muted-foreground mt-0.5">

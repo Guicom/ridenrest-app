@@ -57,7 +57,7 @@ export function DeleteAccountDialog({ userEmail }: DeleteAccountDialogProps) {
       aria-modal="true"
       aria-labelledby="delete-dialog-title"
     >
-      <div className="bg-background rounded-lg border p-6 w-full max-w-sm space-y-4 mx-4">
+      <div className="bg-background rounded-lg border p-6 w-full max-w-[calc(100%-2rem)] sm:min-w-[480px] sm:max-w-lg space-y-4">
         <div className="space-y-1">
           <h3 id="delete-dialog-title" className="text-lg font-semibold">Supprimer mon compte</h3>
           <p className="text-sm text-muted-foreground">
@@ -85,6 +85,7 @@ export function DeleteAccountDialog({ userEmail }: DeleteAccountDialogProps) {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            size="lg"
             className="flex-1"
             onClick={() => { setOpen(false); setEmailInput(''); setError(null) }}
             disabled={isDeleting}
@@ -93,6 +94,7 @@ export function DeleteAccountDialog({ userEmail }: DeleteAccountDialogProps) {
           </Button>
           <Button
             variant="destructive"
+            size="lg"
             className="flex-1"
             onClick={handleDelete}
             disabled={!emailMatches || isDeleting}

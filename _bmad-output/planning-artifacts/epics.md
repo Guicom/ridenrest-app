@@ -1857,7 +1857,7 @@ So that I can navigate search results and control the viewport efficiently.
 
 **Given** the user clicks on a point on the GPX trace,
 **When** the click is on or within 10px of the trace line,
-**Then** a "Rechercher depuis ici" CTA appears (tooltip or floating button) that sets `fromKm` to the clicked km position and opens the search panel.
+**Then** a "Rechercher ici" CTA appears (tooltip or floating button) that sets `fromKm` to the clicked km position and opens the search panel.
 
 **Given** a POI search is in progress,
 **When** results are loading,

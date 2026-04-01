@@ -112,8 +112,8 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction onClick={onRetry}>Remplacer le fichier GPX</AlertDialogAction>
+                  <AlertDialogCancel size="lg">Annuler</AlertDialogCancel>
+                  <AlertDialogAction size="lg" onClick={onRetry}>Remplacer le fichier GPX</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -159,8 +159,9 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogCancel size="lg">Annuler</AlertDialogCancel>
                         <AlertDialogAction
+                          size="lg"
                           onClick={onDelete}
                           disabled={isDeleting}
                           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

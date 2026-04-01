@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronUp, LayoutGrid } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { useMapStore } from '@/stores/map.store'
+import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 function LegendItem({ color, label, detail }: { color: string; label: string; detail: string }) {
   return (
@@ -29,10 +30,12 @@ export function SidebarDensitySection() {
         onClick={() => setExpanded((v) => !v)}
         data-testid="density-section-header"
       >
-        <div className="flex items-center gap-2">
-          <LayoutGrid className="h-5 w-5" aria-hidden="true" />
-          <span className="text-sm font-medium">Densité</span>
-        </div>
+        <SectionTooltip content="Analyse la disponibilité des hébergements sur toute la trace. Les tronçons rouges indiquent les zones sans hébergement.">
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="h-5 w-5" aria-hidden="true" />
+            <span className="text-sm font-medium">Densité</span>
+          </div>
+        </SectionTooltip>
         <span className="text-muted-foreground" aria-hidden="true">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>

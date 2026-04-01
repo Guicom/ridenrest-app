@@ -169,6 +169,29 @@ describe('AppHeader', () => {
     })
   })
 
+  describe('16.6 — Planning badge on map pages', () => {
+    it('renders Planning badge when on a map page and adventure data is loaded', () => {
+      mockPathname = '/map/adv-1'
+      mockParams = { id: 'adv-1' }
+      mockQueryResolved(makeAdventure({ name: 'Transcantabrique 2026' }))
+
+      renderHeader()
+
+      expect(screen.getByText('Planning')).toBeInTheDocument()
+      expect(screen.getByText('Transcantabrique 2026')).toBeInTheDocument()
+    })
+
+    it('does not render Planning badge while adventure is loading', () => {
+      mockPathname = '/map/adv-1'
+      mockParams = { id: 'adv-1' }
+      mockQueryPending()
+
+      renderHeader()
+
+      expect(screen.queryByText('Planning')).not.toBeInTheDocument()
+    })
+  })
+
   describe('6.6 — header hidden in live mode', () => {
     it('does not render the header when pathname starts with /live/', () => {
       mockPathname = '/live/adv-1'

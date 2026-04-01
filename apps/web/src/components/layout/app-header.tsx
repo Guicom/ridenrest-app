@@ -6,6 +6,7 @@ import { Menu } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Logo } from '@/components/ui/logo'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { getAdventure } from '@/lib/api-client'
 import {
   DropdownMenu,
@@ -54,9 +55,17 @@ export function AppHeader() {
           {isPending ? (
             <Skeleton className="h-5 w-40" />
           ) : adventure?.name ? (
-            <span className="text-sm font-medium text-text-primary truncate max-w-xs">
-              {adventure.name}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-text-primary truncate max-w-xs">
+                {adventure.name}
+              </span>
+              <Badge
+                variant="outline"
+                className="shrink-0 bg-blue-500/10 text-blue-600 border-blue-500/20 text-xs font-medium"
+              >
+                Planning
+              </Badge>
+            </div>
           ) : null}
         </div>
       ) : (

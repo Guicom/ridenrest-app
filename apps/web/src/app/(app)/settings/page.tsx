@@ -6,6 +6,7 @@ import { StravaConnectionCard } from './_components/strava-connection-card'
 import { SignOutButton } from './_components/sign-out-button'
 import { DeleteAccountDialog } from './_components/delete-account-dialog'
 import { OverpassToggle } from './_components/overpass-toggle'
+import { Card, CardContent } from '@/components/ui/card'
 
 export const metadata = {
   title: "Paramètres — Ride'n'Rest",
@@ -25,33 +26,44 @@ export default async function SettingsPage() {
   const overpassEnabled = profile?.overpassEnabled ?? false
 
   return (
-    <div className="container max-w-2xl pt-10 pb-8">
-      <h1 className="text-2xl font-bold mb-6">Paramètres</h1>
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Intégrations</h2>
-        <StravaConnectionCard isConnected={isStravaConnected} />
+    <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 space-y-8">
+      <h1 className="text-2xl font-bold">Paramètres</h1>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">Intégrations</h2>
+        <Card>
+          <CardContent className="pt-4">
+            <StravaConnectionCard isConnected={isStravaConnected} />
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Recherche de points d&apos;intérêt</h2>
-        <OverpassToggle initialEnabled={overpassEnabled} />
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">Recherche de points d&apos;intérêt</h2>
+        <Card>
+          <CardContent className="pt-4">
+            <OverpassToggle initialEnabled={overpassEnabled} />
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Session</h2>
-        <div className="flex items-center justify-between rounded-lg border p-4">
-          <div>
-            <p className="font-medium">Compte</p>
-            <p className="text-sm text-muted-foreground">{session.user.email}</p>
-          </div>
-          <SignOutButton />
-        </div>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">Session</h2>
+        <Card>
+          <CardContent className="pt-4 flex items-center justify-between">
+            <div>
+              <p className="font-medium">Compte</p>
+              <p className="text-sm text-muted-foreground">{session.user.email}</p>
+            </div>
+            <SignOutButton />
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-destructive">Zone dangereuse</h2>
-        <div className="rounded-lg border border-destructive p-4">
-          <div className="flex items-center justify-between">
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-destructive uppercase tracking-wide px-1">Zone dangereuse</h2>
+        <Card className="border-destructive">
+          <CardContent className="pt-4 flex items-center justify-between">
             <div>
               <p className="font-medium">Supprimer mon compte</p>
               <p className="text-sm text-muted-foreground">
@@ -59,8 +71,8 @@ export default async function SettingsPage() {
               </p>
             </div>
             <DeleteAccountDialog userEmail={session.user.email} />
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </section>
     </div>
   )

@@ -59,10 +59,9 @@ export function DensityCategoryDialog({ open, onOpenChange, onConfirm, isLoading
           })}
         </div>
         <DialogFooter>
-          <Button variant="outline" size="lg" className="rounded-full px-6 py-6" onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button variant="outline" size="lg" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
             size="lg"
-            className="rounded-full px-6 py-6"
             disabled={selected.size === 0 || isLoading}
             onClick={() => onConfirm([...selected])}
           >

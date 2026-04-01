@@ -22,6 +22,7 @@ import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
 import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { Undo2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
 import { MapSearchOverlay } from '@/app/(app)/map/[id]/_components/map-search-overlay'
 import { ResetZoomButton } from '@/app/(app)/map/[id]/_components/reset-zoom-button'
@@ -226,8 +227,8 @@ export default function LivePage() {
           />
         )}
 
-        {/* Quitter le live — top left z-40 */}
-        <div className="absolute top-4 left-4 z-40">
+        {/* Quitter le live + Live badge — top left z-40 */}
+        <div className="absolute top-4 left-4 z-40 flex items-center gap-2">
           <button
             data-testid="quit-live-btn"
             onClick={handleQuitRequest}
@@ -236,6 +237,12 @@ export default function LivePage() {
           >
             <Undo2 className="h-5 w-5" />
           </button>
+          <Badge
+            variant="outline"
+            className="bg-green-500/10 text-green-600 border-green-500/20 text-xs font-medium"
+          >
+            Live
+          </Badge>
         </div>
 
         {/* Consent modal — z-60 */}

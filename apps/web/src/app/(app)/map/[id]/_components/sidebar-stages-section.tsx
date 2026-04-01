@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label'
 import { STAGE_COLORS } from '@ridenrest/shared'
 import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
 import { StageWeatherBadge } from './stage-weather-badge'
+import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 interface SidebarStagesSectionProps {
   stages: AdventureStageResponse[]
@@ -120,10 +121,12 @@ export function SidebarStagesSection({
         onClick={() => setExpanded((v) => !v)}
         data-testid="stages-section-header"
       >
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5" aria-hidden="true" />
-          <span className="text-sm font-medium">Étapes</span>
-        </div>
+        <SectionTooltip content="Créez des étapes journalières sur votre trace. Cliquez sur la trace ou utilisez le profil d'élévation pour placer la fin de chaque étape.">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" aria-hidden="true" />
+            <span className="text-sm font-medium">Étapes</span>
+          </div>
+        </SectionTooltip>
         <span className="text-muted-foreground" aria-hidden="true">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>
@@ -248,8 +251,8 @@ export function SidebarStagesSection({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={onNamingDialogClose}>Annuler</Button>
-            <Button onClick={handleNamingConfirm}>Sauvegarder</Button>
+            <Button variant="outline" size="lg" onClick={onNamingDialogClose}>Annuler</Button>
+            <Button size="lg" onClick={handleNamingConfirm}>Sauvegarder</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -289,8 +292,8 @@ export function SidebarStagesSection({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditStage(null)}>Annuler</Button>
-            <Button onClick={handleEditSave}>Sauvegarder</Button>
+            <Button variant="outline" size="lg" onClick={() => setEditStage(null)}>Annuler</Button>
+            <Button size="lg" onClick={handleEditSave}>Sauvegarder</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -305,8 +308,8 @@ export function SidebarStagesSection({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>Supprimer</AlertDialogAction>
+            <AlertDialogCancel size="lg">Annuler</AlertDialogCancel>
+            <AlertDialogAction size="lg" onClick={handleDeleteConfirm}>Supprimer</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -171,10 +171,11 @@ export function StravaImportModal({
             {selectedIds.size > 0 ? `${selectedIds.size} sélectionné(s)` : 'Aucun segment sélectionné'}
           </p>
           <div className="flex gap-2 order-1 sm:order-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importMutation.isPending}>
+            <Button variant="outline" size="lg" onClick={() => onOpenChange(false)} disabled={importMutation.isPending}>
               Annuler
             </Button>
             <Button
+              size="lg"
               onClick={() => importMutation.mutate([...selectedIds])}
               disabled={selectedIds.size === 0 || importMutation.isPending}
             >

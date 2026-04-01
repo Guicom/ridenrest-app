@@ -41,7 +41,7 @@ export function StravaConnectionCard({ isConnected }: StravaConnectionCardProps)
   }
 
   return (
-    <div className="rounded-lg border p-4 space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* Strava logo mark */}

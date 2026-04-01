@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, CloudRain } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { WeatherControls } from './weather-controls'
 import { useMapStore } from '@/stores/map.store'
+import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 interface SidebarWeatherSectionProps {
   isPending: boolean
@@ -23,10 +24,12 @@ export function SidebarWeatherSection({ isPending, initialDepartureTime, initial
         onClick={() => setExpanded((v) => !v)}
         data-testid="weather-section-header"
       >
-        <div className="flex items-center gap-2">
-          <CloudRain className="h-5 w-5" aria-hidden="true" />
-          <span className="text-sm font-medium">Météo</span>
-        </div>
+        <SectionTooltip content="Prévisions météo calées sur votre allure estimée. Saisissez une heure de départ et une vitesse pour des prévisions personnalisées.">
+          <div className="flex items-center gap-2">
+            <CloudRain className="h-5 w-5" aria-hidden="true" />
+            <span className="text-sm font-medium">Météo</span>
+          </div>
+        </SectionTooltip>
         <span className="text-muted-foreground" aria-hidden="true">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>

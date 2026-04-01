@@ -7,6 +7,7 @@ import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
+import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 const MAX_RANGE_KM = MAX_SEARCH_RANGE_KM
 
@@ -137,10 +138,12 @@ export function SearchRangeControl({
         onClick={() => setExpanded((v) => !v)}
         data-testid="search-range-header"
       >
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4" aria-hidden="true" />
-          <span className="text-sm font-medium">Recherche</span>
-        </div>
+        <SectionTooltip content="Définissez une plage kilométrique sur la trace. Cliquez 'Rechercher' pour afficher les hébergements, restaurants et autres POIs dans ce corridor.">
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4" aria-hidden="true" />
+            <span className="text-sm font-medium">Recherche</span>
+          </div>
+        </SectionTooltip>
         <span className="text-muted-foreground" aria-hidden="true">
           {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>
