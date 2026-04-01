@@ -43,11 +43,18 @@ export class DensityService {
     const segmentIds = await this.densityRepo.findParsedSegmentIds(adventureId)
     const coverageGaps = await this.densityRepo.findGapsBySegmentIds(segmentIds)
 
+    let densityStale = false
+    if (adventure.densityStatus === 'success' && adventure.densityAnalyzedAt) {
+      const maxUpdated = await this.densityRepo.findMaxSegmentUpdatedAt(adventureId)
+      densityStale = maxUpdated ? maxUpdated > adventure.densityAnalyzedAt : false
+    }
+
     return {
       densityStatus: adventure.densityStatus,
       densityProgress: adventure.densityProgress,
       coverageGaps,
       densityCategories: adventure.densityCategories,
+      densityStale,
     }
   }
 }

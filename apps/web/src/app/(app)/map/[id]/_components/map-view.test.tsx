@@ -32,6 +32,8 @@ vi.mock('@/hooks/use-density', () => ({
   useDensity: () => ({
     coverageGaps: [],
     densityStatus: mockDensityStatus,
+    densityCategories: [],
+    densityStale: false,
     isPending: false,
   }),
 }))
@@ -102,6 +104,11 @@ vi.mock('./sidebar-weather-section', () => ({
 // Mock SidebarDensitySection
 vi.mock('./sidebar-density-section', () => ({
   SidebarDensitySection: () => <div data-testid="sidebar-density-section" />,
+}))
+
+// Mock SidebarDensityCta
+vi.mock('./sidebar-density-cta', () => ({
+  SidebarDensityCta: () => <div data-testid="sidebar-density-cta" />,
 }))
 
 // Mock useStages
@@ -306,6 +313,14 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     const sidebar = screen.getByTestId('planning-sidebar')
     const control = screen.getByTestId('search-range-control')
     expect(sidebar.contains(control)).toBe(true)
+  })
+
+  it('SidebarDensityCta is rendered inside the sidebar (AC #1, Story 16.4)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const sidebar = screen.getByTestId('planning-sidebar')
+    const cta = screen.getByTestId('sidebar-density-cta')
+    expect(sidebar.contains(cta)).toBe(true)
   })
 })
 

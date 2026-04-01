@@ -14,6 +14,7 @@ export const adventures = pgTable('adventures', {
   densityStatus: densityStatusEnum('density_status').notNull().default('idle'),
   densityProgress: integer('density_progress').notNull().default(0),
   densityCategories: text('density_categories').array().notNull().default([]),
+  densityAnalyzedAt: timestamp('density_analyzed_at'),
   startDate: date('start_date'),
   endDate: date('end_date'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

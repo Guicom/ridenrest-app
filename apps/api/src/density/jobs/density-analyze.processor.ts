@@ -96,6 +96,7 @@ export class DensityAnalyzeProcessor extends WorkerHost {
 
       await this.densityRepo.insertGaps(gapsToInsert)
       await this.densityRepo.setDensityStatus(adventureId, 'success')
+      await this.densityRepo.setDensityAnalyzedAt(adventureId, new Date())
       this.logger.log(`Analysis complete — adventureId=${adventureId} gaps=${gapsToInsert.length} troncons=${totalTroncons}`)
     } catch (err) {
       this.logger.error(`[DensityAnalyzeProcessor] Failed for adventure ${adventureId}:`, err)

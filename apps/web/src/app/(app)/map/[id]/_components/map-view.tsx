@@ -27,6 +27,7 @@ import { ResetZoomButton } from './reset-zoom-button'
 import { TraceClickCta } from './trace-click-cta'
 import { MapSearchOverlay } from './map-search-overlay'
 import { SidebarStagesSection } from './sidebar-stages-section'
+import { SidebarDensityCta } from './sidebar-density-cta'
 import { useStages } from '@/hooks/use-stages'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import { getStoredWeatherPace } from '@/lib/weather-pace'
@@ -281,6 +282,9 @@ export function MapView({ adventureId }: MapViewProps) {
             departureTime={stagePace.departureTime}
             speedKmh={stagePace.speedKmh}
           />
+
+          {/* Density CTA — shown when idle or stale, below Stages (AC #1, Story 16.4) */}
+          <SidebarDensityCta adventureId={adventureId} segments={readySegments} />
         </div>
       </aside>
 

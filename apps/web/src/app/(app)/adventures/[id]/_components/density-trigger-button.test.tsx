@@ -60,6 +60,7 @@ beforeEach(() => {
     densityProgress: 0,
     coverageGaps: [],
     densityCategories: [],
+    densityStale: false,
   })
 })
 
@@ -71,12 +72,13 @@ describe('DensityTriggerButton', () => {
     expect(screen.getByRole('button', { name: /calculer la densité/i })).toBeInTheDocument()
   })
 
-  it('shows "Densité calculée" when densityStatus is success', async () => {
+  it('shows "Densité analysée" when densityStatus is success', async () => {
     vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
       densityStatus: 'success',
       densityProgress: 100,
       coverageGaps: [],
       densityCategories: ['hotel'],
+      densityStale: false,
     })
 
     renderWithQuery(
@@ -84,7 +86,7 @@ describe('DensityTriggerButton', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /densité calculée/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /densité analysée/i })).toBeInTheDocument()
     })
   })
 
@@ -94,6 +96,7 @@ describe('DensityTriggerButton', () => {
       densityProgress: 0,
       coverageGaps: [],
       densityCategories: [],
+      densityStale: false,
     })
 
     renderWithQuery(
@@ -111,6 +114,7 @@ describe('DensityTriggerButton', () => {
       densityProgress: 42,
       coverageGaps: [],
       densityCategories: [],
+      densityStale: false,
     })
 
     renderWithQuery(
@@ -157,6 +161,7 @@ describe('DensityTriggerButton', () => {
       densityProgress: 0,
       coverageGaps: [],
       densityCategories: [],
+      densityStale: false,
     })
 
     renderWithQuery(
@@ -174,5 +179,44 @@ describe('DensityTriggerButton', () => {
       <DensityTriggerButton adventureId="adv-1" segments={[]} />,
     )
     expect(screen.getByRole('button')).toBeDisabled()
+  })
+
+  it('shows "Densité analysée" disabled with green class when success and densityStale === false', async () => {
+    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+      densityStatus: 'success',
+      densityProgress: 100,
+      coverageGaps: [],
+      densityCategories: ['hotel'],
+      densityStale: false,
+    })
+
+    renderWithQuery(
+      <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
+    )
+
+    await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /densité analysée/i })
+      expect(btn).toBeDisabled()
+      expect(btn.className).toContain('green')
+    })
+  })
+
+  it('shows "Calculer la densité" enabled when success and densityStale === true', async () => {
+    vi.mocked(apiClient.getDensityStatus).mockResolvedValue({
+      densityStatus: 'success',
+      densityProgress: 100,
+      coverageGaps: [],
+      densityCategories: ['hotel'],
+      densityStale: true,
+    })
+
+    renderWithQuery(
+      <DensityTriggerButton adventureId="adv-1" segments={[makeDoneSegment()]} />,
+    )
+
+    await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /calculer la densité/i })
+      expect(btn).not.toBeDisabled()
+    })
   })
 })

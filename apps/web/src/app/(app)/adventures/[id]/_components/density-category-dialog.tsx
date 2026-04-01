@@ -34,8 +34,9 @@ export function DensityCategoryDialog({ open, onOpenChange, onConfirm, isLoading
         <DialogHeader>
           <DialogTitle>Catégories à analyser</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Sélectionne les types d&apos;hébergements à inclure dans l&apos;analyse de densité.
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          L&apos;analyse se base sur la présence d&apos;hébergements et non leur disponibilité réelle.
+          L&apos;application peut rester ouverte ou être fermée pendant le calcul.
         </p>
         <div className="flex flex-wrap gap-2 py-2">
           {ACCOMMODATION_SUB_TYPES.map(({ type, label, icon }) => {

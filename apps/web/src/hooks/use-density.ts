@@ -6,6 +6,7 @@ interface UseDensityResult {
   coverageGaps: CoverageGapSummary[]
   densityStatus: DensityStatus
   densityCategories: string[]
+  densityStale: boolean
   isPending: boolean
 }
 
@@ -24,6 +25,7 @@ export function useDensity(adventureId: string): UseDensityResult {
     coverageGaps: data?.coverageGaps ?? [],
     densityStatus: data?.densityStatus ?? 'idle',
     densityCategories: data?.densityCategories ?? [],
+    densityStale: data?.densityStale ?? false,
     isPending,
   }
 }

@@ -50,6 +50,11 @@ function renderDialog(props: Partial<React.ComponentProps<typeof DensityCategory
 }
 
 describe('DensityCategoryDialog', () => {
+  it('shows explanatory text when dialog is open', () => {
+    renderDialog()
+    expect(screen.getByText(/L'analyse se base sur la présence d'hébergements/)).toBeInTheDocument()
+  })
+
   it('renders all 5 category chips when dialog opens', () => {
     renderDialog()
     expect(screen.getByText(/Hôtel/)).toBeDefined()

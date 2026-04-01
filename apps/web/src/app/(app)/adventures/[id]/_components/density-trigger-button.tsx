@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { LayoutGrid } from 'lucide-react'
+import { LayoutGrid, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { triggerDensityAnalysis, getDensityStatus } from '@/lib/api-client'
 import { DensityCategoryDialog } from './density-category-dialog'
@@ -47,25 +47,29 @@ export function DensityTriggerButton({ adventureId, segments }: Props) {
     triggerMutation.mutate(categories)
   }
 
+  const densityStale = densityStatus?.densityStale ?? false
   const isAnalyzing = ['pending', 'processing'].includes(densityStatus?.densityStatus ?? '')
-  const isDone = densityStatus?.densityStatus === 'success'
+  const isDone = densityStatus?.densityStatus === 'success' && !densityStale
   const progress = densityStatus?.densityProgress ?? 0
   const allSegmentsParsed = segments.every((s) => s.parseStatus === 'done') && segments.length > 0
+
+  const doneClasses = 'bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/10 hover:text-green-600 cursor-default'
+  const defaultClasses = 'bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary'
 
   return (
     <>
       <Button
         variant="ghost"
         size="lg"
-        className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-        onClick={() => setDialogOpen(true)}
-        disabled={isAnalyzing || !allSegmentsParsed}
+        className={`rounded-full gap-2 px-6 py-6 ${isDone ? doneClasses : defaultClasses}`}
+        onClick={isDone ? undefined : () => setDialogOpen(true)}
+        disabled={isAnalyzing || !allSegmentsParsed || isDone}
       >
-        <LayoutGrid className="h-4 w-4" />
+        {isDone ? <CheckCircle2 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
         {isAnalyzing
           ? `Analyse en cours… ${progress}%`
           : isDone
-            ? 'Densité calculée'
+            ? 'Densité analysée'
             : 'Calculer la densité'}
       </Button>
       <DensityCategoryDialog

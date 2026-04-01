@@ -5,11 +5,12 @@ import type { GooglePlacesProvider } from '../../pois/providers/google-places.pr
 import type { RedisProvider } from '../../common/providers/redis.provider.js'
 import type { Job } from 'bullmq'
 
-const mockRepo: jest.Mocked<Pick<DensityRepository, 'setDensityStatus' | 'setDensityProgress' | 'findSegmentsForAnalysis' | 'insertGaps'>> = {
+const mockRepo: jest.Mocked<Pick<DensityRepository, 'setDensityStatus' | 'setDensityProgress' | 'findSegmentsForAnalysis' | 'insertGaps' | 'setDensityAnalyzedAt'>> = {
   setDensityStatus: jest.fn().mockResolvedValue(undefined),
   setDensityProgress: jest.fn().mockResolvedValue(undefined),
   findSegmentsForAnalysis: jest.fn(),
   insertGaps: jest.fn().mockResolvedValue(undefined),
+  setDensityAnalyzedAt: jest.fn().mockResolvedValue(undefined),
 }
 
 const mockOverpass: jest.Mocked<Pick<OverpassProvider, 'queryPois'>> = {
@@ -75,6 +76,40 @@ describe('DensityAnalyzeProcessor.process', () => {
         expect.objectContaining({ segmentId: 'seg-1', severity: 'critical' }),
       ]),
     )
+    expect(mockRepo.setDensityAnalyzedAt).toHaveBeenCalledWith('adv-1', expect.any(Date))
+  })
+
+  it('setDensityAnalyzedAt is called AFTER setDensityStatus("success")', async () => {
+    mockRepo.findSegmentsForAnalysis.mockResolvedValue([
+      { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
+    ])
+    mockOverpass.queryPois.mockResolvedValue([])
+
+    await processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'] }))
+
+    const successCallOrder = mockRepo.setDensityStatus.mock.invocationCallOrder.at(-1)!
+    const analyzedAtCallOrder = mockRepo.setDensityAnalyzedAt.mock.invocationCallOrder[0]!
+    expect(analyzedAtCallOrder).toBeGreaterThan(successCallOrder)
+  })
+
+  it('setDensityAnalyzedAt is NOT called when analysis fails', async () => {
+    mockRepo.findSegmentsForAnalysis.mockResolvedValue([
+      { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
+    ])
+    mockOverpass.queryPois.mockRejectedValue(new Error('Overpass unavailable'))
+    mockRedisClient.get.mockResolvedValue(null)
+    // Google also fails to ensure error path
+    const mockGoogle = mockGooglePlaces as jest.Mocked<Pick<GooglePlacesProvider, 'searchLayerPlaceIds'>>
+    mockGoogle.searchLayerPlaceIds.mockRejectedValue(new Error('Google unavailable'))
+
+    // Promise.allSettled means both failing → count=0 → critical gap → success (not error)
+    // To trigger the catch block we need insertGaps to throw
+    mockRepo.insertGaps.mockRejectedValue(new Error('DB error'))
+
+    await expect(processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'] }))).rejects.toThrow('DB error')
+
+    expect(mockRepo.setDensityStatus).toHaveBeenCalledWith('adv-1', 'error')
+    expect(mockRepo.setDensityAnalyzedAt).not.toHaveBeenCalled()
   })
 
   it('inserts medium gap when 1 accommodation found', async () => {

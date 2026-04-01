@@ -59,6 +59,7 @@ export interface DensityStatusResponse {
   densityProgress: number  // 0–100
   coverageGaps: CoverageGapSummary[]
   densityCategories: string[]  // empty array when no analysis run yet
+  densityStale: boolean
 }
 
 export interface AdventureStageResponse {

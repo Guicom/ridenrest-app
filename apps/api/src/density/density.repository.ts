@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { db } from '@ridenrest/database'
 import { adventures, adventureSegments, coverageGaps } from '@ridenrest/database'
 import type { Adventure } from '@ridenrest/database'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import type { DensityStatus, CoverageGapSummary } from '@ridenrest/shared'
 
 interface SegmentForAnalysis {
@@ -46,6 +46,21 @@ export class DensityRepository {
       .update(adventures)
       .set({ densityCategories: categories, updatedAt: new Date() })
       .where(eq(adventures.id, adventureId))
+  }
+
+  async setDensityAnalyzedAt(adventureId: string, date: Date): Promise<void> {
+    await db
+      .update(adventures)
+      .set({ densityAnalyzedAt: date, updatedAt: new Date() })
+      .where(eq(adventures.id, adventureId))
+  }
+
+  async findMaxSegmentUpdatedAt(adventureId: string): Promise<Date | null> {
+    const [row] = await db
+      .select({ maxUpdatedAt: sql<Date>`MAX(${adventureSegments.updatedAt})` })
+      .from(adventureSegments)
+      .where(eq(adventureSegments.adventureId, adventureId))
+    return row?.maxUpdatedAt ?? null
   }
 
   async deleteGapsByAdventureId(adventureId: string): Promise<void> {
