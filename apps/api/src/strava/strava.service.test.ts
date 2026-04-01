@@ -74,8 +74,18 @@ describe('listRoutes', () => {
     const result = await service.listRoutes('user-1')
 
     expect(result).toEqual(cachedRoutes)
-    expect(mockRedisClient.get).toHaveBeenCalledWith('strava:routes:v2:user-1')
+    expect(mockRedisClient.get).toHaveBeenCalledWith('strava:routes:v2:user-1:page:1')
     // No DB calls needed when cache HIT
+  })
+
+  it('3.1b — uses page-scoped cache key for page 2', async () => {
+    const cachedRoutes = [{ id: '200', name: 'Route Page 2', distanceKm: 30, elevationGainM: 200 }]
+    mockRedisClient.get.mockResolvedValue(JSON.stringify(cachedRoutes))
+
+    const result = await service.listRoutes('user-1', 2)
+
+    expect(result).toEqual(cachedRoutes)
+    expect(mockRedisClient.get).toHaveBeenCalledWith('strava:routes:v2:user-1:page:2')
   })
 
   it('3.3 — throws NotFoundException when user has no Strava token in DB', async () => {
@@ -118,7 +128,39 @@ describe('listRoutes — cache MISS', () => {
 
     expect(result).toEqual([{ id: '100', name: 'Route Test', distanceKm: 50, elevationGainM: 800 }])
     expect(mockRedisClient.set).toHaveBeenCalledWith(
-      'strava:routes:v2:user-1',
+      'strava:routes:v2:user-1:page:1',
+      JSON.stringify(result),
+      'EX',
+      3600,
+    )
+  })
+
+  it('3.2b — fetches page 2 from Strava with correct URL and cache key', async () => {
+    const validAccount = {
+      accessToken: 'valid-token',
+      accessTokenExpiresAt: new Date(Date.now() + 3600 * 1000),
+      refreshToken: 'refresh-token',
+      id: 'acct-1',
+    }
+    const athleteAccount = { accountId: '12345' }
+
+    mockDbSelectAccount([validAccount])
+    mockDbSelectAccount([athleteAccount])
+
+    const stravaRoutes = [{ id: 200, name: 'Page 2 Route', distance: 30000, elevation_gain: 400 }]
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify(stravaRoutes)),
+    } as unknown as Response)
+
+    const result = await service.listRoutes('user-1', 2)
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('?per_page=30&page=2'),
+      expect.any(Object),
+    )
+    expect(mockRedisClient.set).toHaveBeenCalledWith(
+      'strava:routes:v2:user-1:page:2',
       JSON.stringify(result),
       'EX',
       3600,

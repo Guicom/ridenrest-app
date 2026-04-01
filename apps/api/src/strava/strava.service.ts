@@ -28,9 +28,9 @@ export class StravaService {
     private readonly redisProvider: RedisProvider,
   ) {}
 
-  async listRoutes(userId: string): Promise<StravaRouteItem[]> {
+  async listRoutes(userId: string, page: number = 1): Promise<StravaRouteItem[]> {
     const redis = this.redisProvider.getClient()
-    const cacheKey = `strava:routes:v2:${userId}`
+    const cacheKey = `strava:routes:v2:${userId}:page:${page}`
 
     // Cache HIT
     const cached = await redis.get(cacheKey)
@@ -42,7 +42,7 @@ export class StravaService {
 
     // Fetch routes from Strava (list up to 30 most recent)
     const athleteId = await this.getAthleteId(userId)
-    const res = await fetch(`${STRAVA_API}/athletes/${athleteId}/routes?per_page=30`, {
+    const res = await fetch(`${STRAVA_API}/athletes/${athleteId}/routes?per_page=30&page=${page}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) throw new HttpException('Erreur Strava API', HttpStatus.BAD_GATEWAY)
@@ -90,8 +90,9 @@ export class StravaService {
     const gpxBuffer = Buffer.from(await gpxRes.arrayBuffer())
 
     // Get route name from cache (avoid extra API call)
+    // After pagination, routes are cached per-page: page:1 is the most likely page
     const redis = this.redisProvider.getClient()
-    const cacheKey = `strava:routes:v2:${userId}`
+    const cacheKey = `strava:routes:v2:${userId}:page:1`
     const cached = await redis.get(cacheKey)
     const routes = cached ? (JSON.parse(cached) as StravaRouteItem[]) : []
     const routeName = routes.find((r) => r.id === stravaRouteId)?.name ?? `Route Strava ${stravaRouteId}`

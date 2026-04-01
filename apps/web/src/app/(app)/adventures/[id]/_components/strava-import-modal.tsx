@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listStravaRoutes, importStravaRoute } from '@/lib/api-client'
 import {
@@ -10,10 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { StravaRouteItem } from '@/lib/api-client'
 
 interface StravaImportModalProps {
@@ -30,43 +32,55 @@ export function StravaImportModal({
   stravaConnected,
 }: StravaImportModalProps) {
   const queryClient = useQueryClient()
-  const [importingId, setImportingId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Reset search when modal closes
+  // Reset search and selection when modal closes
   useEffect(() => {
-    if (!open) setSearchQuery('')
+    if (!open) {
+      setSearchQuery('')
+      setSelectedIds(new Set())
+    }
   }, [open])
 
-  const { data: routes, isPending, isError, error } = useQuery({
-    queryKey: ['strava', 'routes'],
-    queryFn: listStravaRoutes,
-    staleTime: 0,  // always stale → refetch on every modal open
-    enabled: stravaConnected && open,
-    retry: false,
-  })
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isPending, isError, error } =
+    useInfiniteQuery({
+      queryKey: ['strava-routes'],
+      queryFn: ({ pageParam }: { pageParam: number }) => listStravaRoutes(pageParam),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage: StravaRouteItem[], allPages: StravaRouteItem[][]) =>
+        lastPage.length === 30 ? allPages.length + 1 : undefined,
+      enabled: open && stravaConnected,
+      staleTime: 0,
+    })
 
-  const filteredRoutes = routes?.filter((r) =>
+  const allRoutes: StravaRouteItem[] = data?.pages.flat() ?? []
+
+  const filteredRoutes = allRoutes.filter((r) =>
     r.name.toLowerCase().includes(searchQuery.toLowerCase())
-  ) ?? []
+  )
+
+  function toggleSelection(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   const importMutation = useMutation({
-    mutationFn: (stravaRouteId: string) => importStravaRoute(stravaRouteId, adventureId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['adventures', adventureId, 'segments'] })
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        await importStravaRoute(id, adventureId)
+      }
+    },
+    onSuccess: (_, ids) => {
+      void queryClient.invalidateQueries({ queryKey: ['adventures', adventureId, 'segments'] })
+      toast.success(`${ids.length} segment(s) importé(s)`)
       onOpenChange(false)
-      toast.success('Route Strava importée — analyse en cours')
     },
-    onError: () => {
-      toast.error("Erreur lors de l'import Strava")
-    },
-    onSettled: () => setImportingId(null),
+    onError: (err: Error) => toast.error(`Erreur lors de l'importation : ${err.message}`),
   })
-
-  function handleImport(route: StravaRouteItem) {
-    setImportingId(route.id)
-    importMutation.mutate(route.id)
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,7 +88,7 @@ export function StravaImportModal({
         <DialogHeader>
           <DialogTitle>Importer depuis Strava</DialogTitle>
           <DialogDescription>
-            Sélectionne une route Strava pour l&apos;importer comme segment GPX.
+            Sélectionne une ou plusieurs routes Strava pour les importer comme segments GPX.
           </DialogDescription>
         </DialogHeader>
 
@@ -96,7 +110,7 @@ export function StravaImportModal({
             Erreur lors du chargement des routes Strava.{' '}
             {(error as { message?: string })?.message ?? ''}
           </p>
-        ) : !routes?.length ? (
+        ) : !allRoutes.length ? (
           <p className="py-4 text-sm text-muted-foreground">
             Aucune route Strava trouvée. Crée des routes dans Strava pour les importer ici.
           </p>
@@ -114,34 +128,62 @@ export function StravaImportModal({
                 Aucune route trouvée pour &laquo;{searchQuery}&raquo;.
               </p>
             ) : (
-              <div className="space-y-2 py-2 max-h-80 overflow-y-auto">
+              <div className="space-y-1 py-2 max-h-80 overflow-y-auto">
                 {filteredRoutes.map((route) => (
                   <div
                     key={route.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    className="flex items-start gap-3 py-2 px-1 rounded cursor-pointer hover:bg-muted/50"
+                    onClick={() => toggleSelection(route.id)}
                   >
-                    <div className="min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(route.id)}
+                      onCheckedChange={() => toggleSelection(route.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5 shrink-0"
+                      aria-label={`Sélectionner ${route.name}`}
+                    />
+                    <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{route.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {route.distanceKm.toFixed(1)} km
                         {route.elevationGainM != null ? ` · ${Math.round(route.elevationGainM)}m D+` : ''}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleImport(route)}
-                      disabled={importMutation.isPending}
-                      className="ml-3 shrink-0"
-                    >
-                      {importMutation.isPending && importingId === route.id ? 'Import...' : 'Importer'}
-                    </Button>
                   </div>
                 ))}
               </div>
             )}
+            {hasNextPage && (
+              <Button
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => void fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? 'Chargement…' : 'Charger plus'}
+              </Button>
+            )}
           </>
         )}
+
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+          <p className="text-xs text-muted-foreground order-2 sm:order-1">
+            {selectedIds.size > 0 ? `${selectedIds.size} sélectionné(s)` : 'Aucun segment sélectionné'}
+          </p>
+          <div className="flex gap-2 order-1 sm:order-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={importMutation.isPending}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => importMutation.mutate([...selectedIds])}
+              disabled={selectedIds.size === 0 || importMutation.isPending}
+            >
+              {importMutation.isPending
+                ? 'Importation…'
+                : `Importer ${selectedIds.size > 0 ? selectedIds.size : ''} segment(s)`}
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

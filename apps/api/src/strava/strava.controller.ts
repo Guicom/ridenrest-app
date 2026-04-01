@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common'
+import { Controller, Get, Post, Param, Body, Query, ParseIntPipe } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { StravaService } from './strava.service.js'
 import { ImportRouteDto } from './dto/import-route.dto.js'
@@ -12,8 +12,11 @@ export class StravaController {
 
   @Get('routes')
   @ApiOperation({ summary: 'List user Strava routes (cached 1h)' })
-  async listRoutes(@CurrentUser() user: CurrentUserPayload) {
-    return this.stravaService.listRoutes(user.id)
+  async listRoutes(
+    @CurrentUser() user: CurrentUserPayload,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
+  ) {
+    return this.stravaService.listRoutes(user.id, Math.max(1, page))
   }
 
   @Post('routes/:stravaRouteId/import')

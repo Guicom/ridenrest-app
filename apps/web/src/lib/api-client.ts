@@ -300,8 +300,8 @@ export interface StravaRouteItem {
   elevationGainM: number | null
 }
 
-export async function listStravaRoutes(): Promise<StravaRouteItem[]> {
-  return apiFetch<StravaRouteItem[]>('/api/strava/routes')
+export async function listStravaRoutes(page: number = 1): Promise<StravaRouteItem[]> {
+  return apiFetch<StravaRouteItem[]>(`/api/strava/routes?page=${page}`)
 }
 
 export async function importStravaRoute(
