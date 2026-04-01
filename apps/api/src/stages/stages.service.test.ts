@@ -319,6 +319,7 @@ describe('createStage — split case', () => {
         adventureId: 'adv-1',
         splitTargetId: 's1',
         splitTargetOrderIndex: 0,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         newStageData: expect.objectContaining({
           orderIndex: 0,
           startKm: 0,
@@ -327,6 +328,7 @@ describe('createStage — split case', () => {
           elevationGainM: 300,
           etaMinutes: 178,
         }),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         remainderUpdate: expect.objectContaining({
           orderIndex: 1,
           startKm: 40,
