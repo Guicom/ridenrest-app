@@ -2,11 +2,15 @@ import { FeedbacksService } from './feedbacks.service.js'
 
 // ── Resend mock ───────────────────────────────────────────────────────────────
 
-const resendMockRef = { send: jest.fn().mockResolvedValue({ id: 'email-123' }) }
+type EmailPayload = { from: string; to: string; subject: string; text: string }
+
+const resendMockRef = {
+  send: jest.fn<Promise<{ id: string }>, [EmailPayload]>().mockResolvedValue({ id: 'email-123' }),
+}
 
 jest.mock('resend', () => ({
   Resend: jest.fn().mockImplementation(() => ({
-    emails: { send: (...args: unknown[]): Promise<{ id: string }> => resendMockRef.send(...args) as Promise<{ id: string }> },
+    emails: { send: (payload: EmailPayload): Promise<{ id: string }> => resendMockRef.send(payload) },
   })),
 }))
 
@@ -36,7 +40,7 @@ describe('FeedbacksService', () => {
       await Promise.resolve()
 
       expect(resendMockRef.send).toHaveBeenCalledTimes(1)
-      const arg = resendMockRef.send.mock.calls[0][0] as { subject: string; text: string }
+      const arg = resendMockRef.send.mock.calls[0][0]
       expect(arg.subject).toContain('bug')
       expect(arg.text).toContain('The map does not load correctly')
     })
@@ -47,7 +51,7 @@ describe('FeedbacksService', () => {
       await Promise.resolve()
 
       expect(resendMockRef.send).toHaveBeenCalledTimes(1)
-      const arg = resendMockRef.send.mock.calls[0][0] as { text: string }
+      const arg = resendMockRef.send.mock.calls[0][0]
       expect(arg.text).toContain('user@example.com')
     })
 
