@@ -1,3 +1,4 @@
+import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
@@ -32,14 +33,15 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
         genReqId: (req) =>
           (req.headers['x-request-id'] as string) ?? crypto.randomUUID(),
         autoLogging: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ignore: (req: any) => (req.url as string)?.startsWith('/api/health') ?? false,
+          ignore: (req: IncomingMessage) => req.url?.startsWith('/api/health') ?? false,
         },
         serializers: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          req: (req: any) => ({ method: req.method as string, url: req.url as string, reqId: req.id as string }),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          res: (res: any) => ({ statusCode: res.statusCode as number }),
+          req: (req: IncomingMessage & { id?: string }) => ({
+            method: req.method,
+            url: req.url,
+            reqId: req.id,
+          }),
+          res: (res: ServerResponse) => ({ statusCode: res.statusCode }),
         },
       },
     }),
