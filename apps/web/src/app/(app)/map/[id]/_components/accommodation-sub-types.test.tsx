@@ -76,11 +76,11 @@ describe('AccommodationSubTypes', () => {
     expect(screen.getByText(/Refuge \/ Abri \(0\)/)).toBeDefined()
   })
 
-  it('greyed-out chip when count = 0 — has opacity-60 class', () => {
+  it('greyed-out chip when count = 0 — has opacity-50 class', () => {
     const pois: Poi[] = [makePoi('hotel')]
     render(<AccommodationSubTypes accommodationPois={pois} />)
     const campingBtn = screen.getByText(/Camping \(0\)/).closest('button')
-    expect(campingBtn?.className).toContain('opacity-60')
+    expect(campingBtn?.className).toContain('opacity-50')
   })
 
   it('chip with zero results is still tappable (calls toggleAccommodationType)', () => {
