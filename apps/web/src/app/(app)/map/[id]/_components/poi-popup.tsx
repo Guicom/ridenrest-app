@@ -189,7 +189,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
               <button
                 onClick={onClose}
                 aria-label="Fermer"
-                className="shrink-0 mt-0.5 h-6 w-6 flex items-center justify-center rounded-full hover:bg-[--surface] text-[--text-secondary]"
+                className="shrink-0 mt-0.5 h-6 w-6 flex items-center justify-center rounded-full hover:bg-[--surface] active:scale-[0.85] transition-all duration-75 text-[--text-secondary] cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -250,9 +250,9 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
                       onClick={() => setSelectedCategory(type.category)}
                       aria-pressed={selectedCategory === type.category}
                       className={[
-                        'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                        'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-75 cursor-pointer active:scale-[0.95]',
                         selectedCategory === type.category
-                          ? 'bg-[--primary] text-white border-[--primary]'
+                          ? 'bg-[--primary] text-white border-[--primary] hover:brightness-90'
                           : 'bg-white text-[--text-primary] border-[--border] hover:bg-[--surface]',
                       ].join(' ')}
                     >
@@ -270,7 +270,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
                 rel="noopener noreferrer"
                 onClick={handleBookingClick}
                 aria-label="Recherche sur Booking.com"
-                className="flex items-center justify-center gap-2 w-full h-11 rounded-full bg-[--primary] text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center justify-center gap-2 w-full h-11 rounded-full bg-[--primary] text-white text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all duration-75"
               >
                 <ExternalLink className="h-4 w-4" />
                 Recherche sur Booking
@@ -283,7 +283,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Site officiel de l'établissement"
-                  className="flex items-center justify-center gap-2 w-full h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface]"
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface] active:scale-[0.98] transition-all duration-75"
                 >
                   <Globe className="h-4 w-4" />
                   Site officiel

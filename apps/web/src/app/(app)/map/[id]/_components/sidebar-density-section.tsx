@@ -26,7 +26,7 @@ export function SidebarDensitySection() {
   return (
     <div className="rounded-xl border border-[--border] overflow-hidden">
       <div
-        className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
+        className="flex items-center justify-between px-4 py-3 cursor-pointer select-none hover:bg-[--surface-raised] active:bg-[--border] transition-colors"
         onClick={() => setExpanded((v) => !v)}
         data-testid="density-section-header"
       >

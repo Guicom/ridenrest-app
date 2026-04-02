@@ -38,9 +38,9 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
             className={[
               'min-w-[40px] min-h-[40px]',
               'flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-2',
-              'text-xs font-medium transition-colors',
+              'text-xs font-medium transition-all duration-75 cursor-pointer active:scale-[0.95]',
               isActive
-                ? 'bg-primary text-primary-foreground border border-primary'
+                ? 'bg-primary text-primary-foreground border border-primary hover:brightness-90'
                 : 'bg-white text-foreground border border-[--border]',
             ].join(' ')}
             aria-label={`${isActive ? 'Masquer' : 'Afficher'} les ${label}`}
@@ -62,9 +62,9 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
           className={[
             'min-w-[40px] min-h-[40px]',
             'flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-2',
-            'text-xs font-medium transition-colors',
+            'text-xs font-medium transition-all duration-75 cursor-pointer active:scale-[0.95]',
             weatherActive
-              ? 'bg-primary text-primary-foreground border border-primary'
+              ? 'bg-primary text-primary-foreground border border-primary hover:brightness-90'
               : 'bg-white text-foreground border border-[--border]',
           ].join(' ')}
           aria-label={`${weatherActive ? 'Désactiver' : 'Activer'} la Météo`}
@@ -81,9 +81,9 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
           className={[
             'min-w-[40px] min-h-[40px]',
             'flex flex-col items-center justify-center gap-0.5 rounded-lg px-3 py-2',
-            'text-xs font-medium transition-colors',
+            'text-xs font-medium transition-all duration-75 cursor-pointer active:scale-[0.95]',
             densityActive
-              ? 'bg-primary text-primary-foreground border border-primary'
+              ? 'bg-primary text-primary-foreground border border-primary hover:brightness-90'
               : 'bg-white text-foreground border border-[--border]',
           ].join(' ')}
           aria-label={`${densityActive ? 'Désactiver' : 'Activer'} la Densité`}

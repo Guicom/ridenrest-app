@@ -60,7 +60,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
         <button
           onClick={onSearch}
           data-testid="btn-search"
-          className="flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2"
+          className="flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2 cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
         >
           <Search className="h-4 w-4" aria-hidden="true" />
           RECHERCHER
@@ -68,7 +68,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
         <button
           onClick={onFiltersOpen}
           data-testid="btn-filters"
-          className="flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2"
+          className="flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2 cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
         >
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           FILTERS

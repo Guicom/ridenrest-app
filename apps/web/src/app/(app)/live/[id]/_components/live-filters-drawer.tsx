@@ -90,7 +90,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
               onClick={() => onOpenChange(false)}
               aria-label="Fermer les filtres"
               data-testid="filters-close-btn"
-              className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-[--surface]"
+              className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-[--surface] active:scale-[0.85] transition-all duration-75 cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -122,7 +122,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setLocalRadius((r) => Math.max(0.5, r - 0.5))}
-                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center"
+                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
                 aria-label="Diminuer le rayon"
               >
                 —
@@ -132,7 +132,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
               </span>
               <button
                 onClick={() => setLocalRadius((r) => Math.min(30, r + 0.5))}
-                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center"
+                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
                 aria-label="Augmenter le rayon"
               >
                 +
@@ -167,7 +167,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
           {/* Section 3: Météo (accordion) */}
           <div className="rounded-xl border border-[--border] overflow-hidden mb-3">
             <button
-              className="w-full flex items-center justify-between px-4 py-3 select-none"
+              className="w-full flex items-center justify-between px-4 py-3 select-none cursor-pointer hover:bg-[--surface-raised] active:bg-[--border] transition-colors"
               onClick={() => setWeatherExpanded((v) => !v)}
               data-testid="weather-accordion-header"
             >
@@ -198,10 +198,10 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
                       onClick={() => setWeatherDimension(id)}
                       aria-pressed={weatherDimension === id}
                       className={[
-                        'flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm font-medium rounded-full transition-colors',
+                        'flex-1 flex items-center justify-center gap-1.5 py-1.5 text-sm font-medium rounded-full transition-all duration-75 cursor-pointer active:scale-[0.95]',
                         weatherDimension === id
                           ? 'bg-background text-primary shadow-sm'
-                          : 'text-muted-foreground',
+                          : 'text-muted-foreground hover:text-foreground',
                       ].join(' ')}
                     >
                       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -227,7 +227,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
           {/* Section 3: Densité (accordion) */}
           <div className="rounded-xl border border-[--border] overflow-hidden mb-4">
             <button
-              className="w-full flex items-center justify-between px-4 py-3 select-none"
+              className="w-full flex items-center justify-between px-4 py-3 select-none cursor-pointer hover:bg-[--surface-raised] active:bg-[--border] transition-colors"
               onClick={() => setDensityExpanded((v) => !v)}
               data-testid="density-accordion-header"
             >
@@ -282,7 +282,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             disabled={!hasPoi}
             onClick={handleApply}
             data-testid="search-btn"
-            className="w-full h-12 bg-primary text-primary-foreground rounded-full font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full h-12 bg-primary text-primary-foreground rounded-full font-medium cursor-pointer transition-all duration-75 hover:enabled:brightness-90 active:enabled:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Rechercher
           </button>

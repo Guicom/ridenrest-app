@@ -24,9 +24,9 @@ export function MapStylePicker({ className }: { className?: string }) {
             key={style.id}
             onClick={() => { setMapStyle(style.id); setOpen(false) }}
             className={cn(
-              'w-full text-left px-3 py-2 rounded-lg text-sm',
+              'w-full text-left px-3 py-2 rounded-lg text-sm cursor-pointer transition-all duration-75 active:scale-[0.97]',
               mapStyle === style.id
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-primary text-primary-foreground hover:brightness-90'
                 : 'hover:bg-[--surface] text-foreground',
             )}
           >

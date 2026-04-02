@@ -11,7 +11,7 @@ export function ResetZoomButton({ onClick }: ResetZoomButtonProps) {
       <Tooltip>
         <TooltipTrigger
           onClick={onClick}
-          className="w-10 h-10 rounded-xl bg-white border border-[--border] shadow-sm flex items-center justify-center hover:bg-white/90 transition-colors"
+          className="w-10 h-10 rounded-xl bg-white border border-[--border] shadow-sm flex items-center justify-center hover:bg-white/90 active:scale-[0.90] transition-all duration-75 cursor-pointer"
           aria-label="Réinitialiser le zoom"
         >
           <ZoomOut className="w-4 h-4 text-foreground" />

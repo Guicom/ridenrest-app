@@ -39,7 +39,7 @@ export function PoiLayerGrid({ isPending }: PoiLayerGridProps) {
             aria-label={`${isActive ? 'Masquer' : 'Afficher'} les ${label}`}
             style={isActive ? { backgroundColor: color, color: '#ffffff', borderColor: 'transparent' } : undefined}
             className={[
-              'flex-1 flex items-center justify-center rounded-xl p-3 transition-colors',
+              'flex-1 flex items-center justify-center rounded-xl p-3 transition-all duration-75 cursor-pointer active:scale-[0.95]',
               isActive ? '' : 'bg-white text-foreground border border-[--border] hover:bg-surface-raised',
             ].join(' ')}
           >

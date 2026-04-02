@@ -12,7 +12,7 @@ interface AdventureCardProps {
 export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: AdventureCardProps) {
   return (
     <div
-      className={`bg-white rounded-xl border border-[--border] p-4 cursor-pointer transition-colors${isSelected ? ' ring-2 ring-[--primary]' : ''}`}
+      className={`bg-white rounded-xl border border-[--border] p-4 transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.98]${isSelected ? ' ring-2 ring-[--primary]' : ''}`}
       onClick={() => onSelect(adventure.id)}
     >
       <div className="flex items-center justify-between">
@@ -43,21 +43,21 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
       >
         <button
           type="button"
-          className="px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
+          className="px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-all duration-75 hover:opacity-90 active:scale-[0.97] cursor-pointer"
           onClick={() => onNavigate(`/map/${adventure.id}?mode=planning`)}
         >
           Planning
         </button>
         <button
           type="button"
-          className="px-5 py-2 border border-[--border] text-text-primary bg-white rounded-lg text-sm font-medium transition-colors hover:bg-[var(--surface-raised)]"
+          className="px-5 py-2 border border-[--border] text-text-primary bg-white rounded-lg text-sm font-medium transition-all duration-75 hover:bg-[var(--surface-raised)] active:scale-[0.97] cursor-pointer"
           onClick={() => onNavigate(`/adventures/${adventure.id}`)}
         >
           Modifier
         </button>
         <button
           type="button"
-          className="px-5 py-2 bg-[var(--surface-raised)] text-text-primary rounded-lg text-sm font-medium transition-colors hover:bg-[var(--border)]"
+          className="px-5 py-2 bg-[var(--surface-raised)] text-text-primary rounded-lg text-sm font-medium transition-all duration-75 hover:bg-[var(--border)] active:scale-[0.97] cursor-pointer"
           onClick={() => onNavigate(`/live/${adventure.id}`)}
         >
           Live
@@ -71,7 +71,7 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
       >
         <button
           type="button"
-          className="w-full px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
+          className="w-full px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-all duration-75 hover:opacity-90 active:scale-[0.97] cursor-pointer"
           onClick={() => onNavigate(`/live/${adventure.id}`)}
         >
           Démarrer en Live
@@ -79,14 +79,14 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
         <div className="flex gap-2">
           <button
             type="button"
-            className="flex-1 px-5 py-2 bg-[var(--surface-raised)] text-text-primary rounded-lg text-sm font-medium transition-colors hover:bg-[var(--border)]"
+            className="flex-1 px-5 py-2 bg-[var(--surface-raised)] text-text-primary rounded-lg text-sm font-medium transition-all duration-75 hover:bg-[var(--border)] active:scale-[0.97] cursor-pointer"
             onClick={() => onNavigate(`/map/${adventure.id}?mode=planning`)}
           >
             Planning
           </button>
           <button
             type="button"
-            className="flex-1 px-5 py-2 border border-[--border] text-text-primary bg-transparent rounded-lg text-sm font-medium transition-colors hover:bg-[var(--surface-raised)]"
+            className="flex-1 px-5 py-2 border border-[--border] text-text-primary bg-transparent rounded-lg text-sm font-medium transition-all duration-75 hover:bg-[var(--surface-raised)] active:scale-[0.97] cursor-pointer"
             onClick={() => onNavigate(`/adventures/${adventure.id}`)}
           >
             Modifier

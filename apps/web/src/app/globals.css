@@ -160,6 +160,14 @@
   html {
     @apply font-sans;
   }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="switch"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
+    cursor: pointer;
+  }
 }
 
 /* ── Ken Burns animation ──────────────────────────────────────────────────── */

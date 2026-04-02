@@ -205,7 +205,7 @@ export function SidebarStagesSection({
                   <button
                     onClick={() => handleEditOpen(stage)}
                     aria-label={`Modifier ${stage.name}`}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-[0.85]"
                     data-testid={`edit-stage-${stage.id}`}
                   >
                     <Pencil className="h-3 w-3" />
@@ -213,7 +213,7 @@ export function SidebarStagesSection({
                   <button
                     onClick={() => setDeleteTarget(stage)}
                     aria-label={`Supprimer ${stage.name}`}
-                    className="text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors active:scale-[0.85]"
                     data-testid={`delete-stage-${stage.id}`}
                   >
                     <Trash2 className="h-3 w-3" />
@@ -280,7 +280,7 @@ export function SidebarStagesSection({
                   <button
                     key={c}
                     onClick={() => setEditColor(c)}
-                    className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                    className={`h-6 w-6 rounded-full border-2 transition-all duration-75 cursor-pointer hover:scale-110 active:scale-95 ${
                       editColor === c ? 'border-foreground scale-110' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: c }}

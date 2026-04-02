@@ -20,7 +20,7 @@ export function TraceClickCta() {
       </span>
       <button
         type="button"
-        className="font-medium text-primary hover:underline"
+        className="font-medium text-primary hover:underline cursor-pointer transition-all duration-75 active:scale-[0.95]"
         onClick={() => {
           const rangeWidth = toKm - fromKm
           setSearchRange(traceClickedKm, traceClickedKm + rangeWidth)
@@ -31,7 +31,7 @@ export function TraceClickCta() {
       </button>
       <button
         type="button"
-        className="text-muted-foreground hover:text-foreground ml-1"
+        className="text-muted-foreground hover:text-foreground ml-1 cursor-pointer transition-all duration-75 active:scale-[0.85]"
         onClick={() => setTraceClickedKm(null)}
         aria-label="Fermer"
       >

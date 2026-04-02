@@ -191,7 +191,7 @@ development_status:
   16-9-live-mode-stage-layer: done                     # layer étapes live + update GPS
   16-10-observability-logging-kuma: done                 # nestjs-pino structured logs + kuma alerts
   16-11-poi-colored-pins-visual-identity: review     # pins colorés per-category + filtres UI cohérents + live mode search fixes (2026-04-02)
-  16-12-interactive-states-hover-click-feedback: ready-for-dev  # cursor + hover bg + active/click feedback sur tous éléments cliquables (2026-04-02)
+  16-12-interactive-states-hover-click-feedback: done    # cursor + hover bg + active/click feedback sur tous éléments cliquables (2026-04-02)
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

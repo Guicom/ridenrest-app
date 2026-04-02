@@ -132,7 +132,7 @@ export function StravaImportModal({
                 {filteredRoutes.map((route) => (
                   <div
                     key={route.id}
-                    className="flex items-start gap-3 py-2 px-1 rounded cursor-pointer hover:bg-muted/50"
+                    className="flex items-start gap-3 py-2 px-1 rounded cursor-pointer hover:bg-muted/50 active:scale-[0.99] transition-all duration-75"
                     onClick={() => toggleSelection(route.id)}
                   >
                     <Checkbox

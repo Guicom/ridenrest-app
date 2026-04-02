@@ -47,10 +47,10 @@ export function DensityCategoryDialog({ open, onOpenChange, onConfirm, isLoading
                 onClick={() => toggle(type)}
                 aria-pressed={isActive}
                 className={[
-                  'text-sm px-3 py-1.5 rounded-full font-medium border',
+                  'text-sm px-3 py-1.5 rounded-full font-medium border cursor-pointer transition-all duration-75 active:scale-[0.95]',
                   isActive
-                    ? 'bg-primary text-primary-foreground border-transparent'
-                    : 'bg-muted text-muted-foreground border-[--border] opacity-60',
+                    ? 'bg-primary text-primary-foreground border-transparent hover:brightness-90'
+                    : 'bg-muted text-muted-foreground border-[--border] opacity-60 hover:opacity-80 hover:bg-muted/70',
                 ].join(' ')}
               >
                 {label}

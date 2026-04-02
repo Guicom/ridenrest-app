@@ -99,7 +99,7 @@ export function AdventureList() {
         <div className="mt-4">
           <button
             type="button"
-            className="flex items-center gap-2 text-sm text-text-muted mb-2 w-full"
+            className="flex items-center gap-2 text-sm text-text-muted mb-2 w-full cursor-pointer rounded-lg px-1 py-0.5 hover:bg-[--surface-raised] active:bg-[--border] transition-colors"
             onClick={() => setIsPastExpanded((v) => !v)}
           >
             <ChevronDown className={`w-4 h-4 transition-transform ${isPastExpanded ? 'rotate-180' : ''}`} />
