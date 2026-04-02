@@ -127,6 +127,7 @@ export default function LivePage() {
   const mapDensityColorEnabled = useMapStore((s) => s.densityColorEnabled)
   const liveSearchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
   const stageLayerActive = useLiveStore((s) => s.stageLayerActive)
+  const gpsTrackingActive = useLiveStore((s) => s.gpsTrackingActive)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (!mapVisibleLayers.has('accommodations')) count++
@@ -355,13 +356,18 @@ export default function LivePage() {
           <ResetZoomButton onClick={() => liveMapCanvasRef.current?.resetZoom()} />
         </div>
 
-        {/* Center on GPS — only in live mode */}
+        {/* Center on GPS — only in live mode; highlighted when tracking is paused */}
         {isLiveModeActive && (
           <div className="absolute top-24 right-4 z-10">
             <button
               onClick={() => liveMapCanvasRef.current?.centerOnGps()}
               aria-label="Centrer sur ma position"
-              className="flex h-8 w-8 items-center justify-center rounded-md bg-background/80 backdrop-blur-sm border border-[--border] text-foreground hover:bg-background/90 shadow-sm"
+              data-testid="center-on-gps-btn"
+              className={`flex h-8 w-8 items-center justify-center rounded-md shadow-sm border transition-colors ${
+                gpsTrackingActive
+                  ? 'bg-background/80 backdrop-blur-sm border-[--border] text-foreground hover:bg-background/90'
+                  : 'bg-primary border-primary text-primary-foreground hover:bg-primary/90'
+              }`}
             >
               <LocateFixed className="h-4 w-4" />
             </button>

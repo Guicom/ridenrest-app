@@ -100,8 +100,14 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       })
 
       // Stop GPS auto-follow when user manually interacts with the map
-      map.on('dragstart', () => { userInteractedRef.current = true })
-      map.on('pitchstart', () => { userInteractedRef.current = true })
+      const pauseTracking = () => {
+        userInteractedRef.current = true
+        useLiveStore.getState().setGpsTrackingActive(false)
+      }
+      map.on('dragstart', pauseTracking)
+      map.on('pitchstart', pauseTracking)
+      // Pinch-to-zoom (mobile) and scroll wheel (desktop) — e.originalEvent only for user gestures
+      map.on('zoomstart', (e: { originalEvent?: Event }) => { if (e.originalEvent) pauseTracking() })
     })
 
     return () => {
@@ -114,6 +120,8 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       }
       mapRef.current = null
       hasInitialZoomedRef.current = false  // Reset so next mount triggers flyTo again
+      userInteractedRef.current = false
+      useLiveStore.getState().setGpsTrackingActive(true)  // Reset tracking on unmount
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -272,6 +280,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     const pos = currentPositionRef.current
     if (!map || !pos) return
     userInteractedRef.current = false
+    useLiveStore.getState().setGpsTrackingActive(true)
     let offsetY = 0
     if (kmWaypointsRef.current.length >= 2) {
       const bearingRad = routeBearingAtPosition(kmWaypointsRef.current, pos)

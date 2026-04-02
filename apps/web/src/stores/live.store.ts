@@ -12,6 +12,7 @@ interface LiveState {
   searchRadiusKm: number // Radius for POI search around GPS position (Story 7.2 prep)
   weatherDepartureTime: string | null // ISO 8601 — user-set departure overrides auto-compute
   stageLayerActive: boolean
+  gpsTrackingActive: boolean // false = user panned, auto-follow paused until centerOnGps()
 
   // Actions
   activateLiveMode: () => void
@@ -24,6 +25,7 @@ interface LiveState {
   setSearchRadius: (km: number) => void
   setWeatherDepartureTime: (time: string | null) => void
   setStageLayerActive: (active: boolean) => void
+  setGpsTrackingActive: (active: boolean) => void
 }
 
 export const useLiveStore = create<LiveState>((set) => ({
@@ -36,6 +38,7 @@ export const useLiveStore = create<LiveState>((set) => ({
   searchRadiusKm: 5, // Story 8.4: updated default (was 3)
   weatherDepartureTime: null,
   stageLayerActive: false,
+  gpsTrackingActive: true,
 
   activateLiveMode: () => set({ isLiveModeActive: true }),
   deactivateLiveMode: () =>
@@ -51,4 +54,5 @@ export const useLiveStore = create<LiveState>((set) => ({
   setSearchRadius: (km) => set({ searchRadiusKm: km }),
   setWeatherDepartureTime: (time) => set({ weatherDepartureTime: time }),
   setStageLayerActive: (active) => set({ stageLayerActive: active }),
+  setGpsTrackingActive: (active) => set({ gpsTrackingActive: active }),
 }))

@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
+import React from 'react'
 import { LiveMapCanvas } from './live-map-canvas'
 import { useLiveStore } from '@/stores/live.store'
 import type { MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
@@ -244,6 +245,77 @@ describe('LiveMapCanvas', () => {
       expect(capturedEl).not.toBeNull()
       expect(capturedEl!.style.opacity).toBe('0.4')
     })
+  })
+
+  it('dragstart pauses GPS auto-follow (easeTo not called after interaction)', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
+    })
+
+    render(<LiveMapCanvas adventureId="adv-1" segments={[makeSegment()]} />)
+
+    await waitFor(() => expect(eventHandlers['load']).toBeDefined())
+    act(() => { eventHandlers['load']?.() })
+
+    // First GPS update → flyTo (initial zoom)
+    act(() => { useLiveStore.setState({ currentPosition: { lat: 43.1, lng: 1.1 } }) })
+    await waitFor(() => expect(mockMapInstance.flyTo).toHaveBeenCalledTimes(1))
+
+    // User pans → dragstart fires → tracking paused
+    act(() => { eventHandlers['dragstart']?.() })
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(false)
+
+    // GPS update after pan → easeTo should NOT be called
+    const easeToCallsBefore = mockMapInstance.easeTo.mock.calls.length
+    act(() => { useLiveStore.setState({ currentPosition: { lat: 43.2, lng: 1.2 } }) })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mockMapInstance.easeTo.mock.calls.length).toBe(easeToCallsBefore)
+  })
+
+  it('zoomstart with originalEvent pauses GPS tracking (pinch-to-zoom support)', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
+    })
+
+    render(<LiveMapCanvas adventureId="adv-1" segments={[makeSegment()]} />)
+    await waitFor(() => expect(eventHandlers['zoomstart']).toBeDefined())
+
+    // Programmatic zoom (no originalEvent) → should NOT pause tracking
+    act(() => { eventHandlers['zoomstart']?.({}) })
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(true)
+
+    // User pinch-to-zoom (has originalEvent) → should pause tracking
+    act(() => { eventHandlers['zoomstart']?.({ originalEvent: new Event('touchstart') }) })
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(false)
+  })
+
+  it('centerOnGps handle resets tracking and calls flyTo', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
+    })
+
+    const ref = React.createRef<import('./live-map-canvas').LiveMapCanvasHandle>()
+    render(<LiveMapCanvas ref={ref} adventureId="adv-1" segments={[makeSegment()]} />)
+
+    await waitFor(() => expect(eventHandlers['load']).toBeDefined())
+    act(() => { eventHandlers['load']?.() })
+
+    // Set GPS position (needed for centerOnGps pos check)
+    act(() => { useLiveStore.setState({ currentPosition: { lat: 43.3, lng: 1.3 } }) })
+
+    // Pause tracking first
+    act(() => { eventHandlers['dragstart']?.() })
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(false)
+
+    // Call centerOnGps → tracking resumes, flyTo called
+    const flyToCallsBefore = mockMapInstance.flyTo.mock.calls.length
+    act(() => { ref.current?.centerOnGps() })
+
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(true)
+    expect(mockMapInstance.flyTo.mock.calls.length).toBeGreaterThan(flyToCallsBefore)
   })
 
   it('calls flyTo when searchTrigger increments (> 0)', async () => {
