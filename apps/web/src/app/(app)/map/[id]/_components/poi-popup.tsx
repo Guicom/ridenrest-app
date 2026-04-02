@@ -99,7 +99,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
       if (!clickedOnPin) onCloseRef.current()
     }
     map.on('click', handleMapClick)
-    return () => map.off('click', handleMapClick)
+    return () => { map.off('click', handleMapClick) }
   }, [map])
 
   // Reset type selection when POI changes
