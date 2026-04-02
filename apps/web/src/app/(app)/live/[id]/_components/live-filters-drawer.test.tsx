@@ -13,6 +13,7 @@ const mockToggleDensityColor      = vi.fn()
 const mockSetSearchRadius         = vi.fn()
 const mockSetSpeedKmh             = vi.fn()
 const mockSetWeatherDepartureTime = vi.fn()
+const mockSetStageLayerActive     = vi.fn()
 
 let mockVisibleLayers        = new Set<MapLayer>(['accommodations'])
 let mockWeatherActive        = false
@@ -21,6 +22,7 @@ let mockDensityColorEnabled  = true
 let mockSearchRadiusKm       = 5
 let mockSpeedKmh             = 15
 let mockWeatherDepartureTime = ''
+let mockStageLayerActive     = false
 
 vi.mock('@/stores/map.store', () => ({
   useMapStore: (selector?: (s: unknown) => unknown) => {
@@ -44,9 +46,11 @@ vi.mock('@/stores/live.store', () => ({
     searchRadiusKm:           mockSearchRadiusKm,
     speedKmh:                 mockSpeedKmh,
     weatherDepartureTime:     mockWeatherDepartureTime,
+    stageLayerActive:         mockStageLayerActive,
     setSearchRadius:          mockSetSearchRadius,
     setSpeedKmh:              mockSetSpeedKmh,
     setWeatherDepartureTime:  mockSetWeatherDepartureTime,
+    setStageLayerActive:      mockSetStageLayerActive,
   }),
 }))
 
@@ -102,6 +106,7 @@ function resetMocks() {
   mockSetSearchRadius.mockClear()
   mockSetSpeedKmh.mockClear()
   mockSetWeatherDepartureTime.mockClear()
+  mockSetStageLayerActive.mockClear()
   mockVisibleLayers        = new Set<MapLayer>(['accommodations'])
   mockWeatherActive        = false
   mockWeatherDimension     = 'temperature'
@@ -109,6 +114,7 @@ function resetMocks() {
   mockSearchRadiusKm       = 5
   mockSpeedKmh             = 15
   mockWeatherDepartureTime = ''
+  mockStageLayerActive     = false
 }
 
 describe('LiveFiltersDrawer', () => {
@@ -322,5 +328,34 @@ describe('LiveFiltersDrawer', () => {
     render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
     fireEvent.click(screen.getByTestId('search-btn'))
     expect(mockSetWeatherDepartureTime).toHaveBeenCalledWith(null)
+  })
+
+  // ── Étapes toggle ────────────────────────────────────────────────────────────
+
+  it('renders Étapes label and switch', () => {
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    expect(screen.getByText('Étapes')).toBeDefined()
+    expect(screen.getByTestId('switch-stages')).toBeDefined()
+  })
+
+  it('Étapes switch reflects stageLayerActive from store (false)', () => {
+    mockStageLayerActive = false
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    const sw = screen.getByTestId('switch-stages')
+    expect(sw.getAttribute('aria-checked')).toBe('false')
+  })
+
+  it('Étapes switch reflects stageLayerActive from store (true)', () => {
+    mockStageLayerActive = true
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    const sw = screen.getByTestId('switch-stages')
+    expect(sw.getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('clicking Étapes switch calls setStageLayerActive with toggled value', () => {
+    mockStageLayerActive = false
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    fireEvent.click(screen.getByTestId('switch-stages'))
+    expect(mockSetStageLayerActive).toHaveBeenCalledWith(true)
   })
 })

@@ -35,9 +35,11 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
   const searchRadiusKm      = useLiveStore((s) => s.searchRadiusKm)
   const speedKmh            = useLiveStore((s) => s.speedKmh)
   const weatherDepartureTime = useLiveStore((s) => s.weatherDepartureTime)
+  const stageLayerActive    = useLiveStore((s) => s.stageLayerActive)
   const setSearchRadius      = useLiveStore((s) => s.setSearchRadius)
   const setSpeedKmh          = useLiveStore((s) => s.setSpeedKmh)
   const setWeatherDepartureTime = useLiveStore((s) => s.setWeatherDepartureTime)
+  const setStageLayerActive  = useLiveStore((s) => s.setStageLayerActive)
 
   // Local state — only radius, speed, and departure time require Apply (layer/weather/density toggles are immediate)
   const [localRadius,        setLocalRadius]        = useState(searchRadiusKm)
@@ -150,6 +152,17 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
               <AccommodationSubTypes accommodationPois={accommodationPois} />
             </div>
           )}
+
+          {/* Section: Étapes — immediate toggle (no Apply) */}
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-foreground">Étapes</p>
+            <Switch
+              checked={stageLayerActive}
+              onCheckedChange={setStageLayerActive}
+              aria-label="Afficher les étapes"
+              data-testid="switch-stages"
+            />
+          </div>
 
           {/* Section 3: Météo (accordion) */}
           <div className="rounded-xl border border-[--border] overflow-hidden mb-3">

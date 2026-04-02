@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
 import { LiveMapCanvas } from './live-map-canvas'
 import { useLiveStore } from '@/stores/live.store'
-import type { MapSegmentData } from '@ridenrest/shared'
+import type { MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
 
 afterEach(cleanup)
 
@@ -19,8 +19,11 @@ const mockMapInstance = {
   once: vi.fn(),
   addSource: vi.fn(),
   addLayer: vi.fn(),
+  removeLayer: vi.fn(),
+  removeSource: vi.fn(),
   getSource: vi.fn(),
   getLayer: vi.fn().mockReturnValue(undefined),
+  getStyle: vi.fn().mockReturnValue({ layers: [], sources: {} }),
   isStyleLoaded: vi.fn().mockReturnValue(false),
   fitBounds: vi.fn(),
   remove: vi.fn(),
@@ -136,6 +139,111 @@ describe('LiveMapCanvas', () => {
     expect(layerIds).toContain('target-dot')
     expect(layerIds).toContain('gps-dot')
     expect(layerIds).toContain('gps-halo')
+  })
+
+  it('creates stage markers when stageLayerActive=true and stages provided', async () => {
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    const stages: AdventureStageResponse[] = [
+      {
+        id: 'stage-1', adventureId: 'adv-1', name: 'Étape 1', color: '#FF0000',
+        orderIndex: 0, startKm: 0, endKm: 25, distanceKm: 25,
+        elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '',
+      },
+    ]
+
+    render(
+      <LiveMapCanvas
+        adventureId="adv-1"
+        segments={[makeSegment()]}
+        stages={stages}
+        stageLayerActive={true}
+        currentKmOnRoute={10}
+      />,
+    )
+
+    await waitFor(() => expect(loadCallback).toBeDefined())
+    act(() => { loadCallback?.() })
+
+    await waitFor(() => {
+      expect(MockMarkerClass).toHaveBeenCalled()
+      expect(mockMarkerInstance.addTo).toHaveBeenCalledWith(mockMapInstance)
+    })
+  })
+
+  it('does not create stage markers when stageLayerActive=false', async () => {
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    const stages: AdventureStageResponse[] = [
+      {
+        id: 'stage-1', adventureId: 'adv-1', name: 'Étape 1', color: '#FF0000',
+        orderIndex: 0, startKm: 0, endKm: 25, distanceKm: 25,
+        elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '',
+      },
+    ]
+
+    const callsBefore = MockMarkerClass.mock.calls.length
+    render(
+      <LiveMapCanvas
+        adventureId="adv-1"
+        segments={[makeSegment()]}
+        stages={stages}
+        stageLayerActive={false}
+        currentKmOnRoute={10}
+      />,
+    )
+
+    await waitFor(() => expect(loadCallback).toBeDefined())
+    act(() => { loadCallback?.() })
+
+    // No new markers created (layer inactive)
+    expect(MockMarkerClass.mock.calls.length).toBe(callsBefore)
+  })
+
+  it('passed stage has opacity 0.4 style when currentKmOnRoute exceeds endKm', async () => {
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    const stages: AdventureStageResponse[] = [
+      {
+        id: 'stage-1', adventureId: 'adv-1', name: 'Étape 1', color: '#FF0000',
+        orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10,
+        elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '',
+      },
+    ]
+
+    // Capture the element passed to Marker constructor
+    let capturedEl: HTMLElement | null = null
+    MockMarkerClass.mockImplementation(function ({ element }: { element: HTMLElement }) {
+      capturedEl = element
+      return mockMarkerInstance
+    })
+
+    render(
+      <LiveMapCanvas
+        adventureId="adv-1"
+        segments={[makeSegment()]}
+        stages={stages}
+        stageLayerActive={true}
+        currentKmOnRoute={20} // past stage endKm=10 → isPassed=true
+      />,
+    )
+
+    await waitFor(() => expect(loadCallback).toBeDefined())
+    act(() => { loadCallback?.() })
+
+    await waitFor(() => {
+      expect(capturedEl).not.toBeNull()
+      expect(capturedEl!.style.opacity).toBe('0.4')
+    })
   })
 
   it('calls flyTo when searchTrigger increments (> 0)', async () => {
