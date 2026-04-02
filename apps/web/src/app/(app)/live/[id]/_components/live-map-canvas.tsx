@@ -8,11 +8,14 @@ import { MAP_STYLES } from '@/lib/map-styles'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { findPointAtKm } from '@ridenrest/gpx'
 import { WeatherLayer, LINE_COLOR_EXPRESSIONS, type WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
-import type { Poi, MapSegmentData, WeatherPoint } from '@ridenrest/shared'
+import type { Poi, MapSegmentData, WeatherPoint, AdventureStageResponse } from '@ridenrest/shared'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import type maplibregl from 'maplibre-gl'
 
 const TRACE_COLOR = '#2D6A4A'
+
+// Module-level Marker class — cached after first dynamic import so refs are never stale
+let _cachedMarker: typeof maplibregl.Marker | null = null
 
 export interface LiveMapCanvasHandle {
   getMap: () => maplibregl.Map | null
@@ -28,15 +31,24 @@ interface LiveMapCanvasProps {
   weatherDimension?: WeatherDimension
   weatherActive?: boolean
   searchTrigger?: number
+  stages?: AdventureStageResponse[]
+  stageLayerActive?: boolean
+  currentKmOnRoute?: number | null
+  onStageLongPress?: (stageId: string) => void
 }
 
-export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, searchTrigger = 0 }: LiveMapCanvasProps, ref) {
+export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, searchTrigger = 0, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress }: LiveMapCanvasProps, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
   const hasInitialZoomedRef = useRef(false)
   const currentPositionRef = useRef<{ lat: number; lng: number } | null>(null)
   const kmWaypointsRef = useRef<KmWaypoint[]>([])
+  const stagesRef = useRef(stages)
+  const stageLayerActiveRef = useRef(stageLayerActive)
+  const currentKmOnRouteRef = useRef(currentKmOnRoute)
+  const onStageLongPressRef = useRef(onStageLongPress)
+  const MarkerClassRef = useRef<typeof maplibregl.Marker | null>(null)
 
   const [mapReady, setMapReady] = useState(false)
 
@@ -48,6 +60,10 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   const currentPosition = useLiveStore((s) => s.currentPosition)
 
   useEffect(() => { segmentsRef.current = segments }, [segments])
+  useEffect(() => { stagesRef.current = stages }, [stages])
+  useEffect(() => { stageLayerActiveRef.current = stageLayerActive }, [stageLayerActive])
+  useEffect(() => { currentKmOnRouteRef.current = currentKmOnRoute }, [currentKmOnRoute])
+  useEffect(() => { onStageLongPressRef.current = onStageLongPress }, [onStageLongPress])
 
   // Init MapLibre map
   useEffect(() => {
@@ -58,6 +74,8 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
 
     import('maplibre-gl').then((maplibreglModule) => {
       if (cancelled) return
+      _cachedMarker = maplibreglModule.Marker
+      MarkerClassRef.current = maplibreglModule.Marker
       map = new maplibreglModule.Map({
         container: mapContainerRef.current!,
         style: styleUrl,
@@ -72,13 +90,20 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
         addTargetPointLayer(map)
         addGpsPositionLayer(map)
         fitToTrace(map, segmentsRef.current)
+        updateLiveStageLayers(map, stagesRef.current, kmWaypointsRef.current, stageLayerActiveRef.current)
+        updateLiveStageMarkers(map, stagesRef.current, kmWaypointsRef.current, currentKmOnRouteRef.current, stageLayerActiveRef.current, MarkerClassRef.current, (id) => onStageLongPressRef.current?.(id))
         setMapReady(true)
       })
     })
 
     return () => {
       cancelled = true
-      map?.remove()
+      if (map) {
+        const markers = liveStageMarkerMap.get(map) ?? []
+        markers.forEach((m) => m.remove())
+        liveStageMarkerMap.delete(map)
+        map.remove()
+      }
       mapRef.current = null
       hasInitialZoomedRef.current = false  // Reset so next mount triggers flyTo again
     }
@@ -102,6 +127,8 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       if (currentPositionRef.current) {
         updateGpsPositionLayer(map, currentPositionRef.current)
       }
+      updateLiveStageLayers(map, stagesRef.current, kmWaypointsRef.current, stageLayerActiveRef.current)
+      updateLiveStageMarkers(map, stagesRef.current, kmWaypointsRef.current, currentKmOnRouteRef.current, stageLayerActiveRef.current, MarkerClassRef.current, (id) => onStageLongPressRef.current?.(id))
       setMapReady(true)
     }
     map.once('styledata', onStyleLoad)
@@ -148,10 +175,15 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   }, [currentPosition, mapReady])
 
   // Compute waypoints in KmWaypoint format for findPointAtKm + route bearing
+  // Use all segments with cumulative adjustment so stage.endKm (cumulative) maps correctly
   const kmWaypoints: KmWaypoint[] = useMemo(() => {
-    const firstSeg = segments[0]
-    if (!firstSeg?.waypoints) return []
-    return firstSeg.waypoints.map((wp) => ({ lat: wp.lat, lng: wp.lng, km: wp.distKm }))
+    return segments.flatMap((s) =>
+      (s.waypoints ?? []).map((wp) => ({
+        lat: wp.lat,
+        lng: wp.lng,
+        km: s.cumulativeStartKm + wp.distKm,
+      }))
+    )
   }, [segments])
 
   // Keep kmWaypointsRef in sync — used in GPS effect without re-triggering it
@@ -174,6 +206,29 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       })
     }
   }, [targetKm, mapReady, kmWaypoints])
+
+  // Update stage colored-trace layers when stages/active/waypoints change (NOT on GPS updates)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    try {
+      updateLiveStageLayers(map, stages, kmWaypoints, stageLayerActive)
+    } catch (e) {
+      console.error('[LiveMapCanvas] updateLiveStageLayers error:', e)
+    }
+  }, [stages, stageLayerActive, mapReady, kmWaypoints])
+
+  // Update stage markers when stages/active/waypoints/currentKm change (includes GPS updates)
+  useEffect(() => {
+    const map = mapRef.current
+    const MarkerClass = MarkerClassRef.current ?? _cachedMarker
+    if (!map || !mapReady) return
+    try {
+      updateLiveStageMarkers(map, stages, kmWaypoints, currentKmOnRoute, stageLayerActive, MarkerClass, (id) => onStageLongPressRef.current?.(id))
+    } catch (e) {
+      console.error('[LiveMapCanvas] updateLiveStageMarkers error:', e)
+    }
+  }, [stages, stageLayerActive, currentKmOnRoute, mapReady, kmWaypoints])
 
   // Zoom to target area when user clicks RECHERCHER
   useEffect(() => {
@@ -232,6 +287,142 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     </div>
   )
 })
+
+// ── Live stage layers (colored trace segments) ───────────────────────────────
+
+function updateLiveStageLayers(
+  map: maplibregl.Map,
+  stages: AdventureStageResponse[],
+  kmWaypoints: KmWaypoint[],
+  active: boolean,
+) {
+  // Remove all existing live stage segment layers/sources
+  for (const layer of [...(map.getStyle().layers ?? [])]) {
+    if (layer.id.startsWith('live-stage-segment-')) {
+      map.removeLayer(layer.id)
+    }
+  }
+  const style = map.getStyle()
+  if (style?.sources) {
+    for (const sourceId of Object.keys(style.sources)) {
+      if (sourceId.startsWith('live-stage-segment-')) {
+        map.removeSource(sourceId)
+      }
+    }
+  }
+
+  if (!active || stages.length === 0 || kmWaypoints.length === 0) return
+
+  for (const stage of stages) {
+    const segWps = kmWaypoints.filter((wp) => wp.km >= stage.startKm && wp.km <= stage.endKm)
+    if (segWps.length < 2) continue
+
+    const sourceId = `live-stage-segment-${stage.id}`
+    map.addSource(sourceId, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: segWps.map((wp) => [wp.lng, wp.lat]) },
+      },
+    })
+    // Insert above live-trace-line
+    const beforeId = map.getLayer('target-dot') ? 'target-dot' : undefined
+    map.addLayer(
+      {
+        id: sourceId,
+        type: 'line',
+        source: sourceId,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': stage.color, 'line-width': 4 },
+      },
+      beforeId,
+    )
+  }
+}
+
+// ── Live stage markers ───────────────────────────────────────────────────────
+
+// WeakMap keyed on the map instance — same cleanup pattern as map-canvas.tsx
+const liveStageMarkerMap = new WeakMap<object, maplibregl.Marker[]>()
+
+function updateLiveStageMarkers(
+  map: maplibregl.Map,
+  stages: AdventureStageResponse[],
+  kmWaypoints: KmWaypoint[],
+  currentKm: number | null,
+  active: boolean,
+  MarkerClass: typeof maplibregl.Marker | null,
+  onLongPress: (stageId: string) => void,
+) {
+  // Remove previous markers
+  const prev = liveStageMarkerMap.get(map) ?? []
+  prev.forEach((m) => m.remove())
+  liveStageMarkerMap.set(map, [])
+
+  if (!active || stages.length === 0 || kmWaypoints.length === 0 || !MarkerClass) return
+
+  const newMarkers: maplibregl.Marker[] = []
+  for (const stage of stages) {
+    const point = findPointAtKm(kmWaypoints, stage.endKm)
+    if (!point) continue
+
+    const isPassed = currentKm !== null && stage.endKm <= currentKm
+
+    // Marker element — inline styles only (no Tailwind on DOM-created elements)
+    // z-index required: MapLibre adds will-change:transform which promotes to compositing layer,
+    // causing markers to render below the canvas on some mobile browsers (iOS Safari)
+    const el = document.createElement('div')
+    el.style.cssText = `position:relative;width:20px;height:20px;border-radius:50%;background:${stage.color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);cursor:pointer;z-index:10`
+    if (isPassed) {
+      el.style.opacity = '0.4'
+    }
+
+    // Checkmark for passed stages
+    if (isPassed) {
+      const check = document.createElement('span')
+      check.textContent = '✓'
+      check.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:white;line-height:1'
+      el.appendChild(check)
+    }
+
+    // Name label
+    const label = document.createElement('span')
+    label.textContent = stage.name
+    label.style.cssText = [
+      'position:absolute',
+      'bottom:-18px',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'font-size:10px',
+      'font-weight:600',
+      'white-space:nowrap',
+      `color:${stage.color}`,
+      'text-shadow:0 1px 2px rgba(255,255,255,0.9)',
+    ].join(';')
+    el.appendChild(label)
+
+    // Long-press (touch) + right-click (desktop)
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null
+    const stageId = stage.id
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return
+      longPressTimer = setTimeout(() => { onLongPress(stageId) }, 500)
+    })
+    el.addEventListener('pointerup', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } })
+    el.addEventListener('pointermove', () => { if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null } })
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      onLongPress(stageId)
+    })
+
+    const marker = new MarkerClass({ element: el, anchor: 'center' })
+      .setLngLat([point.lng, point.lat])
+      .addTo(map)
+    newMarkers.push(marker)
+  }
+  liveStageMarkerMap.set(map, newMarkers)
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

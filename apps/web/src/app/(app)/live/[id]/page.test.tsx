@@ -27,8 +27,18 @@ vi.mock('@/hooks/use-live-weather', () => ({
   useLiveWeather: () => ({ weatherPoints: [], isGpsLost: false }),
 }))
 
+// Mock useStages hook
+const mockUpdateStage = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/hooks/use-stages', () => ({
+  useStages: () => ({ stages: mockStages, isPending: false, createStage: vi.fn(), updateStage: mockUpdateStage, deleteStage: vi.fn() }),
+}))
+
+// Mutable stages for stage update dialog tests
+let mockStages: { id: string; name: string; endKm: number; startKm: number; color: string; orderIndex: number; adventureId: string; distanceKm: number; elevationGainM: null; etaMinutes: null; createdAt: string; updatedAt: string }[] = []
+
 // Mutable live store state for Story 8.4 badge tests
 let mockLiveSearchRadiusKm = 5
+let mockStageLayerActive = false
 
 // Mock Zustand stores
 vi.mock('@/stores/live.store', () => ({
@@ -41,8 +51,10 @@ vi.mock('@/stores/live.store', () => ({
       speedKmh: 15,
       currentPosition: null,
       weatherDepartureTime: null,
+      stageLayerActive: mockStageLayerActive,
       setCurrentKm: () => {},
       setTargetAheadKm: () => {},
+      setStageLayerActive: () => {},
     }),
 }))
 
@@ -65,11 +77,13 @@ vi.mock('@/stores/map.store', () => ({
     }),
 }))
 
-// Mock LiveMapCanvas
+// Mock LiveMapCanvas — captures onStageLongPress for dialog flow tests
+let capturedOnStageLongPress: ((id: string) => void) | undefined
 vi.mock('./_components/live-map-canvas', () => ({
-  LiveMapCanvas: ({ adventureId }: { adventureId: string }) => (
-    <div data-testid="live-map-canvas" data-adventure-id={adventureId} />
-  ),
+  LiveMapCanvas: ({ adventureId, onStageLongPress }: { adventureId: string; onStageLongPress?: (id: string) => void }) => {
+    capturedOnStageLongPress = onStageLongPress
+    return <div data-testid="live-map-canvas" data-adventure-id={adventureId} />
+  },
 }))
 
 // Mock LiveControls — expose btn-filters + activeFilterCount badge for page-level tests
@@ -93,6 +107,17 @@ vi.mock('./_components/live-filters-drawer', () => ({
   LiveFiltersDrawer: ({ open }: { open: boolean }) => (
     open ? <div data-testid="live-filters-drawer" /> : null
   ),
+}))
+
+// Mock shadcn Dialog (used for stage update confirmation modal)
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ open, children }: { open: boolean; children: React.ReactNode }) =>
+    open ? <div data-testid="stage-update-dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 // Mock StatusBanner
@@ -141,6 +166,7 @@ vi.mock('next/navigation', () => ({
 // Mock api-client
 vi.mock('@/lib/api-client', () => ({
   getAdventureMapData: vi.fn(),
+  getAdventure: vi.fn(),
 }))
 
 // Mock snapToTrace + computeElevationGain from gpx package
@@ -309,6 +335,7 @@ describe('LivePage — Story 8.4 FILTERS button', () => {
     mockMapWeatherActive = false
     mockMapDensityColorEnabled = true
     mockLiveSearchRadiusKm = 5
+    mockStageLayerActive = false
   })
 
   it('renders FILTERS button when live mode is active', () => {
@@ -354,5 +381,69 @@ describe('LivePage — Story 8.4 FILTERS button', () => {
     const badge = btn.querySelector('span')
     expect(badge).toBeDefined()
     expect(badge?.textContent).toBe('1')
+  })
+
+  it('activeFilterCount increments by 1 when stageLayerActive = true (AC #4)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockMapVisibleLayers = new Set(['accommodations'])
+    mockMapWeatherActive = false
+    mockMapDensityColorEnabled = false
+    mockLiveSearchRadiusKm = 5
+    mockStageLayerActive = true
+    render(<LivePage />)
+    const btn = screen.getByTestId('live-filters-btn')
+    const badge = btn.querySelector('span')
+    expect(badge).toBeDefined()
+    expect(badge?.textContent).toBe('1')
+  })
+})
+
+describe('LivePage — Stage update dialog (AC #3)', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+    mockStages = []
+    capturedOnStageLongPress = undefined
+  })
+
+  it('onStageLongPress opens dialog with stage name', () => {
+    mockStages = [
+      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+    ]
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+
+    act(() => { capturedOnStageLongPress?.('stage-1') })
+
+    expect(screen.getByTestId('stage-update-dialog')).toBeDefined()
+    expect(screen.getByText(/Étape 1/)).toBeDefined()
+  })
+
+  it('cancel button closes dialog without calling updateStage', () => {
+    mockStages = [
+      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+    ]
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+
+    act(() => { capturedOnStageLongPress?.('stage-1') })
+    expect(screen.getByTestId('stage-update-dialog')).toBeDefined()
+
+    fireEvent.click(screen.getByTestId('stage-update-cancel-btn'))
+    expect(screen.queryByTestId('stage-update-dialog')).toBeNull()
+    expect(mockUpdateStage).not.toHaveBeenCalled()
+  })
+
+  it('confirm button is disabled when currentKmOnRoute is null (no GPS)', () => {
+    mockStages = [
+      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+    ]
+    // currentKmOnRoute = null (GPS not locked) — default in store mock
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    render(<LivePage />)
+
+    act(() => { capturedOnStageLongPress?.('stage-1') })
+
+    const confirmBtn = screen.getByTestId('stage-update-confirm-btn') as HTMLButtonElement
+    expect(confirmBtn.disabled).toBe(true)
   })
 })

@@ -15,7 +15,9 @@ import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData, getAdventure } from '@/lib/api-client'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
+import { useStages } from '@/hooks/use-stages'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { LiveMapCanvas } from './_components/live-map-canvas'
 import type { LiveMapCanvasHandle } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
@@ -48,6 +50,7 @@ export default function LivePage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTrigger, setSearchTrigger] = useState(0)
   const [elevationCollapsed, setElevationCollapsed] = useState(false)
+  const [stageLongPressStageId, setStageLongPressStageId] = useState<string | null>(null)
 
   const handleQuitRequest = () => {
     stopWatching()
@@ -104,6 +107,9 @@ export default function LivePage() {
   const showErrorBanner = isOnline && poisError && isLiveModeActive && !poisFetching
   const showNoResultsBanner = isLiveModeActive && !poisFetching && !poisError && poisHasFetched && pois.length === 0
 
+  // Stages for live map layer + updateStage mutation
+  const { stages, updateStage: updateStageMutation } = useStages(adventureId)
+
   // Live weather — data still fetched for map layer (toggle removed)
   const weatherDepartureTime = useLiveStore((s) => s.weatherDepartureTime)
   const { weatherPoints } = useLiveWeather(segmentId, {
@@ -120,6 +126,7 @@ export default function LivePage() {
   const mapWeatherDimension = useMapStore((s) => s.weatherDimension)
   const mapDensityColorEnabled = useMapStore((s) => s.densityColorEnabled)
   const liveSearchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
+  const stageLayerActive = useLiveStore((s) => s.stageLayerActive)
   const activeFilterCount = useMemo(() => {
     let count = 0
     if (!mapVisibleLayers.has('accommodations')) count++
@@ -129,8 +136,9 @@ export default function LivePage() {
     if (mapWeatherActive) count++
     if (mapDensityColorEnabled) count++
     if (liveSearchRadiusKm !== DEFAULT_RADIUS) count++
+    if (stageLayerActive) count++
     return count
-  }, [mapVisibleLayers, mapWeatherActive, mapDensityColorEnabled, liveSearchRadiusKm])
+  }, [mapVisibleLayers, mapWeatherActive, mapDensityColorEnabled, liveSearchRadiusKm, stageLayerActive])
 
   // Filter accommodation pois once — memoized to avoid new reference on every render (GPS poll)
   const accommodationPois = useMemo(
@@ -216,6 +224,10 @@ export default function LivePage() {
           weatherDimension={mapWeatherDimension}
           weatherActive={mapWeatherActive}
           searchTrigger={searchTrigger}
+          stages={stages}
+          stageLayerActive={stageLayerActive}
+          currentKmOnRoute={currentKmOnRoute}
+          onStageLongPress={setStageLongPressStageId}
         />
 
         {/* POI popup — floating above the clicked pin */}
@@ -373,6 +385,48 @@ export default function LivePage() {
         onSearch={handleSearch}
         defaultSpeedKmh={adventure?.avgSpeedKmh}
       />
+
+      {/* Stage position update confirmation modal */}
+      {(() => {
+        const pressedStage = stages.find((s) => s.id === stageLongPressStageId)
+        if (!pressedStage) return null
+        return (
+          <Dialog
+            open={stageLongPressStageId !== null}
+            onOpenChange={(open) => { if (!open) setStageLongPressStageId(null) }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Mettre à jour l&apos;étape</DialogTitle>
+                <DialogDescription>
+                  {`Mettre à jour la fin de « ${pressedStage.name} » à votre position actuelle${currentKmOnRoute !== null ? ` (${currentKmOnRoute.toFixed(1)} km)` : ''} ?`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setStageLongPressStageId(null)}
+                  data-testid="stage-update-cancel-btn"
+                >
+                  Annuler
+                </Button>
+                <Button
+                  size="lg"
+                  disabled={currentKmOnRoute === null}
+                  onClick={async () => {
+                    await updateStageMutation(pressedStage.id, { endKm: currentKmOnRoute! })
+                    setStageLongPressStageId(null)
+                  }}
+                  data-testid="stage-update-confirm-btn"
+                >
+                  Mettre à jour
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
     </div>
   )
 }
