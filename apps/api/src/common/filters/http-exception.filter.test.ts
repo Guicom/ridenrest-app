@@ -7,7 +7,6 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import type { ArgumentsHost } from '@nestjs/common'
-import type { Logger } from 'nestjs-pino'
 
 const createMockHost = () => {
   const mockJson = jest.fn()
@@ -21,20 +20,21 @@ const createMockHost = () => {
   return { mockHost, mockStatus, mockJson }
 }
 
-const createMockLogger = () =>
-  ({
-    error: jest.fn(),
-    log: jest.fn(),
-    warn: jest.fn(),
-  }) as unknown as Logger
+const createMockLogger = () => ({
+  error: jest.fn(),
+  log: jest.fn(),
+  warn: jest.fn(),
+})
+
+type MockLogger = ReturnType<typeof createMockLogger>
 
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter
-  let mockLogger: Logger
+  let mockLogger: MockLogger
 
   beforeEach(() => {
     mockLogger = createMockLogger()
-    filter = new HttpExceptionFilter(mockLogger)
+    filter = new HttpExceptionFilter(mockLogger as never)
   })
 
   it('handles NotFoundException with 404 status and { error: { code, message } } body', () => {

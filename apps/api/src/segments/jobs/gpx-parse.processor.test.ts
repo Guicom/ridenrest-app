@@ -56,9 +56,9 @@ describe('GpxParseProcessor', () => {
       mockSegmentsService as unknown as SegmentsService,
     )
     // Spy on the logger instance created inside the processor
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
     logSpy = jest.spyOn((processor as any).logger, 'log').mockImplementation(() => undefined)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
     errorSpy = jest.spyOn((processor as any).logger, 'error').mockImplementation(() => undefined)
     mockSegmentsRepo.findAdventureIdBySegmentId.mockResolvedValue('adv-1')
     mockSegmentsRepo.setProcessingStatus.mockResolvedValue(undefined)
@@ -183,7 +183,7 @@ describe('GpxParseProcessor', () => {
     })
 
     it('logs a warn when segment is deleted before processing', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
       const warnSpy = jest.spyOn((processor as any).logger, 'warn').mockImplementation(() => undefined)
 
       await processor.process(makeJob())
@@ -214,6 +214,7 @@ describe('GpxParseProcessor', () => {
       await processor.process(makeJob())
 
       expect(logSpy).toHaveBeenCalledWith(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ segmentId: 'seg-1', durationMs: expect.any(Number) }),
         'GPX parse job completed',
       )
