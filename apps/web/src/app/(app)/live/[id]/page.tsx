@@ -363,9 +363,9 @@ export default function LivePage() {
               onClick={() => liveMapCanvasRef.current?.centerOnGps()}
               aria-label="Centrer sur ma position"
               data-testid="center-on-gps-btn"
-              className={`flex h-8 w-8 items-center justify-center rounded-md shadow-sm border transition-colors ${
+              className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm border transition-colors ${
                 gpsTrackingActive
-                  ? 'bg-background/80 backdrop-blur-sm border-[--border] text-foreground hover:bg-background/90'
+                  ? 'bg-white border-[--border] text-foreground hover:bg-white/90'
                   : 'bg-primary border-primary text-primary-foreground hover:bg-primary/90'
               }`}
             >
