@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common'
 import { StagesRepository } from './stages.repository.js'
 import { AdventuresService } from '../adventures/adventures.service.js'
 import { WeatherService } from '../weather/weather.service.js'
@@ -47,7 +47,7 @@ export function computeEtaMinutes(distanceKm: number, elevationGainM: number | n
 export class StagesService {
   constructor(
     private readonly stagesRepo: StagesRepository,
-    private readonly adventuresService: AdventuresService,
+    @Inject(forwardRef(() => AdventuresService)) private readonly adventuresService: AdventuresService,
     private readonly weatherService: WeatherService,
   ) {}
 

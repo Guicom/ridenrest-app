@@ -1,4 +1,3 @@
-import 'maplibre-gl/dist/maplibre-gl.css'
 import { Suspense } from 'react'
 import { MapView } from './_components/map-view'
 import { Skeleton } from '@/components/ui/skeleton'

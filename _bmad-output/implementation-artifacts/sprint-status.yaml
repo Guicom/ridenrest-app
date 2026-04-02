@@ -189,7 +189,7 @@ development_status:
   16-7-help-and-feedback-system: done                 # page aide + formulaire feedback
   16-8-advanced-stage-management-speed: done
   16-9-live-mode-stage-layer: done                     # layer étapes live + update GPS
-  16-10-observability-logging-kuma: backlog           # nestjs-pino structured logs + kuma alerts
+  16-10-observability-logging-kuma: ready-for-dev      # nestjs-pino structured logs + kuma alerts
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
