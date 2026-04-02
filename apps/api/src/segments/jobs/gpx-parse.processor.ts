@@ -1,4 +1,5 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq'
+import { Logger } from '@nestjs/common'
 import type { Job } from 'bullmq'
 import * as fs from 'node:fs/promises'
 import {
@@ -19,6 +20,8 @@ interface ParseSegmentJob {
 
 @Processor('gpx-processing')
 export class GpxParseProcessor extends WorkerHost {
+  private readonly logger = new Logger(GpxParseProcessor.name)
+
   constructor(
     private readonly segmentsRepo: SegmentsRepository,
     private readonly segmentsService: SegmentsService,
@@ -32,9 +35,12 @@ export class GpxParseProcessor extends WorkerHost {
     // 1. Verify segment still exists and get its adventureId
     const adventureId = await this.segmentsRepo.findAdventureIdBySegmentId(segmentId)
     if (!adventureId) {
-      // Segment deleted before job ran — silently complete
+      this.logger.warn({ segmentId, jobId: job.id }, 'GPX parse job skipped — segment deleted before processing')
       return
     }
+
+    const startTime = Date.now()
+    this.logger.log({ segmentId, jobId: job.id }, 'GPX parse job started')
 
     try {
       // 2. Mark as processing so UI shows "Analyse en cours..."
@@ -83,8 +89,11 @@ export class GpxParseProcessor extends WorkerHost {
 
       // 9. Recompute cumulative distances now that we have real distanceKm
       await this.segmentsService.recomputeCumulativeDistances(adventureId)
+
+      const durationMs = Date.now() - startTime
+      this.logger.log({ segmentId, durationMs, jobId: job.id }, 'GPX parse job completed')
     } catch (err) {
-      console.error(`[GpxParseProcessor] Failed to parse segment ${segmentId}:`, err)
+      this.logger.error({ segmentId, jobId: job.id, err }, 'GPX parse job failed')
       await this.segmentsRepo.updateParseError(segmentId)
       // Re-throw so BullMQ can retry the job (auto-retry up to max attempts)
       throw err

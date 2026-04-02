@@ -30,6 +30,7 @@ const mockSegmentsService = {
 
 const makeJob = (data: Partial<ParseSegmentJobData> = {}): Job<ParseSegmentJobData> =>
   ({
+    id: 'job-abc-123',
     data: { segmentId: 'seg-1', storageUrl: '/data/gpx/seg-1.gpx', ...data },
   }) as unknown as Job<ParseSegmentJobData>
 
@@ -45,6 +46,8 @@ const makeKmWaypoints = (withEle = true) => [
 
 describe('GpxParseProcessor', () => {
   let processor: GpxParseProcessor
+  let logSpy: jest.SpyInstance
+  let errorSpy: jest.SpyInstance
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -52,6 +55,11 @@ describe('GpxParseProcessor', () => {
       mockSegmentsRepo as unknown as SegmentsRepository,
       mockSegmentsService as unknown as SegmentsService,
     )
+    // Spy on the logger instance created inside the processor
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    logSpy = jest.spyOn((processor as any).logger, 'log').mockImplementation(() => undefined)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    errorSpy = jest.spyOn((processor as any).logger, 'error').mockImplementation(() => undefined)
     mockSegmentsRepo.findAdventureIdBySegmentId.mockResolvedValue('adv-1')
     mockSegmentsRepo.setProcessingStatus.mockResolvedValue(undefined)
     mockSegmentsRepo.updateAfterParse.mockResolvedValue(undefined)
@@ -172,6 +180,54 @@ describe('GpxParseProcessor', () => {
       expect(mockSegmentsRepo.setProcessingStatus).not.toHaveBeenCalled()
       expect(mockSegmentsRepo.updateAfterParse).not.toHaveBeenCalled()
       expect(mockSegmentsRepo.updateParseError).not.toHaveBeenCalled()
+    })
+
+    it('logs a warn when segment is deleted before processing', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const warnSpy = jest.spyOn((processor as any).logger, 'warn').mockImplementation(() => undefined)
+
+      await processor.process(makeJob())
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ segmentId: 'seg-1', jobId: 'job-abc-123' }),
+        'GPX parse job skipped — segment deleted before processing',
+      )
+    })
+  })
+
+  describe('logger calls (AC #4)', () => {
+    beforeEach(() => {
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue(makeRawPoints(true))
+      ;(gpxMock.computeCumulativeDistances as jest.Mock).mockReturnValue(makeKmWaypoints(true))
+    })
+
+    it('calls logger.log on job start', async () => {
+      await processor.process(makeJob())
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ segmentId: 'seg-1', jobId: 'job-abc-123' }),
+        'GPX parse job started',
+      )
+    })
+
+    it('calls logger.log on job complete with durationMs', async () => {
+      await processor.process(makeJob())
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ segmentId: 'seg-1', durationMs: expect.any(Number) }),
+        'GPX parse job completed',
+      )
+    })
+
+    it('calls logger.error on job failure', async () => {
+      ;(gpxMock.parseGpx as jest.Mock).mockReturnValue([]) // triggers error
+
+      await expect(processor.process(makeJob())).rejects.toThrow()
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ segmentId: 'seg-1' }),
+        'GPX parse job failed',
+      )
     })
   })
 

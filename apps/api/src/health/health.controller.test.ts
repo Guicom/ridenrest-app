@@ -22,4 +22,11 @@ describe('HealthController', () => {
     expect(typeof result.version).toBe('string')
     expect(result.version.length).toBeGreaterThan(0)
   })
+
+  it('returns uptime as a non-negative integer', () => {
+    const result = controller.check()
+    expect(typeof result.uptime).toBe('number')
+    expect(result.uptime).toBeGreaterThanOrEqual(0)
+    expect(Number.isInteger(result.uptime)).toBe(true)
+  })
 })

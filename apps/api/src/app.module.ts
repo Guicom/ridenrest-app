@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
-import { APP_GUARD } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
+import { LoggerModule } from 'nestjs-pino'
 import { AppController } from './app.controller.js'
 import { AppService } from './app.service.js'
 import { RedisModule } from './common/redis/redis.module.js'
@@ -16,10 +17,29 @@ import { WeatherModule } from './weather/weather.module.js'
 import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
+import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
+        transport:
+          process.env['NODE_ENV'] !== 'production'
+            ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
+            : undefined,
+        genReqId: (req) =>
+          (req.headers['x-request-id'] as string) ?? crypto.randomUUID(),
+        autoLogging: {
+          ignore: (req) => req.url === '/api/health',
+        },
+        serializers: {
+          req: (req) => ({ method: req.method, url: req.url, reqId: req.id }),
+          res: (res) => ({ statusCode: res.statusCode }),
+        },
+      },
+    }),
     RedisModule,
     QueuesModule,
     HealthModule,
@@ -37,6 +57,7 @@ import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
   providers: [
     AppService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
 })
 export class AppModule {}

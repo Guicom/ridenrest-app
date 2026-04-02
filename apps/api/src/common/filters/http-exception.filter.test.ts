@@ -2,10 +2,12 @@ import { HttpExceptionFilter } from './http-exception.filter.js'
 import {
   HttpException,
   HttpStatus,
+  InternalServerErrorException,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common'
 import type { ArgumentsHost } from '@nestjs/common'
+import type { Logger } from 'nestjs-pino'
 
 const createMockHost = () => {
   const mockJson = jest.fn()
@@ -19,11 +21,20 @@ const createMockHost = () => {
   return { mockHost, mockStatus, mockJson }
 }
 
+const createMockLogger = () =>
+  ({
+    error: jest.fn(),
+    log: jest.fn(),
+    warn: jest.fn(),
+  }) as unknown as Logger
+
 describe('HttpExceptionFilter', () => {
   let filter: HttpExceptionFilter
+  let mockLogger: Logger
 
   beforeEach(() => {
-    filter = new HttpExceptionFilter()
+    mockLogger = createMockLogger()
+    filter = new HttpExceptionFilter(mockLogger)
   })
 
   it('handles NotFoundException with 404 status and { error: { code, message } } body', () => {
@@ -66,5 +77,37 @@ describe('HttpExceptionFilter', () => {
     expect(mockJson).toHaveBeenCalledWith({
       error: { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' },
     })
+  })
+
+  it('calls logger.error for non-HttpException (unexpected 500)', () => {
+    const { mockHost } = createMockHost()
+    const error = new Error('Unexpected failure')
+
+    filter.catch(error, mockHost)
+
+    expect(mockLogger.error).toHaveBeenCalledWith({ err: error }, 'Unhandled exception')
+  })
+
+  it('calls logger.error for HttpException with 5xx status', () => {
+    const { mockHost } = createMockHost()
+    const error = new InternalServerErrorException('Service unavailable')
+
+    filter.catch(error, mockHost)
+
+    expect(mockLogger.error).toHaveBeenCalledWith({ err: error }, 'Unhandled exception')
+  })
+
+  it('does NOT call logger.error for 4xx HttpException (normal user errors)', () => {
+    const { mockHost } = createMockHost()
+    filter.catch(new NotFoundException('not found'), mockHost)
+
+    expect(mockLogger.error).not.toHaveBeenCalled()
+  })
+
+  it('does NOT call logger.error for BadRequestException', () => {
+    const { mockHost } = createMockHost()
+    filter.catch(new BadRequestException('bad input'), mockHost)
+
+    expect(mockLogger.error).not.toHaveBeenCalled()
   })
 })
