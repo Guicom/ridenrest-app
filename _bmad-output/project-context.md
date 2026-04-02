@@ -296,6 +296,42 @@ Component: `<OsmAttribution />` — always rendered, never hidden.
 
 ---
 
+### Drizzle Migrations — MANDATORY Workflow (CRITICAL)
+
+**NEVER write migration SQL files manually.** Always use `drizzle-kit generate`.
+
+Every schema change (new table, new column, index, enum…) must follow this exact workflow:
+
+```bash
+# 1. Edit the schema file
+packages/database/src/schema/{table}.ts
+
+# 2. Generate the migration (auto-updates _journal.json)
+cd packages/database && pnpm drizzle-kit generate
+
+# 3. Verify the generated .sql file is correct
+
+# 4. Commit both the schema file AND the generated migration
+git add packages/database/src/schema/ packages/database/migrations/
+git commit -m "feat(db): add {column} to {table}"
+```
+
+**Why this is critical:** `drizzle-kit migrate` (run automatically in `deploy.sh`) only applies migrations listed in `migrations/meta/_journal.json`. A manually-written `.sql` file that is NOT registered in the journal will NEVER be applied to the production database — resulting in missing columns and 500 errors.
+
+**Anti-patterns:**
+```bash
+# ❌ Writing SQL directly
+echo "ALTER TABLE adventures ADD COLUMN start_date date;" > migrations/0009_add_start_date.sql
+# ← This bypasses the journal — will NEVER run in prod
+
+# ❌ Editing _journal.json manually (error-prone, fragile)
+
+# ✅ Always
+cd packages/database && pnpm drizzle-kit generate
+```
+
+---
+
 ### Drizzle Pool Configuration
 
 PostgreSQL runs locally on the VPS (Docker) — no external connection limit. Pool config in `apps/api/src/config/database.config.ts`:
