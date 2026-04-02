@@ -23,7 +23,7 @@ import type { LiveMapCanvasHandle } from './_components/live-map-canvas'
 import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
 import { LiveFiltersDrawer } from './_components/live-filters-drawer'
-import { Undo2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Undo2, ChevronUp, ChevronDown, LocateFixed } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
 import { MapSearchOverlay } from '@/app/(app)/map/[id]/_components/map-search-overlay'
@@ -354,6 +354,19 @@ export default function LivePage() {
         <div className="absolute top-14 right-4 z-10">
           <ResetZoomButton onClick={() => liveMapCanvasRef.current?.resetZoom()} />
         </div>
+
+        {/* Center on GPS — only in live mode */}
+        {isLiveModeActive && (
+          <div className="absolute top-24 right-4 z-10">
+            <button
+              onClick={() => liveMapCanvasRef.current?.centerOnGps()}
+              aria-label="Centrer sur ma position"
+              className="flex h-8 w-8 items-center justify-center rounded-md bg-background/80 backdrop-blur-sm border border-[--border] text-foreground hover:bg-background/90 shadow-sm"
+            >
+              <LocateFixed className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Map style selector — top-right (bottom-right hidden under LiveControls on mobile) */}
         <MapStylePicker className="top-4 right-4 bottom-auto" />

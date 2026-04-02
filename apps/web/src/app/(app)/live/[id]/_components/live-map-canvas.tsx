@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, useMemo } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useMemo } from 'react'
 import { useLiveStore } from '@/stores/live.store'
 import { useLivePoiLayers } from '@/hooks/use-live-poi-layers'
 import { usePrefsStore } from '@/stores/prefs.store'
@@ -20,6 +20,7 @@ let _cachedMarker: typeof maplibregl.Marker | null = null
 export interface LiveMapCanvasHandle {
   getMap: () => maplibregl.Map | null
   resetZoom: () => void
+  centerOnGps: () => void
 }
 
 interface LiveMapCanvasProps {
@@ -49,6 +50,9 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   const currentKmOnRouteRef = useRef(currentKmOnRoute)
   const onStageLongPressRef = useRef(onStageLongPress)
   const MarkerClassRef = useRef<typeof maplibregl.Marker | null>(null)
+
+  // True once user has manually panned/zoomed — stops GPS auto-follow until centerOnGps() is called
+  const userInteractedRef = useRef(false)
 
   const [mapReady, setMapReady] = useState(false)
 
@@ -94,6 +98,10 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
         updateLiveStageMarkers(map, stagesRef.current, kmWaypointsRef.current, currentKmOnRouteRef.current, stageLayerActiveRef.current, MarkerClassRef.current, (id) => onStageLongPressRef.current?.(id))
         setMapReady(true)
       })
+
+      // Stop GPS auto-follow when user manually interacts with the map
+      map.on('dragstart', () => { userInteractedRef.current = true })
+      map.on('pitchstart', () => { userInteractedRef.current = true })
     })
 
     return () => {
@@ -169,7 +177,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     if (!hasInitialZoomedRef.current) {
       hasInitialZoomedRef.current = true
       map.flyTo({ center: [currentPosition.lng, currentPosition.lat], zoom: 10, offset: [0, offsetY], duration: 1200 })
-    } else {
+    } else if (!userInteractedRef.current) {
       map.easeTo({ center: [currentPosition.lng, currentPosition.lat], offset: [0, offsetY], duration: 400 })
     }
   }, [currentPosition, mapReady])
@@ -237,6 +245,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     if (!map || !mapReady || targetKm == null || kmWaypoints.length === 0) return
     const point = findPointAtKm(kmWaypoints, targetKm)
     if (!point) return
+    userInteractedRef.current = true  // Prevent GPS from fighting the search flyTo
     map.flyTo({ center: [point.lng, point.lat], zoom: 13, duration: 800 })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTrigger])
@@ -258,13 +267,27 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   // Segment waypoints for weather layer (MapWaypoint format)
   const segmentWaypoints = segments[0]?.waypoints ?? []
 
+  const centerOnGps = useCallback(() => {
+    const map = mapRef.current
+    const pos = currentPositionRef.current
+    if (!map || !pos) return
+    userInteractedRef.current = false
+    let offsetY = 0
+    if (kmWaypointsRef.current.length >= 2) {
+      const bearingRad = routeBearingAtPosition(kmWaypointsRef.current, pos)
+      offsetY = Math.round(Math.cos(bearingRad) * 300)
+    }
+    map.flyTo({ center: [pos.lng, pos.lat], zoom: 14, offset: [0, offsetY], duration: 800 })
+  }, [])
+
   useImperativeHandle(ref, () => ({
     getMap: () => mapRef.current,
     resetZoom: () => {
       if (!mapRef.current) return
       fitToTrace(mapRef.current, segmentsRef.current, true)
     },
-  }), [])
+    centerOnGps,
+  }), [centerOnGps])
 
   return (
     <div className="relative h-full w-full">
