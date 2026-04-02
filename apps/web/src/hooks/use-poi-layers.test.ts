@@ -47,6 +47,7 @@ interface MockMap {
   hasImage: ReturnType<typeof vi.fn>
   getCanvas: ReturnType<typeof vi.fn>
   flyTo: ReturnType<typeof vi.fn>
+  easeTo: ReturnType<typeof vi.fn>
   getZoom: ReturnType<typeof vi.fn>
   setPaintProperty: ReturnType<typeof vi.fn>
   setLayoutProperty: ReturnType<typeof vi.fn>
@@ -69,6 +70,7 @@ function createMockMap(): MockMap {
     hasImage: vi.fn().mockReturnValue(false),
     getCanvas: vi.fn().mockReturnValue({ style: { cursor: '' } }),
     flyTo: vi.fn(),
+    easeTo: vi.fn(),
     getZoom: vi.fn().mockReturnValue(10),
     setPaintProperty: vi.fn(),
     setLayoutProperty: vi.fn(),
