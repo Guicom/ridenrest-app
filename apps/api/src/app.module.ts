@@ -32,11 +32,14 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
         genReqId: (req) =>
           (req.headers['x-request-id'] as string) ?? crypto.randomUUID(),
         autoLogging: {
-          ignore: (req) => req.url === '/api/health',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ignore: (req: any) => (req.url as string)?.startsWith('/api/health') ?? false,
         },
         serializers: {
-          req: (req) => ({ method: req.method, url: req.url, reqId: req.id }),
-          res: (res) => ({ statusCode: res.statusCode }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          req: (req: any) => ({ method: req.method as string, url: req.url as string, reqId: req.id as string }),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          res: (res: any) => ({ statusCode: res.statusCode as number }),
         },
       },
     }),
