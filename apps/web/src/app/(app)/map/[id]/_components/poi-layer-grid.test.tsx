@@ -38,11 +38,11 @@ describe('PoiLayerGrid', () => {
     expect(mockToggleLayer).toHaveBeenCalledWith('accommodations')
   })
 
-  it('active card has bg-primary class', () => {
+  it('active card has inline background color style and rounded-xl class', () => {
     mockVisibleLayers = new Set(['accommodations'])
     render(<PoiLayerGrid isPending={false} />)
     const btn = screen.getByLabelText(/Masquer les Hébergements/)
-    expect(btn.className).toContain('bg-primary')
+    expect(btn.style.backgroundColor).toBe('rgb(249, 115, 22)')  // #F97316
     expect(btn.className).toContain('rounded-xl')
   })
 

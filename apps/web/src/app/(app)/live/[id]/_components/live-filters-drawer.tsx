@@ -149,7 +149,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
           {/* Section 2b: Sub-types hébergement (conditional) */}
           {visibleLayers.has('accommodations') && (
             <div className="mb-4">
-              <AccommodationSubTypes accommodationPois={accommodationPois} />
+              <AccommodationSubTypes accommodationPois={accommodationPois} onlyCountActive />
             </div>
           )}
 

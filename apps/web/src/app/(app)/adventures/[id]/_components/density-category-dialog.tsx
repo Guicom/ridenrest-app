@@ -39,7 +39,7 @@ export function DensityCategoryDialog({ open, onOpenChange, onConfirm, isLoading
           L&apos;application peut rester ouverte ou être fermée pendant le calcul.
         </p>
         <div className="flex flex-wrap gap-2 py-2">
-          {ACCOMMODATION_SUB_TYPES.map(({ type, label, icon }) => {
+          {ACCOMMODATION_SUB_TYPES.map(({ type, label }) => {
             const isActive = selected.has(type)
             return (
               <button
@@ -53,7 +53,7 @@ export function DensityCategoryDialog({ open, onOpenChange, onConfirm, isLoading
                     : 'bg-muted text-muted-foreground border-[--border] opacity-60',
                 ].join(' ')}
               >
-                {icon} {label}
+                {label}
               </button>
             )
           })}

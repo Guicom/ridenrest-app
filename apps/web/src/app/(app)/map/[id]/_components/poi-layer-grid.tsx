@@ -3,19 +3,21 @@ import { BedDouble, Utensils, ShoppingBasket, Bike } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
 import { Skeleton } from '@/components/ui/skeleton'
+import { POI_LAYER_COLORS } from '@ridenrest/shared'
 import type { MapLayer } from '@ridenrest/shared'
 
 interface LayerCardConfig {
   layer: MapLayer
   label: string
   icon: LucideIcon
+  color: string
 }
 
 const LAYER_CARDS: LayerCardConfig[] = [
-  { layer: 'accommodations', label: 'Hébergements', icon: BedDouble },
-  { layer: 'restaurants',    label: 'Restauration',  icon: Utensils },
-  { layer: 'supplies',       label: 'Alimentation',  icon: ShoppingBasket },
-  { layer: 'bike',           label: 'Vélo',          icon: Bike },
+  { layer: 'accommodations', label: 'Hébergements', icon: BedDouble,      color: POI_LAYER_COLORS.accommodations },
+  { layer: 'restaurants',    label: 'Restauration',  icon: Utensils,       color: POI_LAYER_COLORS.restaurants },
+  { layer: 'supplies',       label: 'Alimentation',  icon: ShoppingBasket, color: POI_LAYER_COLORS.supplies },
+  { layer: 'bike',           label: 'Vélo',          icon: Bike,           color: POI_LAYER_COLORS.bike },
 ]
 
 interface PoiLayerGridProps {
@@ -27,7 +29,7 @@ export function PoiLayerGrid({ isPending }: PoiLayerGridProps) {
 
   return (
     <div className="flex gap-2">
-      {LAYER_CARDS.map(({ layer, label, icon: Icon }) => {
+      {LAYER_CARDS.map(({ layer, label, icon: Icon, color }) => {
         const isActive = visibleLayers.has(layer)
         return (
           <button
@@ -35,12 +37,10 @@ export function PoiLayerGrid({ isPending }: PoiLayerGridProps) {
             onClick={() => toggleLayer(layer)}
             aria-pressed={isActive}
             aria-label={`${isActive ? 'Masquer' : 'Afficher'} les ${label}`}
+            style={isActive ? { backgroundColor: color, color: '#ffffff', borderColor: 'transparent' } : undefined}
             className={[
-              'flex-1 flex items-center justify-center rounded-xl p-3',
-              'transition-colors',
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-white text-foreground border border-[--border] hover:bg-surface-raised',
+              'flex-1 flex items-center justify-center rounded-xl p-3 transition-colors',
+              isActive ? '' : 'bg-white text-foreground border border-[--border] hover:bg-surface-raised',
             ].join(' ')}
           >
             {isPending && isActive

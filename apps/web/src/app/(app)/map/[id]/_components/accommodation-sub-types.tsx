@@ -1,13 +1,14 @@
 'use client'
 import type { Poi, PoiCategory } from '@ridenrest/shared'
+import { POI_CATEGORY_COLORS } from '@ridenrest/shared'
 import { useMapStore } from '@/stores/map.store'
 
-export const ACCOMMODATION_SUB_TYPES: { type: PoiCategory; label: string; icon: string }[] = [
-  { type: 'hotel',      label: 'Hôtel',               icon: '🏨' },
-  { type: 'camp_site',  label: 'Camping',              icon: '⛺' },
-  { type: 'shelter',    label: 'Refuge / Abri',        icon: '🏠' },
-  { type: 'hostel',     label: 'Auberge de jeunesse',  icon: '🛏️' },
-  { type: 'guesthouse', label: 'Chambre d\'hôte',      icon: '🏡' },
+export const ACCOMMODATION_SUB_TYPES: { type: PoiCategory; label: string; color: string }[] = [
+  { type: 'hotel',      label: 'Hôtel',               color: POI_CATEGORY_COLORS.hotel },
+  { type: 'camp_site',  label: 'Camping',              color: POI_CATEGORY_COLORS.camp_site },
+  { type: 'shelter',    label: 'Refuge / Abri',        color: POI_CATEGORY_COLORS.shelter },
+  { type: 'hostel',     label: 'Auberge de jeunesse',  color: POI_CATEGORY_COLORS.hostel },
+  { type: 'guesthouse', label: 'Chambre d\'hôte',      color: POI_CATEGORY_COLORS.guesthouse },
 ]
 
 export function computeAccCountByType(pois?: Poi[]): Record<string, number> | null {
@@ -20,9 +21,11 @@ export function computeAccCountByType(pois?: Poi[]): Record<string, number> | nu
 
 interface AccommodationSubTypesProps {
   accommodationPois?: Poi[]
+  /** When true, count badge is only shown for active types (use in live mode where inactive types aren't searched) */
+  onlyCountActive?: boolean
 }
 
-export function AccommodationSubTypes({ accommodationPois }: AccommodationSubTypesProps) {
+export function AccommodationSubTypes({ accommodationPois, onlyCountActive = false }: AccommodationSubTypesProps) {
   const { activeAccommodationTypes, toggleAccommodationType } = useMapStore()
 
   // Count POIs per sub-type — null when no data provided (no badge)
@@ -30,27 +33,40 @@ export function AccommodationSubTypes({ accommodationPois }: AccommodationSubTyp
 
   return (
     <div>
-      <p className="text-xs font-medium text-[--text-secondary] mb-1">Type d&apos;hébergement</p>
-      <div className="flex flex-wrap gap-1.5 pt-1">
-        {ACCOMMODATION_SUB_TYPES.map(({ type, label, icon }) => {
+      <p className="text-sm font-semibold text-foreground mb-2">Type d&apos;hébergement</p>
+      <div className="flex flex-wrap gap-2">
+        {ACCOMMODATION_SUB_TYPES.map(({ type, label, color }) => {
           const isActive = activeAccommodationTypes.has(type)
-          const count = countByType ? (countByType[type] ?? 0) : null
+          const rawCount = countByType ? (countByType[type] ?? 0) : null
+          // In live mode (onlyCountActive): only show count when active AND count > 0.
+          // This avoids showing "(0)" for newly-activated types whose stale data doesn't include them yet.
+          const count = onlyCountActive
+            ? (isActive && rawCount !== null && rawCount > 0 ? rawCount : null)
+            : rawCount
           const hasZeroResults = count !== null && count === 0
           return (
             <button
               key={type}
               onClick={() => toggleAccommodationType(type)}
               aria-pressed={isActive}
+              style={isActive
+                ? { backgroundColor: color, color: '#ffffff', borderColor: 'transparent' }
+                : undefined}
               className={[
-                'text-xs px-2.5 py-1 rounded-full font-medium',
+                'text-sm px-3 py-1.5 rounded-full font-medium flex items-center gap-2 border transition-colors',
                 hasZeroResults
-                  ? 'bg-muted text-muted-foreground border border-[--border] opacity-60'
+                  ? 'bg-white text-muted-foreground border-[--border] opacity-50'
                   : isActive
-                    ? 'bg-primary text-primary-foreground border border-transparent'
-                    : 'bg-muted text-muted-foreground border border-[--border]',
+                    ? 'border-transparent'
+                    : 'bg-white text-foreground border-[--border] hover:border-[--border-strong]',
               ].join(' ')}
             >
-              {icon} {label}{count !== null ? ` (${count})` : ''}
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: isActive ? '#ffffff' : (hasZeroResults ? '#9CA3AF' : color) }}
+                aria-hidden="true"
+              />
+              {label}{count !== null ? ` (${count})` : ''}
             </button>
           )
         })}

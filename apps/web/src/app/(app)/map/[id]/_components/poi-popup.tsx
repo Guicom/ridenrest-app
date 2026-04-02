@@ -59,6 +59,10 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
   const popupRef = useRef<HTMLDivElement>(null)
   const isLiveMode = !!liveContext
 
+  // Stable ref so map click handler never needs to re-register on onClose identity changes
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   // Accommodation type selector — default to POI's own category
   const [selectedCategory, setSelectedCategory] = useState<PoiCategory>(poi.category)
 
@@ -82,6 +86,21 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
       map.off('zoom', project)
     }
   }, [project, map])
+
+  // Close when clicking on the map background (not on a POI pin or cluster)
+  // MapLibre only fires 'click' when there's no drag — no extra drag detection needed
+  useEffect(() => {
+    const handleMapClick = (e: maplibregl.MapMouseEvent) => {
+      const features = map.queryRenderedFeatures(e.point)
+      // Don't close if the click landed on a POI individual pin (layer IDs end with '-points')
+      const clickedOnPin = features.some(
+        (f) => f.layer.id.endsWith('-points') && !f.properties?.point_count
+      )
+      if (!clickedOnPin) onCloseRef.current()
+    }
+    map.on('click', handleMapClick)
+    return () => map.off('click', handleMapClick)
+  }, [map])
 
   // Reset type selection when POI changes
   useEffect(() => {

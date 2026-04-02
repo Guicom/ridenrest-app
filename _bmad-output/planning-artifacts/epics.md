@@ -2035,6 +2035,72 @@ So that I can debug issues quickly and be notified before users report them.
 
 ---
 
+### Story 16.11: POI Visual Identity — Colored Pins par Catégorie et Sous-type
+
+> **Ajouté 2026-04-02** — Issue de retour utilisateur Guillaume : refonte visuelle des pins POI pour différencier les types à la carte et dans les filtres UI.
+
+As a **cyclist planning a long-distance route**,
+I want each type of POI (hôtel, camping, refuge, restauration, vélo...) to display a distinct colored pin on the map,
+So that I can instantly identify the nature of a POI at a glance, and so the filter buttons in the sidebar and live mode match those same colors.
+
+**Acceptance Criteria:**
+
+**Given** la layer `accommodations` est visible,
+**When** les pins sont rendus (mode planning + live),
+**Then** chaque pin affiche la couleur de son sous-type : hôtel → orange `#F97316`, camping → bleu ciel `#38BDF8`, refuge → vert lime `#84CC16`, chambre d'hôte → rose `#EC4899`, auberge → violet `#8B5CF6`.
+
+**Given** des POIs non-hébergement sont affichés,
+**When** les pins sont rendus,
+**Then** : restauration → rouge `#EF4444`, alimentation → violet `#A855F7`, vélo → teal `#14B8A6`.
+
+**Given** plusieurs POIs forment un cluster,
+**When** le cluster est rendu,
+**Then** la couleur du cluster correspond à son layer : accommodations → orange, restaurants → rouge, supplies → violet, bike → teal.
+
+**Given** les boutons de filtre "Je cherche" dans la sidebar (ou live mode drawer),
+**When** un layer est actif,
+**Then** le bouton actif utilise la couleur du layer (style inline, pas classe Tailwind dynamique) avec icône blanche.
+
+**Given** les chips de sous-type hébergement,
+**When** une chip est active,
+**Then** son fond utilise la couleur du sous-type correspondant.
+**When** une chip est inactive,
+**Then** un dot coloré est affiché à gauche pour permettre l'identification visuelle.
+
+---
+
+### Story 16.12: Interactive States — Cursor, Hover & Click Feedback
+
+> **Ajouté 2026-04-02** — Issue de retour utilisateur Guillaume : standardiser les états interactifs (cursor, hover, active) sur tous les éléments cliquables de l'app.
+
+As a **user navigating the Ride'n'Rest app**,
+I want every interactive element to respond visually when I hover or click it,
+So that the UI feels responsive and polished, and I always know what's clickable.
+
+**Acceptance Criteria:**
+
+**Given** un élément `<div>` ou `<span>` avec `onClick`,
+**When** l'utilisateur survole l'élément sur desktop,
+**Then** le curseur devient `pointer`.
+
+**Given** n'importe quel élément interactif sans état actif (fond neutre),
+**When** l'utilisateur survole l'élément sur desktop,
+**Then** le fond change légèrement (plus sombre en mode clair, plus clair en mode sombre).
+
+**Given** un élément avec fond dynamique inline (ex : bouton layer actif, chip active),
+**When** l'utilisateur survole l'élément,
+**Then** l'élément s'assombrit légèrement (`hover:brightness-90`).
+
+**Given** n'importe quel élément interactif (bouton, card, chip, lien CTA),
+**When** l'utilisateur clique (desktop) ou tape (mobile),
+**Then** un feedback visuel immédiat est visible : légère compression (`active:scale-[0.97]`) ou assombrissement.
+
+**Given** un élément avec `disabled` ou `aria-disabled`,
+**When** l'utilisateur interagit,
+**Then** aucun hover ni active feedback n'est visible.
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

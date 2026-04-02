@@ -1,19 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
+import { POI_CLUSTER_COLOR } from '@ridenrest/shared'
+import { registerPoiPinImages, poiPinImageKey } from '@/lib/poi-pin-factory'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 import type maplibregl from 'maplibre-gl'
-
-// Unified POI pin color — dark forest green (= --poi-pin token = --text-primary)
-export const POI_PIN_COLOR = '#1A2D22'
-
-// Category icons shown as white text on each pin
-const LAYER_ICONS: Record<MapLayer, string> = {
-  accommodations: '🏨',
-  restaurants:    '🍽',
-  supplies:       '🛒',
-  bike:           '🚲',
-}
 
 const CLUSTER_MAX_ZOOM = 13
 const CLUSTER_RADIUS = 50
@@ -40,173 +31,166 @@ export function usePoiLayers(
 
     // Track per-layer click/cursor handlers so we can remove them on cleanup
     const cleanupFns: Array<() => void> = []
+    let cancelled = false
 
-    for (const layer of ALL_LAYERS) {
-      const sourceId = `pois-${layer}`
-      const clusterLayerId = `${sourceId}-clusters`
-      const clusterCountId = `${sourceId}-cluster-count`
-      const pointLayerId = `${sourceId}-points`
-      const iconLayerId = `${sourceId}-icons`
-      const ringLayerId = `${sourceId}-selected-ring`
+    void registerPoiPinImages(map).then(() => {
+      if (cancelled) return
 
-      if (!visibleLayers.has(layer)) {
-        // Remove existing layers + source if they exist
-        if (map.getLayer(iconLayerId)) map.removeLayer(iconLayerId)
-        if (map.getLayer(ringLayerId)) map.removeLayer(ringLayerId)
-        if (map.getLayer(clusterCountId)) map.removeLayer(clusterCountId)
-        if (map.getLayer(clusterLayerId)) map.removeLayer(clusterLayerId)
-        if (map.getLayer(pointLayerId)) map.removeLayer(pointLayerId)
-        if (map.getSource(sourceId)) map.removeSource(sourceId)
-        continue
+      for (const layer of ALL_LAYERS) {
+        const sourceId = `pois-${layer}`
+        const clusterLayerId = `${sourceId}-clusters`
+        const clusterCountId = `${sourceId}-cluster-count`
+        const pointLayerId = `${sourceId}-points`
+        const ringLayerId = `${sourceId}-selected-ring`
+
+        if (!visibleLayers.has(layer)) {
+          // Remove existing layers + source if they exist
+          if (map.getLayer(ringLayerId)) map.removeLayer(ringLayerId)
+          if (map.getLayer(clusterCountId)) map.removeLayer(clusterCountId)
+          if (map.getLayer(clusterLayerId)) map.removeLayer(clusterLayerId)
+          if (map.getLayer(pointLayerId)) map.removeLayer(pointLayerId)
+          if (map.getSource(sourceId)) map.removeSource(sourceId)
+          continue
+        }
+
+        // Client-side sub-type filter for accommodations (Story 8.4)
+        const rawPois = poisByLayer[layer]
+        const pois = layer === 'accommodations'
+          ? rawPois.filter((poi) => activeAccommodationTypes.has(poi.category))
+          : rawPois
+        const features: GeoJSON.Feature[] = pois.map((poi) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
+          properties: {
+            id: poi.id,
+            externalId: poi.externalId,
+            name: poi.name,
+            category: poi.category,
+            iconImageKey: poiPinImageKey(poi.category),
+          },
+        }))
+
+        if (map.getSource(sourceId)) {
+          // Update existing source data — layers persist
+          ;(map.getSource(sourceId) as maplibregl.GeoJSONSource).setData({
+            type: 'FeatureCollection',
+            features,
+          })
+        } else {
+          // Add new clustered source + all layers
+          map.addSource(sourceId, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features },
+            cluster: true,
+            clusterMaxZoom: CLUSTER_MAX_ZOOM,
+            clusterRadius: CLUSTER_RADIUS,
+          })
+
+          // Cluster circle layer — vert brand Ride'n'Rest, unifié tous layers
+          map.addLayer({
+            id: clusterLayerId,
+            type: 'circle',
+            source: sourceId,
+            filter: ['has', 'point_count'],
+            paint: {
+              'circle-color': POI_CLUSTER_COLOR,
+              'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 28],
+              'circle-opacity': 0.8,
+              'circle-stroke-color': '#fff',
+              'circle-stroke-width': 2,
+            },
+          })
+
+          // Cluster count label
+          map.addLayer({
+            id: clusterCountId,
+            type: 'symbol',
+            source: sourceId,
+            filter: ['has', 'point_count'],
+            layout: {
+              'text-field': '{point_count_abbreviated}',
+              'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+              'text-size': 12,
+            },
+            paint: { 'text-color': '#ffffff' },
+          })
+
+          // Individual pin symbol layer — SVG goutte colorée + icône
+          map.addLayer({
+            id: pointLayerId,
+            type: 'symbol',
+            source: sourceId,
+            filter: ['!', ['has', 'point_count']],
+            layout: {
+              'icon-image': ['get', 'iconImageKey'],
+              'icon-size': 1,
+              'icon-anchor': 'bottom',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+            },
+          })
+
+          // Selected ring — initially hidden (filter matches no real ID)
+          map.addLayer({
+            id: ringLayerId,
+            type: 'circle',
+            source: sourceId,
+            filter: ['==', ['get', 'id'], '___none___'],
+            paint: {
+              'circle-radius': 13,
+              'circle-color': 'transparent',
+              'circle-stroke-color': POI_CLUSTER_COLOR,
+              'circle-stroke-width': 2,
+              'circle-opacity': 0,
+              'circle-stroke-opacity': 1,
+            },
+          })
+        }
+
+        // Event handlers — registered every render (outside if/else) so they survive source updates
+        const handleClusterClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+          if (!e.features || e.features.length === 0) return
+          const geometry = e.features[0].geometry as GeoJSON.Point
+          map.flyTo({ center: geometry.coordinates as [number, number], zoom: map.getZoom() + 2 })
+        }
+        const handleClusterMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
+        const handleClusterMouseLeave = () => { map.getCanvas().style.cursor = '' }
+
+        map.on('click', clusterLayerId, handleClusterClick)
+        map.on('mouseenter', clusterLayerId, handleClusterMouseEnter)
+        map.on('mouseleave', clusterLayerId, handleClusterMouseLeave)
+
+        // POI pin click → open detail sheet + select pin
+        const handlePoiClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+          if (!e.features || e.features.length === 0) return
+          const props = e.features[0].properties as { id: string }
+          const geometry = e.features[0].geometry as GeoJSON.Point
+          // Pan map so the pin is slightly below viewport center — leaves room for the popup above
+          map.easeTo({ center: geometry.coordinates as [number, number], offset: [0, 100], duration: 300 })
+          useUIStore.getState().setSelectedPoi(props.id)
+          useMapStore.getState().setSelectedPoiId(props.id)
+          e.preventDefault()
+        }
+        const handlePoiMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
+        const handlePoiMouseLeave = () => { map.getCanvas().style.cursor = '' }
+
+        map.on('click', pointLayerId, handlePoiClick)
+        map.on('mouseenter', pointLayerId, handlePoiMouseEnter)
+        map.on('mouseleave', pointLayerId, handlePoiMouseLeave)
+
+        cleanupFns.push(() => {
+          map.off('click', clusterLayerId, handleClusterClick)
+          map.off('mouseenter', clusterLayerId, handleClusterMouseEnter)
+          map.off('mouseleave', clusterLayerId, handleClusterMouseLeave)
+          map.off('click', pointLayerId, handlePoiClick)
+          map.off('mouseenter', pointLayerId, handlePoiMouseEnter)
+          map.off('mouseleave', pointLayerId, handlePoiMouseLeave)
+        })
       }
-
-      // Client-side sub-type filter for accommodations (Story 8.4)
-      const rawPois = poisByLayer[layer]
-      const pois = layer === 'accommodations'
-        ? rawPois.filter((poi) => activeAccommodationTypes.has(poi.category))
-        : rawPois
-      const features: GeoJSON.Feature[] = pois.map((poi) => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
-        properties: {
-          id: poi.id,
-          externalId: poi.externalId,
-          name: poi.name,
-          category: poi.category,
-          categoryIcon: LAYER_ICONS[layer],
-        },
-      }))
-
-      if (map.getSource(sourceId)) {
-        // Update existing source data — layers persist
-        ;(map.getSource(sourceId) as maplibregl.GeoJSONSource).setData({
-          type: 'FeatureCollection',
-          features,
-        })
-      } else {
-        // Add new clustered source + all layers
-        map.addSource(sourceId, {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features },
-          cluster: true,
-          clusterMaxZoom: CLUSTER_MAX_ZOOM,
-          clusterRadius: CLUSTER_RADIUS,
-        })
-
-        // Cluster circle layer — unified color
-        map.addLayer({
-          id: clusterLayerId,
-          type: 'circle',
-          source: sourceId,
-          filter: ['has', 'point_count'],
-          paint: {
-            'circle-color': POI_PIN_COLOR,
-            'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 28],
-            'circle-opacity': 0.8,
-            'circle-stroke-color': '#fff',
-            'circle-stroke-width': 2,
-          },
-        })
-
-        // Cluster count label
-        map.addLayer({
-          id: clusterCountId,
-          type: 'symbol',
-          source: sourceId,
-          filter: ['has', 'point_count'],
-          layout: {
-            'text-field': '{point_count_abbreviated}',
-            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-            'text-size': 12,
-          },
-          paint: { 'text-color': '#ffffff' },
-        })
-
-        // Individual pin circle layer
-        map.addLayer({
-          id: pointLayerId,
-          type: 'circle',
-          source: sourceId,
-          filter: ['!', ['has', 'point_count']],
-          paint: {
-            'circle-radius': 8,
-            'circle-color': POI_PIN_COLOR,
-            'circle-stroke-color': selectedStageColorRef.current ?? '#FFFFFF',
-            'circle-stroke-width': 1.5,
-          },
-        })
-
-        // White category icon text on top of each pin
-        map.addLayer({
-          id: iconLayerId,
-          type: 'symbol',
-          source: sourceId,
-          filter: ['!', ['has', 'point_count']],
-          layout: {
-            'text-field': ['get', 'categoryIcon'],
-            'text-size': 10,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-          },
-          paint: { 'text-color': '#FFFFFF' },
-        })
-
-        // Selected ring — initially hidden (filter matches no real ID)
-        map.addLayer({
-          id: ringLayerId,
-          type: 'circle',
-          source: sourceId,
-          filter: ['==', ['get', 'id'], '___none___'],
-          paint: {
-            'circle-radius': 13,
-            'circle-color': 'transparent',
-            'circle-stroke-color': '#2D6A4A',
-            'circle-stroke-width': 2,
-            'circle-opacity': 0,
-            'circle-stroke-opacity': 1,
-          },
-        })
-      }
-
-      // Event handlers — registered every render (outside if/else) so they survive source updates
-      const handleClusterClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-        if (!e.features || e.features.length === 0) return
-        const geometry = e.features[0].geometry as GeoJSON.Point
-        map.flyTo({ center: geometry.coordinates as [number, number], zoom: map.getZoom() + 2 })
-      }
-      const handleClusterMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
-      const handleClusterMouseLeave = () => { map.getCanvas().style.cursor = '' }
-
-      map.on('click', clusterLayerId, handleClusterClick)
-      map.on('mouseenter', clusterLayerId, handleClusterMouseEnter)
-      map.on('mouseleave', clusterLayerId, handleClusterMouseLeave)
-
-      // POI pin click → open detail sheet + select pin
-      const handlePoiClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
-        if (!e.features || e.features.length === 0) return
-        const props = e.features[0].properties as { id: string }
-        useUIStore.getState().setSelectedPoi(props.id)
-        useMapStore.getState().setSelectedPoiId(props.id)
-        e.preventDefault()
-      }
-      const handlePoiMouseEnter = () => { map.getCanvas().style.cursor = 'pointer' }
-      const handlePoiMouseLeave = () => { map.getCanvas().style.cursor = '' }
-
-      map.on('click', pointLayerId, handlePoiClick)
-      map.on('mouseenter', pointLayerId, handlePoiMouseEnter)
-      map.on('mouseleave', pointLayerId, handlePoiMouseLeave)
-
-      cleanupFns.push(() => {
-        map.off('click', clusterLayerId, handleClusterClick)
-        map.off('mouseenter', clusterLayerId, handleClusterMouseEnter)
-        map.off('mouseleave', clusterLayerId, handleClusterMouseLeave)
-        map.off('click', pointLayerId, handlePoiClick)
-        map.off('mouseenter', pointLayerId, handlePoiMouseEnter)
-        map.off('mouseleave', pointLayerId, handlePoiMouseLeave)
-      })
-    }
+    })
 
     return () => {
+      cancelled = true
       cleanupFns.forEach((fn) => fn())
     }
   }, [mapRef, poisByLayer, visibleLayers, activeAccommodationTypes, styleVersion])
@@ -217,33 +201,12 @@ export function usePoiLayers(
     if (!map || !map.isStyleLoaded()) return
 
     const id = selectedPoiId ?? '___none___'
-    const radiusExpr = ['case', ['==', ['get', 'id'], selectedPoiId ?? ''], 9.6, 8] as unknown
 
     for (const layer of ALL_LAYERS) {
-      const sourceId = `pois-${layer}`
-      const pointLayerId = `${sourceId}-points`
-      const ringLayerId = `${sourceId}-selected-ring`
-
-      if (map.getLayer(pointLayerId)) {
-        map.setPaintProperty(pointLayerId, 'circle-radius', radiusExpr)
-      }
+      const ringLayerId = `pois-${layer}-selected-ring`
       if (map.getLayer(ringLayerId)) {
         map.setFilter(ringLayerId, ['==', ['get', 'id'], id])
       }
     }
   }, [mapRef, selectedPoiId, styleVersion])
-
-  // Separate effect — updates POI pin stroke color reactively when stage selection changes
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-
-    const strokeColor = selectedStageColor ?? '#FFFFFF'
-    for (const layer of ALL_LAYERS) {
-      const pointLayerId = `pois-${layer}-points`
-      if (map.getLayer(pointLayerId)) {
-        map.setPaintProperty(pointLayerId, 'circle-stroke-color', strokeColor)
-      }
-    }
-  }, [mapRef, selectedStageColor, styleVersion])
 }

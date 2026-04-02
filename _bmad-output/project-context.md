@@ -612,3 +612,33 @@ Le composant `Button` dans ce projet a des tailles différentes du shadcn/ui sta
 - Long-press mobile (≥500ms, `pointerType === 'touch'`) → tooltip
 - Affiche automatiquement un `Info` icon (lucide) pour indiquer qu'une tooltip existe
 - Pattern : wrapper le div icon+titre uniquement, pas le chevron collapse
+
+---
+
+### POI Color System (story 16.11)
+
+Source de vérité : `packages/shared/src/constants/poi-colors.ts`
+- `POI_CATEGORY_COLORS` — couleur par PoiCategory (pins + chips)
+- `POI_LAYER_COLORS` — couleur représentative par MapLayer (boutons filtre)
+- `POI_CLUSTER_COLOR = '#2D6A4A'` — vert brand, unifié tous clusters
+- Ne jamais hardcoder une couleur POI dans un composant — toujours importer depuis shared
+- Couleurs dynamiques UI : style inline uniquement (jamais `bg-[${color}]` Tailwind)
+
+Pins sur carte : SVGs complets (goutte + icône) fournis par Guillaume, chargés via `map.addImage()`
+- Factory : `apps/web/src/lib/poi-pin-factory.ts`
+- SVGs : `apps/web/public/images/poi-icons/{key}.svg` (viewBox 0 0 40 50, fond transparent, pointe en bas)
+- `icon-anchor: 'bottom'` obligatoire dans le layer symbol
+- Taille de rastérisation : **120×150** avec `pixelRatio: window.devicePixelRatio` → 60×75 CSS px — net sur Retina
+- Dégradation gracieuse si SVG manquant (pin invisible, pas d'erreur)
+- `registerPoiPinImages` est async — pattern `void fn().then(() => { if (cancelled) return; /* add layers */ })`
+- ⚠️ Race condition : double `hasImage` check obligatoire — une fois avant le `await loadSvgImage()`, une fois après (deux hooks peuvent appeler `registerPoiPinImages` en parallèle)
+
+Filtres live mode (`use-live-poi-search.ts`) :
+- `categories` passées à l'API = `visibleLayers` × `activeAccommodationTypes` (pour accommodations seulement)
+- `categories` **exclu du queryKey** — la recherche est toujours explicite (`refetch()`), exclure évite que le changement de filtre efface les compteurs affichés avant re-search
+- Chips `AccommodationSubTypes` : prop `onlyCountActive` — masque le badge `(0)` pour les types non recherchés (live mode uniquement)
+
+Popup POI (`poi-popup.tsx`) :
+- **Fermeture au clic extérieur** : `map.on('click', handleMapClick)` enregistré tant que le popup est monté. Guard `queryRenderedFeatures(e.point).some(f => f.layer.id.endsWith('-points') && !f.properties?.point_count)` — ne ferme pas si un pin individuel a été cliqué (un autre POI s'ouvre). MapLibre ne fire pas `click` sur un drag → pas de logique drag supplémentaire.
+- **Stabilité handler** : `onCloseRef` (ref mise à jour chaque render) dans le `useEffect` — évite de re-enregistrer le listener map à chaque changement d'identité de `onClose`.
+- **Recentrage automatique sur clic pin** (hooks `use-poi-layers` + `use-live-poi-layers`) : `map.easeTo({ center: coordinates, offset: [0, 100], duration: 300 })` dans `handlePoiClick` — positionne le pin 100px sous le centre du viewport, laissant la moitié supérieure pour le popup. `easeTo` programmatique ne déclenche pas la détection de pan manuel du suivi GPS live.

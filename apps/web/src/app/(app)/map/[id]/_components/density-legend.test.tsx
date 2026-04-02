@@ -13,11 +13,11 @@ vi.mock('lucide-react', () => ({
 // Mock accommodation-sub-types
 vi.mock('./accommodation-sub-types', () => ({
   ACCOMMODATION_SUB_TYPES: [
-    { type: 'hotel',      label: 'Hôtel',               icon: '🏨' },
-    { type: 'camp_site',  label: 'Camping',              icon: '⛺' },
-    { type: 'shelter',    label: 'Refuge / Abri',        icon: '🏠' },
-    { type: 'hostel',     label: 'Auberge de jeunesse',  icon: '🛏️' },
-    { type: 'guesthouse', label: "Chambre d'hôte",       icon: '🏡' },
+    { type: 'hotel',      label: 'Hôtel',               color: '#F97316' },
+    { type: 'camp_site',  label: 'Camping',              color: '#38BDF8' },
+    { type: 'shelter',    label: 'Refuge / Abri',        color: '#84CC16' },
+    { type: 'hostel',     label: 'Auberge de jeunesse',  color: '#8B5CF6' },
+    { type: 'guesthouse', label: "Chambre d'hôte",       color: '#EC4899' },
   ],
 }))
 
@@ -126,8 +126,8 @@ describe('DensityLegend', () => {
 
     const label = screen.getByText(/Analysé :/i)
     expect(label).toBeDefined()
-    expect(label.textContent).toContain('🏨 Hôtel')
-    expect(label.textContent).toContain('🛏️ Auberge de jeunesse')
+    expect(label.textContent).toContain('Hôtel')
+    expect(label.textContent).toContain('Auberge de jeunesse')
   })
 
   it('does not show categories label when densityCategories is empty', async () => {

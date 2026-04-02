@@ -24,7 +24,7 @@ export function DensityLegend({ densityCategories }: Props) {
       ? densityCategories
           .map((cat) => ACCOMMODATION_SUB_TYPES.find((t) => t.type === cat))
           .filter(Boolean)
-          .map((t) => `${t!.icon} ${t!.label}`)
+          .map((t) => t!.label)
           .join(' + ')
       : null
 
