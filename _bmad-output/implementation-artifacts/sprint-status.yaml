@@ -200,8 +200,8 @@ development_status:
   # Epic 12: PWA & Offline Capability
   # (renommé depuis Epic 11 — Post-MVP, dernier)
   # ─────────────────────────────────────────────────────────────
-  epic-12: backlog
-  12-1-pwa-manifest-app-install: backlog
+  epic-12: in-progress
+  12-1-pwa-manifest-app-install: in-progress
   12-2-service-worker-partial-offline-support: backlog
   12-3-push-notifications-for-density-analysis: backlog
   epic-12-retrospective: optional
