@@ -22,7 +22,9 @@ export function getCorridorCenter(
 }
 
 export function buildBookingSearchUrl(center: { lat: number; lng: number }): string {
-  return `https://www.booking.com/searchresults.html?latitude=${center.lat}&longitude=${center.lng}`
+  const lat = center.lat.toFixed(6)
+  const lng = center.lng.toFixed(6)
+  return `https://www.booking.com/searchresults.html?ss=${lat}%2C+${lng}&dest_type=latlong&latitude=${center.lat}&longitude=${center.lng}`
 }
 
 /** Bounding box ±0.2° (≈ 22 km) autour du centre — Airbnb requiert un bbox pour la recherche par coordonnées */

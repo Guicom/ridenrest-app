@@ -8,6 +8,7 @@ import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH } from '@ridenrest/shared'
 import { trackBookingClick } from '@/lib/api-client'
+import { buildBookingSearchUrl } from '@/lib/booking-url'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 
@@ -89,7 +90,7 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
   // ── Booking deep links ────────────────────────────────────────────────────
   const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
-  const bookingUrl = `https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}`
+  const bookingUrl = buildBookingSearchUrl({ lat: poi.lat, lng: poi.lng })
 
   const handleBookingClick = (platform: 'booking_com') => {
     // Fire-and-forget analytics — do NOT await

@@ -12,12 +12,13 @@ export default withPWA({
   // SW minimal pour story 12.1 — cache statique seulement, pas de tiles MapLibre (→ 12.2)
   workboxOptions: {
     skipWaiting: true,
+    clientsClaim: true,
     runtimeCaching: [
       {
         urlPattern: /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/,
         handler: "CacheFirst",
         options: {
-          cacheName: "static-assets",
+          cacheName: "static-assets-v2",
           expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
         },
       },

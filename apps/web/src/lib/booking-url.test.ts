@@ -48,15 +48,33 @@ describe('getCorridorCenter', () => {
 })
 
 describe('buildBookingSearchUrl', () => {
-  it('builds correct Booking.com URL', () => {
+  it('includes dest_type=latlong for coordinate-based search', () => {
     const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
-    expect(url).toBe('https://www.booking.com/searchresults.html?latitude=43.5&longitude=1.4')
+    expect(url).toContain('dest_type=latlong')
+  })
+
+  it('includes latitude and longitude params', () => {
+    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
+    expect(url).toContain('latitude=43.5')
+    expect(url).toContain('longitude=1.4')
+  })
+
+  it('includes ss param with coordinates for prefilled search box', () => {
+    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
+    expect(url).toContain('ss=')
+    expect(url).toContain('43.500000')
+    expect(url).toContain('1.400000')
   })
 
   it('includes negative coordinates correctly', () => {
     const url = buildBookingSearchUrl({ lat: -34.6, lng: -58.4 })
     expect(url).toContain('latitude=-34.6')
     expect(url).toContain('longitude=-58.4')
+  })
+
+  it('targets booking.com searchresults page', () => {
+    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
+    expect(url).toContain('https://www.booking.com/searchresults.html')
   })
 })
 
