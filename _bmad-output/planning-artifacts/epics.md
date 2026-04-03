@@ -2133,6 +2133,34 @@ So that I can quickly read the essential information and take action.
 
 ---
 
+### Story 16.14: Global Accommodation Search CTA (Booking + Airbnb)
+
+> **Ajouté 2026-04-03** — Composant `SearchOnDropdown` partagé : dropdown "Rechercher sur" (Booking.com + Airbnb) intégré dans le sidebar planning, les contrôles live, et la fiche POI hébergement.
+
+As a **cyclist using the planning or live mode**,
+I want a "Rechercher sur" dropdown CTA available across the app,
+So that I can instantly open Booking.com or Airbnb centered on the right location — from the map sidebar, the live controls, or a specific POI popup.
+
+**Acceptance Criteria:**
+
+**Given** une recherche hébergements est committée et terminée en mode planning,
+**When** `searchCommitted && !isPoisPending && visibleLayers.has('accommodations')`,
+**Then** un dropdown "Rechercher sur" s'affiche sous le bouton "Rechercher" (Booking + Airbnb, centré sur `midKm`).
+
+**Given** le mode live est actif et `targetKm` est connu (slider positionné),
+**When** `LiveControls` s'affiche,
+**Then** `SearchOnDropdown` est actif dans l'action row — pas besoin d'avoir lancé une recherche POI.
+
+**Given** une fiche POI hébergement est ouverte,
+**When** les CTAs s'affichent,
+**Then** `SearchOnDropdown` pleine largeur centré sur les coords du POI, "Site officiel" en dessous si disponible.
+
+**Given** l'utilisateur ouvre le dropdown,
+**When** il clique "Rechercher sur Booking.com" ou "Rechercher sur Airbnb",
+**Then** le lien s'ouvre dans un nouvel onglet (Booking : `latitude/longitude` ; Airbnb : bbox ±0.2°).
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

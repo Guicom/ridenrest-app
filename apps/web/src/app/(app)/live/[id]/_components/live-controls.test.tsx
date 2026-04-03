@@ -5,6 +5,12 @@ import { useLiveStore } from '@/stores/live.store'
 
 afterEach(cleanup)
 
+vi.mock('@/components/shared/search-on-dropdown', () => ({
+  SearchOnDropdown: ({ center }: { center: object | null }) => (
+    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} />
+  ),
+}))
+
 // Mock Slider (Base UI needs DOM features unavailable in jsdom)
 vi.mock('@/components/ui/slider', () => ({
   Slider: (props: Record<string, unknown>) => (
@@ -25,6 +31,7 @@ const defaultProps = {
   onSearch: vi.fn(),
   activeFilterCount: 0,
   elevationGain: null,
+  center: null,
 }
 
 describe('LiveControls', () => {
@@ -73,10 +80,11 @@ describe('LiveControls', () => {
     expect(screen.getByTestId('slider-target')).toBeDefined()
   })
 
-  it('renders RECHERCHER and FILTERS buttons', () => {
+  it('renders RECHERCHER button, filters icon, and SearchOnDropdown', () => {
     render(<LiveControls {...defaultProps} />)
     expect(screen.getByTestId('btn-search')).toBeDefined()
     expect(screen.getByTestId('btn-filters')).toBeDefined()
+    expect(screen.getByTestId('search-on-dropdown')).toBeDefined()
   })
 
   it('calls onSearch when RECHERCHER is clicked', () => {
@@ -86,7 +94,7 @@ describe('LiveControls', () => {
     expect(onSearch).toHaveBeenCalled()
   })
 
-  it('calls onFiltersOpen when FILTERS is clicked', () => {
+  it('calls onFiltersOpen when filters icon is clicked', () => {
     const onFiltersOpen = vi.fn()
     render(<LiveControls {...defaultProps} onFiltersOpen={onFiltersOpen} />)
     fireEvent.click(screen.getByTestId('btn-filters'))
@@ -101,6 +109,16 @@ describe('LiveControls', () => {
   it('does not show badge when activeFilterCount is 0', () => {
     render(<LiveControls {...defaultProps} activeFilterCount={0} />)
     expect(screen.queryByText('0')).toBeNull()
+  })
+
+  it('passes null center to SearchOnDropdown when center is null', () => {
+    render(<LiveControls {...defaultProps} center={null} />)
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-has-center')).toBe('false')
+  })
+
+  it('passes center to SearchOnDropdown when center is provided', () => {
+    render(<LiveControls {...defaultProps} center={{ lat: 43.5, lng: 1.4 }} />)
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-has-center')).toBe('true')
   })
 
   it('updates targetAheadKm when slider changes', () => {

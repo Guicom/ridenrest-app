@@ -7,17 +7,22 @@ afterEach(cleanup)
 
 const mockSetSearchRange = vi.fn()
 const mockSetSelectedStageId = vi.fn()
+const mockSetSearchCommitted = vi.fn()
 let mockFromKm = 0
 let mockSelectedStageId: string | null = null
+let mockSearchCommitted = false
+let mockVisibleLayers = new Set<string>()
 
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
     fromKm: mockFromKm,
     toKm: 15,
     setSearchRange: mockSetSearchRange,
-    visibleLayers: new Set(),
+    visibleLayers: mockVisibleLayers,
     selectedStageId: mockSelectedStageId,
     setSelectedStageId: mockSetSelectedStageId,
+    searchCommitted: mockSearchCommitted,
+    setSearchCommitted: mockSetSearchCommitted,
   }),
 }))
 
@@ -40,6 +45,12 @@ vi.mock('./accommodation-sub-types', () => ({
   AccommodationSubTypes: () => <div data-testid="accommodation-sub-types" />,
 }))
 
+vi.mock('@/components/shared/search-on-dropdown', () => ({
+  SearchOnDropdown: ({ center }: { center: object | null }) => (
+    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} />
+  ),
+}))
+
 const makeWaypoints = (): MapWaypoint[] => [
   { lat: 0, lng: 0, ele: 100, distKm: 0 },
   { lat: 0, lng: 0, ele: 200, distKm: 5 },
@@ -58,8 +69,11 @@ describe('SearchRangeControl', () => {
   beforeEach(() => {
     mockSetSearchRange.mockClear()
     mockSetSelectedStageId.mockClear()
+    mockSetSearchCommitted.mockClear()
     mockFromKm = 0
     mockSelectedStageId = null
+    mockSearchCommitted = false
+    mockVisibleLayers = new Set()
   })
 
   it('renders section header with Recherche label', () => {
@@ -286,5 +300,66 @@ describe('SearchRangeControl', () => {
     )
     const gain = screen.getByTestId('elevation-gain')
     expect(gain.textContent).toContain('150')
+  })
+
+  // ─── Rechercher sur dropdown ─────────────────────────────────────────────────
+
+  it('shows SearchOnDropdown when searchCommitted, accommodations visible, not pending', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    expect(screen.getByTestId('search-on-dropdown')).toBeDefined()
+  })
+
+  it('hides SearchOnDropdown when accommodations layer not in visibleLayers', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['restaurants'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
+  })
+
+  it('hides SearchOnDropdown when isPoisPending=true', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={true} />)
+    expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
+  })
+
+  it('hides SearchOnDropdown when searchCommitted=false', () => {
+    mockSearchCommitted = false
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
+  })
+
+  it('shows SearchOnDropdown even when 0 POIs returned (only isPoisPending=false required)', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    expect(screen.getByTestId('search-on-dropdown')).toBeDefined()
+  })
+
+  it('SearchOnDropdown receives center when waypoints available — AC-4', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-has-center')).toBe('true')
+  })
+
+  it('SearchOnDropdown receives null center when waypoints=null — AC-8', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-has-center')).toBe('false')
+  })
+
+  it('SearchOnDropdown receives null center when waypoints is empty array — AC-8', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={[]} isPoisPending={false} />)
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-has-center')).toBe('false')
   })
 })

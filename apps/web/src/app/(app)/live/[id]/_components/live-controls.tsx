@@ -3,15 +3,18 @@
 import { Search, SlidersHorizontal, MountainSnow, Clock } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useLiveStore } from '@/stores/live.store'
+import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 
 interface LiveControlsProps {
   onFiltersOpen: () => void
   onSearch: () => void
   activeFilterCount: number
   elevationGain: number | null
+  /** Center point for the search area. null = Booking/Airbnb buttons disabled. */
+  center: { lat: number; lng: number } | null
 }
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain }: LiveControlsProps) {
+export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center }: LiveControlsProps) {
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const setTargetAheadKm = useLiveStore((s) => s.setTargetAheadKm)
@@ -26,17 +29,34 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
           <p className="text-xs font-medium uppercase tracking-wide text-[--text-secondary]">MON HÔTEL DANS</p>
           <p className="font-mono text-4xl font-bold text-primary leading-none">{targetAheadKm} km</p>
         </div>
-        <div className="flex flex-col items-end gap-0.5 text-right">
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-sm font-bold" data-testid="elevation-gain-display">
-              {elevationGain != null ? `D+ ${Math.round(elevationGain)}m` : '—'}
-            </span>
-            <MountainSnow className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
+        <div className="flex items-center gap-3">
+          {/* D+/ETA info — slightly left to make room for filters icon */}
+          <div className="flex flex-col items-end gap-0.5 text-right">
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-sm font-bold" data-testid="elevation-gain-display">
+                {elevationGain != null ? `D+ ${Math.round(elevationGain)}m` : '—'}
+              </span>
+              <MountainSnow className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-sm font-bold" data-testid="eta-display">{etaSummary}</span>
+              <Clock className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-sm font-bold" data-testid="eta-display">{etaSummary}</span>
-            <Clock className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
-          </div>
+          {/* Filters icon button — moved from action row to header */}
+          <button
+            onClick={onFiltersOpen}
+            data-testid="btn-filters"
+            aria-label="Ouvrir les filtres"
+            className="relative flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-primary text-[10px] font-bold border border-primary">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -65,19 +85,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
           <Search className="h-4 w-4" aria-hidden="true" />
           RECHERCHER
         </button>
-        <button
-          onClick={onFiltersOpen}
-          data-testid="btn-filters"
-          className="flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2 cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
-        >
-          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-          FILTERS
-          {activeFilterCount > 0 && (
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-primary text-[10px] font-bold">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+        <SearchOnDropdown center={center} variant="action" className="flex-1" />
       </div>
     </div>
   )

@@ -1,11 +1,11 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { X, Search, Globe, Phone, Navigation, Milestone, TrendingUp, Clock, ChevronDown } from 'lucide-react'
+import { X, Globe, Phone, Navigation, Milestone, TrendingUp, Clock, ChevronDown } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH, POI_CATEGORY_COLORS } from '@ridenrest/shared'
-import { trackBookingClick } from '@/lib/api-client'
+import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import type { Poi, PoiCategory } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
@@ -22,13 +22,6 @@ const CATEGORY_LABELS: Record<PoiCategory, string> = {
   convenience:  'Alimentation',
   bike_shop:    'Vélo',
   bike_repair:  'Vélo',
-}
-
-// Booking.com nflt filter per accommodation category
-const POI_BOOKING_FILTERS: Partial<Record<PoiCategory, string>> = {
-  hotel:      'ht_id%3D204',
-  hostel:     'ht_id%3D203',
-  guesthouse: 'ht_id%3D220',
 }
 
 const ACCOMMODATION_CATEGORIES = LAYER_CATEGORIES.accommodations
@@ -190,14 +183,6 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
 
   const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
-  // Booking URL — with optional nflt filter for accommodation type
-  const nflt = POI_BOOKING_FILTERS[poi.category]
-  const bookingUrl = `https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}${nflt ? `&nflt=${nflt}` : ''}`
-
-  const handleBookingClick = () => {
-    trackBookingClick(poi.externalId, 'booking_com')
-  }
-
   const distanceLabel = poi.distFromTraceM < 1000
     ? `${Math.round(poi.distFromTraceM)} m de la trace`
     : `${(poi.distFromTraceM / 1000).toFixed(1)} km de la trace`
@@ -216,7 +201,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
           transform: 'translateX(-50%) translateY(-100%)',
         }}
       >
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-[--border] overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-[--border]">
 
           {/* Header */}
           <div className="px-4 pt-4 pb-3">
@@ -342,37 +327,28 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
             </>
           )}
 
-          {/* CTAs — hébergement : Site officiel (optionnel) + Booking (toujours) */}
+          {/* CTAs — hébergement : Rechercher sur (Booking/Airbnb) + Site officiel (optionnel) */}
           {isAccommodation && (
             <>
               <div className="mx-4 h-px bg-[--border]" />
-              <div className="px-4 py-3 flex gap-2">
+              <div className="px-4 py-3 flex flex-col gap-2">
+                <SearchOnDropdown
+                  center={{ lat: poi.lat, lng: poi.lng }}
+                  variant="action"
+                  className="w-full"
+                />
                 {displayWebsite && (
                   <a
                     href={displayWebsite}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Site officiel"
-                    className="flex-1 flex items-center justify-center gap-1.5 h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface] active:scale-[0.98] transition-all duration-75"
+                    className="flex items-center justify-center gap-1.5 w-full h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface] active:scale-[0.98] transition-all duration-75"
                   >
                     <Globe className="h-4 w-4" />
                     Site officiel
                   </a>
                 )}
-                <a
-                  href={bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleBookingClick}
-                  aria-label="Rechercher sur Booking.com"
-                  className={[
-                    'flex items-center justify-center gap-1.5 h-11 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all duration-75',
-                    displayWebsite ? 'flex-1' : 'w-full',
-                  ].join(' ')}
-                >
-                  <Search className="h-4 w-4" />
-                  Booking
-                </a>
               </div>
             </>
           )}

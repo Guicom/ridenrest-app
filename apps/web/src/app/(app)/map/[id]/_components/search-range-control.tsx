@@ -2,6 +2,8 @@
 import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
+import { getCorridorCenter } from '@/lib/booking-url'
+import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
@@ -41,7 +43,7 @@ export function SearchRangeControl({
   const [expanded, setExpanded] = useState(true)
   const {
     fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId,
-    setSearchCommitted,
+    setSearchCommitted, searchCommitted,
   } = useMapStore()
 
   // rangeKm local state — initialized from store values
@@ -131,7 +133,9 @@ export function SearchRangeControl({
   const sliderValue = relativeKm != null ? relativeKm : fromKm
 
   return (
-    <div className="rounded-xl border border-[--border] overflow-hidden">
+    // overflow-hidden intentionally omitted: SearchOnDropdown renders an absolute dropdown
+    // that must not be clipped by this container
+    <div className="rounded-xl border border-[--border]">
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
@@ -260,6 +264,19 @@ export function SearchRangeControl({
           >
             Rechercher
           </button>
+
+          {/* Rechercher sur CTA — shown after search completes with accommodations layer active */}
+          {searchCommitted && !isPoisPending && visibleLayers.has('accommodations') && (
+            <SearchOnDropdown
+              center={
+                waypoints && waypoints.length > 0
+                  ? getCorridorCenter(waypoints, (fromKm + toKm) / 2)
+                  : null
+              }
+              variant="outline"
+              className="w-full"
+            />
+          )}
         </div>
       )}
     </div>

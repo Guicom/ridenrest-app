@@ -193,7 +193,7 @@ development_status:
   16-11-poi-colored-pins-visual-identity: done     # pins colorés per-category + filtres UI cohérents + live mode search fixes (2026-04-02)
   16-12-interactive-states-hover-click-feedback: done    # cursor + hover bg + active/click feedback sur tous éléments cliquables (2026-04-02)
   16-13-poi-popup-redesign: done                        # badge catégorie, stats icônes, CTAs côte à côte, phone icon inline + Google Places fallback fix (2026-04-03)
-  16-14-global-booking-search-button: ready-for-dev     # bouton "Rechercher sur Booking" global après search hébergements (planning + live)
+  16-14-global-booking-search-button: done        # bouton "Rechercher sur Booking" global après search hébergements (planning + live)
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

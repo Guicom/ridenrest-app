@@ -24,6 +24,7 @@ import { GeolocationConsent } from './_components/geolocation-consent'
 import { LiveControls } from './_components/live-controls'
 import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { Undo2, ChevronUp, ChevronDown, LocateFixed } from 'lucide-react'
+import { getCorridorCenter } from '@/lib/booking-url'
 import { Badge } from '@/components/ui/badge'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
 import { MapSearchOverlay } from '@/app/(app)/map/[id]/_components/map-search-overlay'
@@ -146,6 +147,13 @@ export default function LivePage() {
     () => pois.filter((p) => (LAYER_CATEGORIES.accommodations as readonly string[]).includes(p.category)),
     [pois],
   )
+
+  // Center point for the Rechercher sur dropdown (Booking/Airbnb) in LiveControls
+  // Available as soon as live mode is active and the slider position is known — no search required
+  const liveSearchCenter = useMemo(() => {
+    if (!isLiveModeActive || targetKm === null || allCumulativeWaypoints.length === 0) return null
+    return getCorridorCenter(allCumulativeWaypoints, targetKm)
+  }, [isLiveModeActive, targetKm, allCumulativeWaypoints])
 
   // Live context for PoiDetailSheet (D+/ETA with live mode values)
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
@@ -307,6 +315,7 @@ export default function LivePage() {
                 onSearch={handleSearch}
                 activeFilterCount={activeFilterCount}
                 elevationGain={elevationGain}
+                center={liveSearchCenter}
               />
             )}
 
