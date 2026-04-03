@@ -285,7 +285,7 @@ describe('GooglePlacesProvider', () => {
       await providerWithKey.getPlaceDetails('ChIJABC123')
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://places.googleapis.com/v1/places/ChIJABC123',
+        'https://places.googleapis.com/v1/places/ChIJABC123?languageCode=fr',
         expect.objectContaining({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           headers: expect.objectContaining({
@@ -334,6 +334,8 @@ describe('GooglePlacesProvider', () => {
         lng: 2.3522,
         rating: 4.2,
         isOpenNow: true,
+        weekdayDescriptions: [],
+        periods: [],
         phone: '+33 1 23 45 67 89',
         website: 'https://hotel-test.fr',
         types: ['lodging'],
