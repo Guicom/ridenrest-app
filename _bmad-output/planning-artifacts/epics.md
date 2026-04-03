@@ -2101,6 +2101,38 @@ So that the UI feels responsive and polished, and I always know what's clickable
 
 ---
 
+### Story 16.13: POI Popup — Redesign Layout
+
+> **Ajouté 2026-04-03** — Unification du layout des fiches POI (hébergement et non-hébergement) avec badge catégorie coloré, stats avec icônes, CTAs côte à côte et icône téléphone inline.
+
+As a **cyclist consulting a POI on the map**,
+I want the POI popup to have a clean, unified layout regardless of POI type,
+So that I can quickly read the essential information and take action.
+
+**Acceptance Criteria:**
+
+**Given** n'importe quel POI ouvert en popup,
+**When** la fiche s'affiche,
+**Then** un badge coloré (`POI_CATEGORY_COLORS[poi.category]`) apparaît **au-dessus** du nom avec le label uppercase de la catégorie.
+
+**Given** un POI avec numéro de téléphone,
+**When** la fiche s'affiche,
+**Then** une icône Lucide `Phone` cliquable (`tel:`) apparaît inline à droite du nom — sans afficher le numéro en texte.
+
+**Given** un POI ouvert,
+**When** les stats sont affichées,
+**Then** chaque stat (km, D+, ETA) a une icône Lucide au-dessus de sa valeur (layout en colonnes).
+
+**Given** un POI hébergement avec site web,
+**When** les CTAs s'affichent,
+**Then** "Site officiel" et "Booking" sont côte à côte en `flex-1` — plus empilés.
+
+**Given** un POI non-hébergement avec site web,
+**When** les CTAs s'affichent,
+**Then** un bouton "Site officiel" pleine largeur (plus de lien URL brut).
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

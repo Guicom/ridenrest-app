@@ -339,9 +339,35 @@ describe('PoisService', () => {
       const result = await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
 
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-      expect(mockRedisClient.get).not.toHaveBeenCalled()
-      expect(mockRedisClient.setex).not.toHaveBeenCalled()
       expect(result).toEqual([mockPoi])
+    })
+
+    it('calls Google Places when overpassEnabled=false and DB cache is empty', async () => {
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      // First call (DB cache check) returns empty, second call (after Google prefetch) returns poi
+      mockPoisRepository.findCachedPois
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([mockPoi])
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+
+      const result = await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
+
+      expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchLayerPlaceIds).toHaveBeenCalled()
+      expect(result).toEqual([mockPoi])
+    })
+
+    it('returns empty when overpassEnabled=false, DB cache empty, and Google Places not configured', async () => {
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+      const result = await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
+
+      expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchLayerPlaceIds).not.toHaveBeenCalled()
+      expect(result).toEqual([])
     })
 
     it('calls Overpass when overpassEnabled=true', async () => {

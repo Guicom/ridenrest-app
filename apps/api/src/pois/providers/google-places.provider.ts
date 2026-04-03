@@ -69,7 +69,7 @@ export class GooglePlacesProvider {
   async getPlaceDetails(placeId: string): Promise<GooglePlaceDetails> {
     if (!this.API_KEY) throw new Error('GOOGLE_PLACES_API_KEY not configured')
 
-    const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`
+    const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=fr`
     const fieldMask = [
       'id',
       'displayName',
@@ -77,6 +77,8 @@ export class GooglePlacesProvider {
       'location',
       'rating',
       'regularOpeningHours.openNow',
+      'regularOpeningHours.weekdayDescriptions',
+      'regularOpeningHours.periods',
       'internationalPhoneNumber',
       'websiteUri',
       'types',
@@ -99,7 +101,14 @@ export class GooglePlacesProvider {
       formattedAddress?: string
       location?: { latitude?: number; longitude?: number }
       rating?: number
-      regularOpeningHours?: { openNow?: boolean }
+      regularOpeningHours?: {
+        openNow?: boolean
+        weekdayDescriptions?: string[]
+        periods?: Array<{
+          open:  { day: number; hour: number; minute: number }
+          close: { day: number; hour: number; minute: number }
+        }>
+      }
       internationalPhoneNumber?: string
       websiteUri?: string
       types?: string[]
@@ -112,6 +121,8 @@ export class GooglePlacesProvider {
       lng: data.location?.longitude ?? null,
       rating: data.rating ?? null,
       isOpenNow: data.regularOpeningHours?.openNow ?? null,
+      weekdayDescriptions: data.regularOpeningHours?.weekdayDescriptions ?? [],
+      periods: data.regularOpeningHours?.periods ?? [],
       phone: data.internationalPhoneNumber ?? null,
       website: data.websiteUri ?? null,
       types: data.types ?? [],

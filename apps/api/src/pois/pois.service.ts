@@ -85,9 +85,23 @@ export class PoisService {
     const minLng = Math.min(...rangeWaypoints.map((wp) => wp.lng)) - bufferDeg
     const maxLng = Math.max(...rangeWaypoints.map((wp) => wp.lng)) + bufferDeg
 
-    // 4. Overpass opt-in gate — when disabled, return DB cache directly (no Redis, no Overpass)
+    // 4. Overpass opt-in gate — when disabled, use DB cache then fallback to Google Places
     if (!dto.overpassEnabled) {
-      return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
+      const dbCached = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
+      if (dbCached.length > 0) return dbCached
+
+      // DB cache empty — trigger Google Places search for this bbox
+      if (this.googlePlacesProvider.isConfigured()) {
+        const redis = this.redisProvider.getClient()
+        await this.prefetchAndInsertGooglePois(
+          { minLat, maxLat, minLng, maxLng },
+          segmentId,
+          redis,
+        ).catch((err) => this.logger.warn('Google Places fallback (overpass disabled) failed', err))
+        return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
+      }
+
+      return dbCached
     }
 
     // 5. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)

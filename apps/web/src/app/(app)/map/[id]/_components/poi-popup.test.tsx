@@ -17,6 +17,11 @@ let mockDetails: {
   lng: number | null
   rating: number | null
   isOpenNow: boolean | null
+  weekdayDescriptions: string[]
+  periods: Array<{
+    open:  { day: number; hour: number; minute: number }
+    close: { day: number; hour: number; minute: number }
+  }>
   phone: string | null
   website: string | null
   types: string[]
@@ -89,6 +94,13 @@ const makeSegment = (overrides?: Partial<MapSegmentData>): MapSegmentData => ({
   ...overrides,
 })
 
+const makeDetailsBase = (overrides = {}) => ({
+  placeId: 'ChIJABC', displayName: null, formattedAddress: null, lat: null, lng: null,
+  rating: null, isOpenNow: null, weekdayDescriptions: [], periods: [],
+  phone: null, website: null, types: [],
+  ...overrides,
+})
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('PoiPopup', () => {
@@ -112,14 +124,15 @@ describe('PoiPopup', () => {
     expect(screen.getByText('Hôtel Test')).toBeDefined()
   })
 
-  it('shows type badge "Hébergement" for accommodation', () => {
+  it('shows category badge "Hôtel" for hotel (AC-1)', () => {
     render(
-      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+      <PoiPopup poi={makeAccommodationPoi({ category: 'hotel' })} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.getByText('Hébergement')).toBeDefined()
+    // Badge text (CATEGORY_LABELS.hotel = 'Hôtel')
+    expect(screen.getAllByText('Hôtel').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('shows type badge "Restauration" for restaurant', () => {
+  it('shows category badge "Restauration" for restaurant (AC-1)', () => {
     render(
       <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
@@ -162,23 +175,68 @@ describe('PoiPopup', () => {
         onClose={onClose}
       />,
     )
-    expect(screen.getByText('km 10.0')).toBeDefined()
+    expect(screen.getByText('10.0 km')).toBeDefined()
   })
 
-  // ── Booking CTA ──────────────────────────────────────────────────────────────
+  // ── Navigation icon (AC-2) ───────────────────────────────────────────────────
 
-  it('shows Booking CTA for accommodation', () => {
+  it('shows navigation link adjacent to name (AC-2)', () => {
+    render(
+      <PoiPopup poi={makeAccommodationPoi({ lat: 43.1, lng: 1.1 })} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    const navLink = screen.getByRole('link', { name: /Naviguer vers/ })
+    expect(navLink).toBeDefined()
+    expect((navLink as HTMLAnchorElement).href).toContain('destination=43.1,1.1')
+  })
+
+  it('shows phone icon button when displayPhone available (AC-2)', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { phone: '+33612345678' } } as unknown as Poi
+    render(
+      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByRole('link', { name: /Appeler/ })).toBeDefined()
+  })
+
+  it('does NOT show phone icon when no phone available (AC-2)', () => {
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.getByText('Recherche sur Booking')).toBeDefined()
+    expect(screen.queryByRole('link', { name: /Appeler/ })).toBeNull()
   })
 
-  it('does NOT show Booking CTA for non-accommodation', () => {
+  // ── displayName priority (AC-8) ──────────────────────────────────────────────
+
+  it('displays Google displayName over poi.name (AC-8)', () => {
+    mockDetails = makeDetailsBase({ displayName: 'Google Name Override' })
+    render(
+      <PoiPopup poi={makeAccommodationPoi({ name: 'OSM Name' })} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByText('Google Name Override')).toBeDefined()
+    expect(screen.queryByText('OSM Name')).toBeNull()
+  })
+
+  it('falls back to poi.name when Google displayName is null (AC-8)', () => {
+    mockDetails = makeDetailsBase({ displayName: null })
+    render(
+      <PoiPopup poi={makeAccommodationPoi({ name: 'OSM Name' })} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByText('OSM Name')).toBeDefined()
+  })
+
+  // ── Booking CTA (AC-5) ──────────────────────────────────────────────────────
+
+  it('shows Booking CTA for accommodation (AC-5)', () => {
+    render(
+      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByText('Booking')).toBeDefined()
+  })
+
+  it('does NOT show Booking CTA for non-accommodation (AC-5)', () => {
     render(
       <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.queryByText('Recherche sur Booking')).toBeNull()
+    expect(screen.queryByText('Booking')).toBeNull()
   })
 
   it('Booking link contains latitude and longitude', () => {
@@ -191,7 +249,7 @@ describe('PoiPopup', () => {
         onClose={onClose}
       />,
     )
-    const link = screen.getByText('Recherche sur Booking').closest('a')!
+    const link = screen.getByText('Booking').closest('a')!
     expect(link.href).toContain('latitude=43.1')
     expect(link.href).toContain('longitude=1.1')
   })
@@ -206,56 +264,40 @@ describe('PoiPopup', () => {
         onClose={onClose}
       />,
     )
-    fireEvent.click(screen.getByText('Recherche sur Booking'))
+    fireEvent.click(screen.getByText('Booking'))
     expect(mockTrackBookingClick).toHaveBeenCalledWith('ext-1', 'booking_com')
   })
 
-  // ── Accommodation type selector ──────────────────────────────────────────────
-
-  it('shows accommodation type chips for accommodation POI', () => {
+  it('Booking button is full-width when no website (AC-5)', () => {
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.getByRole('button', { name: /Hôtel/ })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Auberge/ })).toBeDefined()
-    expect(screen.getByRole('button', { name: /Camping/ })).toBeDefined()
+    const link = screen.getByText('Booking').closest('a')!
+    expect(link.className).toContain('w-full')
+    expect(link.className).not.toContain('flex-1')
   })
 
-  it('does NOT show accommodation chips for non-accommodation', () => {
+  it('Booking button is flex-1 when website is present (AC-5)', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { website: 'https://hotel-test.fr' } } as unknown as Poi
     render(
-      <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.queryByRole('button', { name: /🏨/ })).toBeNull()
+    const link = screen.getByText('Booking').closest('a')!
+    expect(link.className).toContain('flex-1')
   })
 
-  it('type chip click updates Booking URL nflt filter', () => {
-    render(
-      <PoiPopup
-        poi={makeAccommodationPoi({ lat: 43.1, lng: 1.1 })}
-        segments={[makeSegment()]}
-        segmentId="seg-1"
-        map={map}
-        onClose={onClose}
-      />,
-    )
-    // Click "Auberge" chip (hostel)
-    fireEvent.click(screen.getByRole('button', { name: /Auberge/ }))
-    const link = screen.getByText('Recherche sur Booking').closest('a')!
-    // hostel filter = ht_id%3D203
-    expect(link.href).toContain('nflt=ht_id')
-  })
+  // ── No accommodation type chips ──────────────────────────────────────────────
 
-  it('hotel chip has aria-pressed=true when hotel is selected', () => {
+  it('does NOT show accommodation type chips section', () => {
     render(
-      <PoiPopup poi={makeAccommodationPoi({ category: 'hotel' })} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    const hotelChip = screen.getByRole('button', { name: /Hôtel/ })
-    expect(hotelChip.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.queryByText("Type d'hébergement")).toBeNull()
   })
 
   // ── "Site officiel" button ───────────────────────────────────────────────────
 
-  it('shows "Site officiel" for accommodation with website', () => {
+  it('shows "Site officiel" for accommodation with website (AC-5)', () => {
     const poi = { ...makeAccommodationPoi(), rawData: { website: 'https://hotel-test.fr' } } as unknown as Poi
     render(
       <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
@@ -265,31 +307,77 @@ describe('PoiPopup', () => {
     expect(link.href).toContain('https://hotel-test.fr')
   })
 
-  it('does NOT show "Site officiel" for accommodation without website', () => {
+  it('does NOT show "Site officiel" for accommodation without website (AC-5)', () => {
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
     expect(screen.queryByText('Site officiel')).toBeNull()
   })
 
-  it('does NOT show "Site officiel" for non-accommodation even with website', () => {
+  it('shows "Site officiel" button for non-accommodation with website (AC-6)', () => {
     const poi = { ...makeRestaurantPoi(), rawData: { website: 'https://resto-test.fr' } } as unknown as Poi
     render(
       <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByText('Site officiel')).toBeDefined()
+    const link = screen.getByText('Site officiel').closest('a')!
+    expect(link.href).toContain('https://resto-test.fr')
+  })
+
+  it('does NOT show "Site officiel" for non-accommodation without website (AC-6)', () => {
+    render(
+      <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
     expect(screen.queryByText('Site officiel')).toBeNull()
   })
 
   it('"Site officiel" uses Google Details website when available', () => {
-    mockDetails = {
-      placeId: 'ChIJABC', displayName: null, formattedAddress: null, lat: null, lng: null,
-      rating: null, isOpenNow: null, phone: null, website: 'https://google-website.fr', types: [],
-    }
+    mockDetails = makeDetailsBase({ website: 'https://google-website.fr' })
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
     const link = screen.getByText('Site officiel').closest('a')!
     expect(link.href).toContain('https://google-website.fr')
+  })
+
+  // ── Horaires (AC-4) ──────────────────────────────────────────────────────────
+
+  it('shows open status for non-accommodation when isOpenNow=true (AC-4)', () => {
+    mockDetails = makeDetailsBase({ isOpenNow: true })
+    render(
+      <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByText('Ouvert')).toBeDefined()
+  })
+
+  it('shows closed status for non-accommodation when isOpenNow=false (AC-4)', () => {
+    mockDetails = makeDetailsBase({ isOpenNow: false })
+    render(
+      <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByText('Fermé')).toBeDefined()
+  })
+
+  it('does NOT show opening hours section for accommodation (AC-4)', () => {
+    mockDetails = makeDetailsBase({ isOpenNow: true })
+    render(
+      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.queryByText('Ouvert')).toBeNull()
+    expect(screen.queryByText('Fermé')).toBeNull()
+  })
+
+  it('expands weekday descriptions on click when available (AC-4)', () => {
+    mockDetails = makeDetailsBase({
+      isOpenNow: true,
+      weekdayDescriptions: ['Lundi: 9:00 – 18:00', 'Mardi: 9:00 – 18:00'],
+    })
+    render(
+      <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.queryByText('Lundi: 9:00 – 18:00')).toBeNull()
+    fireEvent.click(screen.getByText('Ouvert').closest('button')!)
+    expect(screen.getByText('Lundi: 9:00 – 18:00')).toBeDefined()
   })
 
   // ── Close behavior ───────────────────────────────────────────────────────────
@@ -318,28 +406,6 @@ describe('PoiPopup', () => {
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
     expect(screen.getAllByTestId('skeleton').length).toBeGreaterThan(0)
-  })
-
-  it('shows open status when isOpenNow=true', () => {
-    mockDetails = {
-      placeId: 'ChIJABC', displayName: null, formattedAddress: null, lat: null, lng: null,
-      rating: null, isOpenNow: true, phone: null, website: null, types: [],
-    }
-    render(
-      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
-    )
-    expect(screen.getByText('✓ Ouvert')).toBeDefined()
-  })
-
-  it('shows closed status when isOpenNow=false', () => {
-    mockDetails = {
-      placeId: 'ChIJABC', displayName: null, formattedAddress: null, lat: null, lng: null,
-      rating: null, isOpenNow: false, phone: null, website: null, types: [],
-    }
-    render(
-      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
-    )
-    expect(screen.getByText('✗ Fermé')).toBeDefined()
   })
 
   // ── Map interaction ──────────────────────────────────────────────────────────

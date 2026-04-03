@@ -452,6 +452,11 @@ export function MapView({ adventureId }: MapViewProps) {
                 useUIStore.getState().setSelectedPoi(null)
                 useMapStore.getState().setSelectedPoiId(null)
               }}
+              planningFromKm={
+                selectedStageId
+                  ? (stages.find(s => s.id === selectedStageId)?.startKm ?? 0)
+                  : 0
+              }
             />
           )}
 

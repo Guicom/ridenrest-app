@@ -1,38 +1,37 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { X, ExternalLink, Globe } from 'lucide-react'
+import { X, Search, Globe, Phone, Navigation, Milestone, TrendingUp, Clock, ChevronDown } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
 import { computeElevationGain } from '@ridenrest/gpx'
-import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH } from '@ridenrest/shared'
+import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH, POI_CATEGORY_COLORS } from '@ridenrest/shared'
 import { trackBookingClick } from '@/lib/api-client'
-import type { Poi, MapLayer, PoiCategory } from '@ridenrest/shared'
+import type { Poi, PoiCategory } from '@ridenrest/shared'
+import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import type maplibregl from 'maplibre-gl'
 
-const LAYER_LABELS: Record<MapLayer, string> = {
-  accommodations: 'Hébergement',
-  restaurants:    'Restauration',
-  supplies:       'Alimentation',
-  bike:           'Vélo / Réparation',
+const CATEGORY_LABELS: Record<PoiCategory, string> = {
+  hotel:        'Hôtel',
+  hostel:       'Auberge',
+  camp_site:    'Camping',
+  shelter:      'Refuge',
+  guesthouse:   "Chambre d'hôte",
+  restaurant:   'Restauration',
+  supermarket:  'Alimentation',
+  convenience:  'Alimentation',
+  bike_shop:    'Vélo',
+  bike_repair:  'Vélo',
+}
+
+// Booking.com nflt filter per accommodation category
+const POI_BOOKING_FILTERS: Partial<Record<PoiCategory, string>> = {
+  hotel:      'ht_id%3D204',
+  hostel:     'ht_id%3D203',
+  guesthouse: 'ht_id%3D220',
 }
 
 const ACCOMMODATION_CATEGORIES = LAYER_CATEGORIES.accommodations
-
-// Accommodation type chips — shown in popup for accommodations
-// bookingFilter: nflt value for Booking.com property type filter (null = no filter)
-const ACCOMMODATION_TYPES: Array<{
-  category: PoiCategory
-  label: string
-  emoji: string
-  bookingFilter: string | null
-}> = [
-  { category: 'hotel',      label: 'Hôtel',   emoji: '🏨', bookingFilter: 'ht_id%3D204' },
-  { category: 'hostel',     label: 'Auberge', emoji: '🛏️', bookingFilter: 'ht_id%3D203' },
-  { category: 'guesthouse', label: 'Gîte',    emoji: '🏠', bookingFilter: 'ht_id%3D220' },
-  { category: 'camp_site',  label: 'Camping', emoji: '🏕️', bookingFilter: null },
-  { category: 'shelter',    label: 'Refuge',  emoji: '🏔️', bookingFilter: null },
-]
 
 // Pin height in pixels — popup is anchored this far above the pin center
 const PIN_OFFSET_PX = 44
@@ -43,10 +42,16 @@ interface PoiPopupProps {
   segmentId: string | null
   map: maplibregl.Map
   onClose: () => void
+  /** Live mode: GPS position + speed */
   liveContext?: {
     currentKmOnRoute: number
     speedKmh: number
   }
+  /**
+   * Planning mode reference km — start of the current stage (or 0 if no stage selected).
+   * Stats (km, D+, ETA) are computed relative to this position.
+   */
+  planningFromKm?: number
 }
 
 interface ScreenPos {
@@ -54,7 +59,44 @@ interface ScreenPos {
   y: number
 }
 
-export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }: PoiPopupProps) {
+function getNextTransition(
+  isOpenNow: boolean | null,
+  periods: OpeningPeriod[],
+): string | null {
+  if (isOpenNow === null || periods.length === 0) return null
+
+  const now = new Date()
+  const currentDay = now.getDay()   // 0=dimanche
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+  const DAY_NAMES_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
+
+  if (isOpenNow) {
+    const closing = periods.find(p =>
+      p.open.day === currentDay && p.open.hour * 60 + p.open.minute <= currentMinutes
+    )
+    if (!closing) return null
+    const h = String(closing.close.hour).padStart(2, '0')
+    const m = String(closing.close.minute).padStart(2, '0')
+    return `Ferme à ${h}:${m}`
+  } else {
+    const allOpens = [...periods].sort((a, b) =>
+      a.open.day * 1440 + a.open.hour * 60 + a.open.minute
+      - (b.open.day * 1440 + b.open.hour * 60 + b.open.minute)
+    )
+    const next = allOpens.find(p =>
+      p.open.day > currentDay ||
+      (p.open.day === currentDay && p.open.hour * 60 + p.open.minute > currentMinutes)
+    ) ?? allOpens[0]  // wrap to next week
+    if (!next) return null
+    const h = String(next.open.hour).padStart(2, '0')
+    const m = String(next.open.minute).padStart(2, '0')
+    const dayLabel = next.open.day !== currentDay ? ` ${DAY_NAMES_SHORT[next.open.day]}` : ''
+    return `Ouvre à ${h}:${m}${dayLabel}`
+  }
+}
+
+export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, planningFromKm = 0 }: PoiPopupProps) {
   const [pos, setPos] = useState<ScreenPos | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   const isLiveMode = !!liveContext
@@ -63,8 +105,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
-  // Accommodation type selector — default to POI's own category
-  const [selectedCategory, setSelectedCategory] = useState<PoiCategory>(poi.category)
+  const [hoursExpanded, setHoursExpanded] = useState(false)
 
   const { details, isPending: detailsPending } = usePoiGoogleDetails(
     poi.externalId,
@@ -88,11 +129,9 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
   }, [project, map])
 
   // Close when clicking on the map background (not on a POI pin or cluster)
-  // MapLibre only fires 'click' when there's no drag — no extra drag detection needed
   useEffect(() => {
     const handleMapClick = (e: maplibregl.MapMouseEvent) => {
       const features = map.queryRenderedFeatures(e.point)
-      // Don't close if the click landed on a POI individual pin (layer IDs end with '-points')
       const clickedOnPin = features.some(
         (f) => f.layer.id.endsWith('-points') && !f.properties?.point_count
       )
@@ -102,9 +141,9 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
     return () => { map.off('click', handleMapClick) }
   }, [map])
 
-  // Reset type selection when POI changes
+  // Reset hours state when POI changes
   useEffect(() => {
-    setSelectedCategory(poi.category)
+    setHoursExpanded(false)
   }, [poi.category])
 
   // Close on Escape
@@ -117,12 +156,8 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
   if (!pos) return null
 
   // ── Computations ──────────────────────────────────────────────────────────
-  const layer = (Object.entries(LAYER_CATEGORIES).find(([, cats]) =>
-    cats.includes(poi.category),
-  )?.[0] ?? 'accommodations') as MapLayer
-
   const poiKm = poi.distAlongRouteKm
-  const fromKm = isLiveMode ? liveContext.currentKmOnRoute : 0
+  const fromKm = isLiveMode ? liveContext.currentKmOnRoute : planningFromKm
   const speed = isLiveMode ? liveContext.speedKmh : DEFAULT_CYCLING_SPEED_KMH
 
   const rangeWaypoints = segments.flatMap((seg) => {
@@ -146,12 +181,12 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
   const osmWebsite = rawData?.website ?? rawData?.['contact:website'] ?? null
   const displayPhone = details?.phone ?? osmPhone
   const displayWebsite = details?.website ?? osmWebsite
+  const displayName = details?.displayName ?? poi.name
 
   const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
-  // Booking URL — includes nflt filter for the selected accommodation type
-  const selectedType = ACCOMMODATION_TYPES.find(t => t.category === selectedCategory)
-  const nflt = selectedType?.bookingFilter
+  // Booking URL — with optional nflt filter for accommodation type
+  const nflt = POI_BOOKING_FILTERS[poi.category]
   const bookingUrl = `https://www.booking.com/searchresults.html?latitude=${poi.lat}&longitude=${poi.lng}${nflt ? `&nflt=${nflt}` : ''}`
 
   const handleBookingClick = () => {
@@ -161,6 +196,9 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
   const distanceLabel = poi.distFromTraceM < 1000
     ? `${Math.round(poi.distFromTraceM)} m de la trace`
     : `${(poi.distFromTraceM / 1000).toFixed(1)} km de la trace`
+
+  // Tailwind v4 : utiliser les utility classes du design system, pas bg-[--var]
+  const iconBtnClass = 'shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-primary-light text-primary hover:brightness-95 active:scale-[0.85] transition-all duration-75'
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 30 }}>
@@ -176,134 +214,180 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext }
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-[--border] overflow-hidden">
 
           {/* Header */}
-          <div className="px-4 pt-4 pb-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold leading-snug text-[--text-primary] truncate">
-                  {poi.name}
-                </h3>
-                <span className="inline-block mt-1 bg-[--primary-light] text-[--primary] text-xs font-medium px-2 py-0.5 rounded-full">
-                  {LAYER_LABELS[layer]}
-                </span>
-              </div>
+          <div className="px-4 pt-4 pb-3">
+
+            {/* Row 1 : Badge catégorie + bouton Fermer */}
+            <div className="flex items-center justify-between mb-2.5">
+              <span
+                className="inline-block text-xs font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: POI_CATEGORY_COLORS[poi.category] }}
+              >
+                {CATEGORY_LABELS[poi.category]}
+              </span>
               <button
                 onClick={onClose}
                 aria-label="Fermer"
-                className="shrink-0 mt-0.5 h-6 w-6 flex items-center justify-center rounded-full hover:bg-[--surface] active:scale-[0.85] transition-all duration-75 text-[--text-secondary] cursor-pointer"
+                className="shrink-0 h-7 w-7 flex items-center justify-center rounded-full hover:bg-[--surface] active:scale-[0.85] transition-all duration-75 text-[--text-secondary] cursor-pointer"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            <p className="mt-2 text-sm text-[--text-secondary]">{distanceLabel}</p>
+
+            {/* Row 2 : Nom + icône Navigation (adjacent) | icône Téléphone (droite) */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h3 className="text-base font-semibold leading-snug text-[--text-primary] truncate">
+                  {displayName}
+                </h3>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Naviguer vers ${displayName}`}
+                  className={iconBtnClass}
+                >
+                  <Navigation className="h-4 w-4" />
+                </a>
+              </div>
+              {displayPhone && (
+                <a
+                  href={`tel:${displayPhone}`}
+                  aria-label={`Appeler ${displayName}`}
+                  className={iconBtnClass}
+                >
+                  <Phone className="h-4 w-4" />
+                </a>
+              )}
+            </div>
+
+            {/* Row 3 : Distance de la trace */}
+            <p className="mt-1.5 text-sm text-[--text-secondary]">{distanceLabel}</p>
           </div>
 
-          {/* Stats row */}
-          <div className="px-4 py-2 flex items-center gap-3 text-xs text-[--text-secondary] border-t border-[--border]">
-            <span className="font-mono font-medium text-[--text-primary]">km {poiKm.toFixed(1)}</span>
+          {/* Séparateur */}
+          <div className="mx-4 h-px bg-[--border]" />
+
+          {/* Stats row avec icônes */}
+          <div className={`px-4 py-3 grid gap-2 text-center ${elevationGainM ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <div className="flex flex-col items-center gap-0.5">
+              <Milestone className="h-4 w-4 text-primary" />
+              <span className="text-xs font-medium text-[--text-primary]">{distanceKm.toFixed(1)} km</span>
+            </div>
             {elevationGainM !== null && elevationGainM > 0 && (
-              <span>↑ {elevationGainM} m</span>
+              <div className="flex flex-col items-center gap-0.5">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-[--text-primary]">{elevationGainM} m D+</span>
+              </div>
             )}
-            <span>{formatEta(distanceKm, speed)}</span>
+            {distanceKm > 0 && speed > 0 && (
+              <div className="flex flex-col items-center gap-0.5">
+                <Clock className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-[--text-primary]">{formatEta(distanceKm, speed)}</span>
+              </div>
+            )}
           </div>
 
-          {/* Google enrichment */}
-          {detailsPending ? (
-            <div className="px-4 py-2 flex gap-2 border-t border-[--border]">
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-3 w-24" />
-            </div>
-          ) : details ? (
-            <div className="px-4 py-2 flex flex-wrap gap-x-3 gap-y-0.5 text-xs border-t border-[--border]">
-              {details.isOpenNow !== null && (
-                <span className={details.isOpenNow ? 'text-green-600' : 'text-red-500'}>
-                  {details.isOpenNow ? '✓ Ouvert' : '✗ Fermé'}
-                </span>
-              )}
-              {details.formattedAddress && (
-                <span className="text-[--text-secondary] truncate max-w-full">{details.formattedAddress}</span>
-              )}
-            </div>
-          ) : null}
-
-          {/* Phone */}
-          {displayPhone && (
-            <div className="px-4 py-1">
-              <a href={`tel:${displayPhone}`} className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                <span aria-hidden="true">📞</span> {displayPhone}
-              </a>
-            </div>
+          {/* Skeleton pendant chargement Google */}
+          {detailsPending && (
+            <>
+              <div className="mx-4 h-px bg-[--border]" />
+              <div className="px-4 py-2 flex gap-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </>
           )}
 
-          {/* Accommodation: type selector + CTAs */}
-          {isAccommodation && (
-            <div className="px-4 pb-4 pt-3 border-t border-[--border] flex flex-col gap-3">
-
-              {/* Type chips */}
-              <div>
-                <p className="text-[10px] text-[--text-secondary] uppercase tracking-wide mb-1.5">
-                  Type d&apos;hébergement
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {ACCOMMODATION_TYPES.map((type) => (
-                    <button
-                      key={type.category}
-                      onClick={() => setSelectedCategory(type.category)}
-                      aria-pressed={selectedCategory === type.category}
-                      className={[
-                        'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-75 cursor-pointer active:scale-[0.95]',
-                        selectedCategory === type.category
-                          ? 'bg-[--primary] text-white border-[--primary] hover:brightness-90'
-                          : 'bg-white text-[--text-primary] border-[--border] hover:bg-[--surface]',
-                      ].join(' ')}
-                    >
-                      <span aria-hidden="true">{type.emoji}</span>
-                      {type.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Booking CTA */}
-              <a
-                href={bookingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={handleBookingClick}
-                aria-label="Recherche sur Booking.com"
-                className="flex items-center justify-center gap-2 w-full h-11 rounded-full bg-[--primary] text-white text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all duration-75"
+          {/* Section horaires repliables — non-hébergement uniquement */}
+          {!isAccommodation && details && details.isOpenNow !== null && (
+            <>
+              <div className="mx-4 h-px bg-[--border]" />
+              <button
+                onClick={() => (details.weekdayDescriptions?.length ?? 0) > 0 && setHoursExpanded(v => !v)}
+                className={[
+                  'w-full px-4 py-2 flex items-center gap-1.5 text-xs text-left',
+                  (details.weekdayDescriptions?.length ?? 0) > 0 ? 'cursor-pointer hover:bg-[--surface]' : 'cursor-default',
+                ].join(' ')}
               >
-                <ExternalLink className="h-4 w-4" />
-                Recherche sur Booking
-              </a>
+                <span className={details.isOpenNow ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
+                  {details.isOpenNow ? 'Ouvert' : 'Fermé'}
+                </span>
+                {(() => {
+                  const next = getNextTransition(details.isOpenNow, details.periods ?? [])
+                  return next ? <span className="text-[--text-secondary]">· {next}</span> : null
+                })()}
+                {(details.weekdayDescriptions?.length ?? 0) > 0 && (
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 text-[--text-secondary] ml-auto transition-transform duration-150 ${hoursExpanded ? 'rotate-180' : ''}`}
+                  />
+                )}
+              </button>
+              {hoursExpanded && (details.weekdayDescriptions?.length ?? 0) > 0 && (
+                <div className="px-4 pb-2 space-y-0.5">
+                  {details.weekdayDescriptions!.map((line, i) => {
+                    const todayIndex = (new Date().getDay() + 6) % 7  // 0=lundi
+                    return (
+                      <p key={i} className={`text-xs ${i === todayIndex ? 'font-semibold text-[--text-primary]' : 'text-[--text-secondary]'}`}>
+                        {line}
+                      </p>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
 
-              {/* Site officiel */}
-              {displayWebsite && (
+          {/* CTAs — hébergement : Site officiel (optionnel) + Booking (toujours) */}
+          {isAccommodation && (
+            <>
+              <div className="mx-4 h-px bg-[--border]" />
+              <div className="px-4 py-3 flex gap-2">
+                {displayWebsite && (
+                  <a
+                    href={displayWebsite}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Site officiel"
+                    className="flex-1 flex items-center justify-center gap-1.5 h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface] active:scale-[0.98] transition-all duration-75"
+                  >
+                    <Globe className="h-4 w-4" />
+                    Site officiel
+                  </a>
+                )}
+                <a
+                  href={bookingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleBookingClick}
+                  aria-label="Rechercher sur Booking.com"
+                  className={[
+                    'flex items-center justify-center gap-1.5 h-11 rounded-full bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover active:scale-[0.98] transition-all duration-75',
+                    displayWebsite ? 'flex-1' : 'w-full',
+                  ].join(' ')}
+                >
+                  <Search className="h-4 w-4" />
+                  Booking
+                </a>
+              </div>
+            </>
+          )}
+
+          {/* CTA — non-hébergement : Site officiel pleine largeur */}
+          {!isAccommodation && displayWebsite && (
+            <>
+              <div className="mx-4 h-px bg-[--border]" />
+              <div className="px-4 py-3">
                 <a
                   href={displayWebsite}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Site officiel de l'établissement"
-                  className="flex items-center justify-center gap-2 w-full h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface] active:scale-[0.98] transition-all duration-75"
+                  className="flex items-center justify-center gap-1.5 w-full h-11 rounded-full border border-[--border] text-[--text-primary] text-sm font-medium hover:bg-[--surface] active:scale-[0.98] transition-all duration-75"
                 >
                   <Globe className="h-4 w-4" />
                   Site officiel
                 </a>
-              )}
-            </div>
-          )}
-
-          {/* Non-accommodation: website only */}
-          {!isAccommodation && displayWebsite && (
-            <div className="px-4 pb-4 pt-1">
-              <a
-                href={displayWebsite}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 dark:text-blue-400 truncate block"
-              >
-                🌐 {displayWebsite}
-              </a>
-            </div>
+              </div>
+            </>
           )}
         </div>
 
