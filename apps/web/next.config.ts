@@ -10,14 +10,17 @@ export default withPWA({
   disable: process.env.NODE_ENV === "development",
   register: true,
   // SW minimal pour story 12.1 — cache statique seulement, pas de tiles MapLibre (→ 12.2)
-  runtimeCaching: [
-    {
-      urlPattern: /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/,
-      handler: "CacheFirst",
-      options: {
-        cacheName: "static-assets",
-        expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
+  workboxOptions: {
+    skipWaiting: true,
+    runtimeCaching: [
+      {
+        urlPattern: /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "static-assets",
+          expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
       },
-    },
-  ],
+    ],
+  },
 })(nextConfig);
