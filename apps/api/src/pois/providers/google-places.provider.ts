@@ -87,7 +87,7 @@ export class GooglePlacesProvider {
     const response = await fetch(url, {
       headers: {
         'X-Goog-Api-Key': this.API_KEY,
-        'X-Goog-FieldMask': fieldMask,  // Essentials tier — 10k/month free
+        'X-Goog-FieldMask': fieldMask,  // Pro tier (regularOpeningHours, phone, rating, website) — ~$5/1000 req
       },
       signal: AbortSignal.timeout(8_000),
     })

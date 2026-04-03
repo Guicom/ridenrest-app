@@ -641,12 +641,13 @@ Changements purement visuels. Tester manuellement :
 |---|---|
 | `packages/shared/src/types/google-place.types.ts` | UPDATED — `OpeningPeriod` type + `weekdayDescriptions`/`periods` fields added |
 | `packages/shared/src/index.ts` | UPDATED — export `OpeningPeriod` |
-| `apps/api/src/pois/providers/google-places.provider.ts` | UPDATED — fieldMask + `languageCode=fr` + mapping |
+| `apps/api/src/pois/providers/google-places.provider.ts` | UPDATED — fieldMask + `languageCode=fr` + mapping + commentaire tier corrigé (code review) |
 | `apps/api/src/pois/pois.service.ts` | UPDATED — Google Places fallback quand cache DB vide + `overpassEnabled=false` |
 | `apps/api/src/pois/pois.service.test.ts` | UPDATED — 2 nouveaux tests pour le fallback Google Places |
-| `apps/web/src/app/(app)/map/[id]/_components/poi-popup.tsx` | UPDATED — layout complet + `planningFromKm` prop + km relatif |
+| `apps/web/src/app/(app)/map/[id]/_components/poi-popup.tsx` | UPDATED — layout complet + `planningFromKm` prop + km relatif + fixes code review (z-40, close null, externalId reset, cross-midnight) |
 | `apps/web/src/app/(app)/map/[id]/_components/poi-popup.test.tsx` | UPDATED — tests mis à jour pour nouveau comportement + nouveaux tests AC-1 à AC-8 |
 | `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx` | UPDATED — prop `planningFromKm` passée à `PoiPopup` |
+| `_bmad-output/planning-artifacts/epics.md` | UPDATED — synchro story 16.13 |
 
 ---
 
@@ -660,6 +661,16 @@ Changements purement visuels. Tester manuellement :
 - **2026-04-03** — `planningFromKm` prop : km relatif à l'étape en cours (ou 0 si pas d'étape) — stats row affiche `distanceKm` (relatif) plutôt que `poiKm` (absolu)
 - **2026-04-03** — Bug fix backend : quand `overpassEnabled=false` et cache DB vide → déclencher Google Places pour peupler le cache (avant : retournait vide sans appel API)
 - **2026-04-03** — Fix test : assertion `'km 10.0'` → `'10.0 km'` (ordre numéro/unité corrigé)
+- **2026-04-03** — Code review fixes : H-1 `closing.close` null check + cross-midnight detection, H-2 z-index 30→40, M-1 `hoursExpanded` reset sur `externalId`, M-4 commentaire tier API corrigé (Pro, pas Essentials)
+
+---
+
+## Review Follow-ups (AI)
+
+- [ ] [AI-Review][MEDIUM] `pois.service.ts:344` — `redis.setex(\`google_place_id:${placeId}\`, ..., placeId)` stocke placeId→placeId (auto-référentiel, jamais lookup). Supprimer cette ligne ou remplacer par le bon mapping externalId→placeId si disponible.
+- [ ] [AI-Review][LOW] `poi-popup.tsx:271` — Grid layout avec km seul dans une 2-col grid quand D+ ET ETA sont absents. Passer en `grid-cols-1` conditionnellement si seule la colonne km est visible.
+- [ ] [AI-Review][LOW] `poi-popup.tsx:315` — `getNextTransition` appelé dans un IIFE à chaque render (map move/zoom). Calculer avant le `return JSX` pour éviter re-calcul sur chaque repositionnement du popup.
+- [ ] [AI-Review][LOW] `poi-popup.test.tsx` — Aucun test pour le comportement "clic extérieur ferme le popup" (handler map.on('click')). Ajouter `queryRenderedFeatures` au mock et tester ce comportement.
 
 ---
 

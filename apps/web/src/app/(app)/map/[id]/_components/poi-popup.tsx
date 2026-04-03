@@ -72,10 +72,15 @@ function getNextTransition(
   const DAY_NAMES_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
 
   if (isOpenNow) {
-    const closing = periods.find(p =>
-      p.open.day === currentDay && p.open.hour * 60 + p.open.minute <= currentMinutes
-    )
-    if (!closing) return null
+    const previousDay = (currentDay + 6) % 7  // day before currentDay (JS: 0=dimanche)
+    const closing = periods.find(p => {
+      // Period started today and already started
+      if (p.open.day === currentDay && p.open.hour * 60 + p.open.minute <= currentMinutes) return true
+      // Cross-midnight: period opened yesterday and closes today
+      if (p.open.day === previousDay && p.close?.day === currentDay) return true
+      return false
+    })
+    if (!closing?.close) return null  // 24/7 places have no close field
     const h = String(closing.close.hour).padStart(2, '0')
     const m = String(closing.close.minute).padStart(2, '0')
     return `Ferme à ${h}:${m}`
@@ -141,10 +146,10 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     return () => { map.off('click', handleMapClick) }
   }, [map])
 
-  // Reset hours state when POI changes
+  // Reset hours state when POI changes (use externalId — category alone doesn't detect same-category switch)
   useEffect(() => {
     setHoursExpanded(false)
-  }, [poi.category])
+  }, [poi.externalId])
 
   // Close on Escape
   useEffect(() => {
@@ -201,7 +206,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   const iconBtnClass = 'shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-primary-light text-primary hover:brightness-95 active:scale-[0.85] transition-all duration-75'
 
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 30 }}>
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
       <div
         ref={popupRef}
         className="pointer-events-auto absolute w-72 max-w-[calc(100vw-2rem)] [--popup-bg:#ffffff] dark:[--popup-bg:#18181b]"
