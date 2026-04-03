@@ -32,11 +32,6 @@ vi.mock('@/hooks/use-poi-google-details', () => ({
   usePoiGoogleDetails: () => ({ details: mockDetails, isPending: mockDetailsPending }),
 }))
 
-const mockTrackBookingClick = vi.fn()
-vi.mock('@/lib/api-client', () => ({
-  trackBookingClick: (...args: unknown[]) => mockTrackBookingClick(...args),
-}))
-
 vi.mock('@ridenrest/gpx', () => ({
   computeElevationGain: () => 0,
 }))
@@ -44,6 +39,18 @@ vi.mock('@ridenrest/gpx', () => ({
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: ({ className }: { className?: string }) => (
     <div data-testid="skeleton" className={className} />
+  ),
+}))
+
+vi.mock('@/components/shared/search-on-dropdown', () => ({
+  SearchOnDropdown: ({ center, className }: { center: { lat: number; lng: number } | null; className?: string }) => (
+    <div
+      data-testid="search-on-dropdown"
+      data-has-center={String(!!center)}
+      data-lat={center?.lat ?? ''}
+      data-lng={center?.lng ?? ''}
+      className={className}
+    />
   ),
 }))
 
@@ -110,7 +117,6 @@ describe('PoiPopup', () => {
   beforeEach(() => {
     map = createMockMap()
     onClose.mockClear()
-    mockTrackBookingClick.mockClear()
     mockDetails = null
     mockDetailsPending = false
   })
@@ -223,23 +229,23 @@ describe('PoiPopup', () => {
     expect(screen.getByText('OSM Name')).toBeDefined()
   })
 
-  // ── Booking CTA (AC-5) ──────────────────────────────────────────────────────
+  // ── SearchOnDropdown CTA (AC-9) ─────────────────────────────────────────────
 
-  it('shows Booking CTA for accommodation (AC-5)', () => {
+  it('shows SearchOnDropdown for accommodation (AC-9)', () => {
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.getByText('Booking')).toBeDefined()
+    expect(screen.getByTestId('search-on-dropdown')).toBeDefined()
   })
 
-  it('does NOT show Booking CTA for non-accommodation (AC-5)', () => {
+  it('does NOT show SearchOnDropdown for non-accommodation (AC-9)', () => {
     render(
       <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.queryByText('Booking')).toBeNull()
+    expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
   })
 
-  it('Booking link contains latitude and longitude', () => {
+  it('SearchOnDropdown receives POI lat/lng as center (AC-9)', () => {
     render(
       <PoiPopup
         poi={makeAccommodationPoi({ lat: 43.1, lng: 1.1 })}
@@ -249,41 +255,29 @@ describe('PoiPopup', () => {
         onClose={onClose}
       />,
     )
-    const link = screen.getByText('Booking').closest('a')!
-    expect(link.href).toContain('latitude=43.1')
-    expect(link.href).toContain('longitude=1.1')
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-has-center')).toBe('true')
+    expect(el.getAttribute('data-lat')).toBe('43.1')
+    expect(el.getAttribute('data-lng')).toBe('1.1')
   })
 
-  it('trackBookingClick called with externalId and booking_com on click', () => {
-    render(
-      <PoiPopup
-        poi={makeAccommodationPoi({ externalId: 'ext-1' })}
-        segments={[makeSegment()]}
-        segmentId="seg-1"
-        map={map}
-        onClose={onClose}
-      />,
-    )
-    fireEvent.click(screen.getByText('Booking'))
-    expect(mockTrackBookingClick).toHaveBeenCalledWith('ext-1', 'booking_com')
-  })
-
-  it('Booking button is full-width when no website (AC-5)', () => {
+  it('SearchOnDropdown is full-width (AC-9)', () => {
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    const link = screen.getByText('Booking').closest('a')!
-    expect(link.className).toContain('w-full')
-    expect(link.className).not.toContain('flex-1')
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.className).toContain('w-full')
   })
 
-  it('Booking button is flex-1 when website is present (AC-5)', () => {
+  it('SearchOnDropdown appears before "Site officiel" when website available (AC-9)', () => {
     const poi = { ...makeAccommodationPoi(), rawData: { website: 'https://hotel-test.fr' } } as unknown as Poi
     render(
       <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    const link = screen.getByText('Booking').closest('a')!
-    expect(link.className).toContain('flex-1')
+    const dropdown = screen.getByTestId('search-on-dropdown')
+    const siteLink = screen.getByText('Site officiel').closest('a')!
+    // dropdown should appear before site link in DOM order
+    expect(dropdown.compareDocumentPosition(siteLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   // ── No accommodation type chips ──────────────────────────────────────────────
