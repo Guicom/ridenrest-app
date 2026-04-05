@@ -268,9 +268,9 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   return (
     <main className="min-h-screen bg-background-page pt-10">
       <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-10">
-      <div className="flex items-start justify-between gap-4">
-        {/* Left: title + stats */}
-        <div className="min-w-0 flex-1">
+      <div className="space-y-4">
+        {/* Title */}
+        <div>
           {isRenamingAdventure ? (
             <input
               className="text-2xl font-bold bg-transparent border-b border-primary outline-none w-full"
@@ -305,60 +305,16 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
               {adventure.name}
             </h1>
           )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-            <div className="flex items-center gap-2">
-              <label htmlFor="start-date-input" className="text-sm text-text-muted whitespace-nowrap">Date de départ :</label>
-              <input
-                id="start-date-input"
-                type="date"
-                className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
-                value={adventure.startDate ?? ''}
-                disabled={startDateMutation.isPending}
-                onChange={(e) => {
-                  const val = e.target.value || null
-                  startDateMutation.mutate(val)
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="end-date-input" className="text-sm text-text-muted whitespace-nowrap">Date de fin :</label>
-              <input
-                id="end-date-input"
-                type="date"
-                className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
-                value={adventure.endDate ?? ''}
-                disabled={endDateMutation.isPending}
-                onChange={(e) => {
-                  const val = e.target.value || null
-                  endDateMutation.mutate(val)
-                }}
-              />
-            </div>
-          </div>
-          {adventure.totalDistanceKm > 0 && (
-            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Route className="h-4 w-4" />
-                {adventure.totalDistanceKm.toFixed(1)} km
-              </span>
-              {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
-                <span className="flex items-center gap-1">
-                  <TrendingUp className="h-4 w-4" />
-                  {adventure.totalElevationGainM.toFixed(0)} m D+
-                </span>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Right: action buttons — shown when at least one segment exists */}
+        {/* Action buttons — shown when at least one segment exists */}
         {segments.length > 0 && (() => {
           const hasPendingSegments = segments.some(
             (s) => s.parseStatus === 'pending' || s.parseStatus === 'processing'
           )
           const allDone = segments.every((s) => s.parseStatus === 'done')
           return (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               <DensityTriggerButton adventureId={adventureId} segments={segments} />
               {hasPendingSegments && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -377,6 +333,54 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             </div>
           )
         })()}
+
+        {/* Dates */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="start-date-input" className="text-sm text-text-muted whitespace-nowrap">Date de départ :</label>
+            <input
+              id="start-date-input"
+              type="date"
+              className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
+              value={adventure.startDate ?? ''}
+              disabled={startDateMutation.isPending}
+              onChange={(e) => {
+                const val = e.target.value || null
+                startDateMutation.mutate(val)
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="end-date-input" className="text-sm text-text-muted whitespace-nowrap">Date de fin :</label>
+            <input
+              id="end-date-input"
+              type="date"
+              className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
+              value={adventure.endDate ?? ''}
+              disabled={endDateMutation.isPending}
+              onChange={(e) => {
+                const val = e.target.value || null
+                endDateMutation.mutate(val)
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Stats */}
+        {adventure.totalDistanceKm > 0 && (
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Route className="h-4 w-4" />
+              {adventure.totalDistanceKm.toFixed(1)} km
+            </span>
+            {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
+              <span className="flex items-center gap-1">
+                <TrendingUp className="h-4 w-4" />
+                {adventure.totalElevationGainM.toFixed(0)} m D+
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <AlertDialog open={deleteAdventureDialogOpen} onOpenChange={setDeleteAdventureDialogOpen}>
@@ -408,10 +412,10 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
       </AlertDialog>
 
       <section>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
           <h2 className="text-lg font-semibold">Segments</h2>
           {!showUploadForm && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <button
                 className="text-sm text-foreground hover:text-muted-foreground transition-colors"
                 onClick={() => setStravaImportOpen(true)}
