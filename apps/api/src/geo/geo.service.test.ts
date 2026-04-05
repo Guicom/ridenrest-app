@@ -81,7 +81,7 @@ describe('GeoService', () => {
     it('calls Geoapify API and returns city on cache miss', async () => {
       const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
-        json: async () => ({
+        json: () => Promise.resolve({
           results: [{ city: 'Toulouse', town: undefined, village: undefined }],
         }),
       } as Response)
@@ -103,7 +103,7 @@ describe('GeoService', () => {
     it('falls back to town when city absent', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
-        json: async () => ({ results: [{ town: 'Saint-Girons' }] }),
+        json: () => Promise.resolve({ results: [{ town: 'Saint-Girons' }] }),
       } as Response)
 
       const result = await service.reverseCity(42.98, 1.15)
@@ -113,7 +113,7 @@ describe('GeoService', () => {
     it('caches empty string and returns null when Geoapify returns no city', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
-        json: async () => ({ results: [{}] }),
+        json: () => Promise.resolve({ results: [{}] }),
       } as Response)
 
       const result = await service.reverseCity(43.0, 1.0)
