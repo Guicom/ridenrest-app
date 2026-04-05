@@ -1,14 +1,15 @@
 'use client'
 import { Drawer } from 'vaul'
-import { ExternalLink, Globe } from 'lucide-react'
+import { Globe } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUIStore } from '@/stores/ui.store'
 import { useMapStore } from '@/stores/map.store'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH } from '@ridenrest/shared'
-import { trackBookingClick } from '@/lib/api-client'
-import { buildBookingSearchUrl } from '@/lib/booking-url'
+import { extractCityFromOsmRawData } from '@/lib/booking-url'
+import { useReverseCity } from '@/hooks/use-reverse-city'
+import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 
@@ -51,6 +52,18 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
     segmentId,
   )
 
+  // City extraction — hooks must be called before early return (Rules of Hooks)
+  const isAccommodation = poi ? ACCOMMODATION_CATEGORIES.includes(poi.category) : false
+  const rawData = poi ? (poi as Poi & { rawData?: Record<string, string> }).rawData : undefined
+  const extractedCity = isAccommodation
+    ? (details?.locality ?? extractCityFromOsmRawData(rawData) ?? null)
+    : null
+  const needsReverseCity = isAccommodation && !extractedCity && poi !== null
+  const { city: reverseCity } = useReverseCity(
+    needsReverseCity ? { lat: poi!.lat, lng: poi!.lng } : null,
+  )
+  const poiCity = extractedCity ?? reverseCity
+
   if (!poi) return null
 
   // ── D+ and ETA computation ────────────────────────────────────────────────
@@ -80,22 +93,11 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
   const distanceKm = Math.max(0, poiKm - startKm)
 
   // ── OSM fallback data ─────────────────────────────────────────────────────
-  const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
   const osmPhone = rawData?.phone ?? rawData?.['contact:phone'] ?? null
   const osmWebsite = rawData?.website ?? rawData?.['contact:website'] ?? null
 
   const displayPhone = details?.phone ?? osmPhone
   const displayWebsite = details?.website ?? osmWebsite
-
-  // ── Booking deep links ────────────────────────────────────────────────────
-  const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
-
-  const bookingUrl = buildBookingSearchUrl({ lat: poi.lat, lng: poi.lng })
-
-  const handleBookingClick = (platform: 'booking_com') => {
-    // Fire-and-forget analytics — do NOT await
-    trackBookingClick(poi.externalId, platform)
-  }
 
   return (
     <Drawer.Root
@@ -199,20 +201,15 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
               </div>
             )}
 
-            {/* ── Booking deep links (accommodations only) ── */}
+            {/* ── Booking / Airbnb deep links (accommodations only) ── */}
             {isAccommodation && (
               <div className="pt-3 space-y-2">
-                <a
-                  href={bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => handleBookingClick('booking_com')}
-                  aria-label="Recherche sur Booking.com"
-                  className="flex items-center justify-center gap-2 w-full h-12 rounded-full bg-[--primary] text-white text-sm font-medium hover:opacity-90"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Recherche sur Booking
-                </a>
+                <SearchOnDropdown
+                  center={{ lat: poi.lat, lng: poi.lng }}
+                  city={poiCity}
+                  variant="action"
+                  className="w-full"
+                />
                 {displayWebsite && (
                   <a
                     href={displayWebsite}

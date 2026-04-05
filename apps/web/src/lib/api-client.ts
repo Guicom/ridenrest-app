@@ -402,6 +402,12 @@ export const apiClient = {
 }
 
 
+// ── Geo ───────────────────────────────────────────────────────────────────────
+
+export async function getReverseCity(lat: number, lng: number): Promise<{ city: string | null }> {
+  return apiFetch<{ city: string | null }>(`/api/geo/reverse-city?lat=${lat}&lng=${lng}`)
+}
+
 // ── Feedbacks ─────────────────────────────────────────────────────────────────
 
 export async function submitFeedback(data: {

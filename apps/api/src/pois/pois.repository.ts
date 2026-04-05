@@ -36,6 +36,7 @@ export class PoisRepository {
       lng: r.lng,
       distFromTraceM: r.distFromTraceM,
       distAlongRouteKm: r.distAlongRouteKm,
+      rawData: r.rawData as Record<string, unknown> | undefined,
     }))
   }
 
@@ -203,7 +204,7 @@ export class PoisRepository {
    */
   async insertRawPoisForSegment(
     segmentId: string,
-    pois: Array<{ externalId: string; source: 'overpass' | 'amadeus' | 'google'; name: string; lat: number; lng: number; category: string }>,
+    pois: Array<{ externalId: string; source: 'overpass' | 'amadeus' | 'google'; name: string; lat: number; lng: number; category: string; rawData?: Record<string, unknown> }>,
     expiresAt: Date,
   ): Promise<void> {
     if (pois.length === 0) return
@@ -218,7 +219,7 @@ export class PoisRepository {
       lng: p.lng,
       distFromTraceM: 0,
       distAlongRouteKm: 0,
-      rawData: {} as Record<string, unknown>,
+      rawData: p.rawData ?? ({} as Record<string, unknown>),
       cachedAt: new Date(),
       expiresAt,
     }))
@@ -278,6 +279,7 @@ export class PoisRepository {
         ac.lng,
         ac.dist_from_trace_m,
         ac.dist_along_route_km,
+        ac.raw_data,
         ST_Distance(
           ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,
           ST_SetSRID(ST_MakePoint(${targetLng}, ${targetLat}), 4326)::geography
@@ -304,6 +306,7 @@ export class PoisRepository {
       distFromTraceM: r.dist_from_trace_m as number,
       distAlongRouteKm: r.dist_along_route_km as number,
       distFromTargetM: Math.round(r.dist_from_target_m as number),
+      rawData: r.raw_data as Record<string, unknown> | undefined,
     }))
   }
 

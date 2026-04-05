@@ -6,6 +6,8 @@ import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH, POI_CATEGORY_COLORS } from '@ridenrest/shared'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
+import { extractCityFromOsmRawData } from '@/lib/booking-url'
+import { useReverseCity } from '@/hooks/use-reverse-city'
 import type { Poi, PoiCategory } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
@@ -98,6 +100,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   const [pos, setPos] = useState<ScreenPos | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   const isLiveMode = !!liveContext
+  const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
   // Stable ref so map click handler never needs to re-register on onClose identity changes
   const onCloseRef = useRef(onClose)
@@ -109,6 +112,17 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     poi.externalId,
     segmentId,
   )
+
+  // City: Google locality → OSM rawData (Overpass POIs) → Geoapify reverse geocoding
+  const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
+  const extractedCity = isAccommodation
+    ? (details?.locality ?? extractCityFromOsmRawData(rawData))
+    : null
+  const needsReverseCity = isAccommodation && !extractedCity
+  const { city: reverseCity } = useReverseCity(needsReverseCity ? { lat: poi.lat, lng: poi.lng } : null)
+  const poiCity = extractedCity ?? reverseCity
+
+
 
   // Project lat/lng → screen pixels (relative to map container)
   const project = useCallback(() => {
@@ -174,14 +188,11 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
 
   const distanceKm = Math.max(0, poiKm - fromKm)
 
-  const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
   const osmPhone = rawData?.phone ?? rawData?.['contact:phone'] ?? null
   const osmWebsite = rawData?.website ?? rawData?.['contact:website'] ?? null
   const displayPhone = details?.phone ?? osmPhone
   const displayWebsite = details?.website ?? osmWebsite
   const displayName = details?.displayName ?? poi.name
-
-  const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
 
   const distanceLabel = poi.distFromTraceM < 1000
     ? `${Math.round(poi.distFromTraceM)} m de la trace`
@@ -334,6 +345,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
               <div className="px-4 py-3 flex flex-col gap-2">
                 <SearchOnDropdown
                   center={{ lat: poi.lat, lng: poi.lng }}
+                  city={poiCity}
                   variant="action"
                   className="w-full"
                 />

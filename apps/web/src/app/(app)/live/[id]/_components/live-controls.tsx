@@ -12,9 +12,11 @@ interface LiveControlsProps {
   elevationGain: number | null
   /** Center point for the search area. null = Booking/Airbnb buttons disabled. */
   center: { lat: number; lng: number } | null
+  /** City name for Booking.com search. If provided, uses ?ss=city instead of coordinates. */
+  city?: string | null
 }
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center }: LiveControlsProps) {
+export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city }: LiveControlsProps) {
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const setTargetAheadKm = useLiveStore((s) => s.setTargetAheadKm)
@@ -85,7 +87,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
           <Search className="h-4 w-4" aria-hidden="true" />
           RECHERCHER
         </button>
-        <SearchOnDropdown center={center} variant="action" className="flex-1" />
+        <SearchOnDropdown center={center} city={city} variant="action" className="flex-1" />
       </div>
     </div>
   )

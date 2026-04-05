@@ -7,6 +7,8 @@ import { buildBookingSearchUrl, buildAirbnbSearchUrl } from '@/lib/booking-url'
 interface SearchOnDropdownProps {
   /** Waypoint center for the search area. null = disabled (no URL to open). */
   center: { lat: number; lng: number } | null
+  /** City name for Booking.com search. If provided, uses ?ss=city instead of coordinates. */
+  city?: string | null
   /**
    * 'outline' — planning sidebar style (border, text, rounded-lg)
    * 'action'  — live controls action row style (rounded-full, bg-primary)
@@ -15,7 +17,7 @@ interface SearchOnDropdownProps {
   className?: string
 }
 
-export function SearchOnDropdown({ center, variant = 'outline', className }: SearchOnDropdownProps) {
+export function SearchOnDropdown({ center, city, variant = 'outline', className }: SearchOnDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -28,7 +30,7 @@ export function SearchOnDropdown({ center, variant = 'outline', className }: Sea
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [open])
 
-  const bookingUrl = center ? buildBookingSearchUrl(center) : null
+  const bookingUrl = city ? buildBookingSearchUrl(city) : null
   const airbnbUrl = center ? buildAirbnbSearchUrl(center) : null
 
   const triggerClass =
@@ -74,17 +76,19 @@ export function SearchOnDropdown({ center, variant = 'outline', className }: Sea
           data-testid="search-on-menu"
           className="absolute bottom-full mb-1.5 left-0 right-0 z-50 flex flex-col gap-2 rounded-xl border border-[--border] bg-background p-2 shadow-lg"
         >
-          <a
-            href={bookingUrl!}
-            target="_blank"
-            rel="noopener noreferrer"
-            role="menuitem"
-            data-testid="search-on-booking"
-            onClick={() => setOpen(false)}
-            className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white bg-[#003580] hover:bg-[#00296b] active:scale-[0.98] transition-all duration-75 cursor-pointer"
-          >
-            Rechercher sur Booking.com
-          </a>
+          {bookingUrl && (
+            <a
+              href={bookingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              role="menuitem"
+              data-testid="search-on-booking"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white bg-[#003580] hover:bg-[#00296b] active:scale-[0.98] transition-all duration-75 cursor-pointer"
+            >
+              Rechercher sur Booking.com
+            </a>
+          )}
           <a
             href={airbnbUrl!}
             target="_blank"

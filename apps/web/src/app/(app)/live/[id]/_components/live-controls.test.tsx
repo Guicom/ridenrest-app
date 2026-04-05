@@ -6,8 +6,8 @@ import { useLiveStore } from '@/stores/live.store'
 afterEach(cleanup)
 
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center }: { center: object | null }) => (
-    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} />
+  SearchOnDropdown: ({ center, city }: { center: object | null; city?: string | null }) => (
+    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} data-city={city ?? ''} />
   ),
 }))
 
@@ -140,5 +140,15 @@ describe('LiveControls', () => {
   it('does not render weather panel (weather is on map overlay)', () => {
     render(<LiveControls {...defaultProps} />)
     expect(screen.queryByTestId('live-weather-panel')).toBeNull()
+  })
+
+  it('passes city prop to SearchOnDropdown when provided', () => {
+    render(<LiveControls {...defaultProps} city="Pamplona" />)
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('Pamplona')
+  })
+
+  it('passes null city to SearchOnDropdown when city not provided', () => {
+    render(<LiveControls {...defaultProps} />)
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('')
   })
 })

@@ -21,10 +21,24 @@ export function getCorridorCenter(
   return { lat: closest.lat, lng: closest.lng }
 }
 
-export function buildBookingSearchUrl(center: { lat: number; lng: number }): string {
-  const lat = center.lat.toFixed(6)
-  const lng = center.lng.toFixed(6)
-  return `https://www.booking.com/searchresults.html?ss=${lat}%2C+${lng}&dest_type=latlong&latitude=${center.lat}&longitude=${center.lng}`
+export function buildBookingSearchUrl(city: string): string {
+  return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}`
+}
+
+/**
+ * Extracts city from OSM rawData tags.
+ * Priority: addr:city > addr:town > addr:village
+ */
+export function extractCityFromOsmRawData(
+  rawData?: Record<string, unknown>,
+): string | null {
+  if (!rawData) return null
+  return (
+    (rawData['addr:city'] as string | undefined) ??
+    (rawData['addr:town'] as string | undefined) ??
+    (rawData['addr:village'] as string | undefined) ??
+    null
+  )
 }
 
 /** Bounding box ±0.2° (≈ 22 km) autour du centre — Airbnb requiert un bbox pour la recherche par coordonnées */

@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
 import { getCorridorCenter } from '@/lib/booking-url'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
+import { useReverseCity } from '@/hooks/use-reverse-city'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
@@ -45,6 +46,16 @@ export function SearchRangeControl({
     fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId,
     setSearchCommitted, searchCommitted,
   } = useMapStore()
+
+  // Corridor center for reverse geocoding — only when search is committed with accommodations layer
+  const corridorCenter = useMemo(
+    () =>
+      searchCommitted && visibleLayers.has('accommodations') && waypoints && waypoints.length > 0
+        ? getCorridorCenter(waypoints, (fromKm + toKm) / 2)
+        : null,
+    [searchCommitted, visibleLayers, waypoints, fromKm, toKm],
+  )
+  const { city: corridorCity } = useReverseCity(corridorCenter)
 
   // rangeKm local state — initialized from store values
   const [rangeKm, setRangeKm] = useState(() => toKm - fromKm)
@@ -268,11 +279,8 @@ export function SearchRangeControl({
           {/* Rechercher sur CTA — shown after search completes with accommodations layer active */}
           {searchCommitted && !isPoisPending && visibleLayers.has('accommodations') && (
             <SearchOnDropdown
-              center={
-                waypoints && waypoints.length > 0
-                  ? getCorridorCenter(waypoints, (fromKm + toKm) / 2)
-                  : null
-              }
+              center={corridorCenter}
+              city={corridorCity}
               variant="outline"
               className="w-full"
             />

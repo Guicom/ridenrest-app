@@ -15,6 +15,7 @@ import { useUIStore } from '@/stores/ui.store'
 import { getAdventureMapData, getAdventure } from '@/lib/api-client'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints'
+import { useReverseCity } from '@/hooks/use-reverse-city'
 import { useStages } from '@/hooks/use-stages'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
@@ -154,6 +155,9 @@ export default function LivePage() {
     if (!isLiveModeActive || targetKm === null || allCumulativeWaypoints.length === 0) return null
     return getCorridorCenter(allCumulativeWaypoints, targetKm)
   }, [isLiveModeActive, targetKm, allCumulativeWaypoints])
+
+  // Reverse geocoding for Booking.com city-based search
+  const { city: liveCity } = useReverseCity(isLiveModeActive ? liveSearchCenter : null)
 
   // Live context for PoiDetailSheet (D+/ETA with live mode values)
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
@@ -316,6 +320,7 @@ export default function LivePage() {
                 activeFilterCount={activeFilterCount}
                 elevationGain={elevationGain}
                 center={liveSearchCenter}
+                city={liveCity}
               />
             )}
 

@@ -74,6 +74,7 @@ export class GooglePlacesProvider {
       'id',
       'displayName',
       'formattedAddress',
+      'addressComponents',
       'location',
       'rating',
       'regularOpeningHours.openNow',
@@ -99,6 +100,7 @@ export class GooglePlacesProvider {
     const data = await response.json() as {
       displayName?: { text?: string }
       formattedAddress?: string
+      addressComponents?: Array<{ longText?: string; types?: string[] }>
       location?: { latitude?: number; longitude?: number }
       rating?: number
       regularOpeningHours?: {
@@ -113,10 +115,17 @@ export class GooglePlacesProvider {
       websiteUri?: string
       types?: string[]
     }
+
+    // Extract locality (city/town/village) from addressComponents
+    const locality = data.addressComponents?.find(
+      (c) => c.types?.includes('locality'),
+    )?.longText ?? null
+
     return {
       placeId,
       displayName: data.displayName?.text ?? null,
       formattedAddress: data.formattedAddress ?? null,
+      locality,
       lat: data.location?.latitude ?? null,
       lng: data.location?.longitude ?? null,
       rating: data.rating ?? null,
@@ -139,10 +148,10 @@ export class GooglePlacesProvider {
 
     const body = {
       textQuery: name,
-      locationBias: {
+      locationRestriction: {
         circle: {
           center: { latitude: lat, longitude: lng },
-          radius: 150.0,  // 150m — tight radius for specific POI match
+          radius: 2000.0,  // 2km strict — prevents matches 20km+ away while handling OSM coordinate drift
         },
       },
       maxResultCount: 1,

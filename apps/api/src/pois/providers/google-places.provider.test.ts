@@ -188,13 +188,13 @@ describe('GooglePlacesProvider', () => {
       )
       const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string) as {
         textQuery: string
-        locationBias: { circle: { center: { latitude: number; longitude: number }; radius: number } }
+        locationRestriction: { circle: { center: { latitude: number; longitude: number }; radius: number } }
         maxResultCount: number
       }
       expect(body.textQuery).toBe('Hotel Test')
-      expect(body.locationBias.circle.center.latitude).toBe(43.1)
-      expect(body.locationBias.circle.center.longitude).toBe(1.1)
-      expect(body.locationBias.circle.radius).toBe(150.0)
+      expect(body.locationRestriction.circle.center.latitude).toBe(43.1)
+      expect(body.locationRestriction.circle.center.longitude).toBe(1.1)
+      expect(body.locationRestriction.circle.radius).toBe(2000.0)
       expect(body.maxResultCount).toBe(1)
     })
 
@@ -315,6 +315,12 @@ describe('GooglePlacesProvider', () => {
           id: 'ChIJABC123',
           displayName: { text: 'Hotel Test' },
           formattedAddress: '1 Rue Test, Paris',
+          addressComponents: [
+            { longText: '1', types: ['street_number'] },
+            { longText: 'Rue Test', types: ['route'] },
+            { longText: 'Paris', types: ['locality', 'political'] },
+            { longText: 'France', types: ['country', 'political'] },
+          ],
           location: { latitude: 48.8566, longitude: 2.3522 },
           rating: 4.2,
           regularOpeningHours: { openNow: true },
@@ -330,6 +336,7 @@ describe('GooglePlacesProvider', () => {
         placeId: 'ChIJABC123',
         displayName: 'Hotel Test',
         formattedAddress: '1 Rue Test, Paris',
+        locality: 'Paris',
         lat: 48.8566,
         lng: 2.3522,
         rating: 4.2,

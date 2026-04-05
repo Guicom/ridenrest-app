@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getCorridorCenter, buildBookingSearchUrl, buildAirbnbSearchUrl } from './booking-url'
+import { getCorridorCenter, buildBookingSearchUrl, buildAirbnbSearchUrl, extractCityFromOsmRawData } from './booking-url'
 import type { MapWaypoint } from '@ridenrest/shared'
 
 const makeWp = (distKm: number, lat: number, lng: number): MapWaypoint => ({
@@ -48,33 +48,57 @@ describe('getCorridorCenter', () => {
 })
 
 describe('buildBookingSearchUrl', () => {
-  it('includes dest_type=latlong for coordinate-based search', () => {
-    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
-    expect(url).toContain('dest_type=latlong')
+  it('uses ss param with city name', () => {
+    expect(buildBookingSearchUrl('Pamplona')).toBe('https://www.booking.com/searchresults.html?ss=Pamplona')
   })
 
-  it('includes latitude and longitude params', () => {
-    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
-    expect(url).toContain('latitude=43.5')
-    expect(url).toContain('longitude=1.4')
+  it('encodes city name with hyphen', () => {
+    expect(buildBookingSearchUrl('Saint-Girons')).toContain('ss=Saint-Girons')
   })
 
-  it('includes ss param with coordinates for prefilled search box', () => {
-    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
-    expect(url).toContain('ss=')
-    expect(url).toContain('43.500000')
-    expect(url).toContain('1.400000')
+  it('encodes spaces in city name', () => {
+    expect(buildBookingSearchUrl('Les Houches')).toContain('ss=Les%20Houches')
   })
 
-  it('includes negative coordinates correctly', () => {
-    const url = buildBookingSearchUrl({ lat: -34.6, lng: -58.4 })
-    expect(url).toContain('latitude=-34.6')
-    expect(url).toContain('longitude=-58.4')
+  it('does not include lat/lng or dest_type', () => {
+    const url = buildBookingSearchUrl('Toulouse')
+    expect(url).not.toContain('dest_type')
+    expect(url).not.toContain('latitude')
+    expect(url).not.toContain('longitude')
   })
 
   it('targets booking.com searchresults page', () => {
-    const url = buildBookingSearchUrl({ lat: 43.5, lng: 1.4 })
-    expect(url).toContain('https://www.booking.com/searchresults.html')
+    expect(buildBookingSearchUrl('Pamplona')).toContain('https://www.booking.com/searchresults.html')
+  })
+})
+
+describe('extractCityFromOsmRawData', () => {
+  it('returns null for undefined rawData', () => {
+    expect(extractCityFromOsmRawData(undefined)).toBeNull()
+  })
+
+  it('returns null for empty rawData', () => {
+    expect(extractCityFromOsmRawData({})).toBeNull()
+  })
+
+  it('returns addr:city if present', () => {
+    expect(extractCityFromOsmRawData({ 'addr:city': 'Pamplona' })).toBe('Pamplona')
+  })
+
+  it('falls back to addr:town when addr:city absent', () => {
+    expect(extractCityFromOsmRawData({ 'addr:town': 'Saint-Girons' })).toBe('Saint-Girons')
+  })
+
+  it('falls back to addr:village when addr:city and addr:town absent', () => {
+    expect(extractCityFromOsmRawData({ 'addr:village': 'Eylie' })).toBe('Eylie')
+  })
+
+  it('prefers addr:city over addr:town', () => {
+    expect(extractCityFromOsmRawData({ 'addr:city': 'Toulouse', 'addr:town': 'Other' })).toBe('Toulouse')
+  })
+
+  it('prefers addr:town over addr:village', () => {
+    expect(extractCityFromOsmRawData({ 'addr:town': 'Miramont', 'addr:village': 'Hamlet' })).toBe('Miramont')
   })
 })
 

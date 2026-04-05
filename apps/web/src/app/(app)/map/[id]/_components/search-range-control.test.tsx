@@ -45,9 +45,15 @@ vi.mock('./accommodation-sub-types', () => ({
   AccommodationSubTypes: () => <div data-testid="accommodation-sub-types" />,
 }))
 
+let mockReverseCityResult: string | null = null
+
+vi.mock('@/hooks/use-reverse-city', () => ({
+  useReverseCity: () => ({ city: mockReverseCityResult, isPending: false }),
+}))
+
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center }: { center: object | null }) => (
-    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} />
+  SearchOnDropdown: ({ center, city }: { center: object | null; city?: string | null }) => (
+    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} data-city={city ?? ''} />
   ),
 }))
 
@@ -74,6 +80,7 @@ describe('SearchRangeControl', () => {
     mockSelectedStageId = null
     mockSearchCommitted = false
     mockVisibleLayers = new Set()
+    mockReverseCityResult = null
   })
 
   it('renders section header with Recherche label', () => {
@@ -361,5 +368,25 @@ describe('SearchRangeControl', () => {
     render(<SearchRangeControl totalDistanceKm={100} waypoints={[]} isPoisPending={false} />)
     const el = screen.getByTestId('search-on-dropdown')
     expect(el.getAttribute('data-has-center')).toBe('false')
+  })
+
+  // ─── useReverseCity integration ───────────────────────────────────────────────
+
+  it('passes city from useReverseCity to SearchOnDropdown when resolved', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    mockReverseCityResult = 'Toulouse'
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-city')).toBe('Toulouse')
+  })
+
+  it('passes null city to SearchOnDropdown when reverse geocoding not resolved', () => {
+    mockSearchCommitted = true
+    mockVisibleLayers = new Set(['accommodations'])
+    mockReverseCityResult = null
+    render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-city')).toBe('')
   })
 })

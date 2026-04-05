@@ -27,15 +27,25 @@ vi.mock('@/stores/map.store', () => ({
   ),
 }))
 
+vi.mock('@/hooks/use-reverse-city', () => ({
+  useReverseCity: () => ({ city: null, isPending: false }),
+}))
+
 let mockDetails: { placeId: string; displayName: string | null; formattedAddress: string | null; lat: number | null; lng: number | null; rating: number | null; isOpenNow: boolean | null; phone: string | null; website: string | null; types: string[] } | null = null
 let mockDetailsPending = false
 vi.mock('@/hooks/use-poi-google-details', () => ({
   usePoiGoogleDetails: () => ({ details: mockDetails, isPending: mockDetailsPending }),
 }))
 
-const mockTrackBookingClick = vi.fn()
-vi.mock('@/lib/api-client', () => ({
-  trackBookingClick: (...args: unknown[]) => mockTrackBookingClick(...args),
+vi.mock('@/components/shared/search-on-dropdown', () => ({
+  SearchOnDropdown: ({ center, city, className }: { center: { lat: number; lng: number } | null; city?: string | null; className?: string }) => (
+    <div
+      data-testid="search-on-dropdown"
+      data-has-center={String(!!center)}
+      data-city={city ?? ''}
+      className={className}
+    />
+  ),
 }))
 
 vi.mock('@ridenrest/gpx', () => ({
@@ -124,7 +134,6 @@ describe('PoiDetailSheet', () => {
     mockDetails = null
     mockDetailsPending = false
     mockSetSelectedPoi.mockClear()
-    mockTrackBookingClick.mockClear()
   })
 
   it('does not render when poi=null', () => {
@@ -215,46 +224,45 @@ describe('PoiDetailSheet', () => {
     expect(screen.getByText('Restauration')).toBeDefined()
   })
 
-  // ── Booking CTA ─────────────────────────────────────────────────────────────
+  // ── SearchOnDropdown CTA (accommodations) ─────���────────────────────────────
 
-  it('shows "Recherche sur Booking" button for accommodation POI', () => {
+  it('shows SearchOnDropdown for accommodation POI', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.getByText('Recherche sur Booking')).toBeDefined()
+    expect(screen.getByTestId('search-on-dropdown')).toBeDefined()
   })
 
-  it('does NOT show booking button for restaurant POI', () => {
+  it('does NOT show SearchOnDropdown for restaurant POI', () => {
     render(
       <PoiDetailSheet poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    expect(screen.queryByText('Recherche sur Booking')).toBeNull()
+    expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
   })
 
-  it('booking link href contains latitude and longitude', () => {
-    const poi = makeAccommodationPoi({ lat: 43.1, lng: 1.1 })
+  it('SearchOnDropdown receives city from OSM rawData', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { 'addr:city': 'Pamplona' } } as unknown as Poi
     render(
       <PoiDetailSheet poi={poi} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    const bookingLink = screen.getByText('Recherche sur Booking').closest('a')!
-    expect(bookingLink.href).toContain('latitude=43.1')
-    expect(bookingLink.href).toContain('longitude=1.1')
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-city')).toBe('Pamplona')
   })
 
-  it('trackBookingClick called with booking_com on Booking button click', () => {
+  it('SearchOnDropdown receives empty city when no city available', () => {
     render(
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    fireEvent.click(screen.getByText('Recherche sur Booking'))
-    expect(mockTrackBookingClick).toHaveBeenCalledWith('123', 'booking_com')
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-city')).toBe('')
   })
 
-  it('trackBookingClick NOT called for hotels_com (Hotels.com removed)', () => {
+  it('SearchOnDropdown receives POI coordinates as center', () => {
     render(
-      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
+      <PoiDetailSheet poi={makeAccommodationPoi({ lat: 43.1, lng: 1.1 })} segments={[makeSegment()]} segmentId="seg-1" />,
     )
-    // Only Booking button exists — assert hotels_com is never tracked
-    expect(mockTrackBookingClick).not.toHaveBeenCalledWith(expect.anything(), 'hotels_com')
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-has-center')).toBe('true')
   })
 
   // ── "Site officiel" ghost button ────────────────────────────────────────────
@@ -307,14 +315,6 @@ describe('PoiDetailSheet', () => {
       <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
     )
     expect(screen.queryByText(/Hotels\.com/i)).toBeNull()
-  })
-
-  it('does NOT show rating block (⭐)', () => {
-    mockDetails = { placeId: 'ChIJABC', displayName: 'Hotel Test', formattedAddress: '1 Rue Test', lat: 48.8, lng: 2.3, rating: 4.2, isOpenNow: true, phone: null, website: null, types: [] }
-    render(
-      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
-    )
-    expect(screen.queryByText('⭐ 4.2 / 5')).toBeNull()
   })
 
   // ── Google enrichment ───────────────────────────────────────────────────────

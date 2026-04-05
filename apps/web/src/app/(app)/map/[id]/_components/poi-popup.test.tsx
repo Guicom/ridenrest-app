@@ -9,6 +9,10 @@ afterEach(cleanup)
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('@/hooks/use-reverse-city', () => ({
+  useReverseCity: () => ({ city: null, isPending: false }),
+}))
+
 let mockDetails: {
   placeId: string
   displayName: string | null
@@ -43,12 +47,13 @@ vi.mock('@/components/ui/skeleton', () => ({
 }))
 
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center, className }: { center: { lat: number; lng: number } | null; className?: string }) => (
+  SearchOnDropdown: ({ center, city, className }: { center: { lat: number; lng: number } | null; city?: string | null; className?: string }) => (
     <div
       data-testid="search-on-dropdown"
       data-has-center={String(!!center)}
       data-lat={center?.lat ?? ''}
       data-lng={center?.lng ?? ''}
+      data-city={city ?? ''}
       className={className}
     />
   ),
@@ -102,9 +107,9 @@ const makeSegment = (overrides?: Partial<MapSegmentData>): MapSegmentData => ({
 })
 
 const makeDetailsBase = (overrides = {}) => ({
-  placeId: 'ChIJABC', displayName: null, formattedAddress: null, lat: null, lng: null,
-  rating: null, isOpenNow: null, weekdayDescriptions: [], periods: [],
-  phone: null, website: null, types: [],
+  placeId: 'ChIJABC', displayName: null, formattedAddress: null, locality: null,
+  lat: null, lng: null, rating: null, isOpenNow: null, weekdayDescriptions: [],
+  periods: [], phone: null, website: null, types: [],
   ...overrides,
 })
 
@@ -432,5 +437,64 @@ describe('PoiPopup', () => {
     unmount()
     expect((map.off as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('move', expect.any(Function))
     expect((map.off as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('zoom', expect.any(Function))
+  })
+
+  // ── City extraction for Booking.com CTA ────────────────────────────────────
+
+  it('extracts city from Google locality (primary source)', () => {
+    mockDetails = makeDetailsBase({ locality: 'Dieffenthal' })
+    render(
+      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('Dieffenthal')
+  })
+
+  it('falls back to OSM rawData addr:city when no Google locality', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { 'addr:city': 'Pamplona' } } as unknown as Poi
+    mockDetails = makeDetailsBase({ locality: null })
+    render(
+      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('Pamplona')
+  })
+
+  it('Google locality takes priority over OSM rawData', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { 'addr:city': 'Pamplona' } } as unknown as Poi
+    mockDetails = makeDetailsBase({ locality: 'Estella' })
+    render(
+      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('Estella')
+  })
+
+  it('falls back to OSM rawData addr:village when no Google locality', () => {
+    const poi = { ...makeAccommodationPoi(), rawData: { 'addr:village': 'Eylie' } } as unknown as Poi
+    render(
+      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('Eylie')
+  })
+
+  it('passes empty city while Google Places details are loading and no OSM city', () => {
+    mockDetails = null
+    render(
+      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('')
+  })
+
+  it('passes empty city when locality is null and no OSM city', () => {
+    mockDetails = makeDetailsBase({ locality: null })
+    render(
+      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('')
+  })
+
+  it('does not extract city for non-accommodation POIs', () => {
+    render(
+      <PoiPopup poi={makeRestaurantPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
+    )
+    expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
   })
 })

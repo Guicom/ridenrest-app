@@ -7,6 +7,8 @@ export interface GooglePlaceDetails {
   placeId: string
   displayName: string | null
   formattedAddress: string | null
+  /** City/town/village extracted from addressComponents (locality type). */
+  locality: string | null
   lat: number | null
   lng: number | null
   rating: number | null

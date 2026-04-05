@@ -32,6 +32,7 @@ type RawCacheablePoi = {
   lat: number
   lng: number
   category: string
+  rawData?: Record<string, unknown>
 }
 
 @Injectable()
@@ -163,8 +164,8 @@ export class PoisService {
     // 10. Store in Redis only after a fresh Overpass fetch — never cache stale fallback data
     // Option A: strip segment-specific distances — geo-scoped key is cross-user, distances are not
     if (overpassSucceeded) {
-      const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category }) => ({
-        externalId, source, name, lat, lng, category,
+      const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category, rawData }) => ({
+        externalId, source, name, lat, lng, category, rawData,
       }))
       await redis.setex(cacheKey, POI_BBOX_CACHE_TTL, JSON.stringify(rawPois))
     }
@@ -182,12 +183,18 @@ export class PoisService {
     let placeId = await redis.get(placeIdKey)
 
     if (!placeId) {
-      // 2. Not pre-cached — do targeted Text Search (IDs Only) by name + location
-      const poi = await this.poisRepository.findByExternalId(externalId, segmentId)
-      if (!poi) return null
+      // 2a. If externalId is already a Google place_id (source=google POIs), use it directly
+      if (externalId.startsWith('ChIJ') || externalId.startsWith('Eh')) {
+        placeId = externalId
+      } else {
+        // 2b. OSM/Overpass POIs — do targeted Text Search (IDs Only) by name + location
+        const poi = await this.poisRepository.findByExternalId(externalId, segmentId)
+        if (!poi) return null
 
-      placeId = await this.googlePlacesProvider.findPlaceId(poi.name, poi.lat, poi.lng)
-      if (!placeId) return null
+        placeId = await this.googlePlacesProvider.findPlaceId(poi.name, poi.lat, poi.lng)
+        this.logger.debug(`[getPoiGoogleDetails] findPlaceId("${poi.name}", ${poi.lat}, ${poi.lng}) → ${placeId}`)
+        if (!placeId) return null
+      }
 
       await redis.setex(placeIdKey, GOOGLE_PLACES_CACHE_TTL, placeId)
     }
@@ -207,6 +214,8 @@ export class PoisService {
       this.logger.warn(`[getPoiGoogleDetails] getPlaceDetails failed for ${placeId}: ${String(err)}`)
       return null
     }
+
+    this.logger.debug(`[getPoiGoogleDetails] details for ${placeId}: formattedAddress=${details.formattedAddress}, displayName=${details.displayName}`)
 
     // 5. Cache for 7 days
     await redis.setex(detailsKey, GOOGLE_PLACES_CACHE_TTL, JSON.stringify(details))
@@ -277,8 +286,8 @@ export class PoisService {
     // Only cache after a fresh Overpass fetch — never cache stale fallback data
     // Option A: strip segment-specific distances before caching cross-user geo key
     if (overpassSucceeded) {
-      const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category }) => ({
-        externalId, source, name, lat, lng, category,
+      const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category, rawData }) => ({
+        externalId, source, name, lat, lng, category, rawData,
       }))
       await redis.setex(cacheKey, POI_BBOX_CACHE_TTL, JSON.stringify(rawPois))
     }

@@ -21,17 +21,21 @@ export function useLiveMode() {
     // Guard: don't start a second watcher if one is already active
     if (watchIdRef.current !== null) return
 
+    const onSuccess = (pos: GeolocationPosition) => {
+      useLiveStore.getState().updateGpsPosition({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      })
+      useLiveStore.getState().activateLiveMode()
+    }
+
+    const onError = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED) setPermissionDenied(true)
+    }
+
     watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        useLiveStore.getState().updateGpsPosition({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        })
-        useLiveStore.getState().activateLiveMode()
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setPermissionDenied(true)
-      },
+      onSuccess,
+      onError,
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
     )
   }, [])

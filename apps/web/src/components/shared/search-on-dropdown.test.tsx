@@ -30,22 +30,41 @@ describe('SearchOnDropdown', () => {
     expect(screen.queryByTestId('search-on-menu')).toBeNull()
   })
 
-  it('shows Booking.com and Airbnb links when open', () => {
-    render(<SearchOnDropdown center={center} />)
+  it('shows Booking.com and Airbnb links when open with city', () => {
+    render(<SearchOnDropdown center={center} city="Toulouse" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     expect(screen.getByTestId('search-on-booking')).toBeDefined()
     expect(screen.getByTestId('search-on-airbnb')).toBeDefined()
   })
 
-  it('Booking.com link has correct URL', () => {
+  it('shows only Airbnb when no city', () => {
     render(<SearchOnDropdown center={center} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
+    expect(screen.queryByTestId('search-on-booking')).toBeNull()
+    expect(screen.getByTestId('search-on-airbnb')).toBeDefined()
+  })
+
+  it('Booking.com link uses ?ss=city when city provided', () => {
+    render(<SearchOnDropdown center={center} city="Pamplona" />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('booking.com/searchresults.html')
-    expect(link.href).toContain('latitude=43.5')
-    expect(link.href).toContain('longitude=1.4')
+    expect(link.href).toContain('ss=Pamplona')
+    expect(link.href).not.toContain('dest_type')
+    expect(link.href).not.toContain('latitude')
     expect(link.getAttribute('target')).toBe('_blank')
     expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+  })
+
+  it('Booking.com link hidden when no city provided', () => {
+    render(<SearchOnDropdown center={center} />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    expect(screen.queryByTestId('search-on-booking')).toBeNull()
+  })
+
+  it('Booking.com link hidden when city is null', () => {
+    render(<SearchOnDropdown center={center} city={null} />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    expect(screen.queryByTestId('search-on-booking')).toBeNull()
   })
 
   it('Airbnb link has correct bbox URL', () => {
@@ -59,8 +78,15 @@ describe('SearchOnDropdown', () => {
     expect(link.getAttribute('rel')).toBe('noopener noreferrer')
   })
 
-  it('clicking a menu link closes the dropdown', () => {
+  it('clicking Airbnb link closes the dropdown', () => {
     render(<SearchOnDropdown center={center} />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    fireEvent.click(screen.getByTestId('search-on-airbnb'))
+    expect(screen.queryByTestId('search-on-menu')).toBeNull()
+  })
+
+  it('clicking Booking link closes the dropdown', () => {
+    render(<SearchOnDropdown center={center} city="Pamplona" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     fireEvent.click(screen.getByTestId('search-on-booking'))
     expect(screen.queryByTestId('search-on-menu')).toBeNull()
