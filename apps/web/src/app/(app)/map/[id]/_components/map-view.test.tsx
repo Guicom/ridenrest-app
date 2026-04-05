@@ -19,9 +19,10 @@ vi.mock('@/lib/api-client', () => ({
 
 // Mock usePois hook — mutable isPending for auto-zoom tests
 let mockPoisIsPending = false
+let mockPoisAccommodations: { id: string; category: string }[] = []
 vi.mock('@/hooks/use-pois', () => ({
   usePois: () => ({
-    poisByLayer: { accommodations: [], restaurants: [], supplies: [], bike: [] },
+    poisByLayer: { accommodations: mockPoisAccommodations, restaurants: [], supplies: [], bike: [] },
     isPending: mockPoisIsPending,
     hasError: false,
   }),
@@ -42,6 +43,7 @@ vi.mock('@/hooks/use-density', () => ({
 // Mutable map store state for Story 8.4 + 16.15 tests
 let mockMapStoreVisibleLayers = new Set<string>()
 let mockSearchCommitted = false
+let mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
 
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
@@ -58,7 +60,7 @@ vi.mock('@/stores/map.store', () => ({
     toKm: 30,
     setSearchRange: vi.fn(),
     searchRangeInteracted: false,
-    activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
+    activeAccommodationTypes: mockActiveAccommodationTypes,
     toggleAccommodationType: vi.fn(),
     selectedStageId: null,
     setSelectedStageId: vi.fn(),
@@ -159,6 +161,22 @@ vi.mock('./sidebar-stages-section', () => ({
 // Mock AccommodationSubTypes
 vi.mock('./accommodation-sub-types', () => ({
   AccommodationSubTypes: () => <div data-testid="accommodation-sub-types" />,
+  ACCOMMODATION_SUB_TYPES: [
+    { type: 'hotel', label: 'Hôtel', color: '#000' },
+    { type: 'camp_site', label: 'Camping', color: '#000' },
+    { type: 'shelter', label: 'Refuge / Abri', color: '#000' },
+    { type: 'hostel', label: 'Auberge de jeunesse', color: '#000' },
+    { type: 'guesthouse', label: 'Chambre d\'hôte', color: '#000' },
+  ],
+}))
+
+// Mock NoResultsSubTypeBanner
+vi.mock('./no-results-sub-type-banner', () => ({
+  NoResultsSubTypeBanner: ({ activeTypeLabels, alternatives, onResetFilters }: { activeTypeLabels: string[], alternatives: { label: string; count: number }[], onResetFilters: () => void }) => (
+    <button data-testid="no-results-sub-type-banner" onClick={onResetFilters}>
+      {activeTypeLabels.join(', ')} — {alternatives.map(a => `${a.count} ${a.label}`).join(', ')}
+    </button>
+  ),
 }))
 
 // Mock StatusBanner
@@ -214,6 +232,8 @@ describe('MapView', () => {
     mockMapStoreVisibleLayers = new Set()
     mockPoisIsPending = false
     mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
     mockFitToCorridorRange.mockClear()
   })
 
@@ -281,6 +301,8 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     mockMapStoreVisibleLayers = new Set()
     mockPoisIsPending = false
     mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
     mockFitToCorridorRange.mockClear()
   })
 
@@ -353,6 +375,8 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
 describe('MapView — Story 8.4 AccommodationSubTypes', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
   })
 
   // AccommodationSubTypes is now inside SearchRangeControl (mocked) — conditional logic tested in search-range-control.test.tsx
@@ -374,6 +398,8 @@ describe('MapView — back button (Story 8.3, AC #2)', () => {
     mockMapStoreVisibleLayers = new Set()
     mockPoisIsPending = false
     mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
     mockFitToCorridorRange.mockClear()
   })
 
@@ -402,6 +428,8 @@ describe('MapView — elevation profile collapse (Story 8.8, AC #1, AC #6)', () 
     mockMapStoreVisibleLayers = new Set()
     mockPoisIsPending = false
     mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
     mockFitToCorridorRange.mockClear()
   })
 
@@ -445,6 +473,8 @@ describe('MapView — stagesVisible toggle (Story 11.2, AC4)', () => {
     mockMapStoreVisibleLayers = new Set()
     mockPoisIsPending = false
     mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
     mockFitToCorridorRange.mockClear()
   })
 
@@ -488,6 +518,8 @@ describe('MapView — auto-zoom on search (Story 16.15)', () => {
     mockMapStoreVisibleLayers = new Set()
     mockPoisIsPending = false
     mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
     mockFitToCorridorRange.mockClear()
   })
 
@@ -545,5 +577,71 @@ describe('MapView — auto-zoom on search (Story 16.15)', () => {
     await screen.findByTestId('map-canvas')
 
     expect(mockFitToCorridorRange).not.toHaveBeenCalled()
+  })
+})
+
+describe('MapView — NoResultsSubTypeBanner (Story 16.17)', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set(['accommodations'])
+    mockPoisIsPending = false
+    mockSearchCommitted = true
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
+    mockFitToCorridorRange.mockClear()
+  })
+
+  it('shows blue banner when accommodations exist but none match active filter (AC-1)', async () => {
+    mockPoisAccommodations = [
+      { id: 'p1', category: 'camp_site' },
+      { id: 'p2', category: 'shelter' },
+    ]
+    mockActiveAccommodationTypes = new Set(['hotel'])
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    expect(screen.getByTestId('no-results-sub-type-banner')).toBeInTheDocument()
+  })
+
+  it('banner text lists alternative types with counts (AC-2)', async () => {
+    mockPoisAccommodations = [
+      { id: 'p1', category: 'camp_site' },
+      { id: 'p2', category: 'camp_site' },
+      { id: 'p3', category: 'shelter' },
+    ]
+    mockActiveAccommodationTypes = new Set(['hotel'])
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    const banner = screen.getByTestId('no-results-sub-type-banner')
+    expect(banner.textContent).toContain('hôtel')
+    expect(banner.textContent).toContain('2 camping')
+    expect(banner.textContent).toContain('1 refuge / abri')
+  })
+
+  it('does NOT show blue banner when at least one accommodation matches filter (AC-3)', async () => {
+    mockPoisAccommodations = [
+      { id: 'p1', category: 'hotel' },
+      { id: 'p2', category: 'camp_site' },
+    ]
+    mockActiveAccommodationTypes = new Set(['hotel'])
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    expect(screen.queryByTestId('no-results-sub-type-banner')).toBeNull()
+  })
+
+  it('orange banner shows when allPois empty, blue banner does not (AC-5)', async () => {
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel'])
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+    await screen.findByTestId('map-canvas')
+    expect(screen.queryByTestId('no-results-sub-type-banner')).toBeNull()
+    expect(screen.getByText('Aucun résultat dans cette zone')).toBeInTheDocument()
   })
 })

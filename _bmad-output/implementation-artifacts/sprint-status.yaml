@@ -196,6 +196,7 @@ development_status:
   16-14-global-booking-search-button: done        # bouton "Rechercher sur Booking" global après search hébergements (planning + live)
   16-15-map-zoom-search-zone: done       # fix auto-zoom planning (cache chaud) + new auto-zoom live mode (2026-04-05)
   16-16-city-based-booking-search-url: done  # liens Booking avec nom de ville — chaîne: Google locality (primary) → OSM rawData → Geoapify reverse geocoding (2026-04-05)
+  16-17-smart-no-results-message: done
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
@@ -222,10 +223,10 @@ development_status:
   # Epic 15: Analytics & Affiliate Partnership Readiness
   # (ajouté 2026-03-23 — tracking dès le lancement pour Booking.com)
   # ─────────────────────────────────────────────────────────────
-  epic-15: backlog
-  15-1-plausible-ce-setup-vps-nextjs: backlog        # Docker Plausible CE + stats.ridenrest.app + pageviews auto
-  15-2-click-tracking-enrichi-booking-links: backlog  # event booking_click avec poi_id, source, page, user_tier
-  15-3-funnel-tracking-complet: backlog               # gpx_uploaded → map_opened → poi_search → poi_detail → booking_click
-  15-4-admin-analytics-dashboard: backlog             # /admin/analytics protégé, embed Plausible, métriques affilié
-  15-5-admin-cache-invalidation-by-geographic-zone: backlog  # déplacé depuis 10-4 — DELETE /admin/cache/zone, SCAN+DEL pipeline
+  epic-15: in-progress
+  15-1-plausible-ce-setup-vps-nextjs: ready-for-dev        # Docker Plausible CE + stats.ridenrest.app + pageviews auto
+  15-2-click-tracking-enrichi-booking-links: ready-for-dev  # event booking_click avec poi_id, source, page, user_tier
+  15-3-funnel-tracking-complet: ready-for-dev               # gpx_uploaded → map_opened → poi_search → poi_detail → booking_click
+  15-4-admin-analytics-dashboard: ready-for-dev             # /admin/analytics protégé, embed Plausible, métriques affilié
+  15-5-admin-cache-invalidation-by-geographic-zone: ready-for-dev  # déplacé depuis 10-4 — DELETE /admin/cache/zone, SCAN+DEL pipeline
   epic-15-retrospective: optional

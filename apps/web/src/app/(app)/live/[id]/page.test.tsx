@@ -39,6 +39,7 @@ let mockStages: { id: string; name: string; endKm: number; startKm: number; colo
 // Mutable live store state for Story 8.4 badge tests
 let mockLiveSearchRadiusKm = 5
 let mockStageLayerActive = false
+let mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
 
 // Mock Zustand stores
 vi.mock('@/stores/live.store', () => ({
@@ -69,13 +70,22 @@ let mockMapVisibleLayers = new Set(['accommodations'])
 let mockMapWeatherActive = false
 let mockMapDensityColorEnabled = true
 vi.mock('@/stores/map.store', () => ({
-  useMapStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({
-      visibleLayers: mockMapVisibleLayers,
-      weatherActive: mockMapWeatherActive,
-      weatherDimension: 'temperature',
-      densityColorEnabled: mockMapDensityColorEnabled,
-    }),
+  useMapStore: Object.assign(
+    (selector: (s: Record<string, unknown>) => unknown) =>
+      selector({
+        visibleLayers: mockMapVisibleLayers,
+        activeAccommodationTypes: mockActiveAccommodationTypes,
+        weatherActive: mockMapWeatherActive,
+        weatherDimension: 'temperature',
+        densityColorEnabled: mockMapDensityColorEnabled,
+      }),
+    {
+      getState: () => ({
+        resetAccommodationTypes: vi.fn(),
+        setSelectedPoiId: vi.fn(),
+      }),
+    },
+  ),
 }))
 
 // Mock LiveMapCanvas — forwardRef for fitToSearchZone tests + captures onStageLongPress
@@ -143,6 +153,22 @@ vi.mock('./_components/geolocation-consent', () => ({
 // Mock PoiDetailSheet (from map route, reused in live)
 vi.mock('../../map/[id]/_components/poi-detail-sheet', () => ({
   PoiDetailSheet: () => <div data-testid="poi-detail-sheet" />,
+}))
+
+// Mock AccommodationSubTypes (reused from map route)
+vi.mock('../../map/[id]/_components/accommodation-sub-types', () => ({
+  ACCOMMODATION_SUB_TYPES: [
+    { type: 'hotel', label: 'Hôtel', color: '#000' },
+    { type: 'camp_site', label: 'Camping', color: '#000' },
+    { type: 'shelter', label: 'Refuge / Abri', color: '#000' },
+    { type: 'hostel', label: 'Auberge de jeunesse', color: '#000' },
+    { type: 'guesthouse', label: 'Chambre d\'hôte', color: '#000' },
+  ],
+}))
+
+// Mock NoResultsSubTypeBanner
+vi.mock('../../map/[id]/_components/no-results-sub-type-banner', () => ({
+  NoResultsSubTypeBanner: () => <div data-testid="no-results-sub-type-banner" />,
 }))
 
 // Mock TanStack Query
@@ -337,6 +363,7 @@ describe('LivePage — Story 8.4 FILTERS button', () => {
     mockMapDensityColorEnabled = true
     mockLiveSearchRadiusKm = 5
     mockStageLayerActive = false
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
   })
 
   it('renders FILTERS button when live mode is active', () => {
@@ -485,5 +512,53 @@ describe('LivePage — auto-zoom on search (Story 16.15)', () => {
     // Wait for mount effect to complete, then verify no banner
     await screen.findByTestId('live-map-canvas')
     expect(screen.queryByText('Aucun résultat dans cette zone')).toBeNull()
+  })
+})
+
+describe('LivePage — NoResultsSubTypeBanner (Story 16.17, AC-4)', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
+    mockUseNetworkStatus.mockReturnValue({ isOnline: true })
+  })
+
+  it('shows blue banner when live active, no accommodations, and not all types selected', async () => {
+    mockActiveAccommodationTypes = new Set(['hotel'])
+    mockUseNetworkStatus.mockReturnValue({ isOnline: true })
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseLivePoisSearch.mockReturnValue({
+      pois: [], hasFetched: true, isFetching: false, targetKm: 30,
+      isError: false, refetch: mockRefetchPois, canSearch: true,
+    })
+    render(<LivePage />)
+    // Wait for mounted useEffect to fire
+    expect(await screen.findByTestId('no-results-sub-type-banner')).toBeDefined()
+  })
+
+  it('does NOT show blue banner when all accommodation types are selected', async () => {
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
+    mockUseNetworkStatus.mockReturnValue({ isOnline: true })
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseLivePoisSearch.mockReturnValue({
+      pois: [], hasFetched: true, isFetching: false, targetKm: 30,
+      isError: false, refetch: mockRefetchPois, canSearch: true,
+    })
+    render(<LivePage />)
+    await screen.findByTestId('live-map-canvas')
+    expect(screen.queryByTestId('no-results-sub-type-banner')).toBeNull()
+  })
+
+  it('shows orange banner instead when all types selected and no results (AC-5)', async () => {
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
+    mockUseNetworkStatus.mockReturnValue({ isOnline: true })
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseLivePoisSearch.mockReturnValue({
+      pois: [], hasFetched: true, isFetching: false, targetKm: 30,
+      isError: false, refetch: mockRefetchPois, canSearch: true,
+    })
+    render(<LivePage />)
+    // Wait for mounted useEffect, then check banners
+    expect(await screen.findByText('Aucun résultat dans cette zone')).toBeDefined()
+    expect(screen.queryByTestId('no-results-sub-type-banner')).toBeNull()
   })
 })
