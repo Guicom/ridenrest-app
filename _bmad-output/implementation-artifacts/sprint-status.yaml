@@ -194,7 +194,7 @@ development_status:
   16-12-interactive-states-hover-click-feedback: done    # cursor + hover bg + active/click feedback sur tous éléments cliquables (2026-04-02)
   16-13-poi-popup-redesign: done                        # badge catégorie, stats icônes, CTAs côte à côte, phone icon inline + Google Places fallback fix (2026-04-03)
   16-14-global-booking-search-button: done        # bouton "Rechercher sur Booking" global après search hébergements (planning + live)
-  16-15-map-zoom-search-zone: ready-for-dev       # fix auto-zoom planning (cache chaud) + new auto-zoom live mode (2026-04-03)
+  16-15-map-zoom-search-zone: done       # fix auto-zoom planning (cache chaud) + new auto-zoom live mode (2026-04-05)
   16-16-city-based-booking-search-url: done  # liens Booking avec nom de ville — chaîne: Google locality (primary) → OSM rawData → Geoapify reverse geocoding (2026-04-05)
   epic-16-retrospective: optional
 

@@ -9,9 +9,9 @@ vi.mock('@/hooks/use-live-mode', () => ({
   useLiveMode: () => mockUseLiveMode(),
 }))
 
-// Mock use-live-poi-search hook
+// Mock use-live-poi-search hook — mutable for auto-zoom tests
 const mockRefetchPois = vi.fn()
-const mockUseLivePoisSearch = vi.fn().mockReturnValue({ pois: [], isFetching: false, targetKm: null, isError: false, refetch: mockRefetchPois, canSearch: false })
+const mockUseLivePoisSearch = vi.fn().mockReturnValue({ pois: [], hasFetched: false, isFetching: false, targetKm: null, isError: false, refetch: mockRefetchPois, canSearch: false })
 vi.mock('@/hooks/use-live-poi-search', () => ({
   useLivePoisSearch: () => mockUseLivePoisSearch(),
 }))
@@ -52,6 +52,7 @@ vi.mock('@/stores/live.store', () => ({
       currentPosition: null,
       weatherDepartureTime: null,
       stageLayerActive: mockStageLayerActive,
+      gpsTrackingActive: true,
       setCurrentKm: () => {},
       setTargetAheadKm: () => {},
       setStageLayerActive: () => {},
@@ -77,7 +78,7 @@ vi.mock('@/stores/map.store', () => ({
     }),
 }))
 
-// Mock LiveMapCanvas — captures onStageLongPress for dialog flow tests
+// Mock LiveMapCanvas — forwardRef for fitToSearchZone tests + captures onStageLongPress
 let capturedOnStageLongPress: ((id: string) => void) | undefined
 vi.mock('./_components/live-map-canvas', () => ({
   LiveMapCanvas: ({ adventureId, onStageLongPress }: { adventureId: string; onStageLongPress?: (id: string) => void }) => {
@@ -273,7 +274,7 @@ describe('LivePage', () => {
   it('shows error banner when POI query fails and online (AC #1)', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockUseNetworkStatus.mockReturnValue({ isOnline: true })
-    mockUseLivePoisSearch.mockReturnValue({ pois: [{ id: '1' }, { id: '2' }], isFetching: false, targetKm: 40, isError: true })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [{ id: '1' }, { id: '2' }], hasFetched: true, isFetching: false, targetKm: 40, isError: true, refetch: mockRefetchPois, canSearch: true })
     render(<LivePage />)
     const banner = screen.getByTestId('status-banner')
     expect(banner.getAttribute('data-variant')).toBe('error')
@@ -291,7 +292,7 @@ describe('LivePage', () => {
   it('hides banner when POI query succeeds after error (AC #2)', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockUseNetworkStatus.mockReturnValue({ isOnline: true })
-    mockUseLivePoisSearch.mockReturnValue({ pois: [], isFetching: false, targetKm: 40, isError: false })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [], hasFetched: true, isFetching: false, targetKm: 40, isError: false, refetch: mockRefetchPois, canSearch: true })
     render(<LivePage />)
     expect(screen.queryByTestId('status-banner')).toBeNull()
   })
@@ -299,7 +300,7 @@ describe('LivePage', () => {
   it('shows offline banner over error banner when both apply', () => {
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     mockUseNetworkStatus.mockReturnValue({ isOnline: false })
-    mockUseLivePoisSearch.mockReturnValue({ pois: [], isFetching: false, targetKm: 40, isError: true })
+    mockUseLivePoisSearch.mockReturnValue({ pois: [], hasFetched: false, isFetching: false, targetKm: 40, isError: true, refetch: mockRefetchPois, canSearch: false })
     render(<LivePage />)
     const banners = screen.getAllByTestId('status-banner')
     expect(banners).toHaveLength(1)
@@ -445,5 +446,44 @@ describe('LivePage — Stage update dialog (AC #3)', () => {
 
     const confirmBtn = screen.getByTestId('stage-update-confirm-btn') as HTMLButtonElement
     expect(confirmBtn.disabled).toBe(true)
+  })
+})
+
+describe('LivePage — auto-zoom on search (Story 16.15)', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('survives poisFetching true→false transition without error (AC #4)', () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseLivePoisSearch.mockReturnValue({
+      pois: [], hasFetched: true, isFetching: true, targetKm: 30,
+      isError: false, refetch: mockRefetchPois, canSearch: true,
+    })
+
+    const { rerender } = render(<LivePage />)
+    expect(screen.getByTestId('live-map-canvas')).toBeDefined()
+
+    // Transition: isFetching true→false — should not throw
+    mockUseLivePoisSearch.mockReturnValue({
+      pois: [{ id: 'p1' }], hasFetched: true, isFetching: false, targetKm: 30,
+      isError: false, refetch: mockRefetchPois, canSearch: true,
+    })
+    rerender(<LivePage />)
+
+    // Component still renders after transition
+    expect(screen.getByTestId('live-map-canvas')).toBeDefined()
+  })
+
+  it('does not show no-results banner before first search (AC #6)', async () => {
+    mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
+    mockUseLivePoisSearch.mockReturnValue({
+      pois: [], hasFetched: false, isFetching: false, targetKm: null,
+      isError: false, refetch: mockRefetchPois, canSearch: false,
+    })
+    render(<LivePage />)
+    // Wait for mount effect to complete, then verify no banner
+    await screen.findByTestId('live-map-canvas')
+    expect(screen.queryByText('Aucun résultat dans cette zone')).toBeNull()
   })
 })

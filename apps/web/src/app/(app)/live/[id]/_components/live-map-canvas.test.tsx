@@ -318,41 +318,76 @@ describe('LiveMapCanvas', () => {
     expect(mockMapInstance.flyTo.mock.calls.length).toBeGreaterThan(flyToCallsBefore)
   })
 
-  it('calls flyTo when searchTrigger increments (> 0)', async () => {
-    let loadCallback: (() => void) | undefined
-    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
-      if (event === 'load') loadCallback = cb
-    })
-    mockMapInstance.getSource.mockReturnValue({
-      setData: vi.fn(),
+  it('fitToSearchZone calls fitBounds with waypoints in range and pauses GPS tracking (AC #4, #5)', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
     })
 
-    const { rerender } = render(
+    const ref = React.createRef<import('./live-map-canvas').LiveMapCanvasHandle>()
+    const seg = makeSegment()
+    render(
       <LiveMapCanvas
+        ref={ref}
         adventureId="adv-1"
-        segments={[makeSegment()]}
-        targetKm={40}
-        searchTrigger={0}
+        segments={[seg]}
+        currentKmOnRoute={10}
       />,
     )
 
-    await waitFor(() => expect(loadCallback).toBeDefined())
-    act(() => { loadCallback?.() })
+    await waitFor(() => expect(eventHandlers['load']).toBeDefined())
+    act(() => { eventHandlers['load']?.() })
 
-    // Trigger search
-    rerender(
-      <LiveMapCanvas
-        adventureId="adv-1"
-        segments={[makeSegment()]}
-        targetKm={40}
-        searchTrigger={1}
-      />,
+    // Waypoints at distKm 5 (out of range), 15 (in range), 25 (in range)
+    // fromKm = max(0, 20 - 5) = 15, toKm = 20 + 5 = 25
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 5 },
+      { lat: 43.2, lng: 1.2, distKm: 15 },
+      { lat: 43.5, lng: 1.5, distKm: 25 },
+    ]
+
+    act(() => { ref.current?.fitToSearchZone(20, 5, [seg], waypoints as never[]) })
+
+    // Bounds with 10% expansion: dLat=0.3, dLng=0.3
+    // minLng=1.2-0.03=1.17, minLat=43.2-0.03=43.17, maxLng=1.5+0.03=1.53, maxLat=43.5+0.03=43.53
+    expect(mockMapInstance.fitBounds).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.any(Array), expect.any(Array)]),
+      expect.objectContaining({ padding: { top: 60, right: 60, bottom: 240, left: 60 }, maxZoom: 16, animate: true }),
     )
-
-    await waitFor(() => {
-      expect(mockMapInstance.flyTo).toHaveBeenCalledWith(
-        expect.objectContaining({ zoom: 13 }),
-      )
-    })
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(false)
   })
+
+  it('fitToSearchZone falls back to fitToTrace when no waypoints in range (AC #4)', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
+    })
+
+    const ref = React.createRef<import('./live-map-canvas').LiveMapCanvasHandle>()
+    const seg = makeSegment()
+    render(
+      <LiveMapCanvas
+        ref={ref}
+        adventureId="adv-1"
+        segments={[seg]}
+        currentKmOnRoute={50}
+      />,
+    )
+
+    await waitFor(() => expect(eventHandlers['load']).toBeDefined())
+    act(() => { eventHandlers['load']?.() })
+
+    // All waypoints before currentKm range → empty inRange → fitToTrace (fitBounds from trace)
+    const waypoints = [
+      { lat: 43.0, lng: 1.0, distKm: 5 },
+      { lat: 43.2, lng: 1.2, distKm: 15 },
+    ]
+
+    act(() => { ref.current?.fitToSearchZone(20, 5, [seg], waypoints as never[]) })
+
+    // fitToTrace uses segment boundingBox → fitBounds called with trace bounds
+    expect(mockMapInstance.fitBounds).toHaveBeenCalled()
+    expect(useLiveStore.getState().gpsTrackingActive).toBe(false)
+  })
+
 })

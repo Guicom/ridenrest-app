@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { X, ChevronDown, ChevronUp, CloudRain, LayoutGrid, Thermometer, Umbrella, Wind, Calendar } from 'lucide-react'
 import { Drawer } from 'vaul'
+import { MAX_LIVE_RADIUS_KM } from '@ridenrest/shared'
 import type { Poi } from '@ridenrest/shared'
 import { Switch } from '@/components/ui/switch'
 import { useMapStore } from '@/stores/map.store'
@@ -131,7 +132,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
                 {localRadius} km
               </span>
               <button
-                onClick={() => setLocalRadius((r) => Math.min(30, r + 0.5))}
+                onClick={() => setLocalRadius((r) => Math.min(MAX_LIVE_RADIUS_KM, r + 0.5))}
                 className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
                 aria-label="Augmenter le rayon"
               >

@@ -196,6 +196,35 @@ export default function LivePage() {
     }
   }, [currentPosition, kmWaypoints, setCurrentKm])
 
+  // Auto-zoom to search zone after live POI search completes (Story 16.15, AC #4, #5, #6)
+  // Two paths: cold cache (poisFetching true→false) and warm cache (searchTrigger increments while !poisFetching)
+  const prevPoisFetchingRef = useRef(false)
+  const prevSearchTriggerRef = useRef(0)
+  useEffect(() => {
+    const justResolved = prevPoisFetchingRef.current && !poisFetching
+    const justSearched = searchTrigger > 0 && searchTrigger !== prevSearchTriggerRef.current && !poisFetching && poisHasFetched
+
+    // justResolved: fetch completed (success or error) → zoom regardless of poisHasFetched
+    // justSearched: warm cache (poisHasFetched already required in justSearched definition)
+    if ((justResolved || justSearched) && isLiveModeActive) {
+      const targetKmValue = targetKm ?? 0
+      liveMapCanvasRef.current?.fitToSearchZone(
+        targetKmValue,
+        liveSearchRadiusKm,
+        segments,
+        allCumulativeWaypoints,
+      )
+    }
+    prevPoisFetchingRef.current = poisFetching
+    prevSearchTriggerRef.current = searchTrigger
+    return () => {
+      prevPoisFetchingRef.current = false
+      prevSearchTriggerRef.current = 0
+    }
+  }, [poisFetching, poisHasFetched, isLiveModeActive, searchTrigger])
+  // Note: targetKm, liveSearchRadiusKm, segments, allCumulativeWaypoints intentionally excluded
+  // (refs or stable-during-search values — same pattern as map-view.tsx)
+
   // Hydration-safe: defer client-only rendering until after mount
   useEffect(() => {
     setMounted(true)
@@ -236,7 +265,6 @@ export default function LivePage() {
           weatherPoints={weatherPoints}
           weatherDimension={mapWeatherDimension}
           weatherActive={mapWeatherActive}
-          searchTrigger={searchTrigger}
           stages={stages}
           stageLayerActive={stageLayerActive}
           currentKmOnRoute={currentKmOnRoute}

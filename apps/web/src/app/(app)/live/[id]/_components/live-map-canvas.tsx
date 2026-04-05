@@ -8,7 +8,7 @@ import { MAP_STYLES } from '@/lib/map-styles'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { findPointAtKm } from '@ridenrest/gpx'
 import { WeatherLayer, LINE_COLOR_EXPRESSIONS, type WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
-import type { Poi, MapSegmentData, WeatherPoint, AdventureStageResponse } from '@ridenrest/shared'
+import type { Poi, MapSegmentData, MapWaypoint, WeatherPoint, AdventureStageResponse } from '@ridenrest/shared'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import type maplibregl from 'maplibre-gl'
 
@@ -21,6 +21,7 @@ export interface LiveMapCanvasHandle {
   getMap: () => maplibregl.Map | null
   resetZoom: () => void
   centerOnGps: () => void
+  fitToSearchZone: (targetKm: number, radiusKm: number, segments: MapSegmentData[], waypoints: MapWaypoint[]) => void
 }
 
 interface LiveMapCanvasProps {
@@ -31,14 +32,13 @@ interface LiveMapCanvasProps {
   weatherPoints?: WeatherPoint[]
   weatherDimension?: WeatherDimension
   weatherActive?: boolean
-  searchTrigger?: number
   stages?: AdventureStageResponse[]
   stageLayerActive?: boolean
   currentKmOnRoute?: number | null
   onStageLongPress?: (stageId: string) => void
 }
 
-export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, searchTrigger = 0, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress }: LiveMapCanvasProps, ref) {
+export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress }: LiveMapCanvasProps, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
@@ -246,18 +246,6 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     }
   }, [stages, stageLayerActive, currentKmOnRoute, mapReady, kmWaypoints])
 
-  // Zoom to target area when user clicks RECHERCHER
-  useEffect(() => {
-    if (searchTrigger === 0) return
-    const map = mapRef.current
-    if (!map || !mapReady || targetKm == null || kmWaypoints.length === 0) return
-    const point = findPointAtKm(kmWaypoints, targetKm)
-    if (!point) return
-    userInteractedRef.current = true  // Prevent GPS from fighting the search flyTo
-    map.flyTo({ center: [point.lng, point.lat], zoom: 13, duration: 800 })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTrigger])
-
   // Centralized dimension update — same pattern as map-canvas.tsx in planning mode
   useEffect(() => {
     const map = mapRef.current
@@ -289,6 +277,47 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     map.flyTo({ center: [pos.lng, pos.lat], zoom: 14, offset: [0, offsetY], duration: 800 })
   }, [])
 
+  const fitToSearchZone = useCallback((targetKm: number, radiusKm: number, segs: MapSegmentData[], waypoints: MapWaypoint[]) => {
+    const map = mapRef.current
+    if (!map) return
+
+    // Pause GPS tracking (same pattern as dragstart/zoomstart)
+    userInteractedRef.current = true
+    useLiveStore.getState().setGpsTrackingActive(false)
+
+    // Zoom to the target area (where POIs are), not the full route from GPS to target
+    const fromKm = Math.max(0, targetKm - radiusKm)
+    const toKm = targetKm + radiusKm
+
+    const inRange = waypoints.filter((wp) => wp.distKm >= fromKm && wp.distKm <= toKm)
+    if (inRange.length === 0) {
+      fitToTrace(map, segs, true)
+      return
+    }
+
+    let minLng = inRange[0].lng, maxLng = inRange[0].lng
+    let minLat = inRange[0].lat, maxLat = inRange[0].lat
+    for (const wp of inRange) {
+      if (wp.lng < minLng) minLng = wp.lng
+      if (wp.lng > maxLng) maxLng = wp.lng
+      if (wp.lat < minLat) minLat = wp.lat
+      if (wp.lat > maxLat) maxLat = wp.lat
+    }
+
+    // Expand bounds by searchRadiusKm to show POI search area around the route
+    // 1° lat ≈ 111 km ; 1° lng ≈ 111 km × cos(lat)
+    const avgLat = (minLat + maxLat) / 2
+    const expand = radiusKm * 0.3
+    const expandLat = expand / 111.32
+    const expandLng = expand / (111.32 * Math.cos(avgLat * Math.PI / 180))
+
+    map.fitBounds(
+      [[minLng - expandLng, minLat - expandLat], [maxLng + expandLng, maxLat + expandLat]],
+      // Bottom padding ~240px accounts for LiveControls panel overlay
+      { padding: { top: 60, right: 60, bottom: 240, left: 60 }, maxZoom: 16, animate: true, duration: 600 },
+    )
+  }, [])
+
   useImperativeHandle(ref, () => ({
     getMap: () => mapRef.current,
     resetZoom: () => {
@@ -296,7 +325,8 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       fitToTrace(mapRef.current, segmentsRef.current, true)
     },
     centerOnGps,
-  }), [centerOnGps])
+    fitToSearchZone,
+  }), [centerOnGps, fitToSearchZone])
 
   return (
     <div className="relative h-full w-full">
