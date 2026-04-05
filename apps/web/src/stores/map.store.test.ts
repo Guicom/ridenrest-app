@@ -149,4 +149,31 @@ describe('useMapStore', () => {
     useMapStore.getState().setTraceClickedKm(null)
     expect(useMapStore.getState().traceClickedKm).toBeNull()
   })
+
+  it('resetAccommodationTypes restores all sub-types (Story 16.17, AC-6)', () => {
+    // Start with only hotel selected
+    expect(useMapStore.getState().activeAccommodationTypes.size).toBe(1)
+    expect(useMapStore.getState().activeAccommodationTypes.has('hotel')).toBe(true)
+
+    useMapStore.getState().resetAccommodationTypes()
+
+    const types = useMapStore.getState().activeAccommodationTypes
+    expect(types.size).toBe(5)
+    expect(types.has('hotel')).toBe(true)
+    expect(types.has('camp_site')).toBe(true)
+    expect(types.has('shelter')).toBe(true)
+    expect(types.has('hostel')).toBe(true)
+    expect(types.has('guesthouse')).toBe(true)
+  })
+
+  it('resetAccommodationTypes works after toggling types', () => {
+    // Toggle some types
+    useMapStore.getState().toggleAccommodationType('camp_site')
+    useMapStore.getState().toggleAccommodationType('shelter')
+    expect(useMapStore.getState().activeAccommodationTypes.size).toBe(3)
+
+    // Reset
+    useMapStore.getState().resetAccommodationTypes()
+    expect(useMapStore.getState().activeAccommodationTypes.size).toBe(5)
+  })
 })

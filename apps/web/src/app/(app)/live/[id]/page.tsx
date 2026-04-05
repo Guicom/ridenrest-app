@@ -27,6 +27,8 @@ import { LiveFiltersDrawer } from './_components/live-filters-drawer'
 import { Undo2, ChevronUp, ChevronDown, LocateFixed } from 'lucide-react'
 import { getCorridorCenter } from '@/lib/booking-url'
 import { Badge } from '@/components/ui/badge'
+import { ACCOMMODATION_SUB_TYPES } from '@/app/(app)/map/[id]/_components/accommodation-sub-types'
+import { NoResultsSubTypeBanner } from '@/app/(app)/map/[id]/_components/no-results-sub-type-banner'
 import { MapStylePicker } from '@/app/(app)/map/[id]/_components/map-style-picker'
 import { MapSearchOverlay } from '@/app/(app)/map/[id]/_components/map-search-overlay'
 import { ResetZoomButton } from '@/app/(app)/map/[id]/_components/reset-zoom-button'
@@ -124,6 +126,7 @@ export default function LivePage() {
 
   // Active filter count for badge
   const mapVisibleLayers = useMapStore((s) => s.visibleLayers)
+  const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes)
   const mapWeatherActive = useMapStore((s) => s.weatherActive)
   const mapWeatherDimension = useMapStore((s) => s.weatherDimension)
   const mapDensityColorEnabled = useMapStore((s) => s.densityColorEnabled)
@@ -148,6 +151,26 @@ export default function LivePage() {
     () => pois.filter((p) => (LAYER_CATEGORIES.accommodations as readonly string[]).includes(p.category)),
     [pois],
   )
+
+  // Detect "filter empty" for accommodations in live mode (Story 16.17, AC-4)
+  // In live mode, API already filters by activeAccommodationTypes, so we can't compute exact alternative counts.
+  // Detect: pois exist (other layers) but no accommodation pois, and not all acc types are selected.
+  const allAccommodationTypes = LAYER_CATEGORIES.accommodations as readonly string[]
+  const hasLiveUnfilteredResults = isLiveModeActive && !poisFetching && poisHasFetched
+    && mapVisibleLayers.has('accommodations')
+    && accommodationPois.length === 0
+    && activeAccommodationTypes.size < allAccommodationTypes.length
+  const liveActiveTypeLabels = useMemo(
+    () => ACCOMMODATION_SUB_TYPES.filter(({ type }) => activeAccommodationTypes.has(type)).map(({ label }) => label.toLowerCase()),
+    [activeAccommodationTypes],
+  )
+  // In live mode, we don't know the alternative counts — show non-selected types as available
+  const liveAlternatives = useMemo(() => {
+    if (!hasLiveUnfilteredResults) return []
+    return ACCOMMODATION_SUB_TYPES
+      .filter(({ type }) => !activeAccommodationTypes.has(type))
+      .map(({ label }) => ({ label: label.toLowerCase(), count: 0 }))
+  }, [hasLiveUnfilteredResults, activeAccommodationTypes])
 
   // Center point for the Rechercher sur dropdown (Booking/Airbnb) in LiveControls
   // Available as soon as live mode is active and the slider position is known — no search required
@@ -321,7 +344,19 @@ export default function LivePage() {
             message={`Connexion instable — ${pois.length} résultat${pois.length !== 1 ? 's' : ''} chargé${pois.length !== 1 ? 's' : ''}`}
           />
         )}
-        {mounted && showNoResultsBanner && !showOfflineBanner && !showErrorBanner && (
+        {/* Contextual sub-type filter banner — live mode (Story 16.17, AC-4) */}
+        {mounted && hasLiveUnfilteredResults && liveAlternatives.length > 0 && !showOfflineBanner && !showErrorBanner && (
+          <NoResultsSubTypeBanner
+            activeTypeLabels={liveActiveTypeLabels}
+            alternatives={liveAlternatives}
+            onResetFilters={() => {
+              useMapStore.getState().resetAccommodationTypes()
+              handleSearch()
+            }}
+            className="absolute top-16 left-1/2 -translate-x-1/2 z-40"
+          />
+        )}
+        {mounted && showNoResultsBanner && !hasLiveUnfilteredResults && !showOfflineBanner && !showErrorBanner && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 whitespace-nowrap rounded-lg bg-orange-500/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
             Aucun résultat dans cette zone
           </div>

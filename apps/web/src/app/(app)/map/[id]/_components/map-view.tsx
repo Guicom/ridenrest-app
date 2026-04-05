@@ -28,6 +28,8 @@ import { TraceClickCta } from './trace-click-cta'
 import { MapSearchOverlay } from './map-search-overlay'
 import { SidebarStagesSection } from './sidebar-stages-section'
 import { SidebarDensityCta } from './sidebar-density-cta'
+import { NoResultsSubTypeBanner } from './no-results-sub-type-banner'
+import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
 import { useStages } from '@/hooks/use-stages'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import { getStoredWeatherPace } from '@/lib/weather-pace'
@@ -61,7 +63,7 @@ export function MapView({ adventureId }: MapViewProps) {
   const [paceParams, setPaceParams] = useState<{ departureTime: string | null }>(() => ({
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers, activeAccommodationTypes } = useMapStore()
 
   // Reset transient map state when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
@@ -137,6 +139,25 @@ export function MapView({ adventureId }: MapViewProps) {
   const selectedPoi = selectedPoiId
     ? allPois.find((p) => p.id === selectedPoiId) ?? null
     : null
+
+  // Detect "filter empty" — accommodations exist but none match the active sub-type filter (AC-1, AC-2, Story 16.17)
+  const filteredAccommodations = poisByLayer.accommodations.filter((p) => activeAccommodationTypes.has(p.category))
+  const hasUnfilteredResults = searchCommitted && !poisPending && visibleLayers.has('accommodations')
+    && poisByLayer.accommodations.length > 0 && filteredAccommodations.length === 0
+  const alternativeCounts = useMemo(() => {
+    if (!hasUnfilteredResults) return []
+    const countByType: Record<string, number> = {}
+    for (const poi of poisByLayer.accommodations) {
+      countByType[poi.category] = (countByType[poi.category] ?? 0) + 1
+    }
+    return ACCOMMODATION_SUB_TYPES
+      .filter(({ type }) => !activeAccommodationTypes.has(type) && (countByType[type] ?? 0) > 0)
+      .map(({ type, label }) => ({ label: label.toLowerCase(), count: countByType[type] ?? 0 }))
+  }, [hasUnfilteredResults, poisByLayer.accommodations, activeAccommodationTypes])
+  const activeTypeLabels = useMemo(
+    () => ACCOMMODATION_SUB_TYPES.filter(({ type }) => activeAccommodationTypes.has(type)).map(({ label }) => label.toLowerCase()),
+    [activeAccommodationTypes],
+  )
 
   // Find which segment contains the selected POI (for Google Details lookup)
   const selectedSegmentId = selectedPoi
@@ -428,8 +449,18 @@ export function MapView({ adventureId }: MapViewProps) {
           {/* Loading overlay while POI search is pending (AC #4, Story 16.3) */}
           <MapSearchOverlay visible={searchCommitted && poisPending} />
 
+          {/* Contextual sub-type filter banner — blue, shown when accommodations exist but none match active filter (Story 16.17) */}
+          {hasUnfilteredResults && alternativeCounts.length > 0 && (
+            <NoResultsSubTypeBanner
+              activeTypeLabels={activeTypeLabels}
+              alternatives={alternativeCounts}
+              onResetFilters={() => useMapStore.getState().resetAccommodationTypes()}
+              className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30"
+            />
+          )}
+
           {/* No-results banner — orange, centered, shown after a committed search returns nothing */}
-          {searchCommitted && !poisPending && !poisError && allPois.length === 0 && readySegments.length > 0 && visibleLayers.size > 0 && (
+          {!hasUnfilteredResults && searchCommitted && !poisPending && !poisError && allPois.length === 0 && readySegments.length > 0 && visibleLayers.size > 0 && (
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 whitespace-nowrap rounded-lg bg-orange-500/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
               Aucun résultat dans cette zone
             </div>

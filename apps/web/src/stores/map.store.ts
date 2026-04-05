@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { MapLayer, PoiCategory } from '@ridenrest/shared'
+import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 
 export type { MapLayer }
@@ -48,6 +49,7 @@ interface MapState {
   setWeatherActive: (active: boolean) => void
   setWeatherDimension: (dimension: WeatherDimension) => void
   toggleAccommodationType: (type: PoiCategory) => void
+  resetAccommodationTypes: () => void
   setSelectedPoiId: (id: string | null) => void
   setSelectedStageId: (id: string | null) => void
   setTraceClickedKm: (km: number | null) => void
@@ -105,6 +107,9 @@ export const useMapStore = create<MapState>((set) => ({
       }
       return { activeAccommodationTypes: next }
     }),
+
+  resetAccommodationTypes: () =>
+    set({ activeAccommodationTypes: new Set(LAYER_CATEGORIES.accommodations) }),
 
   setSelectedPoiId: (id) => set({ selectedPoiId: id }),
 
