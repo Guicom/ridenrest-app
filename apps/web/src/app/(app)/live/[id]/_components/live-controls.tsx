@@ -1,9 +1,15 @@
 'use client'
 
+import { useEffect } from 'react'
 import { Search, SlidersHorizontal, MountainSnow, Clock } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useLiveStore } from '@/stores/live.store'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
+
+/** Round down to nearest multiple of step */
+export function roundDownToStep(value: number, step: number): number {
+  return Math.floor(value / step) * step
+}
 
 interface LiveControlsProps {
   onFiltersOpen: () => void
@@ -14,12 +20,27 @@ interface LiveControlsProps {
   center: { lat: number; lng: number } | null
   /** City name for Booking.com search. If provided, uses ?ss=city instead of coordinates. */
   city?: string | null
+  /** Max km ahead based on remaining distance. Defaults to 100 when undefined (GPS not snapped). */
+  maxAheadKm?: number
 }
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city }: LiveControlsProps) {
+const SLIDER_STEP = 5
+const DEFAULT_MAX = 100
+
+export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, maxAheadKm }: LiveControlsProps) {
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const setTargetAheadKm = useLiveStore((s) => s.setTargetAheadKm)
+
+  // Compute effective slider max: round down to step, minimum 5 (AC #1, #3, #4)
+  const effectiveMax = Math.max(SLIDER_STEP, roundDownToStep(maxAheadKm ?? DEFAULT_MAX, SLIDER_STEP))
+
+  // Clamp targetAheadKm when max shrinks below current value (AC #2)
+  useEffect(() => {
+    if (targetAheadKm > effectiveMax) {
+      setTargetAheadKm(effectiveMax)
+    }
+  }, [effectiveMax, targetAheadKm, setTargetAheadKm])
 
   const etaSummary = formatEtaSummary(targetAheadKm, speedKmh)
 
@@ -64,14 +85,14 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
 
       {/* Distance cible slider */}
       <Slider
-        value={[targetAheadKm]}
+        value={[Math.min(targetAheadKm, effectiveMax)]}
         onValueChange={(v: number | readonly number[]) => {
           const val = typeof v === 'number' ? v : v[0]
           setTargetAheadKm(val)
         }}
         min={5}
-        max={100}
-        step={5}
+        max={effectiveMax}
+        step={SLIDER_STEP}
         data-testid="slider-target"
         className="mb-8"
         thumbClassName="size-6 border-2 after:-inset-1"

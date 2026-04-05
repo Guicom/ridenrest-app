@@ -190,6 +190,14 @@ export default function LivePage() {
   // Elevation strip positions
   const elevationCurrentDistKm = currentKmOnRoute
   const elevationTargetDistKm = currentKmOnRoute !== null ? currentKmOnRoute + targetAheadKm : null
+  // Dynamic slider max — remaining distance on trace (Story 16.20)
+  const maxAheadKm = useMemo(() => {
+    if (currentKmOnRoute === null || allCumulativeWaypoints.length === 0) return undefined
+    const totalDistKm = allCumulativeWaypoints[allCumulativeWaypoints.length - 1].distKm
+    const remaining = totalDistKm - currentKmOnRoute
+    return Math.ceil(remaining)
+  }, [currentKmOnRoute, allCumulativeWaypoints])
+
   // D+ computation for LiveControls
   const elevationGain = useMemo(() => {
     if (currentKmOnRoute === null || allCumulativeWaypoints.length === 0) return null
@@ -384,6 +392,7 @@ export default function LivePage() {
                 elevationGain={elevationGain}
                 center={liveSearchCenter}
                 city={liveCity}
+                maxAheadKm={maxAheadKm}
               />
             )}
 

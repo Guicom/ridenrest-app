@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { LiveControls } from './live-controls'
+import { LiveControls, roundDownToStep } from './live-controls'
 import { useLiveStore } from '@/stores/live.store'
 
 afterEach(cleanup)
@@ -18,6 +18,9 @@ vi.mock('@/components/ui/slider', () => ({
       type="range"
       data-testid={props['data-testid'] as string}
       value={(props.value as number[])?.[0]}
+      min={props.min as number}
+      max={props.max as number}
+      step={props.step as number}
       onChange={(e) => {
         const fn = props.onValueChange as (v: number | readonly number[]) => void
         fn([Number(e.target.value)])
@@ -150,5 +153,64 @@ describe('LiveControls', () => {
   it('passes null city to SearchOnDropdown when city not provided', () => {
     render(<LiveControls {...defaultProps} />)
     expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('')
+  })
+
+  // ── Story 16.20: Dynamic slider max ──────────────────────────
+
+  describe('dynamic slider max (Story 16.20)', () => {
+    it('slider max reflects remaining distance (AC #1)', () => {
+      // total 200km, currentKm 50 → remaining 150, rounded to 150
+      render(<LiveControls {...defaultProps} maxAheadKm={150} />)
+      const slider = screen.getByTestId('slider-target')
+      expect(slider.getAttribute('max')).toBe('150')
+    })
+
+    it('slider max rounds down to step=5 (AC #1)', () => {
+      // remaining 143km → round down to 140
+      render(<LiveControls {...defaultProps} maxAheadKm={143} />)
+      const slider = screen.getByTestId('slider-target')
+      expect(slider.getAttribute('max')).toBe('140')
+    })
+
+    it('slider max minimum is 5 even when remaining < 5 (AC #3)', () => {
+      render(<LiveControls {...defaultProps} maxAheadKm={3} />)
+      const slider = screen.getByTestId('slider-target')
+      expect(slider.getAttribute('max')).toBe('5')
+    })
+
+    it('slider max defaults to 100 when maxAheadKm is undefined (AC #4)', () => {
+      render(<LiveControls {...defaultProps} />)
+      const slider = screen.getByTestId('slider-target')
+      expect(slider.getAttribute('max')).toBe('100')
+    })
+
+    it('clamps targetAheadKm when max shrinks below current value (AC #2)', () => {
+      // targetAheadKm=30 in store, new max=20 → should clamp to 20
+      useLiveStore.setState({ targetAheadKm: 30 })
+      render(<LiveControls {...defaultProps} maxAheadKm={22} />)
+      // effectiveMax = roundDown(22, 5) = 20, and 30 > 20 → clamp
+      expect(useLiveStore.getState().targetAheadKm).toBe(20)
+    })
+
+    it('does not clamp when targetAheadKm is within max', () => {
+      useLiveStore.setState({ targetAheadKm: 30 })
+      render(<LiveControls {...defaultProps} maxAheadKm={200} />)
+      expect(useLiveStore.getState().targetAheadKm).toBe(30)
+    })
+  })
+})
+
+describe('roundDownToStep', () => {
+  it('rounds 143 down to 140 with step 5', () => {
+    expect(roundDownToStep(143, 5)).toBe(140)
+  })
+  it('keeps exact multiples unchanged', () => {
+    expect(roundDownToStep(150, 5)).toBe(150)
+  })
+  it('rounds 9 down to 5 with step 5', () => {
+    expect(roundDownToStep(9, 5)).toBe(5)
+  })
+  it('rounds 4 down to 0 with step 5', () => {
+    expect(roundDownToStep(4, 5)).toBe(0)
   })
 })
