@@ -200,6 +200,7 @@ development_status:
   16-18-pwa-scope-authenticated-only: done
   16-19-live-mode-google-places-fallback: done  # bug: live mode skip Google Places (source primaire) quand overpassEnabled=false → zéro résultat
   16-20-live-slider-dynamic-max-remaining-km: done  # slider live mode max dynamique = distance restante (pas 100km fixe)
+  16-21-booking-url-postal-code: done  # ajouter code postal au ?ss= Booking pour désambiguïser les villes
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

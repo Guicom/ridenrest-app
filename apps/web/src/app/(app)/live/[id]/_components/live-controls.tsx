@@ -20,6 +20,8 @@ interface LiveControlsProps {
   center: { lat: number; lng: number } | null
   /** City name for Booking.com search. If provided, uses ?ss=city instead of coordinates. */
   city?: string | null
+  /** Postal code appended to city in Booking.com ?ss= param for disambiguation. */
+  postcode?: string | null
   /** Max km ahead based on remaining distance. Defaults to 100 when undefined (GPS not snapped). */
   maxAheadKm?: number
 }
@@ -27,7 +29,7 @@ interface LiveControlsProps {
 const SLIDER_STEP = 5
 const DEFAULT_MAX = 100
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, maxAheadKm }: LiveControlsProps) {
+export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, postcode, maxAheadKm }: LiveControlsProps) {
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const setTargetAheadKm = useLiveStore((s) => s.setTargetAheadKm)
@@ -108,7 +110,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
           <Search className="h-4 w-4" aria-hidden="true" />
           RECHERCHER
         </button>
-        <SearchOnDropdown center={center} city={city} variant="action" className="flex-1" />
+        <SearchOnDropdown center={center} city={city} postcode={postcode} variant="action" className="flex-1" />
       </div>
     </div>
   )

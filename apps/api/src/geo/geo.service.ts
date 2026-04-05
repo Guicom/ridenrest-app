@@ -18,17 +18,20 @@ export class GeoService {
     }
   }
 
-  async reverseCity(lat: number, lng: number): Promise<string | null> {
+  async reverseCity(lat: number, lng: number): Promise<{ city: string | null; postcode: string | null }> {
     if (!this.geoapifyApiKey) {
       this.logger.debug(`reverseCity(${lat}, ${lng}): GEOAPIFY_API_KEY not set`)
-      return null
+      return { city: null, postcode: null }
     }
 
     const redis = this.redisProvider.getClient()
-    const key = `geo:city:${lat.toFixed(3)}:${lng.toFixed(3)}`
+    const key = `geo:cityv2:${lat.toFixed(3)}:${lng.toFixed(3)}`
 
     const cached = await redis.get(key)
-    if (cached !== null) return cached === '' ? null : cached
+    if (cached !== null) {
+      const parsed = JSON.parse(cached) as { city: string | null; postcode: string | null }
+      return parsed
+    }
 
     const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&format=json&apiKey=${this.geoapifyApiKey}`
 
@@ -37,23 +40,23 @@ export class GeoService {
       res = await fetch(url)
     } catch {
       this.logger.warn(`Geoapify fetch failed for lat=${lat} lng=${lng}`)
-      return null
+      return { city: null, postcode: null }
     }
 
     if (!res.ok) {
       this.logger.warn(`Geoapify returned HTTP ${res.status} for lat=${lat} lng=${lng}`)
-      return null
+      return { city: null, postcode: null }
     }
 
     const data = await res.json() as {
-      results: Array<{ city?: string; town?: string; village?: string; municipality?: string }>
+      results: Array<{ city?: string; town?: string; village?: string; municipality?: string; postcode?: string }>
     }
     const result = data.results?.[0]
     const city = result?.city ?? result?.town ?? result?.village ?? result?.municipality ?? null
-    this.logger.debug(`reverseCity(${lat}, ${lng}): result=${JSON.stringify(result)}, city=${city}`)
+    const postcode = result?.postcode ?? null
+    this.logger.debug(`reverseCity(${lat}, ${lng}): result=${JSON.stringify(result)}, city=${city}, postcode=${postcode}`)
 
-    // Cache empty string for null to avoid re-fetching unknown areas
-    await redis.set(key, city ?? '', 'EX', GEOAPIFY_CACHE_TTL)
-    return city
+    await redis.set(key, JSON.stringify({ city, postcode }), 'EX', GEOAPIFY_CACHE_TTL)
+    return { city, postcode }
   }
 }

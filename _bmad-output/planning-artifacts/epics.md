@@ -2281,6 +2281,92 @@ So that the PWA experience feels like a native app — no marketing pages, strai
 
 ---
 
+### Story 16.19: Bug Fix — Live Mode POI Search Skips Google Places (Primary Source) When Overpass Disabled
+
+> **Ajouté 2026-04-05** — Bug critique : en live mode avec `overpassEnabled=false`, `findLiveModePois` retourne directement le cache DB sans jamais appeler Google Places (source primaire). En prod, la DB est vide → zéro résultat. Rappel archi : Google Places = API de base, Overpass/OSM = complément optionnel.
+
+As a **cyclist using Live mode with overpassEnabled=false**,
+I want the POI search to call Google Places (the primary data source) when the local DB cache is empty,
+So that I see nearby accommodations and POIs — Google Places being the base API, Overpass/OSM being the optional complement.
+
+**Acceptance Criteria:**
+
+**Given** `overpassEnabled=false` en live mode,
+**When** le cache DB pour la zone cible est vide,
+**Then** `prefetchAndInsertGooglePois` (source primaire) est appelé avec la bbox calculée, puis `findPoisNearPoint` retourne les résultats fraîchement insérés.
+
+**Given** `overpassEnabled=false` en live mode,
+**When** le cache DB pour la zone cible contient déjà des POIs,
+**Then** aucun appel Google Places n'est fait — les résultats en cache sont retournés directement.
+
+**Given** `overpassEnabled=false` ET `googlePlacesProvider.isConfigured()` retourne `false`,
+**When** la recherche live mode s'exécute,
+**Then** le cache DB est retourné tel quel (même comportement qu'actuellement — pas d'erreur, résultats potentiellement vides).
+
+---
+
+### Story 16.20: Live Mode Slider — Dynamic Max Based on Remaining Distance
+
+> **Ajouté 2026-04-05** — Le slider "Mon hôtel dans X km" est hardcodé à max 100 km. Sur une aventure de 300 km, l'utilisateur ne peut pas chercher au-delà de 100 km devant lui. Le max devrait être la distance restante sur la trace.
+
+As a **cyclist in Live mode**,
+I want the "Mon hôtel dans X km" slider to go up to the remaining distance of my adventure (not a fixed 100 km),
+So that I can search for accommodations along the entire remaining route, not just the next 100 km.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est au km X sur une trace de distance totale D,
+**When** le slider s'affiche,
+**Then** `max` vaut `Math.ceil(D - X)` arrondi au multiple de 5 inférieur.
+
+**Given** le slider max diminue (l'utilisateur avance sur la trace),
+**When** `targetAheadKm > newMax`,
+**Then** `targetAheadKm` est automatiquement réduit au nouveau max.
+
+**Given** `currentKmOnRoute` est null (GPS pas encore snappé) ou la distance totale est inconnue,
+**When** le slider s'affiche,
+**Then** `max` par défaut vaut 100 (comportement actuel préservé).
+
+---
+
+### Story 16.21: Booking URL — Ajouter le Code Postal au Paramètre de Recherche
+
+> **Ajouté 2026-04-05** — Amélioration pertinence Booking : inclure le code postal dans le `?ss=` pour désambiguïser les homonymes de villes (ex. "Saint-Jean-de-Luz 64500" plutôt que "Saint-Jean-de-Luz" seul).
+
+As a **cyclist using Booking.com deep links from the app**,
+I want the Booking search URL to include the postal code alongside the city name,
+So that search results target the correct location — especially for common city names that exist in multiple regions.
+
+**Postal code priority chain:** Google Places `addressComponents[postal_code]` (PRIMARY) → OSM `addr:postcode` (complément) → Geoapify `postcode` (fallback zone sans POI).
+
+**Acceptance Criteria:**
+
+**Given** un POI hébergement avec Google Places details chargés,
+**When** `getPlaceDetails()` retourne les `addressComponents`,
+**Then** le `postal_code` est extrait (type `postal_code`) et exposé dans `GooglePlaceDetails.postalCode`.
+
+**Given** un POI hébergement avec `details.postalCode` disponible (Google Places = source primaire),
+**When** l'URL Booking est construite,
+**Then** le paramètre `?ss=` vaut `{ville} {codepostal}` (ex: `?ss=Saint-Jean-de-Luz%2064500`).
+
+**Given** un POI Overpass (opt-in) sans détails Google mais avec `addr:postcode` dans rawData,
+**When** l'URL Booking est construite,
+**Then** le `addr:postcode` OSM est utilisé comme fallback.
+
+**Given** le `SearchOnDropdown` global (sidebar ou live — pas de POI spécifique),
+**When** `useReverseCity` résout la zone via Geoapify,
+**Then** le `postcode` Geoapify est aussi retourné et inclus dans `?ss=`.
+
+**Given** une ville disponible MAIS code postal absent (aucune source),
+**When** l'URL Booking est construite,
+**Then** le `?ss=` utilise la ville seule (pas de régression).
+
+**Given** ni ville ni code postal disponibles,
+**When** l'URL Booking est construite,
+**Then** fallback coordonnées GPS `?latitude=&longitude=&dest_type=latlong` (pas de régression).
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

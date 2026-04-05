@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { buildBookingSearchUrl, buildAirbnbSearchUrl } from '@/lib/booking-url'
+import { buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl } from '@/lib/booking-url'
 
 interface SearchOnDropdownProps {
   /** Waypoint center for the search area. null = disabled (no URL to open). */
   center: { lat: number; lng: number } | null
   /** City name for Booking.com search. If provided, uses ?ss=city instead of coordinates. */
   city?: string | null
+  /** Postal code appended to city in Booking.com ?ss= param for disambiguation. */
+  postcode?: string | null
   /**
    * 'outline' — planning sidebar style (border, text, rounded-lg)
    * 'action'  — live controls action row style (rounded-full, bg-primary)
@@ -17,7 +19,7 @@ interface SearchOnDropdownProps {
   className?: string
 }
 
-export function SearchOnDropdown({ center, city, variant = 'outline', className }: SearchOnDropdownProps) {
+export function SearchOnDropdown({ center, city, postcode, variant = 'outline', className }: SearchOnDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -30,7 +32,11 @@ export function SearchOnDropdown({ center, city, variant = 'outline', className 
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [open])
 
-  const bookingUrl = city ? buildBookingSearchUrl(city) : null
+  const bookingUrl = city
+    ? buildBookingSearchUrl(city, postcode)
+    : center
+      ? buildBookingCoordUrl(center)
+      : null
   const airbnbUrl = center ? buildAirbnbSearchUrl(center) : null
 
   const triggerClass =

@@ -5,7 +5,7 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
 
 export function useReverseCity(
   center: { lat: number; lng: number } | null,
-): { city: string | null; isPending: boolean } {
+): { city: string | null; postcode: string | null; isPending: boolean } {
   const roundedKey = center
     ? `${center.lat.toFixed(3)},${center.lng.toFixed(3)}`
     : null
@@ -20,6 +20,7 @@ export function useReverseCity(
 
   return {
     city: data?.city ?? null,
+    postcode: data?.postcode ?? null,
     isPending: center !== null && isPending,
   }
 }

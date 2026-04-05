@@ -55,7 +55,7 @@ export function SearchRangeControl({
         : null,
     [searchCommitted, visibleLayers, waypoints, fromKm, toKm],
   )
-  const { city: corridorCity } = useReverseCity(corridorCenter)
+  const { city: corridorCity, postcode: corridorPostcode } = useReverseCity(corridorCenter)
 
   // rangeKm local state — initialized from store values
   const [rangeKm, setRangeKm] = useState(() => toKm - fromKm)
@@ -281,6 +281,7 @@ export function SearchRangeControl({
             <SearchOnDropdown
               center={corridorCenter}
               city={corridorCity}
+              postcode={corridorPostcode}
               variant="outline"
               className="w-full"
             />

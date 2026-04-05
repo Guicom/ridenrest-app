@@ -52,17 +52,21 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
     segmentId,
   )
 
-  // City extraction — hooks must be called before early return (Rules of Hooks)
+  // City + Postcode extraction — hooks must be called before early return (Rules of Hooks)
   const isAccommodation = poi ? ACCOMMODATION_CATEGORIES.includes(poi.category) : false
   const rawData = poi ? (poi as Poi & { rawData?: Record<string, string> }).rawData : undefined
+  const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
   const extractedCity = isAccommodation
-    ? (details?.locality ?? extractCityFromOsmRawData(rawData) ?? null)
+    ? (details?.locality ?? osmData?.city ?? null)
     : null
   const needsReverseCity = isAccommodation && !extractedCity && poi !== null
-  const { city: reverseCity } = useReverseCity(
+  const { city: reverseCity, postcode: reversePostcode } = useReverseCity(
     needsReverseCity ? { lat: poi!.lat, lng: poi!.lng } : null,
   )
   const poiCity = extractedCity ?? reverseCity
+  const poiPostcode = isAccommodation
+    ? (details?.postalCode ?? osmData?.postcode ?? reversePostcode)
+    : null
 
   if (!poi) return null
 
@@ -207,6 +211,7 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
                 <SearchOnDropdown
                   center={{ lat: poi.lat, lng: poi.lng }}
                   city={poiCity}
+                  postcode={poiPostcode}
                   variant="action"
                   className="w-full"
                 />

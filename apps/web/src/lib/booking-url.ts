@@ -21,24 +21,31 @@ export function getCorridorCenter(
   return { lat: closest.lat, lng: closest.lng }
 }
 
-export function buildBookingSearchUrl(city: string): string {
-  return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}`
+export function buildBookingSearchUrl(city: string, postcode?: string | null): string {
+  const ss = postcode ? `${city} ${postcode}` : city
+  return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(ss)}`
 }
 
 /**
- * Extracts city from OSM rawData tags.
- * Priority: addr:city > addr:town > addr:village
+ * Extracts city and postcode from OSM rawData tags.
+ * City priority: addr:city > addr:town > addr:village
  */
 export function extractCityFromOsmRawData(
   rawData?: Record<string, unknown>,
-): string | null {
-  if (!rawData) return null
-  return (
+): { city: string | null; postcode: string | null } {
+  if (!rawData) return { city: null, postcode: null }
+  const city =
     (rawData['addr:city'] as string | undefined) ??
     (rawData['addr:town'] as string | undefined) ??
     (rawData['addr:village'] as string | undefined) ??
     null
-  )
+  const postcode = (rawData['addr:postcode'] as string | undefined) ?? null
+  return { city, postcode }
+}
+
+/** Fallback when no city is available — uses GPS coordinates for Booking.com search */
+export function buildBookingCoordUrl(center: { lat: number; lng: number }): string {
+  return `https://www.booking.com/searchresults.html?latitude=${center.lat}&longitude=${center.lng}&dest_type=latlong`
 }
 
 /** Bounding box ±0.2° (≈ 22 km) autour du centre — Airbnb requiert un bbox pour la recherche par coordonnées */

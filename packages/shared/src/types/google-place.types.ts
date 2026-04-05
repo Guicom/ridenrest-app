@@ -9,6 +9,8 @@ export interface GooglePlaceDetails {
   formattedAddress: string | null
   /** City/town/village extracted from addressComponents (locality type). */
   locality: string | null
+  /** Postal code extracted from addressComponents (postal_code type). */
+  postalCode: string | null
   lat: number | null
   lng: number | null
   rating: number | null

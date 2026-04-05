@@ -37,11 +37,13 @@ describe('SearchOnDropdown', () => {
     expect(screen.getByTestId('search-on-airbnb')).toBeDefined()
   })
 
-  it('shows only Airbnb when no city', () => {
+  it('shows both Booking (coord fallback) and Airbnb when no city but center available', () => {
     render(<SearchOnDropdown center={center} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
-    expect(screen.queryByTestId('search-on-booking')).toBeNull()
+    expect(screen.getByTestId('search-on-booking')).toBeDefined()
     expect(screen.getByTestId('search-on-airbnb')).toBeDefined()
+    const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
+    expect(link.href).toContain('dest_type=latlong')
   })
 
   it('Booking.com link uses ?ss=city when city provided', () => {
@@ -55,16 +57,29 @@ describe('SearchOnDropdown', () => {
     expect(link.getAttribute('rel')).toBe('noopener noreferrer')
   })
 
-  it('Booking.com link hidden when no city provided', () => {
+  it('Booking.com uses coord fallback when no city but center available', () => {
     render(<SearchOnDropdown center={center} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
-    expect(screen.queryByTestId('search-on-booking')).toBeNull()
+    const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
+    expect(link.href).toContain('latitude=43.5')
+    expect(link.href).toContain('longitude=1.4')
+    expect(link.href).not.toContain('ss=')
   })
 
-  it('Booking.com link hidden when city is null', () => {
+  it('Booking.com link includes postcode in ss param when both city and postcode provided', () => {
+    render(<SearchOnDropdown center={center} city="Saint-Jean-de-Luz" postcode="64500" />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
+    expect(link.href).toContain('ss=Saint-Jean-de-Luz%2064500')
+  })
+
+  it('Booking.com link uses coordinates fallback when city is null but center available (AC #6)', () => {
     render(<SearchOnDropdown center={center} city={null} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
-    expect(screen.queryByTestId('search-on-booking')).toBeNull()
+    const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
+    expect(link.href).toContain('latitude=43.5')
+    expect(link.href).toContain('longitude=1.4')
+    expect(link.href).toContain('dest_type=latlong')
   })
 
   it('Airbnb link has correct bbox URL', () => {

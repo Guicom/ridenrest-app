@@ -320,6 +320,7 @@ describe('GooglePlacesProvider', () => {
             { longText: 'Rue Test', types: ['route'] },
             { longText: 'Paris', types: ['locality', 'political'] },
             { longText: 'France', types: ['country', 'political'] },
+            { longText: '75001', types: ['postal_code'] },
           ],
           location: { latitude: 48.8566, longitude: 2.3522 },
           rating: 4.2,
@@ -337,6 +338,7 @@ describe('GooglePlacesProvider', () => {
         displayName: 'Hotel Test',
         formattedAddress: '1 Rue Test, Paris',
         locality: 'Paris',
+        postalCode: '75001',
         lat: 48.8566,
         lng: 2.3522,
         rating: 4.2,
@@ -365,6 +367,7 @@ describe('GooglePlacesProvider', () => {
 
       expect(result.displayName).toBeNull()
       expect(result.formattedAddress).toBeNull()
+      expect(result.postalCode).toBeNull()
       expect(result.lat).toBeNull()
       expect(result.lng).toBeNull()
       expect(result.rating).toBeNull()

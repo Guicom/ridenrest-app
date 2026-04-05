@@ -10,8 +10,7 @@ export class GeoController {
 
   @Get('reverse-city')
   @ApiOperation({ summary: 'Reverse geocode lat/lng to city name' })
-  async reverseCity(@Query() dto: ReverseCityDto): Promise<{ city: string | null }> {
-    const city = await this.geoService.reverseCity(dto.lat, dto.lng)
-    return { city }
+  async reverseCity(@Query() dto: ReverseCityDto): Promise<{ city: string | null; postcode: string | null }> {
+    return this.geoService.reverseCity(dto.lat, dto.lng)
   }
 }

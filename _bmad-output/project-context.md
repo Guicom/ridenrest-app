@@ -466,7 +466,7 @@ Overpass API calls are **opt-in** — disabled by default for all users.
 - `profiles.overpass_enabled boolean DEFAULT false` — persisted in DB
 - NestJS: `GET /api/profile` + `PATCH /api/profile` — `ProfileModule`
 - Frontend: `useProfile()` hook reads the flag, passes it to `getPois()` and `getLivePois()`
-- Gate applies to **both planning and live mode**: `PoisService.findPois()` early-returns DB cache (no Redis, no Overpass) when `overpassEnabled=false`
+- Gate applies to **both planning and live mode**: when `overpassEnabled=false`, only Google Places (primary source) is used via DB cache; when `overpassEnabled=true`, Overpass complements Google Places results
 - TQ query keys include `overpassEnabled` to avoid cache sharing between opt-in/opt-out
 - Settings page: `OverpassToggle` component, section "Recherche de points d'intérêt"
 

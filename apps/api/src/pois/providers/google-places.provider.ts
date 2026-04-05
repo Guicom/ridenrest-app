@@ -121,11 +121,17 @@ export class GooglePlacesProvider {
       (c) => c.types?.includes('locality'),
     )?.longText ?? null
 
+    // Extract postal code from addressComponents
+    const postalCode = data.addressComponents?.find(
+      (c) => c.types?.includes('postal_code'),
+    )?.longText ?? null
+
     return {
       placeId,
       displayName: data.displayName?.text ?? null,
       formattedAddress: data.formattedAddress ?? null,
       locality,
+      postalCode,
       lat: data.location?.latitude ?? null,
       lng: data.location?.longitude ?? null,
       rating: data.rating ?? null,

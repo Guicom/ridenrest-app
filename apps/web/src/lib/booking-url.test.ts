@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getCorridorCenter, buildBookingSearchUrl, buildAirbnbSearchUrl, extractCityFromOsmRawData } from './booking-url'
+import { getCorridorCenter, buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl, extractCityFromOsmRawData } from './booking-url'
 import type { MapWaypoint } from '@ridenrest/shared'
 
 const makeWp = (distKm: number, lat: number, lng: number): MapWaypoint => ({
@@ -70,35 +70,73 @@ describe('buildBookingSearchUrl', () => {
   it('targets booking.com searchresults page', () => {
     expect(buildBookingSearchUrl('Pamplona')).toContain('https://www.booking.com/searchresults.html')
   })
+
+  it('appends postcode to city when provided', () => {
+    const url = buildBookingSearchUrl('Saint-Jean-de-Luz', '64500')
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Saint-Jean-de-Luz%2064500')
+  })
+
+  it('ignores null postcode', () => {
+    expect(buildBookingSearchUrl('Toulouse', null)).toBe('https://www.booking.com/searchresults.html?ss=Toulouse')
+  })
+
+  it('ignores undefined postcode', () => {
+    expect(buildBookingSearchUrl('Toulouse', undefined)).toBe('https://www.booking.com/searchresults.html?ss=Toulouse')
+  })
+})
+
+describe('buildBookingCoordUrl', () => {
+  it('uses latitude, longitude and dest_type=latlong params', () => {
+    const url = buildBookingCoordUrl({ lat: 43.5, lng: 1.4 })
+    expect(url).toBe('https://www.booking.com/searchresults.html?latitude=43.5&longitude=1.4&dest_type=latlong')
+  })
+
+  it('does not include ss param', () => {
+    const url = buildBookingCoordUrl({ lat: 48.8566, lng: 2.3522 })
+    expect(url).not.toContain('ss=')
+  })
+
+  it('targets booking.com searchresults page', () => {
+    expect(buildBookingCoordUrl({ lat: 0, lng: 0 })).toContain('https://www.booking.com/searchresults.html')
+  })
 })
 
 describe('extractCityFromOsmRawData', () => {
-  it('returns null for undefined rawData', () => {
-    expect(extractCityFromOsmRawData(undefined)).toBeNull()
+  it('returns nulls for undefined rawData', () => {
+    expect(extractCityFromOsmRawData(undefined)).toEqual({ city: null, postcode: null })
   })
 
-  it('returns null for empty rawData', () => {
-    expect(extractCityFromOsmRawData({})).toBeNull()
+  it('returns nulls for empty rawData', () => {
+    expect(extractCityFromOsmRawData({})).toEqual({ city: null, postcode: null })
   })
 
-  it('returns addr:city if present', () => {
-    expect(extractCityFromOsmRawData({ 'addr:city': 'Pamplona' })).toBe('Pamplona')
+  it('returns addr:city and addr:postcode if present', () => {
+    expect(extractCityFromOsmRawData({ 'addr:city': 'Pamplona', 'addr:postcode': '31001' }))
+      .toEqual({ city: 'Pamplona', postcode: '31001' })
   })
 
   it('falls back to addr:town when addr:city absent', () => {
-    expect(extractCityFromOsmRawData({ 'addr:town': 'Saint-Girons' })).toBe('Saint-Girons')
+    expect(extractCityFromOsmRawData({ 'addr:town': 'Saint-Girons' }).city).toBe('Saint-Girons')
   })
 
   it('falls back to addr:village when addr:city and addr:town absent', () => {
-    expect(extractCityFromOsmRawData({ 'addr:village': 'Eylie' })).toBe('Eylie')
+    expect(extractCityFromOsmRawData({ 'addr:village': 'Eylie' }).city).toBe('Eylie')
   })
 
   it('prefers addr:city over addr:town', () => {
-    expect(extractCityFromOsmRawData({ 'addr:city': 'Toulouse', 'addr:town': 'Other' })).toBe('Toulouse')
+    expect(extractCityFromOsmRawData({ 'addr:city': 'Toulouse', 'addr:town': 'Other' }).city).toBe('Toulouse')
   })
 
   it('prefers addr:town over addr:village', () => {
-    expect(extractCityFromOsmRawData({ 'addr:town': 'Miramont', 'addr:village': 'Hamlet' })).toBe('Miramont')
+    expect(extractCityFromOsmRawData({ 'addr:town': 'Miramont', 'addr:village': 'Hamlet' }).city).toBe('Miramont')
+  })
+
+  it('returns postcode null when addr:postcode absent', () => {
+    expect(extractCityFromOsmRawData({ 'addr:city': 'Toulouse' }).postcode).toBeNull()
+  })
+
+  it('extracts addr:postcode from OSM rawData', () => {
+    expect(extractCityFromOsmRawData({ 'addr:postcode': '31000' }).postcode).toBe('31000')
   })
 })
 

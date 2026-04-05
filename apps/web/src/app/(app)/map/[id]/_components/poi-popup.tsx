@@ -113,14 +113,18 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     segmentId,
   )
 
-  // City: Google locality → OSM rawData (Overpass POIs) → Geoapify reverse geocoding
+  // City + Postcode: Google Places (primary) → OSM rawData (Overpass POIs) → Geoapify reverse geocoding
   const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
+  const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
   const extractedCity = isAccommodation
-    ? (details?.locality ?? extractCityFromOsmRawData(rawData))
+    ? (details?.locality ?? osmData?.city ?? null)
     : null
   const needsReverseCity = isAccommodation && !extractedCity
-  const { city: reverseCity } = useReverseCity(needsReverseCity ? { lat: poi.lat, lng: poi.lng } : null)
+  const { city: reverseCity, postcode: reversePostcode } = useReverseCity(needsReverseCity ? { lat: poi.lat, lng: poi.lng } : null)
   const poiCity = extractedCity ?? reverseCity
+  const poiPostcode = isAccommodation
+    ? (details?.postalCode ?? osmData?.postcode ?? reversePostcode)
+    : null
 
 
 
@@ -346,6 +350,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
                 <SearchOnDropdown
                   center={{ lat: poi.lat, lng: poi.lng }}
                   city={poiCity}
+                  postcode={poiPostcode}
                   variant="action"
                   className="w-full"
                 />
