@@ -145,8 +145,8 @@ describe('PoisService', () => {
         .rejects.toThrow(BadRequestException)
     })
 
-    it('throws BadRequestException when range > 30km', async () => {
-      await expect(service.findPois({ ...baseDto, fromKm: 0, toKm: 31 }, userId))
+    it('throws BadRequestException when range > 50km', async () => {
+      await expect(service.findPois({ ...baseDto, fromKm: 0, toKm: 51 }, userId))
         .rejects.toThrow(BadRequestException)
     })
   })

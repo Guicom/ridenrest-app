@@ -7,8 +7,11 @@ export const RDP_EPSILON = 0.0001
 /** Corridor width for POI search bbox in meters (3km each side) */
 export const CORRIDOR_WIDTH_M = 3000
 
-/** Maximum km range for a single POI corridor search */
-export const MAX_SEARCH_RANGE_KM = 30
+/** Maximum km range for a single POI corridor search (planning mode) */
+export const MAX_SEARCH_RANGE_KM = 50
+
+/** Maximum radius in km for live mode POI search (distance from trace) */
+export const MAX_LIVE_RADIUS_KM = 20
 
 /** Maximum GPX file size in bytes (10MB) */
 export const MAX_GPX_FILE_SIZE_BYTES = 10 * 1024 * 1024

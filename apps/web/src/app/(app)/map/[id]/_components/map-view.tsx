@@ -178,10 +178,11 @@ export function MapView({ adventureId }: MapViewProps) {
     if (!stageClickMode) setHoverKmPreview(null)
   }, [stageClickMode])
 
-  // Auto-zoom to corridor after POI search completes (AC #1, Story 16.3)
+  // Auto-zoom to corridor after POI search completes (AC #1, Story 16.3 + Story 16.15)
   // NOTE: mapFromKm, mapToKm, readySegments intentionally excluded from deps —
   // they are stable during an active search, and including them would cause the
-  // cleanup to reset prevIsPendingRef before the transition fires.
+  // cleanup to reset refs before the transition fires.
+  const prevSearchCommittedRef = useRef(false)
   const prevIsPendingRef = useRef(false)
   const mapFromKmRef = useRef(mapFromKm)
   const mapToKmRef = useRef(mapToKm)
@@ -190,11 +191,19 @@ export function MapView({ adventureId }: MapViewProps) {
   useEffect(() => { mapToKmRef.current = mapToKm }, [mapToKm])
   useEffect(() => { readySegmentsRef.current = readySegments }, [readySegments])
   useEffect(() => {
-    if (searchCommitted && prevIsPendingRef.current && !poisPending) {
+    const justCommitted = searchCommitted && !prevSearchCommittedRef.current
+    const justResolved = searchCommitted && prevIsPendingRef.current && !poisPending
+
+    if ((justCommitted && !poisPending) || justResolved) {
       mapCanvasRef.current?.fitToCorridorRange(mapFromKmRef.current, mapToKmRef.current, readySegmentsRef.current)
     }
+
+    prevSearchCommittedRef.current = searchCommitted
     prevIsPendingRef.current = poisPending
-    return () => { prevIsPendingRef.current = false }
+    return () => {
+      prevIsPendingRef.current = false
+      prevSearchCommittedRef.current = false
+    }
   }, [poisPending, searchCommitted])
 
   // Clear trace CTA when search is committed (AC #3, Story 16.3)

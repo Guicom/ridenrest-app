@@ -17,11 +17,12 @@ vi.mock('@/lib/api-client', () => ({
   getAdventureMapData: vi.fn(),
 }))
 
-// Mock usePois hook
+// Mock usePois hook — mutable isPending for auto-zoom tests
+let mockPoisIsPending = false
 vi.mock('@/hooks/use-pois', () => ({
   usePois: () => ({
     poisByLayer: { accommodations: [], restaurants: [], supplies: [], bike: [] },
-    isPending: false,
+    isPending: mockPoisIsPending,
     hasError: false,
   }),
 }))
@@ -38,8 +39,9 @@ vi.mock('@/hooks/use-density', () => ({
   }),
 }))
 
-// Mutable map store state for Story 8.4 tests
+// Mutable map store state for Story 8.4 + 16.15 tests
 let mockMapStoreVisibleLayers = new Set<string>()
+let mockSearchCommitted = false
 
 // Mock map store
 vi.mock('@/stores/map.store', () => ({
@@ -60,7 +62,7 @@ vi.mock('@/stores/map.store', () => ({
     toggleAccommodationType: vi.fn(),
     selectedStageId: null,
     setSelectedStageId: vi.fn(),
-    searchCommitted: false,
+    searchCommitted: mockSearchCommitted,
     setSearchCommitted: vi.fn(),
     traceClickedKm: null,
     setTraceClickedKm: vi.fn(),
@@ -77,12 +79,30 @@ vi.mock('./poi-detail-sheet', () => ({
   PoiDetailSheet: () => null,
 }))
 
-// Mock MapCanvas to avoid WebGL in tests
-vi.mock('./map-canvas', () => ({
-  MapCanvas: ({ segments, stages }: { segments: unknown[]; stages?: unknown[] }) => (
-    <div data-testid="map-canvas" data-segments={segments.length} data-stage-count={stages?.length ?? 0} />
-  ),
-}))
+// Mock MapCanvas to avoid WebGL in tests — forwardRef for auto-zoom ref tests
+const mockFitToCorridorRange = vi.fn()
+vi.mock('./map-canvas', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react')
+  return {
+    MapCanvas: React.forwardRef(function MockMapCanvas(
+      { segments, stages }: { segments: unknown[]; stages?: unknown[] },
+      ref: unknown,
+    ) {
+      React.useImperativeHandle(ref, () => ({
+        fitToCorridorRange: mockFitToCorridorRange,
+        getMap: () => null,
+        resetZoom: () => {},
+        updateCrosshair: () => {},
+      }))
+      return React.createElement('div', {
+        'data-testid': 'map-canvas',
+        'data-segments': (segments as unknown[]).length,
+        'data-stage-count': ((stages as unknown[]) ?? []).length,
+      })
+    }),
+  }
+})
 
 // Mock ElevationProfile to avoid Recharts in map-view integration tests
 vi.mock('./elevation-profile', () => ({
@@ -192,6 +212,9 @@ describe('MapView', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
     mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockFitToCorridorRange.mockClear()
   })
 
   it('shows Skeleton when isPending', () => {
@@ -256,6 +279,9 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
     mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockFitToCorridorRange.mockClear()
   })
 
   function renderWithData() {
@@ -346,6 +372,9 @@ describe('MapView — back button (Story 8.3, AC #2)', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
     mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockFitToCorridorRange.mockClear()
   })
 
   it('"← Aventures" link points to /adventures', async () => {
@@ -371,6 +400,9 @@ describe('MapView — elevation profile collapse (Story 8.8, AC #1, AC #6)', () 
   beforeEach(() => {
     mockDensityStatus = 'idle'
     mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockFitToCorridorRange.mockClear()
   })
 
   function renderWithData() {
@@ -411,6 +443,9 @@ describe('MapView — stagesVisible toggle (Story 11.2, AC4)', () => {
   beforeEach(() => {
     mockDensityStatus = 'idle'
     mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockFitToCorridorRange.mockClear()
   })
 
   function renderWithData() {
@@ -444,5 +479,71 @@ describe('MapView — stagesVisible toggle (Story 11.2, AC4)', () => {
 
     const profile = screen.getByTestId('elevation-profile')
     expect(profile.getAttribute('data-stages-visible')).toBe('true')
+  })
+})
+
+describe('MapView — auto-zoom on search (Story 16.15)', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockFitToCorridorRange.mockClear()
+  })
+
+  it('warm cache: calls fitToCorridorRange when searchCommitted turns true and poisPending stays false (AC #1)', async () => {
+    mockSearchCommitted = false
+    mockPoisIsPending = false
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    const { rerender } = render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+
+    await screen.findByTestId('map-canvas')
+    expect(mockFitToCorridorRange).not.toHaveBeenCalled()
+
+    // User commits search — warm cache: isPending stays false
+    mockSearchCommitted = true
+    rerender(<MapView adventureId="adv-1" />)
+
+    // Effect fires: justCommitted=true (searchCommitted && !prevSearchCommittedRef),
+    // !poisPending=true → fitToCorridorRange called
+    expect(mockFitToCorridorRange).toHaveBeenCalledTimes(1)
+  })
+
+  it('cold cache: calls fitToCorridorRange when poisPending transitions true→false (AC #2)', async () => {
+    mockSearchCommitted = false
+    mockPoisIsPending = false
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    const { rerender } = render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+
+    await screen.findByTestId('map-canvas')
+
+    // User commits search — cold cache: isPending goes true
+    mockSearchCommitted = true
+    mockPoisIsPending = true
+    rerender(<MapView adventureId="adv-1" />)
+
+    // justCommitted=true but !poisPending=false → no zoom
+    expect(mockFitToCorridorRange).not.toHaveBeenCalled()
+
+    // Fetch completes: poisPending false
+    mockPoisIsPending = false
+    rerender(<MapView adventureId="adv-1" />)
+
+    // justResolved = prevIsPendingRef(true) && !poisPending(true) → zoom
+    expect(mockFitToCorridorRange).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT zoom when searchCommitted is false (no search triggered)', async () => {
+    mockSearchCommitted = false
+    mockPoisIsPending = false
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+
+    await screen.findByTestId('map-canvas')
+
+    expect(mockFitToCorridorRange).not.toHaveBeenCalled()
   })
 })
