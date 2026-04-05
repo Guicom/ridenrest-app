@@ -345,7 +345,7 @@ describe('PoisService', () => {
     it('calls Google Places when overpassEnabled=false and DB cache is empty', async () => {
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
-      // First call (DB cache check) returns empty, second call (after Google prefetch) returns poi
+      // First call (DB cache check) returns empty, second call (after Google Places primary fetch) returns poi
       mockPoisRepository.findCachedPois
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([mockPoi])
@@ -540,6 +540,73 @@ describe('PoisService', () => {
       mockGooglePlacesProvider.searchLayerPlaceIds.mockRejectedValue(new Error('Google API error'))
 
       await expect(service.findPois(liveDto, userId)).resolves.not.toThrow()
+    })
+
+    describe('live mode — overpassEnabled=false (Google Places primary source)', () => {
+      const liveDtoNoOverpass = {
+        segmentId: '00000000-0000-0000-0000-000000000001',
+        targetKm: 42.3,
+        radiusKm: 3,
+        categories: ['hotel'] as string[],
+        overpassEnabled: false,
+      }
+
+      it('returns DB cache directly when non-empty (no Google API call)', async () => {
+        mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+        mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([mockLivePoi])
+
+        const result = await service.findPois(liveDtoNoOverpass, userId)
+
+        expect(result).toEqual([mockLivePoi])
+        expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.isConfigured).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).not.toHaveBeenCalled()
+        expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledTimes(1)
+      })
+
+      it('calls Google Places when DB cache is empty and Google is configured', async () => {
+        mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+        // First call: DB empty. Second call (after Google Places primary fetch): returns poi
+        mockPoisRepository.findPoisNearPoint
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([mockLivePoi])
+
+        const result = await service.findPois(liveDtoNoOverpass, userId)
+
+        expect(result).toEqual([mockLivePoi])
+        expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).toHaveBeenCalled()
+        expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledTimes(2)
+      })
+
+      it('does not throw when Google Places fails (catch path)', async () => {
+        mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockGooglePlacesProvider.searchLayerPlaceIds.mockRejectedValue(new Error('Google API error'))
+        // First call: DB empty. Second call (after failed Google prefetch): still empty
+        mockPoisRepository.findPoisNearPoint
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+
+        const result = await service.findPois(liveDtoNoOverpass, userId)
+
+        expect(result).toEqual([])
+        expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledTimes(2)
+      })
+
+      it('returns empty array when DB cache is empty and Google is NOT configured', async () => {
+        mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
+        mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
+
+        const result = await service.findPois(liveDtoNoOverpass, userId)
+
+        expect(result).toEqual([])
+        expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).not.toHaveBeenCalled()
+      })
     })
   })
 

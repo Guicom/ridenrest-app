@@ -86,19 +86,19 @@ export class PoisService {
     const minLng = Math.min(...rangeWaypoints.map((wp) => wp.lng)) - bufferDeg
     const maxLng = Math.max(...rangeWaypoints.map((wp) => wp.lng)) + bufferDeg
 
-    // 4. Overpass opt-in gate — when disabled, use DB cache then fallback to Google Places
+    // 4. Overpass opt-in gate — when disabled, use Google Places (primary source) via DB cache
     if (!dto.overpassEnabled) {
       const dbCached = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
       if (dbCached.length > 0) return dbCached
 
-      // DB cache empty — trigger Google Places search for this bbox
+      // DB cache empty — call Google Places (primary data source)
       if (this.googlePlacesProvider.isConfigured()) {
         const redis = this.redisProvider.getClient()
         await this.prefetchAndInsertGooglePois(
           { minLat, maxLat, minLng, maxLng },
           segmentId,
           redis,
-        ).catch((err) => this.logger.warn('Google Places fallback (overpass disabled) failed', err))
+        ).catch((err) => this.logger.warn('Google Places primary fetch (overpass disabled) failed', err))
         return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
       }
 
@@ -145,14 +145,14 @@ export class PoisService {
       // 7. Update Overpass POI distances with PostGIS
       await this.poisRepository.updatePoiDistances(segmentId)
 
-      // 8. Google Places: awaited so Google POIs are included in the first response
+      // 8. Google Places (primary source): awaited so results are included in the first response
       await this.prefetchAndInsertGooglePois(
         { minLat, maxLat, minLng, maxLng },
         segmentId,
         redis,
-      ).catch((err) => this.logger.warn('Google Places prefetch failed silently', err))
+      ).catch((err) => this.logger.warn('Google Places fetch failed silently', err))
 
-      // 9. Read back from DB — includes both Overpass + Google POIs with PostGIS distances
+      // 9. Read back from DB — includes both Google Places + Overpass POIs with PostGIS distances
       pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm)
       overpassSucceeded = true
     } catch (error) {
@@ -233,9 +233,25 @@ export class PoisService {
     const targetPoint = await this.poisRepository.getWaypointAtKm(segmentId, targetKm!, userId)
     if (!targetPoint) return []
 
-    // 2. Overpass opt-in gate — when disabled, return DB cache directly (no Redis, no Overpass)
+    // 2. Overpass opt-in gate — when disabled, use Google Places (primary source) via DB cache
     if (!overpassEnabled) {
-      return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories)
+      const dbCached = await this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories)
+      if (dbCached.length > 0) return dbCached
+
+      // DB cache empty — call Google Places (primary data source)
+      if (this.googlePlacesProvider.isConfigured()) {
+        const radDeg = (radiusKm ?? 3) / 111.0
+        const bbox = {
+          minLat: targetPoint.lat - radDeg, maxLat: targetPoint.lat + radDeg,
+          minLng: targetPoint.lng - radDeg, maxLng: targetPoint.lng + radDeg,
+        }
+        const redis = this.redisProvider.getClient()
+        await this.prefetchAndInsertGooglePois(bbox, segmentId, redis)
+          .catch((err) => this.logger.warn('Google Places primary fetch (overpass disabled, live) failed', err))
+        return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories)
+      }
+
+      return dbCached
     }
 
     // 3. Compute bbox around target point
@@ -271,9 +287,9 @@ export class PoisService {
       await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
       await this.poisRepository.updatePoiDistances(segmentId)
       overpassSucceeded = true
-      // Google Places: enrich with additional POIs — only when Overpass succeeds (consistent with corridor mode)
+      // Google Places (primary source): complement Overpass results — runs after Overpass succeeds
       await this.prefetchAndInsertGooglePois(bbox, segmentId, redis)
-        .catch((err) => this.logger.warn('Google Places prefetch failed in live mode', err))
+        .catch((err) => this.logger.warn('Google Places fetch failed in live mode', err))
     } catch (err) {
       this.logger.warn(`Overpass failed in live mode: ${String(err)}`)
       // Fall through — may still have cached POIs from a previous fetch

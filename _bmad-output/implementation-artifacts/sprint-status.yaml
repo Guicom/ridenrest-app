@@ -198,6 +198,7 @@ development_status:
   16-16-city-based-booking-search-url: done  # liens Booking avec nom de ville — chaîne: Google locality (primary) → OSM rawData → Geoapify reverse geocoding (2026-04-05)
   16-17-smart-no-results-message: done
   16-18-pwa-scope-authenticated-only: done
+  16-19-live-mode-google-places-fallback: done  # bug: live mode skip Google Places (source primaire) quand overpassEnabled=false → zéro résultat
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
