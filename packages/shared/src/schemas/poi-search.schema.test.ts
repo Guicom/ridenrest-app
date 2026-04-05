@@ -31,16 +31,16 @@ describe('poiSearchSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('rejects when range exceeds 30km', () => {
-    const result = poiSearchSchema.safeParse({ ...validBase, fromKm: 0, toKm: 31 })
+  it('rejects when range exceeds 50km', () => {
+    const result = poiSearchSchema.safeParse({ ...validBase, fromKm: 0, toKm: 51 })
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toMatch(/30/)
+      expect(result.error.issues[0]?.message).toMatch(/50/)
     }
   })
 
-  it('accepts exactly 30km range', () => {
-    const result = poiSearchSchema.safeParse({ ...validBase, fromKm: 0, toKm: 30 })
+  it('accepts exactly 50km range', () => {
+    const result = poiSearchSchema.safeParse({ ...validBase, fromKm: 0, toKm: 50 })
     expect(result.success).toBe(true)
   })
 
