@@ -2161,6 +2161,126 @@ So that I can instantly open Booking.com or Airbnb centered on the right locatio
 
 ---
 
+### Story 16.15: Map Auto-Zoom to Search Zone
+
+> **Ajouté 2026-04-03** — Fix régression : auto-zoom planning mode ne fire pas sur cache chaud. New feature : auto-zoom live mode sur la zone de recherche.
+
+As a **cyclist searching for POIs in planning or live mode**,
+I want the map to automatically zoom to display the searched zone after each search completes,
+So that I can immediately see the results without having to manually navigate to the right area.
+
+**Acceptance Criteria:**
+
+**Given** the user commits a POI search in planning mode (clicks "Rechercher"),
+**When** the search completes — whether from network (cold cache) or Redis cache (warm cache, `isPending` never goes `true`),
+**Then** the map auto-zooms to fit the search corridor (`fitToCorridorRange(fromKm, toKm, segments)`) with ~10% padding.
+
+**Given** the user commits a POI search in planning mode and the search returns no results,
+**When** the empty result is returned,
+**Then** the map still auto-zooms to the corridor zone (same behavior as non-empty results).
+
+**Given** live mode is active and the user triggers a POI search (`refetchPois()`),
+**When** the fetch completes (`poisFetching: true → false`, `poisHasFetched: true`),
+**Then** the map viewport adapts to show the search zone: fit waypoints in range `[currentKm, targetKm + searchRadiusKm]` with 10% padding.
+
+**Given** live mode is active and the map auto-zooms after a search,
+**When** the zoom fires,
+**Then** GPS auto-tracking is paused (same `userInteractedRef` mechanism as a manual pan/zoom) — the user must tap "Centre sur ma position" to resume tracking.
+
+**Given** live mode is active but no search has been triggered yet (`!poisHasFetched`),
+**When** the user moves the target slider,
+**Then** no auto-zoom fires (zoom only triggers after an explicit search, not on slider move).
+
+---
+
+### Story 16.16: City-Based Booking Search URLs
+
+> **Ajouté 2026-04-03** — Amélioration de la pertinence des liens Booking : utilisation du nom de ville au lieu des coordonnées GPS brutes, pour une meilleure compatibilité avec l'app Booking mobile.
+
+As a **cyclist using the app**,
+I want Booking.com search links to use a relevant city name instead of raw GPS coordinates,
+So that search results are more accurate and the Booking mobile app opens correctly to a recognizable location.
+
+**Acceptance Criteria:**
+
+**Given** a POI accommodation has OSM rawData with `addr:city`, `addr:town`, or `addr:village`,
+**When** the POI popup opens,
+**Then** the Booking.com search URL uses `?ss={city_name}` instead of `?latitude=&longitude=`.
+
+**Given** a POI accommodation has no city in rawData but Google Places `formattedAddress` is available,
+**When** the POI popup opens,
+**Then** the city is extracted from `formattedAddress` (strip postal code prefix) and used as `?ss={city}`.
+
+**Given** no city is extractable (rawData empty, formattedAddress absent or unrecognizable),
+**When** the POI popup opens,
+**Then** the Booking URL falls back to the existing `?latitude={lat}&longitude={lng}&dest_type=latlong` format.
+
+**Given** the user has committed a POI search in planning or live mode,
+**When** the center coordinates are known,
+**Then** a `GET /geo/reverse-city?lat=&lng=` call is made to the NestJS backend to resolve the city via Geoapify, cached 7 days in Redis.
+**And** if a city is resolved, the Booking URL uses `?ss={city_name}`.
+**And** if reverse geocoding fails, the URL falls back to coordinates (silent degradation).
+
+---
+
+### Story 16.17: Smart No-Results Message for Filtered Accommodation Search
+
+> **Ajouté 2026-04-05** — Issue de retour utilisateur Guillaume : quand le filtre sous-type hébergement exclut tous les résultats (ex. "Hôtel" sélectionné mais seuls des campings existent), aucun message ne s'affiche. L'utilisateur voit une carte vide sans explication.
+
+As a **cyclist searching for accommodations on the planning or live map**,
+I want a contextual message when my sub-type filter yields no visible results but other accommodation types exist,
+So that I know results are available if I broaden my filter — instead of seeing an empty map with no explanation.
+
+**Acceptance Criteria:**
+
+**Given** une recherche commitée avec la couche "Hébergements" active,
+**When** `poisByLayer.accommodations` contient des résultats MAIS aucun ne correspond aux `activeAccommodationTypes` sélectionnés,
+**Then** un banner info s'affiche : "Aucun {types_actifs} — {N} {types_disponibles} disponible(s)".
+
+**Given** le banner contextuel est affiché,
+**When** l'utilisateur clique dessus,
+**Then** tous les sous-types hébergement sont réactivés et le banner disparaît.
+
+**Given** au moins 1 POI correspond à un `activeAccommodationType` sélectionné,
+**When** la carte affiche les pins,
+**Then** aucun banner contextuel n'est affiché.
+
+**Given** `allPois.length === 0` (aucun résultat toutes couches confondues),
+**When** la recherche est terminée,
+**Then** le banner orange existant "Aucun résultat dans cette zone" s'affiche normalement (pas de régression).
+
+---
+
+### Story 16.18: PWA Scope — Limiter à la Partie Connectée
+
+> **Ajouté 2026-04-05** — Retour utilisateur Guillaume : la PWA installée sur l'écran d'accueil affiche la landing page au lancement. Les pages publiques (landing, login, mentions légales, contact) n'ont pas vocation à être dans l'expérience PWA standalone. Seule la partie connectée (`/adventures`, `/map`, `/live`, `/settings`, `/help`) doit être englobée.
+
+As a **cyclist who installed Ride'n'Rest as a PWA on my home screen**,
+I want the app to open directly on my adventures dashboard (not the landing page),
+So that the PWA experience feels like a native app — no marketing pages, straight to my content.
+
+**Acceptance Criteria:**
+
+**Given** the Web App Manifest is configured,
+**When** the manifest is served,
+**Then** `start_url` is set to `/adventures` and `scope` is set to `/` (navigation vers login autorisée mais l'app démarre sur le dashboard).
+
+**Given** the user launches the PWA from the home screen,
+**When** the app opens,
+**Then** they land on `/adventures` (redirigé vers `/login` par auth middleware si non connecté, puis retour sur `/adventures` après connexion).
+
+**Given** the user is in the PWA and navigates to a public page (landing, mentions légales, contact),
+**When** the navigation occurs,
+**Then** the link opens in the browser externe (pas dans le standalone shell), car ces pages sont hors du scope PWA fonctionnel.
+
+**Given** the Service Worker (next-pwa) is configured,
+**When** it pre-caches routes,
+**Then** seules les routes `(app)/*` sont incluses dans la stratégie cache-first ; les routes `(marketing)/*` ne sont pas pré-cachées.
+
+**Note technique :** Le `scope` du manifest reste `/` (pas `/adventures`) pour que le flow auth (`/login` → `/adventures`) fonctionne à l'intérieur du shell standalone. La distinction se fait via : (1) `start_url: "/adventures"` — point d'entrée PWA, (2) Config service worker — exclusion des routes `(marketing)` du precache, (3) Les liens vers pages publiques depuis l'app utilisent `target="_blank"` ou `window.open()` pour sortir du shell.
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

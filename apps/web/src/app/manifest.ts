@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Ride'n'Rest",
     short_name: "RnR",
     description: "Planification hébergements pour cyclistes longue distance",
-    start_url: "/",
+    start_url: "/adventures",
     display: "standalone",
     orientation: "portrait",
     theme_color: "#2D6A4A",

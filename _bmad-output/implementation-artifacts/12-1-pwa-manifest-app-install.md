@@ -60,7 +60,6 @@ So that I can launch it instantly without going through the browser — especial
 
 - [ ] **Review Follow-ups (AI)**
   - [ ] [AI-Review][CRITICAL] Valider AC #4 et #5 via Lighthouse sur prod : PWA ≥ 85, FCP < 1.5s, LCP < 2.5s, CLS < 0.1, bundle < 200 KB → `pnpm build && pnpm start` puis Chrome DevTools Lighthouse Mobile [Task 6]
-  - [ ] [AI-Review][HIGH] Vérifier le contenu de `apps/web/src/app/icon.png` — doit être l'icône de marque Ride'n'Rest (pas un placeholder) ; tracker le fichier dans git
   - [ ] [AI-Review][HIGH] Clarifier pourquoi `apps/web/src/lib/poi-pin-factory.ts` est modifié dans cette story (refactor canvas/ImageData hors scope 12.1) — commiter séparément ou documenter la raison
   - [ ] [AI-Review][MEDIUM] Auditer l'impact du body `env(safe-area-inset-*)` sur la vue carte full-screen (mode planning + live) — vérifier que le map container n'est pas double-paddé en mode standalone iOS
 

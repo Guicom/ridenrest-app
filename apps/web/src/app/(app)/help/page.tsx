@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: "Aide — Ride'n'Rest",
@@ -132,9 +131,9 @@ export default function HelpPage() {
       <div className="border-t border-[--border] pt-8 text-sm text-text-secondary">
         <p>
           Un problème ou une question ?{' '}
-          <Link href="/contact" className="text-accent hover:underline">
+          <a href="/contact" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
             Contactez-nous
-          </Link>{' '}
+          </a>{' '}
           ou utilisez le bouton <strong>Feedback</strong> dans la navigation.
         </p>
       </div>

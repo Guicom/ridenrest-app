@@ -25,8 +25,16 @@ describe('PWA manifest', () => {
     expect(m.orientation).toBe('portrait')
   })
 
-  it('has start_url set to root', () => {
-    expect(m.start_url).toBe('/')
+  it('has start_url set to /adventures (PWA opens on dashboard)', () => {
+    expect(m.start_url).toBe('/adventures')
+  })
+
+  it('has id set to / (stable PWA identity)', () => {
+    expect(m.id).toBe('/')
+  })
+
+  it('does NOT have explicit scope property (default / for auth flow)', () => {
+    expect(m).not.toHaveProperty('scope')
   })
 
   it('includes at least 2 icons (192 and 512)', () => {

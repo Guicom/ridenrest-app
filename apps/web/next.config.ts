@@ -18,12 +18,12 @@ export default withPWA({
     // Exclude marketing/auth routes from precache — only (app)/* routes are precached
     exclude: [
       /^\/?$/,
-      /\/login/,
-      /\/register/,
-      /\/forgot-password/,
-      /\/reset-password/,
-      /\/contact/,
-      /\/mentions-legales/,
+      /^\/login(\/|$)/,
+      /^\/register(\/|$)/,
+      /^\/forgot-password(\/|$)/,
+      /^\/reset-password(\/|$)/,
+      /^\/contact(\/|$)/,
+      /^\/mentions-legales(\/|$)/,
     ],
     runtimeCaching: [
       {
