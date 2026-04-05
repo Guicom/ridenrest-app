@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
     name: "Ride'n'Rest",
-    short_name: "RnR",
+    short_name: "Ride'n'Rest",
     description: "Planification hébergements pour cyclistes longue distance",
     start_url: "/adventures",
     display: "standalone",

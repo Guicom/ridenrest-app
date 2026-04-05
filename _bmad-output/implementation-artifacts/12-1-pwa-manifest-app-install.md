@@ -120,7 +120,7 @@ import type { MetadataRoute } from 'next'
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Ride'n'Rest",
-    short_name: 'RnR',
+    short_name: "Ride'n'Rest",
     description: 'Planification hébergements pour cyclistes longue distance',
     start_url: '/',
     display: 'standalone',

@@ -6,7 +6,7 @@ describe('PWA manifest', () => {
 
   it('has correct app name', () => {
     expect(m.name).toBe("Ride'n'Rest")
-    expect(m.short_name).toBe('RnR')
+    expect(m.short_name).toBe("Ride'n'Rest")
   })
 
   it('has display: standalone', () => {
