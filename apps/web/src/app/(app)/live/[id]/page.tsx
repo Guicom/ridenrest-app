@@ -302,6 +302,7 @@ export default function LivePage() {
           adventureId={adventureId}
           segments={segments}
           targetKm={targetKm}
+          searchRadiusKm={liveSearchRadiusKm}
           pois={pois}
           weatherPoints={weatherPoints}
           weatherDimension={mapWeatherDimension}

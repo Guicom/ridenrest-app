@@ -28,6 +28,7 @@ interface LiveMapCanvasProps {
   adventureId: string
   segments: MapSegmentData[]
   targetKm?: number | null
+  searchRadiusKm?: number
   pois?: Poi[]
   weatherPoints?: WeatherPoint[]
   weatherDimension?: WeatherDimension
@@ -38,7 +39,7 @@ interface LiveMapCanvasProps {
   onStageLongPress?: (stageId: string) => void
 }
 
-export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress }: LiveMapCanvasProps, ref) {
+export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, searchRadiusKm = 5, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress }: LiveMapCanvasProps, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
@@ -49,6 +50,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   const stageLayerActiveRef = useRef(stageLayerActive)
   const currentKmOnRouteRef = useRef(currentKmOnRoute)
   const onStageLongPressRef = useRef(onStageLongPress)
+  const searchRadiusKmRef = useRef(searchRadiusKm)
   const MarkerClassRef = useRef<typeof maplibregl.Marker | null>(null)
 
   // True once user has manually panned/zoomed — stops GPS auto-follow until centerOnGps() is called
@@ -68,6 +70,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   useEffect(() => { stageLayerActiveRef.current = stageLayerActive }, [stageLayerActive])
   useEffect(() => { currentKmOnRouteRef.current = currentKmOnRoute }, [currentKmOnRoute])
   useEffect(() => { onStageLongPressRef.current = onStageLongPress }, [onStageLongPress])
+  useEffect(() => { searchRadiusKmRef.current = searchRadiusKm }, [searchRadiusKm])
 
   // Init MapLibre map
   useEffect(() => {
@@ -91,6 +94,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
 
       map.on('load', () => {
         addTraceLayers(map, segmentsRef.current)
+        addSearchRadiusLayer(map)
         addTargetPointLayer(map)
         addGpsPositionLayer(map)
         fitToTrace(map, segmentsRef.current)
@@ -137,6 +141,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     setMapReady(false)
     const onStyleLoad = () => {
       addTraceLayers(map, segmentsRef.current)
+      addSearchRadiusLayer(map)
       addTargetPointLayer(map)
       addGpsPositionLayer(map)
       // Restore GPS position after style switch
@@ -205,10 +210,19 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   // Keep kmWaypointsRef in sync — used in GPS effect without re-triggering it
   useEffect(() => { kmWaypointsRef.current = kmWaypoints }, [kmWaypoints])
 
-  // Update target point marker
+  // Update target point marker + search radius circle
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !mapReady || targetKm == null || kmWaypoints.length === 0) return
+    if (!map || !mapReady || kmWaypoints.length === 0) return
+
+    // Clear circle if targetKm is null (GPS lost)
+    if (targetKm == null) {
+      const radiusSource = map.getSource('search-radius') as maplibregl.GeoJSONSource | undefined
+      if (radiusSource) {
+        radiusSource.setData({ type: 'FeatureCollection', features: [] })
+      }
+      return
+    }
 
     const point = findPointAtKm(kmWaypoints, targetKm)
     if (!point) return
@@ -221,7 +235,53 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
         properties: {},
       })
     }
-  }, [targetKm, mapReady, kmWaypoints])
+
+    // Update search radius circle
+    const radiusSource = map.getSource('search-radius') as maplibregl.GeoJSONSource | undefined
+    if (radiusSource) {
+      radiusSource.setData(createCirclePolygon({ lat: point.lat, lng: point.lng }, searchRadiusKm))
+    }
+  }, [targetKm, searchRadiusKm, mapReady, kmWaypoints])
+
+  // Auto-zoom when targetKm changes (slider move) — shows GPS + target + search radius circle
+  // currentPosition read via ref to avoid re-triggering on every GPS update (1-3s interval)
+  // Slider move resets userInteractedRef so auto-zoom works after fitToSearchZone (AC #5: only
+  // manual map interaction inhibits auto-zoom; centerOnGps is not the only way to re-enable it)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || targetKm == null) return
+    const pos = currentPositionRef.current
+    if (!pos) return
+
+    // Slider move = intentional action → re-enable auto-zoom (was disabled by drag/pinch/fitToSearchZone)
+    userInteractedRef.current = false
+
+    const timer = setTimeout(() => {
+      const targetPoint = findPointAtKm(kmWaypointsRef.current, targetKm)
+      if (!targetPoint) return
+
+      const radius = searchRadiusKm
+      const minLat = Math.min(pos.lat, targetPoint.lat)
+      const maxLat = Math.max(pos.lat, targetPoint.lat)
+      const minLng = Math.min(pos.lng, targetPoint.lng)
+      const maxLng = Math.max(pos.lng, targetPoint.lng)
+
+      // Expand bounds by searchRadiusKm to include the circle
+      const expandLat = radius / 111.32
+      const avgLat = (minLat + maxLat) / 2
+      const expandLng = radius / (111.32 * Math.cos((avgLat * Math.PI) / 180))
+
+      map.fitBounds(
+        [
+          [minLng - expandLng, minLat - expandLat],
+          [maxLng + expandLng, maxLat + expandLat],
+        ],
+        { padding: { top: 60, right: 60, bottom: 240, left: 60 }, maxZoom: 16, animate: true, duration: 400 },
+      )
+    }, 150) // Debounce 150ms
+
+    return () => clearTimeout(timer)
+  }, [targetKm, searchRadiusKm, mapReady])
 
   // Update stage colored-trace layers when stages/active/waypoints change (NOT on GPS updates)
   useEffect(() => {
@@ -520,6 +580,67 @@ function addTraceLayers(map: maplibregl.Map, segments: MapSegmentData[]) {
       'line-opacity': 0.9,
     },
   })
+}
+
+function addSearchRadiusLayer(map: maplibregl.Map) {
+  if (map.getSource('search-radius')) return
+
+  map.addSource('search-radius', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  })
+
+  map.addLayer({
+    id: 'search-radius-fill',
+    type: 'fill',
+    source: 'search-radius',
+    paint: {
+      'fill-color': '#2D6A4A',
+      'fill-opacity': 0.08,
+    },
+  })
+
+  map.addLayer({
+    id: 'search-radius-stroke',
+    type: 'line',
+    source: 'search-radius',
+    paint: {
+      'line-color': '#2D6A4A',
+      'line-opacity': 0.3,
+      'line-width': 1.5,
+    },
+  })
+}
+
+export function createCirclePolygon(
+  center: { lat: number; lng: number },
+  radiusKm: number,
+  steps = 64,
+): GeoJSON.Feature<GeoJSON.Polygon> {
+  const coords: [number, number][] = []
+  const R = 6371 // Earth radius km
+  for (let i = 0; i < steps; i++) {
+    const bearing = (2 * Math.PI * i) / steps
+    const lat1 = (center.lat * Math.PI) / 180
+    const lng1 = (center.lng * Math.PI) / 180
+    const d = radiusKm / R
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(bearing),
+    )
+    const lng2 =
+      lng1 +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(d) * Math.cos(lat1),
+        Math.cos(d) - Math.sin(lat1) * Math.sin(lat2),
+      )
+    coords.push([(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI])
+  }
+  coords.push(coords[0]) // Explicit ring closure — avoids float drift at bearing 2π vs 0
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [coords] },
+    properties: {},
+  }
 }
 
 function addTargetPointLayer(map: maplibregl.Map) {

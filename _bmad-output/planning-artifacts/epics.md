@@ -2445,6 +2445,160 @@ So that I can access all planning tools (search, weather, density, stages) witho
 
 ---
 
+### Story 16.24: Live Mode Slider — Boutons − / + pour Ajustement Précis
+
+> **Ajouté 2026-04-06** — Retour utilisateur Guillaume : en mode Live, le slider seul est difficile à manipuler précisément sur mobile (doigt sur petit thumb). Des boutons − / + permettraient un ajustement par pas discrets.
+
+As a **cyclist in Live mode on mobile**,
+I want − and + buttons on either side of the distance slider,
+So that I can precisely adjust the "Mon hôtel dans X km" value without struggling with the slider thumb on a small screen.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est en mode Live et le panneau de contrôle s'affiche,
+**When** le composant `LiveControls` est rendu,
+**Then** un bouton `−` est visible à gauche du slider et un bouton `+` à droite, alignés verticalement au centre du slider.
+
+**Given** le slider affiche une valeur de `targetAheadKm` supérieure au minimum (5 km),
+**When** l'utilisateur tape le bouton `−`,
+**Then** `targetAheadKm` diminue de `SLIDER_STEP` (5 km), et la valeur affichée ainsi que la position du thumb se mettent à jour immédiatement.
+
+**Given** le slider affiche une valeur de `targetAheadKm` inférieure à `effectiveMax`,
+**When** l'utilisateur tape le bouton `+`,
+**Then** `targetAheadKm` augmente de `SLIDER_STEP` (5 km), et la valeur affichée ainsi que la position du thumb se mettent à jour immédiatement.
+
+**Given** `targetAheadKm` est déjà au minimum (5 km),
+**When** l'utilisateur tape `−`,
+**Then** le bouton est visuellement désactivé (`opacity-50`, `cursor-not-allowed`) et aucune action ne se produit.
+
+**Given** `targetAheadKm` est déjà à `effectiveMax`,
+**When** l'utilisateur tape `+`,
+**Then** le bouton est visuellement désactivé (`opacity-50`, `cursor-not-allowed`) et aucune action ne se produit.
+
+**Technical notes:**
+- Composant : `apps/web/src/app/(app)/live/[id]/_components/live-controls.tsx`
+- Layout : `<div className="flex items-center gap-2 mb-8">` wrappant `bouton −` + `<Slider>` + `bouton +`
+- Boutons : `h-8 w-8 rounded-full border border-primary text-primary` avec icônes `Minus` / `Plus` de lucide-react
+- Step identique au slider : `SLIDER_STEP = 5`
+- Clamp via `Math.max(5, targetAheadKm - SLIDER_STEP)` et `Math.min(effectiveMax, targetAheadKm + SLIDER_STEP)`
+
+---
+
+### Story 16.26: Live Mode — Auto-Zoom Slider + Cercle de Rayon de Recherche
+
+> **Ajouté 2026-04-06** — Retour utilisateur Guillaume : en mode Live, le zoom par défaut est trop serré, le point cible "Mon hôtel dans X km" sort du viewport. Le cercle de recherche (`searchRadiusKm`) n'est pas matérialisé visuellement sur la carte.
+
+As a **cyclist in Live mode**,
+I want the map to auto-adjust its zoom when I change the distance slider, and to see a geographic circle showing the search radius around the target point,
+So that I always see both my GPS position and the target point, and I can visualize the search area before launching a search.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est en mode Live avec GPS actif et `targetAheadKm` change (slider ou boutons − / +),
+**When** la valeur de `targetAheadKm` se met à jour dans le store,
+**Then** la carte ajuste automatiquement son zoom pour montrer à la fois la position GPS actuelle et le point cible, avec un padding suffisant pour que le cercle de rayon de recherche soit entièrement visible.
+
+**Given** la carte s'auto-zoom après un changement de slider,
+**When** l'ajustement est terminé,
+**Then** l'animation est fluide (`easeTo` ~400ms), le panneau LiveControls en bas n'occulte pas le point cible (padding bottom ~240px).
+
+**Given** un cercle géographique est rendu autour du target point,
+**When** `targetKm` et `searchRadiusKm` sont définis,
+**Then** un polygone circulaire semi-transparent (fill vert brand 8%, stroke vert brand 30%) est affiché, centré sur le target point, avec un rayon correspondant à `searchRadiusKm` en km réels.
+
+**Given** le cercle de rayon est affiché,
+**When** `searchRadiusKm` change (via le drawer filtres),
+**Then** le cercle se met à jour immédiatement.
+
+**Given** l'utilisateur pan ou zoom manuellement la carte,
+**When** il interagit avec la carte (drag, pinch, scroll),
+**Then** l'auto-zoom du slider est inhibé tant que l'utilisateur n'a pas cliqué "Recentrer GPS".
+
+**Given** le slider est manipulé rapidement (plusieurs changements en <300ms),
+**When** les valeurs changent en cascade,
+**Then** seul le dernier changement déclenche un ajustement de zoom (debounce).
+
+**Technical notes:**
+- Composant principal : `apps/web/src/app/(app)/live/[id]/_components/live-map-canvas.tsx`
+- Cercle : polygone GeoJSON 64 segments (Haversine inverse), source `search-radius`, layers `search-radius-fill` + `search-radius-stroke`
+- Auto-zoom : `fitBounds` avec bounds GPS→target expandés du `searchRadiusKm`, debounce 150ms
+- Ordre layers : trace → cercle rayon → target dot → POIs → GPS dot
+
+---
+
+### Story 16.27: GPX Upload dans une Dialog (Popin)
+
+> **Ajouté 2026-04-06** — Retour utilisateur Guillaume : le formulaire d'upload GPX s'affiche inline dans la page détail, ce qui casse le flow visuel. Il doit s'ouvrir dans une dialog (popin), cohérent avec le pattern de l'import Strava.
+
+As a **cyclist on the adventure detail page**,
+I want the GPX upload form to open in a dialog instead of appearing inline,
+So that the upload flow is cleaner and consistent with the Strava import modal pattern.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est sur la page détail d'une aventure sans segments,
+**When** la page s'affiche,
+**Then** un bouton "Ajouter un segment GPX" est visible (remplace le formulaire inline) et ouvre une dialog au clic.
+
+**Given** l'aventure a déjà des segments,
+**When** l'utilisateur clique sur le bouton "+ Ajouter un segment",
+**Then** une dialog s'ouvre avec le formulaire d'upload GPX.
+
+**Given** la dialog d'upload est ouverte,
+**When** l'utilisateur sélectionne un fichier .gpx et clique "Uploader le segment",
+**Then** l'upload se lance, et à la réussite la dialog se ferme automatiquement.
+
+**Given** la dialog d'upload est ouverte et un upload est en cours,
+**When** l'utilisateur tente de fermer la dialog,
+**Then** la dialog reste ouverte tant que l'upload n'est pas terminé.
+
+**Technical notes:**
+- Utiliser `Dialog` / `DialogContent` / `DialogHeader` / `DialogTitle` / `DialogFooter` de `@/components/ui/dialog`
+- Pattern identique à `strava-import-modal.tsx`
+- Bouton dans `DialogFooter` en `size="lg"` (convention WCAG)
+- Retirer le wrapper `div.border.rounded-lg.p-4` de `GpxUploadForm` (le style vient de `DialogContent`)
+
+---
+
+### Story 16.28: Heure de Départ par Étape + Météo Ajustée
+
+> **Ajouté 2026-04-06** — Retour utilisateur Guillaume : la météo des étapes utilise un seul horaire de départ global. Pour un voyage multi-jours, chaque étape a sa propre heure de départ (ex: 7h jour 1, 8h jour 2). La météo doit refléter ces horaires individuels.
+
+As a **cyclist planning a multi-day adventure**,
+I want to set a departure time for each stage,
+So that the weather forecast shows the conditions I'll actually encounter when I ride each stage.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est sur la page planning avec des étapes définies,
+**When** il consulte une étape dans la sidebar,
+**Then** un champ "Départ" est visible sur chaque étape, affichant l'heure de départ configurée ou un placeholder "Définir" si non définie.
+
+**Given** l'utilisateur saisit une date/heure de départ pour une étape,
+**When** la valeur est soumise,
+**Then** elle est sauvegardée via `PATCH /adventures/:adventureId/stages/:stageId` avec le champ `departureTime`.
+
+**Given** une étape a une `departureTime` définie,
+**When** la météo de cette étape est demandée,
+**Then** l'API utilise la `departureTime` de l'étape pour calculer l'ETA au `endKm` : `stage.departureTime + (stage.distanceKm / speedKmh) × 3600000ms`.
+
+**Given** une étape n'a PAS de `departureTime` définie,
+**When** la météo est demandée,
+**Then** le `departureTime` global (localStorage) est utilisé en fallback, ou l'heure actuelle si aucun n'est défini.
+
+**Given** l'utilisateur modifie ou supprime la `departureTime` d'une étape,
+**When** la valeur change,
+**Then** le `StageWeatherBadge` se rafraîchit automatiquement.
+
+**Technical notes:**
+- Nouvelle colonne DB : `departure_time timestamp` nullable dans `adventure_stages`
+- Migration via `drizzle-kit generate` obligatoire
+- Priorité météo : `stage.departureTime` > `dto.departureTime` (global) > heure actuelle
+- Calcul ETA stage : basé sur `stage.distanceKm` (longueur de l'étape), pas `stage.endKm` (km absolu)
+- UI : `<input type="datetime-local">` ou bouton "Définir le départ" dans la sidebar étapes
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

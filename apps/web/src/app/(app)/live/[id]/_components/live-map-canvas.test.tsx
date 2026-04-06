@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
 import React from 'react'
-import { LiveMapCanvas } from './live-map-canvas'
+import { LiveMapCanvas, createCirclePolygon } from './live-map-canvas'
 import { useLiveStore } from '@/stores/live.store'
 import type { MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
 
@@ -390,4 +390,163 @@ describe('LiveMapCanvas', () => {
     expect(useLiveStore.getState().gpsTrackingActive).toBe(false)
   })
 
+  it('adds search-radius source and layers on map load', async () => {
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    render(<LiveMapCanvas adventureId="adv-1" segments={[makeSegment()]} />)
+
+    await waitFor(() => expect(mockMapInstance.on).toHaveBeenCalledWith('load', expect.any(Function)))
+    loadCallback?.()
+
+    const addSourceCalls = mockMapInstance.addSource.mock.calls as [string, unknown][]
+    const sourceIds = addSourceCalls.map(([id]) => id)
+    expect(sourceIds).toContain('search-radius')
+
+    const addLayerCalls = mockMapInstance.addLayer.mock.calls as [{ id: string }][]
+    const layerIds = addLayerCalls.map(([l]) => l.id)
+    expect(layerIds).toContain('search-radius-fill')
+    expect(layerIds).toContain('search-radius-stroke')
+  })
+
+  it('auto-zoom calls fitBounds when targetKm changes and GPS position exists (AC #1)', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
+    })
+
+    const seg = makeSegment()
+    const { rerender } = render(
+      <LiveMapCanvas adventureId="adv-1" segments={[seg]} targetKm={25} searchRadiusKm={5} />,
+    )
+
+    await waitFor(() => expect(eventHandlers['load']).toBeDefined())
+    act(() => { eventHandlers['load']?.() })
+
+    // Set GPS position so auto-zoom has a position to work with
+    act(() => { useLiveStore.setState({ currentPosition: { lat: 43.1, lng: 1.1 } }) })
+
+    // Wait for initial flyTo
+    await waitFor(() => expect(mockMapInstance.flyTo).toHaveBeenCalled())
+
+    const fitBoundsBefore = mockMapInstance.fitBounds.mock.calls.length
+
+    // Change targetKm → triggers auto-zoom
+    rerender(<LiveMapCanvas adventureId="adv-1" segments={[seg]} targetKm={30} searchRadiusKm={5} />)
+
+    // Debounce 150ms
+    await waitFor(() => {
+      expect(mockMapInstance.fitBounds.mock.calls.length).toBeGreaterThan(fitBoundsBefore)
+    }, { timeout: 500 })
+
+    // Verify fitBounds was called with correct padding
+    const lastCall = mockMapInstance.fitBounds.mock.calls[mockMapInstance.fitBounds.mock.calls.length - 1]
+    expect(lastCall[1]).toMatchObject({
+      padding: { top: 60, right: 60, bottom: 240, left: 60 },
+      maxZoom: 16,
+      animate: true,
+      duration: 400,
+    })
+  })
+
+  it('auto-zoom does NOT fire when currentPosition is null (AC #6)', async () => {
+    const eventHandlers: Record<string, (e?: { originalEvent?: Event }) => void> = {}
+    mockMapInstance.on.mockImplementation((event: string, cb: (e?: { originalEvent?: Event }) => void) => {
+      eventHandlers[event] = cb
+    })
+
+    const seg = makeSegment()
+    // No GPS position set
+    const { rerender } = render(
+      <LiveMapCanvas adventureId="adv-1" segments={[seg]} targetKm={25} searchRadiusKm={5} />,
+    )
+
+    await waitFor(() => expect(eventHandlers['load']).toBeDefined())
+    act(() => { eventHandlers['load']?.() })
+
+    const fitBoundsBefore = mockMapInstance.fitBounds.mock.calls.length
+
+    // Change targetKm without GPS
+    rerender(<LiveMapCanvas adventureId="adv-1" segments={[seg]} targetKm={30} searchRadiusKm={5} />)
+
+    // Wait past debounce
+    await new Promise((r) => setTimeout(r, 200))
+
+    // fitBounds should NOT have been called for auto-zoom (may be called for fitToTrace on mount)
+    expect(mockMapInstance.fitBounds.mock.calls.length).toBe(fitBoundsBefore)
+  })
+
+  it('search radius circle updates when searchRadiusKm changes (AC #4)', async () => {
+    let loadCallback: (() => void) | undefined
+    mockMapInstance.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'load') loadCallback = cb
+    })
+
+    const mockSetData = vi.fn()
+    mockMapInstance.getSource.mockImplementation((id: string) => {
+      if (id === 'live-target-point' || id === 'search-radius') return { setData: mockSetData }
+      return undefined
+    })
+
+    const seg = makeSegment()
+    const { rerender } = render(
+      <LiveMapCanvas adventureId="adv-1" segments={[seg]} targetKm={25} searchRadiusKm={5} />,
+    )
+
+    await waitFor(() => expect(loadCallback).toBeDefined())
+    act(() => { loadCallback?.() })
+
+    // Initial setData calls for target point + circle
+    const callsBefore = mockSetData.mock.calls.length
+
+    // Change searchRadiusKm → circle should update
+    rerender(<LiveMapCanvas adventureId="adv-1" segments={[seg]} targetKm={25} searchRadiusKm={10} />)
+
+    await waitFor(() => {
+      expect(mockSetData.mock.calls.length).toBeGreaterThan(callsBefore)
+    })
+
+    // Verify last call contains a Polygon (the circle)
+    const allCalls = mockSetData.mock.calls
+    const lastCircleCall = allCalls.findLast(
+      (call: unknown[]) => (call[0] as { type?: string })?.type === 'Feature'
+        && (call[0] as { geometry?: { type?: string } })?.geometry?.type === 'Polygon',
+    )
+    expect(lastCircleCall).toBeDefined()
+  })
+})
+
+describe('createCirclePolygon', () => {
+  it('generates polygon with 65 coordinates (64 segments + closure)', () => {
+    const feature = createCirclePolygon({ lat: 43.3, lng: 1.3 }, 5)
+    const coords = feature.geometry.coordinates[0]
+    expect(coords).toHaveLength(65)
+    // First and last point should be identical (explicit ring closure)
+    expect(coords[0][0]).toBe(coords[64][0])
+    expect(coords[0][1]).toBe(coords[64][1])
+  })
+
+  it('generates polygon with correct approximate radius', () => {
+    const radiusKm = 10
+    const center = { lat: 45.0, lng: 2.0 }
+    const feature = createCirclePolygon(center, radiusKm)
+    const coords = feature.geometry.coordinates[0]
+
+    // Check north point (first bearing = 0 = north)
+    // At lat 45, 1° lat ≈ 111.32 km → 10 km ≈ 0.0898°
+    const northPoint = coords[0]
+    const dLat = northPoint[1] - center.lat
+    const approxDistKm = dLat * 111.32
+    expect(approxDistKm).toBeCloseTo(radiusKm, 0)
+  })
+
+  it('returns a valid GeoJSON Feature with Polygon geometry', () => {
+    const feature = createCirclePolygon({ lat: 48.8, lng: 2.3 }, 3)
+    expect(feature.type).toBe('Feature')
+    expect(feature.geometry.type).toBe('Polygon')
+    expect(feature.geometry.coordinates).toHaveLength(1)
+    expect(feature.properties).toEqual({})
+  })
 })
