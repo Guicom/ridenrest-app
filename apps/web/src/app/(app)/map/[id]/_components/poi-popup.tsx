@@ -11,6 +11,7 @@ import { useReverseCity } from '@/hooks/use-reverse-city'
 import type { Poi, PoiCategory } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
+import { trackPoiDetailOpened } from '@/lib/analytics'
 import type maplibregl from 'maplibre-gl'
 
 const CATEGORY_LABELS: Record<PoiCategory, string> = {
@@ -160,7 +161,12 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   // Reset hours state when POI changes (use externalId — category alone doesn't detect same-category switch)
   useEffect(() => {
     setHoursExpanded(false)
-  }, [poi.externalId])
+    // Track POI detail opened (AC #4, Story 15.3)
+    trackPoiDetailOpened({
+      poi_type: poi.category,
+      source: poi.source === 'overpass' ? 'overpass' : 'google',
+    })
+  }, [poi.externalId, poi.category, poi.source])
 
   // Close on Escape
   useEffect(() => {

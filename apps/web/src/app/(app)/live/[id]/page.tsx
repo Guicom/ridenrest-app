@@ -36,6 +36,7 @@ import { StatusBanner } from './_components/status-banner'
 import { PoiPopup } from '../../map/[id]/_components/poi-popup'
 import { ElevationStrip } from './_components/elevation-strip'
 import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
+import { trackPoiSearchTriggered } from '@/lib/analytics'
 
 const DEFAULT_RADIUS = 5
 
@@ -245,6 +246,15 @@ export default function LivePage() {
         segments,
         allCumulativeWaypoints,
       )
+      // Track POI search completion — live mode (AC #3, Story 15.3)
+      // Only track successful searches — errors would report stale result_count
+      if (!poisError) {
+        trackPoiSearchTriggered({
+          mode: 'live',
+          poi_categories: [...mapVisibleLayers],
+          result_count: pois.length,
+        })
+      }
     }
     prevPoisFetchingRef.current = poisFetching
     prevSearchTriggerRef.current = searchTrigger

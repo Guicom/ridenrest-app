@@ -44,6 +44,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { trackGpxUploaded } from '@/lib/analytics'
 import { GpxUploadForm } from './gpx-upload-form'
 import { SortableSegmentCard } from './sortable-segment-card'
 import { StravaImportModal } from './strava-import-modal'
@@ -214,6 +215,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   // Transition detection — runs after every segments update
   useEffect(() => {
     const prev = prevSegmentsRef.current
+    let hasNewDone = false
 
     if (prev !== undefined) {
       for (const seg of segments) {
@@ -223,6 +225,12 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
           // New segment appeared already done/error (fast BullMQ processing)
           if (seg.parseStatus === 'done') {
             toast.success(`Segment "${seg.name ?? 'Sans nom'}" analysé avec succès !`)
+            const doneSegments = segments.filter((s) => s.parseStatus === 'done')
+            trackGpxUploaded({
+              segment_count: doneSegments.length,
+              total_km: doneSegments.reduce((sum, s) => sum + (s.distanceKm ?? 0), 0),
+            })
+            hasNewDone = true
           } else if (seg.parseStatus === 'error') {
             toast.error(`Parsing échoué pour "${seg.name ?? 'Sans nom'}"`, {
               description: 'Vérifiez le format du fichier GPX',
@@ -237,6 +245,12 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
 
         if (seg.parseStatus === 'done') {
           toast.success(`Segment "${seg.name ?? 'Sans nom'}" analysé avec succès !`)
+          const doneSegments = segments.filter((s) => s.parseStatus === 'done')
+          trackGpxUploaded({
+            segment_count: doneSegments.length,
+            total_km: doneSegments.reduce((sum, s) => sum + (s.distanceKm ?? 0), 0),
+          })
+          hasNewDone = true
         } else if (seg.parseStatus === 'error') {
           toast.error(`Parsing échoué pour "${seg.name ?? 'Sans nom'}"`, {
             description: 'Vérifiez le format du fichier GPX',
@@ -245,11 +259,16 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
       }
     }
 
+    // Refresh adventure data (totalDistanceKm) when a segment finishes parsing
+    if (hasNewDone) {
+      queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
+    }
+
     // Only record state once we have real server data (not the [] default)
     if (segments.length > 0) {
       prevSegmentsRef.current = segments
     }
-  }, [segments])
+  }, [segments, queryClient, adventureId])
 
   if (adventureLoading) {
     return <div className="animate-pulse h-32 bg-muted rounded-lg m-4" />

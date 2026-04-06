@@ -33,6 +33,7 @@ import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
 import { useStages } from '@/hooks/use-stages'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import { getStoredWeatherPace } from '@/lib/weather-pace'
+import { trackMapOpened, trackPoiSearchTriggered, hashAdventureId } from '@/lib/analytics'
 
 interface MapViewProps {
   adventureId: string
@@ -106,6 +107,15 @@ export function MapView({ adventureId }: MapViewProps) {
     () => data?.segments.filter((s) => s.parseStatus === 'done') ?? [],
     [data],
   )
+  // Track map_opened once when trace is displayed (AC #2, Story 15.3)
+  const mapOpenedTrackedRef = useRef(false)
+  useEffect(() => {
+    if (mapOpenedTrackedRef.current || readySegments.length === 0) return
+    mapOpenedTrackedRef.current = true
+    trackMapOpened({ adventure_id_hash: hashAdventureId(adventureId) })
+    return () => { mapOpenedTrackedRef.current = false }
+  }, [readySegments, adventureId])
+
   const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
   const { coverageGaps, densityStatus, densityCategories } = useDensity(adventureId)
 
@@ -218,6 +228,13 @@ export function MapView({ adventureId }: MapViewProps) {
 
     if ((justCommitted && !poisPending) || justResolved) {
       mapCanvasRef.current?.fitToCorridorRange(mapFromKmRef.current, mapToKmRef.current, readySegmentsRef.current)
+      // Track POI search completion (AC #3, Story 15.3)
+      const allResults = Object.values(poisByLayer).flat()
+      trackPoiSearchTriggered({
+        mode: 'planning',
+        poi_categories: [...visibleLayers],
+        result_count: allResults.length,
+      })
     }
 
     prevSearchCommittedRef.current = searchCommitted
