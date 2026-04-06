@@ -70,7 +70,7 @@ export function PwaInstallBanner() {
                 <p className="mb-1 font-semibold text-green-300">iPhone / iPad</p>
                 <ol className="list-inside list-decimal space-y-0.5 text-white/80">
                   <li>Cliquez le bouton <span className="font-semibold text-white">Partager</span></li>
-                  <li>Cliquez sur le bouton <span className="font-semibold text-white">voir plus</span></li>
+                  <li>Cliquez sur le bouton <span className="font-semibold text-white">En voir plus</span></li>
                   <li>Faites défiler et touchez <span className="font-semibold text-white">Sur l&apos;écran d&apos;accueil</span></li>
                   <li>Confirmez en touchant <span className="font-semibold text-white">Ajouter</span></li>
                 </ol>
