@@ -14,7 +14,15 @@ const { toastSuccess, toastError } = vi.hoisted(() => ({
 
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }))
 vi.mock('@/lib/api-client')
-vi.mock('./gpx-upload-form', () => ({ GpxUploadForm: () => null }))
+vi.mock('./gpx-upload-form', () => ({
+  GpxUploadForm: ({ onSuccess, onPendingChange }: { onSuccess?: () => void; onPendingChange?: (p: boolean) => void }) => (
+    <div data-testid="gpx-upload-form">
+      <button data-testid="simulate-upload-success" onClick={() => onSuccess?.()}>Upload</button>
+      <button data-testid="simulate-pending-true" onClick={() => onPendingChange?.(true)}>Set Pending</button>
+      <button data-testid="simulate-pending-false" onClick={() => onPendingChange?.(false)}>Clear Pending</button>
+    </div>
+  ),
+}))
 vi.mock('./sortable-segment-card', () => ({
   SortableSegmentCard: ({ segment }: { segment: { id: string } }) => (
     <div data-testid={`seg-${segment.id}`} />
@@ -26,6 +34,31 @@ vi.mock('./segment-card', () => ({
     <div data-testid={`seg-${segment.id}`} />
   ),
 }))
+// Mock Dialog to avoid base-ui portal issues in JSDOM
+// Only the OPEN dialog stores its onOpenChange so Close targets the right one
+vi.mock('@/components/ui/dialog', () => {
+  let activeOnOpenChange: ((o: boolean) => void) | null = null
+  return {
+    Dialog: ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (o: boolean) => void; children: React.ReactNode }) => {
+      if (open) activeOnOpenChange = onOpenChange
+      return open ? <div data-testid="dialog-root">{children}</div> : null
+    },
+    DialogContent: ({ children }: { children: React.ReactNode }) => (
+      <div>
+        {children}
+        <button aria-label="Close" onClick={() => activeOnOpenChange?.(false)}>×</button>
+      </div>
+    ),
+    DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    DialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
+    DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+    DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    DialogClose: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    DialogOverlay: () => null,
+    DialogPortal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    DialogTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  }
+})
 vi.mock('./density-trigger-button', () => ({
   DensityTriggerButton: () => <button data-testid="density-trigger-btn">Calculer la densité</button>,
 }))
@@ -412,6 +445,102 @@ describe('AdventureDetail — date pickers', () => {
     fireEvent.change(input, { target: { value: '2026-06-15' } })
 
     await waitFor(() => expect(input.disabled).toBe(true))
+  })
+})
+
+describe('AdventureDetail — GPX upload dialog', () => {
+  it('shows "Ajouter un segment GPX" button when adventure has no segments', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    expect(screen.getByRole('button', { name: /ajouter un segment gpx/i })).toBeInTheDocument()
+  })
+
+  it('shows "+ Ajouter un segment" button when adventure has segments', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([
+      makeSeg({ id: 'seg-1', parseStatus: 'done', distanceKm: 10 }),
+    ])
+    renderDetail()
+
+    await waitFor(() => screen.getByTestId('seg-seg-1'))
+    expect(screen.getByRole('button', { name: /ajouter un segment/i })).toBeInTheDocument()
+  })
+
+  it('clicking add button opens dialog with GPX upload form', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+
+    // Dialog form should not be visible yet
+    expect(screen.queryByTestId('gpx-upload-form')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /ajouter un segment gpx/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dialog-root')).toBeInTheDocument()
+      expect(screen.getByTestId('gpx-upload-form')).toBeInTheDocument()
+    })
+  })
+
+  it('dialog closes after successful upload (onSuccess called)', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByRole('button', { name: /ajouter un segment gpx/i }))
+
+    await waitFor(() => screen.getByTestId('gpx-upload-form'))
+
+    // Simulate successful upload
+    fireEvent.click(screen.getByTestId('simulate-upload-success'))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('gpx-upload-form')).not.toBeInTheDocument()
+    })
+  })
+
+  it('dialog does NOT close while upload is pending', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByRole('button', { name: /ajouter un segment gpx/i }))
+
+    await waitFor(() => screen.getByTestId('gpx-upload-form'))
+
+    // Set upload as pending
+    fireEvent.click(screen.getByTestId('simulate-pending-true'))
+
+    // Try to close via the X button
+    const closeButton = screen.getByRole('button', { name: /close/i })
+    fireEvent.click(closeButton)
+
+    // Dialog should still be open
+    expect(screen.getByTestId('gpx-upload-form')).toBeInTheDocument()
+  })
+
+  it('dialog closes after pending is cleared', async () => {
+    vi.spyOn(apiClient, 'listSegments').mockResolvedValue([])
+    renderDetail()
+
+    await waitFor(() => screen.getByText('Tour test'))
+    fireEvent.click(screen.getByRole('button', { name: /ajouter un segment gpx/i }))
+
+    await waitFor(() => screen.getByTestId('gpx-upload-form'))
+
+    // Set pending, then clear it
+    fireEvent.click(screen.getByTestId('simulate-pending-true'))
+    fireEvent.click(screen.getByTestId('simulate-pending-false'))
+
+    // Now close should work
+    const closeButton = screen.getByRole('button', { name: /close/i })
+    fireEvent.click(closeButton)
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('gpx-upload-form')).not.toBeInTheDocument()
+    })
   })
 })
 

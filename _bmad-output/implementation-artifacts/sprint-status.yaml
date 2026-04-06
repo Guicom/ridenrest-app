@@ -206,7 +206,7 @@ development_status:
   16-24-live-slider-plus-minus-buttons: review  # boutons − / + autour du slider live mode pour ajustement précis
   16-25-live-filter-distance-persist-on-close: done  # persister distance/vitesse/départ à la fermeture du drawer filtres sans recherche
   16-26-live-auto-zoom-search-radius-circle: done  # auto-zoom slider + cercle géographique searchRadiusKm
-  16-27-gpx-upload-dialog: ready-for-dev  # formulaire upload GPX dans une dialog au lieu d'inline
+  16-27-gpx-upload-dialog: done  # formulaire upload GPX dans une dialog au lieu d'inline
   16-28-stage-departure-time-weather: ready-for-dev  # heure de départ par étape + météo ajustée par étape
   epic-16-retrospective: optional
 

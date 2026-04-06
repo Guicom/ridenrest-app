@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Trash2, Map, Navigation, Route, TrendingUp, Info } from 'lucide-react'
+import { ArrowLeft, Trash2, Map, Navigation, Route, TrendingUp, Info, Upload } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -34,6 +34,13 @@ import {
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +73,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [replacingSegmentId, setReplacingSegmentId] = useState<string | null>(null)
   const [stravaImportOpen, setStravaImportOpen] = useState(false)
+  const [uploadPending, setUploadPending] = useState(false)
   const [isRenamingAdventure, setIsRenamingAdventure] = useState(false)
   const [adventureNameInput, setAdventureNameInput] = useState('')
   const [deleteAdventureDialogOpen, setDeleteAdventureDialogOpen] = useState(false)
@@ -446,28 +454,25 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
       <section>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
           <h2 className="text-lg font-semibold">Segments</h2>
-          {!showUploadForm && (
-            <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
-                onClick={() => setStravaImportOpen(true)}
-              >
-                Importer depuis Strava
-              </Button>
-              {segments.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
-                  onClick={() => setShowUploadForm(true)}
-                >
-                  + Ajouter un segment
-                </Button>
-              )}
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+              onClick={() => setStravaImportOpen(true)}
+            >
+              Importer depuis Strava
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+              onClick={() => { setUploadPending(false); setShowUploadForm(true) }}
+            >
+              <Upload className="h-4 w-4" />
+              {segments.length > 0 ? '+ Ajouter un segment' : 'Ajouter un segment GPX'}
+            </Button>
+          </div>
         </div>
         {segments.length === 0 ? (
           <p className="text-muted-foreground text-sm">
@@ -493,15 +498,22 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         )}
       </section>
 
-      {(!segments.length || showUploadForm) && (
-        <section>
-          <h2 className="text-lg font-semibold mb-3">Ajouter un segment GPX</h2>
+      <Dialog open={showUploadForm} onOpenChange={(open) => {
+        if (!open && uploadPending) return
+        setShowUploadForm(open)
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un segment GPX</DialogTitle>
+            <DialogDescription>Sélectionnez un fichier .gpx depuis votre appareil.</DialogDescription>
+          </DialogHeader>
           <GpxUploadForm
             adventureId={adventureId}
             onSuccess={() => setShowUploadForm(false)}
+            onPendingChange={setUploadPending}
           />
-        </section>
-      )}
+        </DialogContent>
+      </Dialog>
 
       <StravaImportModal
         adventureId={adventureId}
