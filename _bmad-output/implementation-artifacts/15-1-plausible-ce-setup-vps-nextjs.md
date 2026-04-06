@@ -88,12 +88,14 @@ Plausible CE v2 requires 3 containers:
 
 **CRITICAL**: Plausible's PostgreSQL is SEPARATE from the app's PostGIS database. Do NOT reuse `ridenrest-db`. Use a dedicated `plausible-db` container with its own volume.
 
-### next-plausible Library
+### next-plausible Library (v4 — API changed from v3)
 
 Use `next-plausible` (MIT, ~50k weekly downloads) — provides `<PlausibleProvider>` for App Router and `usePlausible()` hook for custom events (used in stories 15.2, 15.3).
 
+**IMPORTANT**: v4 removed `domain`, `customDomain`, `selfHosted` props. Use `src`, `init.endpoint`, and `scriptProps["data-domain"]` instead.
+
 ```typescript
-// layout.tsx pattern
+// layout.tsx — actual pattern (next-plausible v4)
 import PlausibleProvider from 'next-plausible'
 
 export default function RootLayout({ children }) {
@@ -101,9 +103,9 @@ export default function RootLayout({ children }) {
     <html lang="fr">
       <head>
         <PlausibleProvider
-          domain="ridenrest.app"
-          customDomain="https://stats.ridenrest.app"
-          selfHosted
+          src={`${process.env.NEXT_PUBLIC_PLAUSIBLE_HOST}/js/script.outbound-links.pageview-props.tagged-events.js`}
+          init={{ endpoint: `${process.env.NEXT_PUBLIC_PLAUSIBLE_HOST}/api/event` }}
+          scriptProps={{ "data-domain": process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN }}
         />
       </head>
       <body>{children}</body>
@@ -112,14 +114,23 @@ export default function RootLayout({ children }) {
 }
 ```
 
-**Note**: In Next.js App Router, `<PlausibleProvider>` goes inside `<head>` (not wrapping `<body>`). Check `next-plausible` v3+ docs for exact App Router pattern — API may differ from Pages Router.
+Script extensions enabled: `outbound-links` (Booking.com clicks), `pageview-props` (custom properties), `tagged-events` (custom events for funnel).
 
 ### Security Considerations
 
 - Plausible's built-in auth is sufficient (no need for Caddy basic_auth like Uptime Kuma)
-- `SECRET_KEY_BASE` must be 64+ random bytes: `openssl rand -base64 64`
-- `TOTP_VAULT_KEY` must be 32 random bytes: `openssl rand -base64 32`
+- `SECRET_KEY_BASE` must be 64+ random bytes: `openssl rand -base64 64 | tr -d '\n'`
+- `TOTP_VAULT_KEY` must be 32 random bytes: `openssl rand -base64 32 | tr -d '\n'`
+- **CRITICAL**: Values in `.env` MUST be wrapped in double quotes (base64 contains `+`, `/`, `=` that break bash `source`)
 - Stats API key (for story 15.4) is generated within Plausible dashboard — store as `PLAUSIBLE_API_KEY` in VPS `.env`
+
+### Hostinger KVM VPS — ClickHouse Gotchas (discovered 2026-04-06)
+
+1. **IPv6 disabled** — ClickHouse defaults to `[::]`, must mount `clickhouse/ipv4-only.xml` to force `0.0.0.0`
+2. **NUMA capabilities** — `get_mempolicy` blocked by Docker seccomp → `cap_add: [SYS_NICE, IPC_LOCK]`
+3. **No wget in alpine** — Health check must use `clickhouse-client --query 'SELECT 1'`, not `wget`
+4. **First boot** — Requires manual steps: create ClickHouse DB (`CREATE DATABASE IF NOT EXISTS plausible_events`), then run Plausible migrations (`Plausible.Release.createdb && Plausible.Release.interweave_migrate`)
+5. **start_period** — ClickHouse needs 60s on first boot (default 30s too short)
 
 ### Local Development
 
@@ -147,6 +158,12 @@ Claude Opus 4.6
 ### Debug Log References
 - next-plausible v4 API change: `domain`/`customDomain`/`selfHosted` props removed. Replaced with `src` (full script URL), `init.endpoint`, and `scriptProps["data-domain"]`.
 - ClickHouse image: `clickhouse/clickhouse-server:24-alpine` with `ulimits.nofile` required for production stability.
+- **ClickHouse `get_mempolicy` error on KVM VPS** — Fixed by adding `cap_add: [SYS_NICE, IPC_LOCK]` to grant NUMA capabilities blocked by Docker seccomp profile on Hostinger KVM.
+- **ClickHouse IPv6 bind failure** — Hostinger KVM has IPv6 disabled. ClickHouse defaults to listening on `[::]` which fails. Fixed by mounting `clickhouse/ipv4-only.xml` config override (`<listen_host>0.0.0.0</listen_host>`).
+- **ClickHouse health check** — `wget` not available in `clickhouse-server:24-alpine`. Replaced with `clickhouse-client --query 'SELECT 1'`.
+- **Plausible DB migrations** — First boot requires manual migration: `docker run ... /app/bin/plausible eval "Plausible.Release.createdb && Plausible.Release.interweave_migrate"`. Also need to create ClickHouse database first: `docker exec plausible-events-db clickhouse-client --query "CREATE DATABASE IF NOT EXISTS plausible_events"`.
+- **`.env` quoting** — `openssl rand -base64 64` output contains `+`, `/`, `=` characters that break bash `source` — values MUST be wrapped in double quotes in `.env`.
+- **Plausible script extensions** — Enabling outbound links, custom properties, and tagged events in Plausible dashboard changes the script URL from `script.js` to `script.outbound-links.pageview-props.tagged-events.js`. Updated `layout.tsx` accordingly.
 
 ### Completion Notes List
 - ✅ Task 1: Added 3 Docker services (plausible, plausible-db, plausible-events-db) with `profiles: ["production"]`, health checks, and dedicated volumes. Validated with `docker compose config`.
@@ -157,19 +174,23 @@ Claude Opus 4.6
 - ✅ Task 6: 3 new Vitest tests verify PlausibleProvider renders with correct self-hosted props and no plausible.io references.
 - Full test suite: 852 web + 245 API = 1097 tests, 0 regressions.
 
-### Manual VPS Steps Required After Deploy
-1. Add DNS A record: `stats.ridenrest.app → 72.62.189.193`
-2. Add to VPS `.env`: `PLAUSIBLE_SECRET_KEY_BASE` (openssl rand -base64 64), `PLAUSIBLE_TOTP_VAULT_KEY` (openssl rand -base64 32), `PLAUSIBLE_DB_PASSWORD`
-3. Add to VPS `.env`: `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=ridenrest.app`, `NEXT_PUBLIC_PLAUSIBLE_HOST=https://stats.ridenrest.app`
-4. Run `docker compose --profile production up -d` to start Plausible services
-5. Visit `https://stats.ridenrest.app` to create admin account (first-boot wizard)
-6. Register site `ridenrest.app` in Plausible dashboard
-7. Enable Goals feature for custom events (stories 15.2/15.3)
-8. Generate Stats API key (story 15.4), store as `PLAUSIBLE_API_KEY` in VPS `.env`
+### Manual VPS Steps (completed 2026-04-06)
+1. ✅ DNS A record: `stats.ridenrest.app → 72.62.189.193`
+2. ✅ VPS `.env`: `PLAUSIBLE_SECRET_KEY_BASE` (quoted!), `PLAUSIBLE_TOTP_VAULT_KEY`, `PLAUSIBLE_DB_PASSWORD`
+3. ✅ VPS `.env`: `NEXT_PUBLIC_PLAUSIBLE_DOMAIN=ridenrest.app`, `NEXT_PUBLIC_PLAUSIBLE_HOST=https://stats.ridenrest.app`
+4. ✅ ClickHouse DB init: `docker exec plausible-events-db clickhouse-client --query "CREATE DATABASE IF NOT EXISTS plausible_events"`
+5. ✅ Plausible DB migrations: `docker run ... /app/bin/plausible eval "Plausible.Release.createdb && Plausible.Release.interweave_migrate"`
+6. ✅ `docker compose --profile production up -d` — all 3 Plausible containers healthy
+7. ✅ Caddy restart to pick up `stats.ridenrest.app` — SSL auto-provisioned via Let's Encrypt
+8. ✅ Admin account created via first-boot wizard at `https://stats.ridenrest.app`
+9. ✅ Site `ridenrest.app` registered in Plausible dashboard
+10. ✅ Enabled: Outbound links, Custom events (tagged-events), Custom properties (pageview-props)
+11. ⬜ Generate Stats API key (needed by story 15.4), store as `PLAUSIBLE_API_KEY` in VPS `.env`
 
 ### File List
-- `docker-compose.yml` — added plausible, plausible-db, plausible-events-db services + 2 volumes
+- `docker-compose.yml` — added plausible, plausible-db, plausible-events-db services + 2 volumes + cap_add for KVM
 - `Caddyfile` — added stats.ridenrest.app reverse proxy block
+- `clickhouse/ipv4-only.xml` — NEW: ClickHouse config override to force IPv4-only (VPS has no IPv6)
 - `apps/web/src/app/layout.tsx` — added PlausibleProvider in `<head>`
 - `apps/web/src/app/layout.test.ts` — added 3 PlausibleProvider tests
 - `apps/web/package.json` — added next-plausible dependency

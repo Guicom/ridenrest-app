@@ -28,7 +28,7 @@ export default function RootLayout({
     <html lang="fr" className={montserrat.variable}>
       <head>
         <PlausibleProvider
-          src={`${process.env.NEXT_PUBLIC_PLAUSIBLE_HOST || "https://stats.ridenrest.app"}/js/script.js`}
+          src={`${process.env.NEXT_PUBLIC_PLAUSIBLE_HOST || "https://stats.ridenrest.app"}/js/script.outbound-links.pageview-props.tagged-events.js`}
           init={{ endpoint: `${process.env.NEXT_PUBLIC_PLAUSIBLE_HOST || "https://stats.ridenrest.app"}/api/event` }}
           scriptProps={{ "data-domain": process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || "ridenrest.app" } as React.DetailedHTMLProps<React.ScriptHTMLAttributes<HTMLScriptElement>, HTMLScriptElement>}
         />

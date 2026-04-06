@@ -398,13 +398,15 @@ NEVER expose a direct public URL to `/data/gpx/*.gpx`.
 
 ```
 VPS Hostinger KVM 2 (~$8/mois) — IP: 72.62.189.193
-├── Docker: PostgreSQL+PostGIS :5432, Redis :6379, Caddy (SSL auto)
+├── Docker: PostgreSQL+PostGIS :5432, Redis :6379, Caddy (SSL auto),
+│           Uptime Kuma :3001, Plausible CE :8000 (+ ClickHouse + plausible-db)
 └── PM2:    Next.js standalone (port 3011), NestJS (port 3010)
 ```
 
 **Domaine** : `ridenrest.app` (migré depuis `ridenrest.com` le 2026-03-26)
 - `ridenrest.app` → Next.js :3011
 - `api.ridenrest.app` → NestJS :3010
+- `stats.ridenrest.app` → Plausible CE :8000 (analytics, self-hosted)
 
 **Deploy** : GitHub Actions → SSH → `deploy.sh` sur le VPS :
 ```
@@ -423,10 +425,17 @@ git pull → source .env → turbo build → copy static assets → drizzle-kit 
 
 **Gotchas découverts en prod (2026-03-26) :**
 - `.env` : pas de commentaires inline (`KEY=value # comment` → la valeur inclut le commentaire)
+- `.env` : les valeurs base64 (`openssl rand`) contiennent `+/=` → TOUJOURS les wrapper en double quotes
 - Turbo cache : les `NEXT_PUBLIC_*` doivent être dans `turbo.json#env` sinon le cache ignore les changements
 - PM2 : les vars d'env doivent être dans la section `env` de l'app explicitement (pas juste `process.env`)
 - Next.js standalone static : faire `rm -rf` avant `cp` pour éviter l'accumulation de chunks entre builds
 - `deploy.sh` via SSH : `source .env` requis avant `turbo build` pour embarquer les `NEXT_PUBLIC_*`
+
+**Gotchas ClickHouse / Hostinger KVM (2026-04-06) :**
+- IPv6 désactivé → monter `clickhouse/ipv4-only.xml` (`<listen_host>0.0.0.0</listen_host>`)
+- NUMA bloqué par seccomp → `cap_add: [SYS_NICE, IPC_LOCK]`
+- Pas de `wget` dans alpine → health check via `clickhouse-client --query 'SELECT 1'`
+- Premier boot : créer la DB ClickHouse + lancer les migrations Plausible manuellement
 
 > Fly.io config moved to `_deprecated/` (14.7). `apps/api/Dockerfile` removed (14.7).
 

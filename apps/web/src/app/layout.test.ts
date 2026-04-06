@@ -47,7 +47,7 @@ describe('PlausibleProvider in layout', () => {
     const tree = RootLayout({ children: null })
     const plausible = findPlausibleElement(tree)
     expect(plausible).not.toBeNull()
-    expect(plausible.props.src).toContain('stats.ridenrest.app/js/script.js')
+    expect(plausible.props.src).toContain('stats.ridenrest.app/js/script.')
   })
 
   it('sets data-domain via scriptProps', () => {
