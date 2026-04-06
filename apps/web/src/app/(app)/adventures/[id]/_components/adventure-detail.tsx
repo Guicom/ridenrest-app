@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Trash2, Map, Route, TrendingUp, Info } from 'lucide-react'
+import { ArrowLeft, Trash2, Map, Navigation, Route, TrendingUp, Info } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -268,7 +268,11 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   return (
     <main className="min-h-screen bg-background-page pt-10">
       <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-10">
-      <div className="space-y-4">
+      <Link href="/adventures" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <ArrowLeft className="h-4 w-4" />
+        Mes aventures
+      </Link>
+      <div className="space-y-8">
         {/* Title */}
         <div>
           {isRenamingAdventure ? (
@@ -307,6 +311,22 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
           )}
         </div>
 
+        {/* Stats */}
+        {adventure.totalDistanceKm > 0 && (
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Route className="h-4 w-4" />
+              {adventure.totalDistanceKm.toFixed(1)} km
+            </span>
+            {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
+              <span className="flex items-center gap-1">
+                <TrendingUp className="h-4 w-4" />
+                {adventure.totalElevationGainM.toFixed(0)} m D+
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Action buttons — shown when at least one segment exists */}
         {segments.length > 0 && (() => {
           const hasPendingSegments = segments.some(
@@ -314,7 +334,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
           )
           const allDone = segments.every((s) => s.parseStatus === 'done')
           return (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
               <DensityTriggerButton adventureId={adventureId} segments={segments} />
               {hasPendingSegments && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -323,12 +343,20 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
                 </span>
               )}
               {allDone && (
-                <Link href={`/map/${adventureId}`}>
-                  <Button variant="default" size="lg" className="rounded-full gap-2 px-6 py-6">
-                    <Map className="h-4 w-4" />
-                    Voir la carte
-                  </Button>
-                </Link>
+                <>
+                  <Link href={`/map/${adventureId}`} className="w-full sm:w-auto">
+                    <Button variant="default" size="lg" className="w-full sm:w-auto rounded-full gap-2 px-6 py-6">
+                      <Map className="h-4 w-4" />
+                      Voir la carte
+                    </Button>
+                  </Link>
+                  <Link href={`/live/${adventureId}`} className="w-full sm:w-auto">
+                    <Button variant="outline" size="lg" className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary">
+                      <Navigation className="h-4 w-4" />
+                      Mode live
+                    </Button>
+                  </Link>
+                </>
               )}
             </div>
           )
@@ -366,21 +394,6 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
           </div>
         </div>
 
-        {/* Stats */}
-        {adventure.totalDistanceKm > 0 && (
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Route className="h-4 w-4" />
-              {adventure.totalDistanceKm.toFixed(1)} km
-            </span>
-            {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
-              <span className="flex items-center gap-1">
-                <TrendingUp className="h-4 w-4" />
-                {adventure.totalElevationGainM.toFixed(0)} m D+
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       <AlertDialog open={deleteAdventureDialogOpen} onOpenChange={setDeleteAdventureDialogOpen}>
@@ -415,18 +428,20 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
           <h2 className="text-lg font-semibold">Segments</h2>
           {!showUploadForm && (
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <button
-                className="text-sm text-foreground hover:text-muted-foreground transition-colors"
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
                 onClick={() => setStravaImportOpen(true)}
               >
                 Importer depuis Strava
-              </button>
+              </Button>
               {segments.length > 0 && (
                 <Button
                   variant="ghost"
                   size="lg"
-                  className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                  className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
                   onClick={() => setShowUploadForm(true)}
                 >
                   + Ajouter un segment

@@ -61,7 +61,7 @@ export function DensityTriggerButton({ adventureId, segments }: Props) {
       <Button
         variant="ghost"
         size="lg"
-        className={`rounded-full gap-2 px-6 py-6 ${isDone ? doneClasses : defaultClasses}`}
+        className={`w-full sm:w-auto rounded-full gap-2 px-6 py-6 ${isDone ? doneClasses : defaultClasses}`}
         onClick={isDone ? undefined : () => setDialogOpen(true)}
         disabled={isAnalyzing || !allSegmentsParsed || isDone}
       >

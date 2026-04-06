@@ -282,7 +282,7 @@ No API changes. No new packages. shadcn `DropdownMenu` and lucide icons (`Settin
 - [x] [Review][MEDIUM] **Intro texte modes** — Ajouter un encart d'introduction entre le titre "Mes aventures" et le bouton "+ Nouvelle aventure" pour contextualiser les deux modes :
   ```
   Planning — Prépare ton itinéraire : hébergements, densité, météo sur chaque tronçon.
-  Live — Sur le vélo : visualise les options dans les prochains kilomètres devant toi.
+  Live — Sur le vélo : visualise les options pour les prochains kilomètres devant toi.
   ```
   - Rendu : encart `rounded-xl p-4` sur fond vert pastel `bg-[#b4c9b1]`, deux lignes, `text-sm text-[--text-primary]`, "Planning" et "Live" en `font-semibold`
   - Ajouter `#b4c9b1` comme token CSS dans `globals.css` : `--background-intro: #b4c9b1` + `--color-background-intro: var(--background-intro)` dans `@theme inline` → classe `bg-background-intro`

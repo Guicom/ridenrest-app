@@ -16,7 +16,7 @@ export default function AdventuresPage() {
         </div>
         <div className="rounded-xl p-4 bg-background-intro mb-6 text-sm text-[--text-primary]">
           <p><span className="font-semibold">Planning</span> — Prépare ton itinéraire : hébergements, densité, météo sur chaque tronçon.</p>
-          <p className="mt-1"><span className="font-semibold">Live</span> — Sur le vélo : visualise les options dans les prochains kilomètres devant toi.</p>
+          <p className="mt-1"><span className="font-semibold">Live</span> — Sur le vélo : visualise les options pour les prochains kilomètres devant toi.</p>
         </div>
         <Suspense fallback={<AdventureListSkeleton />}>
           <AdventureList />
