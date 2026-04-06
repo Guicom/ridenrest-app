@@ -68,6 +68,23 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
     visibleLayers.has('bike')
   )
 
+  // Persist local values to the store on any close (swipe, overlay tap, X button)
+  const handleClose = () => {
+    setSearchRadius(localRadius)
+    setSpeedKmh(localSpeed)
+    setWeatherDepartureTime(localDepartureTime || null)
+    onOpenChange(false)
+  }
+
+  // Wrapper for Drawer.Root onOpenChange — intercept close to persist values
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose()
+    } else {
+      onOpenChange(true)
+    }
+  }
+
   const handleApply = () => {
     setSearchRadius(localRadius)
     setSpeedKmh(localSpeed)
@@ -77,7 +94,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
   }
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange}>
+    <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
         <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl p-4 pb-8 max-h-[95vh] overflow-y-auto">
@@ -88,7 +105,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
           <div className="flex items-center justify-between mb-4">
             <Drawer.Title className="text-base font-semibold">Filtres</Drawer.Title>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               aria-label="Fermer les filtres"
               data-testid="filters-close-btn"
               className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-[--surface] active:scale-[0.85] transition-all duration-75 cursor-pointer"

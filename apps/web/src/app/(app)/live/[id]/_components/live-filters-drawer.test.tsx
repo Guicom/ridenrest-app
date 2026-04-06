@@ -86,8 +86,8 @@ vi.mock('@/components/ui/switch', () => ({
 
 vi.mock('vaul', () => ({
   Drawer: {
-    Root:    ({ children, open }: { children: React.ReactNode; open: boolean }) =>
-      open ? <div data-testid="drawer-root">{children}</div> : null,
+    Root:    ({ children, open, onOpenChange }: { children: React.ReactNode; open: boolean; onOpenChange?: (v: boolean) => void }) =>
+      open ? <div data-testid="drawer-root"><button data-testid="drawer-swipe-close" onClick={() => onOpenChange?.(false)} />{children}</div> : null,
     Portal:  ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Overlay: () => <div data-testid="drawer-overlay" />,
     Content: ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -357,5 +357,76 @@ describe('LiveFiltersDrawer', () => {
     render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
     fireEvent.click(screen.getByTestId('switch-stages'))
     expect(mockSetStageLayerActive).toHaveBeenCalledWith(true)
+  })
+
+  // ── Story 16.25: Persist values on close without search ─────────────────────
+
+  it('closing via X persists modified radius to store', () => {
+    const onOpenChange = vi.fn()
+    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
+    fireEvent.click(screen.getByTestId('filters-close-btn'))
+    expect(mockSetSearchRadius).toHaveBeenCalledWith(5.5)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('closing via swipe/overlay persists modified radius to store', () => {
+    const onOpenChange = vi.fn()
+    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    fireEvent.click(screen.getByLabelText('Diminuer le rayon'))
+    fireEvent.click(screen.getByTestId('drawer-swipe-close'))
+    expect(mockSetSearchRadius).toHaveBeenCalledWith(4.5)
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('reopening drawer shows previously persisted radius', () => {
+    // Simulate that the store was updated by a previous close
+    mockSearchRadiusKm = 7
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    expect(screen.getByText('7 km')).toBeDefined()
+  })
+
+  it('closing without modifying commits original values (idempotent no-op)', () => {
+    const onOpenChange = vi.fn()
+    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    fireEvent.click(screen.getByTestId('filters-close-btn'))
+    // Setters called with original values — Zustand ignores identical state
+    expect(mockSetSearchRadius).toHaveBeenCalledWith(5)
+    expect(mockSetSpeedKmh).toHaveBeenCalledWith(15)
+    expect(mockSetWeatherDepartureTime).toHaveBeenCalledWith(null)
+  })
+
+  it('search button still commits + calls onSearch (existing behavior preserved)', () => {
+    const onOpenChange = vi.fn()
+    const onSearch = vi.fn()
+    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} onSearch={onSearch} />)
+    fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
+    fireEvent.click(screen.getByTestId('search-btn'))
+    expect(mockSetSearchRadius).toHaveBeenCalledWith(5.5)
+    expect(onSearch).toHaveBeenCalled()
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  it('closing via X does NOT call onSearch', () => {
+    const onSearch = vi.fn()
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} onSearch={onSearch} />)
+    fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
+    fireEvent.click(screen.getByTestId('filters-close-btn'))
+    expect(onSearch).not.toHaveBeenCalled()
+  })
+
+  it('closing via X persists modified speed to store', () => {
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    fireEvent.change(screen.getByTestId('input-speed'), { target: { value: '20' } })
+    fireEvent.click(screen.getByTestId('filters-close-btn'))
+    expect(mockSetSpeedKmh).toHaveBeenCalledWith(20)
+  })
+
+  it('closing via X persists modified departure time to store', () => {
+    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    fireEvent.click(screen.getByTestId('weather-accordion-header'))
+    fireEvent.change(screen.getByTestId('input-departure-time'), { target: { value: '2026-04-01T09:00' } })
+    fireEvent.click(screen.getByTestId('filters-close-btn'))
+    expect(mockSetWeatherDepartureTime).toHaveBeenCalledWith('2026-04-01T09:00')
   })
 })
