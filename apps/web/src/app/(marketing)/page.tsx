@@ -2,6 +2,7 @@ import { MarketingHeader } from './_components/marketing-header';
 import { Hero } from './_components/hero';
 import { FeatureStepOne } from './_components/feature-step-one';
 import { FeatureStepTwo } from './_components/feature-step-two';
+import { FeatureStepThree } from './_components/feature-step-three';
 import { Testimonials } from './_components/testimonials';
 import { MarketingFooter } from './_components/marketing-footer';
 
@@ -13,6 +14,7 @@ export default function LandingPage() {
         <Hero />
         <FeatureStepOne />
         <FeatureStepTwo />
+        <FeatureStepThree />
         <Testimonials />
       </main>
       <MarketingFooter />

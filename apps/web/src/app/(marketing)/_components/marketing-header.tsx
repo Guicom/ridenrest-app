@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/lib/auth/client';
 
 const navLinkClass =
-  'text-[10px] font-semibold tracking-[0.2em] uppercase hover:text-[#4A7C44] transition-colors relative after:content-[\'\'] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-[-4px] after:left-0 after:bg-[#4A7C44] after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left block py-2 md:py-0';
+  'text-[10px] font-semibold tracking-[0.2em] uppercase hover:text-[#4A7C44] transition-colors relative after:content-[\'\'] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-[-4px] after:left-0 after:bg-[#4A7C44] after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left block py-2 lg:py-0';
 
 export function MarketingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -25,7 +25,7 @@ export function MarketingHeader() {
           <Logo className="h-full w-auto" />
         </Link>
 
-        <nav className="hidden md:flex items-center gap-10">
+        <nav className="hidden lg:flex items-center gap-10">
           <Link className={navLinkClass} href="/#concept">
             Le Concept
           </Link>
@@ -48,7 +48,7 @@ export function MarketingHeader() {
         <button
           type="button"
           onClick={() => setMenuOpen((o) => !o)}
-          className="md:hidden p-2 rounded-lg text-earth-dark hover:bg-earth-dark/5 focus:outline-none focus:ring-2 focus:ring-[#4A7C44]/30"
+          className="lg:hidden p-2 rounded-lg text-earth-dark hover:bg-earth-dark/5 focus:outline-none focus:ring-2 focus:ring-[#4A7C44]/30"
           aria-expanded={menuOpen}
           aria-label="Menu"
         >
@@ -65,7 +65,7 @@ export function MarketingHeader() {
 
       {/* Mobile menu panel */}
       <div
-        className={`md:hidden overflow-hidden transition-[max-height] duration-300 ease-out ${
+        className={`lg:hidden overflow-hidden transition-[max-height] duration-300 ease-out ${
           menuOpen ? 'max-h-52' : 'max-h-0'
         }`}
       >
