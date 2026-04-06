@@ -3,12 +3,17 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/ui/logo';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useSession } from '@/lib/auth/client';
 
 const navLinkClass =
   'text-[10px] font-semibold tracking-[0.2em] uppercase hover:text-[#4A7C44] transition-colors relative after:content-[\'\'] after:absolute after:w-full after:scale-x-0 after:h-0.5 after:bottom-[-4px] after:left-0 after:bg-[#4A7C44] after:origin-bottom-right after:transition-transform after:duration-300 hover:after:scale-x-100 hover:after:origin-bottom-left block py-2 md:py-0';
 
 export function MarketingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { data: session, isPending } = useSession();
+  const isAuthenticated = !!session?.user;
+  const ctaLabel = isAuthenticated ? 'Mes aventures' : 'Se connecter';
 
   return (
     <header className="sticky top-0 z-50 w-full bg-earth-light/95 backdrop-blur-md border-b border-earth-dark/5">
@@ -27,12 +32,16 @@ export function MarketingHeader() {
           <Link className={navLinkClass} href="/#pour-qui">
             Pour qui?
           </Link>
-          <Link
-            href="/adventures"
-            className="px-5 py-2 bg-[#4A7C44] text-white text-[10px] font-semibold tracking-[0.2em] uppercase rounded-lg hover:bg-[#3D6B39] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4A7C44]/40"
-          >
-            Se connecter
-          </Link>
+          {isPending ? (
+            <Skeleton data-testid="cta-skeleton" className="h-9 w-28 rounded-lg" />
+          ) : (
+            <Link
+              href="/adventures"
+              className="px-5 py-2 bg-[#4A7C44] text-white text-[10px] font-semibold tracking-[0.2em] uppercase rounded-lg hover:bg-[#3D6B39] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4A7C44]/40"
+            >
+              {ctaLabel}
+            </Link>
+          )}
         </nav>
 
         {/* Mobile menu button */}
@@ -67,13 +76,17 @@ export function MarketingHeader() {
           <Link className={navLinkClass} href="/#pour-qui" onClick={() => setMenuOpen(false)}>
             Pour qui?
           </Link>
-          <Link
-            href="/adventures"
-            onClick={() => setMenuOpen(false)}
-            className="mt-2 px-5 py-3 bg-[#4A7C44] text-white text-[10px] font-semibold tracking-[0.2em] uppercase rounded-lg hover:bg-[#3D6B39] transition-colors text-center"
-          >
-            Se connecter
-          </Link>
+          {isPending ? (
+            <Skeleton data-testid="cta-skeleton" className="mt-2 h-11 w-full rounded-lg" />
+          ) : (
+            <Link
+              href="/adventures"
+              onClick={() => setMenuOpen(false)}
+              className="mt-2 px-5 py-3 bg-[#4A7C44] text-white text-[10px] font-semibold tracking-[0.2em] uppercase rounded-lg hover:bg-[#3D6B39] transition-colors text-center"
+            >
+              {ctaLabel}
+            </Link>
+          )}
         </nav>
       </div>
     </header>

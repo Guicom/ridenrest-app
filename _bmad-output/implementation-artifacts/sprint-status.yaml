@@ -201,6 +201,8 @@ development_status:
   16-19-live-mode-google-places-fallback: done  # bug: live mode skip Google Places (source primaire) quand overpassEnabled=false → zéro résultat
   16-20-live-slider-dynamic-max-remaining-km: done  # slider live mode max dynamique = distance restante (pas 100km fixe)
   16-21-booking-url-postal-code: done  # ajouter code postal au ?ss= Booking pour désambiguïser les villes
+  16-22-landing-page-dynamic-auth-cta: done  # bouton Se connecter → Mes aventures si session active
+  16-23-mobile-sidebar-toggle-responsive-planning: backlog  # bouton flottant gauche pour ouvrir sidebar en overlay sur mobile/tablette
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
