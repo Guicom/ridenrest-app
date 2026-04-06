@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MapView } from './map-view'
 
@@ -350,7 +350,7 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     renderWithData()
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const control = screen.getByTestId('search-range-control')
+    const control = within(sidebar).getByTestId('search-range-control')
     expect(sidebar.contains(control)).toBe(true)
   })
 
@@ -359,7 +359,7 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     renderWithData()
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const control = screen.getByTestId('search-range-control')
+    const control = within(sidebar).getByTestId('search-range-control')
     expect(sidebar.contains(control)).toBe(true)
   })
 
@@ -367,7 +367,7 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     renderWithData()
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const cta = screen.getByTestId('sidebar-density-cta')
+    const cta = within(sidebar).getByTestId('sidebar-density-cta')
     expect(sidebar.contains(cta)).toBe(true)
   })
 })
@@ -387,7 +387,7 @@ describe('MapView — Story 8.4 AccommodationSubTypes', () => {
     render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
     await screen.findByTestId('map-canvas')
     const sidebar = screen.getByTestId('planning-sidebar')
-    const weatherSection = screen.getByTestId('sidebar-weather-section')
+    const weatherSection = within(sidebar).getByTestId('sidebar-weather-section')
     expect(sidebar.contains(weatherSection)).toBe(true)
   })
 })
@@ -502,7 +502,8 @@ describe('MapView — stagesVisible toggle (Story 11.2, AC4)', () => {
     renderWithData()
     await screen.findByTestId('map-canvas')
 
-    fireEvent.click(screen.getByTestId('toggle-stages'))
+    const desktopSidebar = screen.getByTestId('planning-sidebar')
+    fireEvent.click(within(desktopSidebar).getByTestId('toggle-stages'))
 
     const canvas = screen.getByTestId('map-canvas')
     expect(canvas.getAttribute('data-stage-count')).toBe('1')
@@ -643,5 +644,148 @@ describe('MapView — NoResultsSubTypeBanner (Story 16.17)', () => {
     await screen.findByTestId('map-canvas')
     expect(screen.queryByTestId('no-results-sub-type-banner')).toBeNull()
     expect(screen.getByText('Aucun résultat dans cette zone')).toBeInTheDocument()
+  })
+})
+
+describe('MapView — Mobile Sidebar (Story 16.23)', () => {
+  beforeEach(() => {
+    mockDensityStatus = 'idle'
+    mockMapStoreVisibleLayers = new Set()
+    mockPoisIsPending = false
+    mockSearchCommitted = false
+    mockPoisAccommodations = []
+    mockActiveAccommodationTypes = new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
+    mockFitToCorridorRange.mockClear()
+  })
+
+  function renderWithData() {
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    return render(<MapView adventureId="adv-1" />, { wrapper: Wrapper })
+  }
+
+  // Helper: translate classes are on the wrapper parent of mobile-sidebar
+  function getMobileSidebarWrapper() {
+    return screen.getByTestId('mobile-sidebar').parentElement!
+  }
+
+  it('renders mobile toggle button (AC #1)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const toggle = screen.getByTestId('mobile-sidebar-toggle')
+    expect(toggle).toBeInTheDocument()
+    expect(getMobileSidebarWrapper().className).toContain('lg:hidden')
+  })
+
+  it('mobile sidebar starts closed (-translate-x-full) (AC #1)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    expect(getMobileSidebarWrapper().className).toContain('-translate-x-full')
+  })
+
+  it('clicking toggle opens mobile sidebar (translate-x-0) (AC #2)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const toggle = screen.getByTestId('mobile-sidebar-toggle')
+    fireEvent.click(toggle)
+    const wrapper = getMobileSidebarWrapper()
+    expect(wrapper.className).toContain('translate-x-0')
+    expect(wrapper.className).not.toContain('-translate-x-full')
+  })
+
+  it('backdrop is visible when sidebar is open (AC #3)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const backdrop = screen.getByTestId('mobile-sidebar-backdrop')
+    // Initially hidden (opacity-0 + pointer-events-none)
+    expect(backdrop.className).toContain('opacity-0')
+    expect(backdrop.className).toContain('pointer-events-none')
+    // Open sidebar
+    fireEvent.click(screen.getByTestId('mobile-sidebar-toggle'))
+    expect(backdrop.className).toContain('opacity-100')
+    expect(backdrop.className).not.toContain('pointer-events-none')
+  })
+
+  it('clicking backdrop closes sidebar (AC #3)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    fireEvent.click(screen.getByTestId('mobile-sidebar-toggle'))
+    fireEvent.click(screen.getByTestId('mobile-sidebar-backdrop'))
+    expect(getMobileSidebarWrapper().className).toContain('-translate-x-full')
+    const backdrop = screen.getByTestId('mobile-sidebar-backdrop')
+    expect(backdrop.className).toContain('opacity-0')
+  })
+
+  it('toggle button aria-label reflects open/close state (AC #2)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const toggle = screen.getByTestId('mobile-sidebar-toggle')
+    expect(toggle).toHaveAttribute('aria-label', 'Ouvrir le panneau')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-label', 'Fermer le panneau')
+  })
+
+  it('mobile sidebar contains same sections as desktop (AC #4)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const mobileSidebar = screen.getByTestId('mobile-sidebar')
+    const desktopSidebar = screen.getByTestId('planning-sidebar')
+    // Both should contain the search range control (rendered twice — once per sidebar)
+    const controls = screen.getAllByTestId('search-range-control')
+    expect(controls.length).toBe(2)
+    expect(desktopSidebar.contains(controls[0])).toBe(true)
+    expect(mobileSidebar.contains(controls[1])).toBe(true)
+  })
+
+  it('Escape key closes mobile sidebar (AC #3)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    fireEvent.click(screen.getByTestId('mobile-sidebar-toggle'))
+    expect(getMobileSidebarWrapper().className).toContain('translate-x-0')
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(getMobileSidebarWrapper().className).toContain('-translate-x-full')
+  })
+
+  it('clicking toggle again closes sidebar (AC #3)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const toggle = screen.getByTestId('mobile-sidebar-toggle')
+    fireEvent.click(toggle) // open
+    expect(getMobileSidebarWrapper().className).toContain('translate-x-0')
+    fireEvent.click(toggle) // close
+    expect(getMobileSidebarWrapper().className).toContain('-translate-x-full')
+  })
+
+  it('desktop sidebar is unchanged (AC #5)', async () => {
+    renderWithData()
+    await screen.findByTestId('map-canvas')
+    const sidebar = screen.getByTestId('planning-sidebar')
+    expect(sidebar.className).toContain('hidden')
+    expect(sidebar.className).toContain('lg:flex')
+    expect(sidebar.className).toContain('w-[360px]')
+  })
+
+  it('auto-closes on searchCommitted (AC #6)', async () => {
+    mockSearchCommitted = false
+    const doneSeg = makeSegment('done')
+    vi.mocked(getAdventureMapData).mockResolvedValue(makeMapResponse({ segments: [doneSeg as never] }))
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <MapView adventureId="adv-1" />
+      </QueryClientProvider>,
+    )
+    await screen.findByTestId('map-canvas')
+    // Open sidebar
+    fireEvent.click(screen.getByTestId('mobile-sidebar-toggle'))
+    expect(getMobileSidebarWrapper().className).toContain('translate-x-0')
+
+    mockSearchCommitted = true
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <MapView adventureId="adv-1" />
+      </QueryClientProvider>,
+    )
+    expect(getMobileSidebarWrapper().className).toContain('-translate-x-full')
   })
 })

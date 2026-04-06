@@ -40,6 +40,7 @@ interface MapViewProps {
 
 export function MapView({ adventureId }: MapViewProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
   const [elevationCollapsed, setElevationCollapsed] = useState(false)
   const [stageClickMode, setStageClickMode] = useState(false)
   const [pendingEndKm, setPendingEndKm] = useState<number | null>(null)
@@ -234,10 +235,23 @@ export function MapView({ adventureId }: MapViewProps) {
     }
   }, [searchCommitted, setTraceClickedKm])
 
-  // Close trace CTA on Escape key (AC #3, Story 16.3)
+  // Auto-close mobile sidebar when search is committed (AC #6, Story 16.23)
+  const prevSearchCommittedMobileRef = useRef(false)
+  useEffect(() => {
+    if (searchCommitted && !prevSearchCommittedMobileRef.current) {
+      setMobileOpen(false)
+    }
+    prevSearchCommittedMobileRef.current = searchCommitted
+    return () => { prevSearchCommittedMobileRef.current = false }
+  }, [searchCommitted])
+
+  // Close trace CTA + mobile sidebar on Escape key (AC #3, Story 16.3 + Story 16.23)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setTraceClickedKm(null)
+      if (e.key === 'Escape') {
+        setTraceClickedKm(null)
+        setMobileOpen(false)
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -277,102 +291,139 @@ export function MapView({ adventureId }: MapViewProps) {
 
   const errorCount = data.segments.filter((s) => s.parseStatus === 'error').length
 
+  const sidebarContent = (
+    <div className="flex flex-col gap-4 p-4">
+      {/* Vitesse moyenne — inline edit */}
+      <div className="flex items-center justify-between rounded-xl border border-[--border] px-4 py-3">
+        <span className="text-sm font-medium">Vitesse moyenne</span>
+        {isEditingSpeed ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={5}
+              max={50}
+              value={speedInput}
+              onChange={(e) => setSpeedInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const v = Number(speedInput)
+                  if (v >= 5 && v <= 50) avgSpeedMutation.mutate(v)
+                }
+                if (e.key === 'Escape') setIsEditingSpeed(false)
+              }}
+              onBlur={() => {
+                const v = Number(speedInput)
+                if (v >= 5 && v <= 50) avgSpeedMutation.mutate(v)
+                else setIsEditingSpeed(false)
+              }}
+              className="w-14 rounded-md border border-[--border] bg-muted px-2 py-1 text-sm text-center font-mono"
+              // eslint-disable-next-line jsx-a11y/no-autofocus
+              autoFocus
+            />
+            <span className="text-sm text-muted-foreground">km/h</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setSpeedInput(String(adventure?.avgSpeedKmh ?? 15)); setIsEditingSpeed(true) }}
+            className="flex items-center gap-1.5 text-sm font-mono text-foreground hover:text-primary"
+            aria-label="Modifier la vitesse moyenne"
+          >
+            {adventure?.avgSpeedKmh ?? 15} km/h
+            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        )}
+      </div>
+
+      {/* Search range slider */}
+      <SearchRangeControl
+        totalDistanceKm={data.totalDistanceKm}
+        waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
+        isPoisPending={poisPending}
+        accommodationPois={poisByLayer.accommodations}
+        stages={stages.length > 0 ? stages : undefined}
+      />
+
+      {/* Météo section — collapsible accordion (Story 8.4 correction) */}
+      <SidebarWeatherSection
+        isPending={weatherPending}
+        initialDepartureTime={savedPace.departureTime}
+        onPaceSubmit={(departureTime) => setPaceParams({ departureTime })}
+      />
+
+      {/* Densité section — collapsible with legend (Story 8.4 correction / 8.5 merge) */}
+      <SidebarDensitySection />
+
+      {/* Stages list — Epic 11 */}
+      <SidebarStagesSection
+        stages={stages}
+        onEnterClickMode={() => setStageClickMode(true)}
+        onExitClickMode={() => setStageClickMode(false)}
+        isClickModeActive={stageClickMode}
+        pendingEndKm={pendingEndKm}
+        showNamingDialog={showNamingDialog}
+        onNamingDialogClose={() => {
+          setShowNamingDialog(false)
+          setPendingEndKm(null)
+        }}
+        stagesVisible={stagesVisible}
+        onStagesVisibilityChange={setStagesVisible}
+        onCreateStage={createStage}
+        onUpdateStage={updateStage}
+        onDeleteStage={deleteStage}
+        weatherActive={weatherActive}
+        departureTime={stagePace.departureTime}
+        speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
+      />
+
+      {/* Density CTA — shown when idle or stale, below Stages (AC #1, Story 16.4) */}
+      <SidebarDensityCta adventureId={adventureId} segments={readySegments} />
+    </div>
+  )
+
   return (
     <div className="flex h-full w-full">
-      {/* Left column: desktop sidebar (hidden on mobile) */}
+      {/* Desktop sidebar (hidden on mobile) */}
       <aside
         data-testid="planning-sidebar"
         className={`hidden lg:flex flex-col shrink-0 bg-background border-r border-[--border] transition-all duration-200 ${
           collapsed ? 'w-0 overflow-hidden' : 'w-[360px] overflow-y-auto'
         }`}
       >
-        <div className="flex flex-col gap-4 p-4">
-          {/* Vitesse moyenne — inline edit */}
-          <div className="flex items-center justify-between rounded-xl border border-[--border] px-4 py-3">
-            <span className="text-sm font-medium">Vitesse moyenne</span>
-            {isEditingSpeed ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={5}
-                  max={50}
-                  value={speedInput}
-                  onChange={(e) => setSpeedInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const v = Number(speedInput)
-                      if (v >= 5 && v <= 50) avgSpeedMutation.mutate(v)
-                    }
-                    if (e.key === 'Escape') setIsEditingSpeed(false)
-                  }}
-                  onBlur={() => {
-                    const v = Number(speedInput)
-                    if (v >= 5 && v <= 50) avgSpeedMutation.mutate(v)
-                    else setIsEditingSpeed(false)
-                  }}
-                  className="w-14 rounded-md border border-[--border] bg-muted px-2 py-1 text-sm text-center font-mono"
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
-                  autoFocus
-                />
-                <span className="text-sm text-muted-foreground">km/h</span>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setSpeedInput(String(adventure?.avgSpeedKmh ?? 15)); setIsEditingSpeed(true) }}
-                className="flex items-center gap-1.5 text-sm font-mono text-foreground hover:text-primary"
-                aria-label="Modifier la vitesse moyenne"
-              >
-                {adventure?.avgSpeedKmh ?? 15} km/h
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-
-          {/* Search range slider */}
-          <SearchRangeControl
-            totalDistanceKm={data.totalDistanceKm}
-            waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
-            isPoisPending={poisPending}
-            accommodationPois={poisByLayer.accommodations}
-            stages={stages.length > 0 ? stages : undefined}
-          />
-
-          {/* Météo section — collapsible accordion (Story 8.4 correction) */}
-          <SidebarWeatherSection
-            isPending={weatherPending}
-            initialDepartureTime={savedPace.departureTime}
-            onPaceSubmit={(departureTime) => setPaceParams({ departureTime })}
-          />
-
-          {/* Densité section — collapsible with legend (Story 8.4 correction / 8.5 merge) */}
-          <SidebarDensitySection />
-
-          {/* Stages list — Epic 11 */}
-          <SidebarStagesSection
-            stages={stages}
-            onEnterClickMode={() => setStageClickMode(true)}
-            onExitClickMode={() => setStageClickMode(false)}
-            isClickModeActive={stageClickMode}
-            pendingEndKm={pendingEndKm}
-            showNamingDialog={showNamingDialog}
-            onNamingDialogClose={() => {
-              setShowNamingDialog(false)
-              setPendingEndKm(null)
-            }}
-            stagesVisible={stagesVisible}
-            onStagesVisibilityChange={setStagesVisible}
-            onCreateStage={createStage}
-            onUpdateStage={updateStage}
-            onDeleteStage={deleteStage}
-            weatherActive={weatherActive}
-            departureTime={stagePace.departureTime}
-            speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
-          />
-
-          {/* Density CTA — shown when idle or stale, below Stages (AC #1, Story 16.4) */}
-          <SidebarDensityCta adventureId={adventureId} segments={readySegments} />
-        </div>
+        {sidebarContent}
       </aside>
+
+      {/* Mobile sidebar backdrop (AC #3) */}
+      <div
+        data-testid="mobile-sidebar-backdrop"
+        className={`lg:hidden fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+          mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      {/* Mobile sidebar + toggle wrapper — slides together (AC #1, #2, #4) */}
+      <div
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[360px] transition-transform duration-300 ease-in-out ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <aside
+          data-testid="mobile-sidebar"
+          className="h-full bg-background border-r border-[--border] overflow-y-auto"
+        >
+          {sidebarContent}
+        </aside>
+
+        {/* Toggle button — sticks to right edge of sidebar panel */}
+        <button
+          data-testid="mobile-sidebar-toggle"
+          className="absolute top-1/2 right-0 translate-x-full -translate-y-1/2 flex items-center justify-center rounded-r-lg bg-background/90 backdrop-blur-sm border border-l-0 border-[--border] shadow-md px-1 py-3"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label={mobileOpen ? 'Fermer le panneau' : 'Ouvrir le panneau'}
+        >
+          {mobileOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+      </div>
 
       {/* Right column: map + elevation profile */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -382,12 +433,12 @@ export function MapView({ adventureId }: MapViewProps) {
           <button
             data-testid="sidebar-toggle"
             onClick={() => setCollapsed((v) => !v)}
-            className={`hidden lg:flex absolute top-1/2 z-20 -translate-y-1/2 h-6 w-6 items-center justify-center rounded-full bg-background border border-[--border] shadow-sm text-text-secondary hover:text-text-primary ${
-              collapsed ? 'left-0' : '-left-3'
+            className={`hidden lg:flex absolute top-1/2 z-20 -translate-y-1/2 items-center justify-center rounded-r-lg bg-background/90 backdrop-blur-sm border border-l-0 border-[--border] shadow-md px-1 py-3 text-muted-foreground hover:text-foreground ${
+              collapsed ? 'left-0' : 'left-0'
             }`}
             aria-label={collapsed ? 'Ouvrir le panneau' : 'Fermer le panneau'}
           >
-            {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
 
           {/* "← Aventures" back button */}
