@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Search, SlidersHorizontal, MountainSnow, Clock } from 'lucide-react'
+import { Search, SlidersHorizontal, MountainSnow, Clock, Minus, Plus } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useLiveStore } from '@/stores/live.store'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
@@ -88,20 +88,46 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
         </div>
       </div>
 
-      {/* Distance cible slider */}
-      <Slider
-        value={[Math.min(targetAheadKm, effectiveMax)]}
-        onValueChange={(v: number | readonly number[]) => {
-          const val = typeof v === 'number' ? v : v[0]
-          setTargetAheadKm(val)
-        }}
-        min={5}
-        max={effectiveMax}
-        step={SLIDER_STEP}
-        data-testid="slider-target"
-        className="mb-8"
-        thumbClassName="size-6 border-2 after:-inset-1"
-      />
+      {/* Distance cible slider with +/- buttons */}
+      {(() => {
+        const atMin = targetAheadKm <= SLIDER_STEP
+        const atMax = targetAheadKm >= effectiveMax
+        return (
+          <div className="flex items-center gap-2 mb-8">
+            <button
+              onClick={() => !atMin && setTargetAheadKm(Math.max(SLIDER_STEP, targetAheadKm - SLIDER_STEP))}
+              disabled={atMin}
+              data-testid="btn-minus"
+              aria-label="Diminuer de 5 km"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary text-primary transition-all duration-75 ${atMin ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-primary/10 active:scale-95'}`}
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <Slider
+              value={[Math.min(targetAheadKm, effectiveMax)]}
+              onValueChange={(v: number | readonly number[]) => {
+                const val = typeof v === 'number' ? v : v[0]
+                setTargetAheadKm(val)
+              }}
+              min={SLIDER_STEP}
+              max={effectiveMax}
+              step={SLIDER_STEP}
+              data-testid="slider-target"
+              className="flex-1"
+              thumbClassName="size-6 border-2 after:-inset-1"
+            />
+            <button
+              onClick={() => !atMax && setTargetAheadKm(Math.min(effectiveMax, targetAheadKm + SLIDER_STEP))}
+              disabled={atMax}
+              data-testid="btn-plus"
+              aria-label="Augmenter de 5 km"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary text-primary transition-all duration-75 ${atMax ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-primary/10 active:scale-95'}`}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Action buttons */}
       <div className="flex gap-3">

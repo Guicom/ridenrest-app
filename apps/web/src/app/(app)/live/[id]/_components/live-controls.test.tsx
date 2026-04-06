@@ -165,6 +165,60 @@ describe('LiveControls', () => {
     expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('')
   })
 
+  // ── Story 16.24: +/- buttons ──────────────────────────────────
+
+  describe('+/- buttons (Story 16.24)', () => {
+    it('renders btn-minus and btn-plus in the DOM (AC #1)', () => {
+      render(<LiveControls {...defaultProps} />)
+      expect(screen.getByTestId('btn-minus')).toBeDefined()
+      expect(screen.getByTestId('btn-plus')).toBeDefined()
+    })
+
+    it('clicking btn-minus decreases targetAheadKm by 5 (AC #2)', () => {
+      useLiveStore.setState({ targetAheadKm: 30 })
+      render(<LiveControls {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('btn-minus'))
+      expect(useLiveStore.getState().targetAheadKm).toBe(25)
+    })
+
+    it('clicking btn-plus increases targetAheadKm by 5 (AC #3)', () => {
+      useLiveStore.setState({ targetAheadKm: 30 })
+      render(<LiveControls {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('btn-plus'))
+      expect(useLiveStore.getState().targetAheadKm).toBe(35)
+    })
+
+    it('btn-minus is disabled when targetAheadKm is 5 (AC #4)', () => {
+      useLiveStore.setState({ targetAheadKm: 5 })
+      render(<LiveControls {...defaultProps} />)
+      const btn = screen.getByTestId('btn-minus')
+      expect(btn.getAttribute('disabled')).not.toBeNull()
+      expect(btn.className).toContain('opacity-50')
+    })
+
+    it('btn-plus is disabled when targetAheadKm equals effectiveMax (AC #5)', () => {
+      useLiveStore.setState({ targetAheadKm: 50 })
+      render(<LiveControls {...defaultProps} maxAheadKm={50} />)
+      const btn = screen.getByTestId('btn-plus')
+      expect(btn.getAttribute('disabled')).not.toBeNull()
+      expect(btn.className).toContain('opacity-50')
+    })
+
+    it('clicking disabled btn-minus does not change targetAheadKm (AC #4)', () => {
+      useLiveStore.setState({ targetAheadKm: 5 })
+      render(<LiveControls {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('btn-minus'))
+      expect(useLiveStore.getState().targetAheadKm).toBe(5)
+    })
+
+    it('clicking disabled btn-plus does not change targetAheadKm (AC #5)', () => {
+      useLiveStore.setState({ targetAheadKm: 50 })
+      render(<LiveControls {...defaultProps} maxAheadKm={50} />)
+      fireEvent.click(screen.getByTestId('btn-plus'))
+      expect(useLiveStore.getState().targetAheadKm).toBe(50)
+    })
+  })
+
   // ── Story 16.20: Dynamic slider max ──────────────────────────
 
   describe('dynamic slider max (Story 16.20)', () => {
