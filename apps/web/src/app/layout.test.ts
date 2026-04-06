@@ -43,11 +43,11 @@ describe('PlausibleProvider in layout', () => {
     return null
   }
 
-  it('renders PlausibleProvider with self-hosted src', () => {
+  it('renders PlausibleProvider with same-origin proxied src', () => {
     const tree = RootLayout({ children: null })
     const plausible = findPlausibleElement(tree)
     expect(plausible).not.toBeNull()
-    expect(plausible.props.src).toContain('stats.ridenrest.app/js/script.')
+    expect(plausible.props.src).toBe('/js/script.outbound-links.pageview-props.tagged-events.js')
   })
 
   it('sets data-domain via scriptProps', () => {
@@ -56,11 +56,11 @@ describe('PlausibleProvider in layout', () => {
     expect(plausible.props.scriptProps['data-domain']).toBe('ridenrest.app')
   })
 
-  it('points to self-hosted endpoint, not plausible.io', () => {
+  it('points to same-origin endpoint (proxied by Caddy)', () => {
     const tree = RootLayout({ children: null })
     const plausible = findPlausibleElement(tree)
+    expect(plausible.props.src).not.toContain('stats.ridenrest.app')
     expect(plausible.props.src).not.toContain('plausible.io')
-    expect(plausible.props.init.endpoint).toContain('stats.ridenrest.app')
-    expect(plausible.props.init.endpoint).not.toContain('plausible.io')
+    expect(plausible.props.init.endpoint).toBe('/api/event')
   })
 })

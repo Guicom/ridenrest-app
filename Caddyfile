@@ -3,6 +3,25 @@
 }
 
 ridenrest.app {
+  # Plausible reverse proxy (bypass ad blockers — story 15.6)
+  handle /js/script* {
+    reverse_proxy plausible:8000 {
+      header_up Host stats.ridenrest.app
+      transport http {
+        versions 1.1
+      }
+    }
+  }
+
+  handle /api/event {
+    reverse_proxy plausible:8000 {
+      header_up Host stats.ridenrest.app
+      transport http {
+        versions 1.1
+      }
+    }
+  }
+
   reverse_proxy host.docker.internal:3011
   header {
     X-Frame-Options DENY
