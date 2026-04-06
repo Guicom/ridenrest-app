@@ -7,6 +7,7 @@ interface UseDensityResult {
   densityStatus: DensityStatus
   densityCategories: string[]
   densityStale: boolean
+  densityProgress: number
   isPending: boolean
 }
 
@@ -26,6 +27,7 @@ export function useDensity(adventureId: string): UseDensityResult {
     densityStatus: data?.densityStatus ?? 'idle',
     densityCategories: data?.densityCategories ?? [],
     densityStale: data?.densityStale ?? false,
+    densityProgress: data?.densityProgress ?? 0,
     isPending,
   }
 }

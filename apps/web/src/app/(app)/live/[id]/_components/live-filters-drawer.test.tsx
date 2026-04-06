@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { LiveFiltersDrawer } from './live-filters-drawer'
 import type { MapLayer } from '@ridenrest/shared'
 
@@ -54,6 +55,29 @@ vi.mock('@/stores/live.store', () => ({
   }),
 }))
 
+// ── Density / API mocks ──────────────────────────────────────────────────────
+
+vi.mock('@/hooks/use-density', () => ({
+  useDensity: () => ({
+    coverageGaps: [],
+    densityStatus: 'idle',
+    densityCategories: [],
+    densityStale: false,
+    densityProgress: 0,
+    isPending: false,
+  }),
+}))
+
+vi.mock('@/lib/api-client', () => ({
+  triggerDensityAnalysis: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
+vi.mock('@/app/(app)/adventures/[id]/_components/density-category-dialog', () => ({
+  DensityCategoryDialog: () => null,
+}))
+
 // ── Planning-mode component mocks ─────────────────────────────────────────────
 
 vi.mock('@/app/(app)/map/[id]/_components/poi-layer-grid', () => ({
@@ -99,6 +123,20 @@ vi.mock('vaul', () => ({
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const defaultDrawerProps = {
+  adventureId: 'adv-1',
+  segments: [{ id: 'seg-1', name: 'Seg 1', orderIndex: 0, cumulativeStartKm: 0, distanceKm: 50, parseStatus: 'done' as const, waypoints: [{ lat: 1, lng: 2, distKm: 0 }], boundingBox: null }],
+}
+
+function renderDrawer(props: Partial<React.ComponentProps<typeof LiveFiltersDrawer>> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <LiveFiltersDrawer open={true} onOpenChange={() => {}} {...defaultDrawerProps} {...props} />
+    </QueryClientProvider>,
+  )
+}
+
 function resetMocks() {
   mockSetWeatherActive.mockClear()
   mockSetWeatherDimension.mockClear()
@@ -123,18 +161,18 @@ describe('LiveFiltersDrawer', () => {
   // ── Open/close ──────────────────────────────────────────────────────────────
 
   it('renders drawer when open=true', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByTestId('drawer-root')).toBeDefined()
   })
 
   it('does not render when open=false', () => {
-    render(<LiveFiltersDrawer open={false} onOpenChange={() => {}} />)
+    renderDrawer({ open: false })
     expect(screen.queryByTestId('drawer-root')).toBeNull()
   })
 
   it('X close button calls onOpenChange(false)', () => {
     const onOpenChange = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    renderDrawer({ onOpenChange })
     fireEvent.click(screen.getByTestId('filters-close-btn'))
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
@@ -142,51 +180,51 @@ describe('LiveFiltersDrawer', () => {
   // ── PoiLayerGrid + sub-types ────────────────────────────────────────────────
 
   it('renders PoiLayerGrid with isPending=false', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const grid = screen.getByTestId('poi-layer-grid')
     expect(grid).toBeDefined()
     expect(grid.getAttribute('data-pending')).toBe('false')
   })
 
   it('shows accommodation sub-types when accommodations layer is active', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByTestId('accommodation-sub-types')).toBeDefined()
   })
 
   it('hides accommodation sub-types when accommodations layer is not active', () => {
     mockVisibleLayers = new Set<MapLayer>()
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.queryByTestId('accommodation-sub-types')).toBeNull()
   })
 
   // ── Météo accordion ─────────────────────────────────────────────────────────
 
   it('renders Météo accordion header with CloudRain icon', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByTestId('weather-accordion-header')).toBeDefined()
     expect(screen.getByText('Météo')).toBeDefined()
   })
 
   it('météo switch is hidden until accordion is expanded', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.queryByTestId('switch-weather')).toBeNull()
   })
 
   it('météo switch is visible after expanding accordion', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     expect(screen.getByTestId('switch-weather')).toBeDefined()
   })
 
   it('clicking météo switch calls setWeatherActive with toggled value', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     fireEvent.click(screen.getByTestId('switch-weather'))
     expect(mockSetWeatherActive).toHaveBeenCalledWith(true)
   })
 
   it('dimension segmented control visible when météo accordion is expanded', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     expect(screen.getByText('Temp.')).toBeDefined()
     expect(screen.getByText('Pluie')).toBeDefined()
@@ -194,19 +232,19 @@ describe('LiveFiltersDrawer', () => {
   })
 
   it('departure time input is visible after expanding météo accordion', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     expect(screen.getByTestId('input-departure-time')).toBeDefined()
   })
 
   it('departure time input is hidden until accordion is expanded', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.queryByTestId('input-departure-time')).toBeNull()
   })
 
   it('departure time input initializes from store value', () => {
     mockWeatherDepartureTime = '2026-03-24T08:00'
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     const input = screen.getByTestId('input-departure-time') as HTMLInputElement
     expect(input.value).toBe('2026-03-24T08:00')
@@ -215,57 +253,51 @@ describe('LiveFiltersDrawer', () => {
   // ── Densité accordion ───────────────────────────────────────────────────────
 
   it('renders Densité accordion header with LayoutGrid icon', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByTestId('density-accordion-header')).toBeDefined()
     expect(screen.getByText('Densité')).toBeDefined()
   })
 
-  it('densité switch is hidden until accordion is expanded', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
-    expect(screen.queryByTestId('switch-density')).toBeNull()
+  it('densité CTA is hidden until accordion is expanded', () => {
+    renderDrawer()
+    expect(screen.queryByTestId('live-density-cta-btn')).toBeNull()
   })
 
-  it('densité switch is visible after expanding accordion', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+  it('densité CTA is visible after expanding accordion when status is idle', () => {
+    renderDrawer()
     fireEvent.click(screen.getByTestId('density-accordion-header'))
-    expect(screen.getByTestId('switch-density')).toBeDefined()
-  })
-
-  it('clicking densité switch calls toggleDensityColor', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
-    fireEvent.click(screen.getByTestId('density-accordion-header'))
-    fireEvent.click(screen.getByTestId('switch-density'))
-    expect(mockToggleDensityColor).toHaveBeenCalled()
+    expect(screen.getByTestId('live-density-cta-btn')).toBeDefined()
+    expect(screen.getByText(/Calculer la densité/)).toBeDefined()
   })
 
   // ── Distance stepper ────────────────────────────────────────────────────────
 
   it('renders distance stepper with current radius', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByText('5 km')).toBeDefined()
   })
 
   it('stepper buttons have bg-white + border', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const btn = screen.getByLabelText('Augmenter le rayon')
     expect(btn.className).toContain('bg-white')
     expect(btn.className).toContain('border')
   })
 
   it('stepper increment increases radius', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
     expect(screen.getByText('5.5 km')).toBeDefined()
   })
 
   it('stepper decrement decreases radius', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByLabelText('Diminuer le rayon'))
     expect(screen.getByText('4.5 km')).toBeDefined()
   })
 
   it('km display does not wrap (whitespace-nowrap)', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const kmSpan = screen.getByText('5 km')
     expect(kmSpan.className).toContain('whitespace-nowrap')
   })
@@ -273,7 +305,7 @@ describe('LiveFiltersDrawer', () => {
   // ── Allure ──────────────────────────────────────────────────────────────────
 
   it('renders Allure input with current speedKmh', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const input = screen.getByTestId('input-speed') as HTMLInputElement
     expect(input.value).toBe('15')
   })
@@ -281,33 +313,33 @@ describe('LiveFiltersDrawer', () => {
   // ── Apply button ─────────────────────────────────────────────────────────────
 
   it('search button is rounded-full h-12', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const btn = screen.getByTestId('search-btn')
     expect(btn.className).toContain('rounded-full')
     expect(btn.className).toContain('h-12')
   })
 
   it('search button is enabled when a POI layer is active', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect((screen.getByTestId('search-btn') as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('shows validation message when all POI layers off', () => {
     mockVisibleLayers = new Set<MapLayer>()
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByText('Sélectionne au moins un type de lieu')).toBeDefined()
   })
 
   it('search button is disabled when all POI layers off', () => {
     mockVisibleLayers = new Set<MapLayer>()
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect((screen.getByTestId('search-btn') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('search button commits radius and speed, calls onSearch and onOpenChange', () => {
     const onOpenChange = vi.fn()
     const onSearch = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} onSearch={onSearch} />)
+    renderDrawer({ onOpenChange, onSearch })
     fireEvent.change(screen.getByTestId('input-speed'), { target: { value: '20' } })
     fireEvent.click(screen.getByTestId('search-btn'))
     expect(mockSetSpeedKmh).toHaveBeenCalledWith(20)
@@ -317,7 +349,7 @@ describe('LiveFiltersDrawer', () => {
   })
 
   it('search button commits departure time when set', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     fireEvent.change(screen.getByTestId('input-departure-time'), { target: { value: '2026-03-24T08:00' } })
     fireEvent.click(screen.getByTestId('search-btn'))
@@ -325,7 +357,7 @@ describe('LiveFiltersDrawer', () => {
   })
 
   it('search button commits null departure time when field is empty', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('search-btn'))
     expect(mockSetWeatherDepartureTime).toHaveBeenCalledWith(null)
   })
@@ -333,28 +365,28 @@ describe('LiveFiltersDrawer', () => {
   // ── Étapes toggle ────────────────────────────────────────────────────────────
 
   it('renders Étapes label and switch', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByText('Étapes')).toBeDefined()
     expect(screen.getByTestId('switch-stages')).toBeDefined()
   })
 
   it('Étapes switch reflects stageLayerActive from store (false)', () => {
     mockStageLayerActive = false
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const sw = screen.getByTestId('switch-stages')
     expect(sw.getAttribute('aria-checked')).toBe('false')
   })
 
   it('Étapes switch reflects stageLayerActive from store (true)', () => {
     mockStageLayerActive = true
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     const sw = screen.getByTestId('switch-stages')
     expect(sw.getAttribute('aria-checked')).toBe('true')
   })
 
   it('clicking Étapes switch calls setStageLayerActive with toggled value', () => {
     mockStageLayerActive = false
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('switch-stages'))
     expect(mockSetStageLayerActive).toHaveBeenCalledWith(true)
   })
@@ -363,7 +395,7 @@ describe('LiveFiltersDrawer', () => {
 
   it('closing via X persists modified radius to store', () => {
     const onOpenChange = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    renderDrawer({ onOpenChange })
     fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
     fireEvent.click(screen.getByTestId('filters-close-btn'))
     expect(mockSetSearchRadius).toHaveBeenCalledWith(5.5)
@@ -372,7 +404,7 @@ describe('LiveFiltersDrawer', () => {
 
   it('closing via swipe/overlay persists modified radius to store', () => {
     const onOpenChange = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    renderDrawer({ onOpenChange })
     fireEvent.click(screen.getByLabelText('Diminuer le rayon'))
     fireEvent.click(screen.getByTestId('drawer-swipe-close'))
     expect(mockSetSearchRadius).toHaveBeenCalledWith(4.5)
@@ -382,13 +414,13 @@ describe('LiveFiltersDrawer', () => {
   it('reopening drawer shows previously persisted radius', () => {
     // Simulate that the store was updated by a previous close
     mockSearchRadiusKm = 7
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     expect(screen.getByText('7 km')).toBeDefined()
   })
 
   it('closing without modifying commits original values (idempotent no-op)', () => {
     const onOpenChange = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} />)
+    renderDrawer({ onOpenChange })
     fireEvent.click(screen.getByTestId('filters-close-btn'))
     // Setters called with original values — Zustand ignores identical state
     expect(mockSetSearchRadius).toHaveBeenCalledWith(5)
@@ -399,7 +431,7 @@ describe('LiveFiltersDrawer', () => {
   it('search button still commits + calls onSearch (existing behavior preserved)', () => {
     const onOpenChange = vi.fn()
     const onSearch = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={onOpenChange} onSearch={onSearch} />)
+    renderDrawer({ onOpenChange, onSearch })
     fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
     fireEvent.click(screen.getByTestId('search-btn'))
     expect(mockSetSearchRadius).toHaveBeenCalledWith(5.5)
@@ -409,21 +441,21 @@ describe('LiveFiltersDrawer', () => {
 
   it('closing via X does NOT call onSearch', () => {
     const onSearch = vi.fn()
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} onSearch={onSearch} />)
+    renderDrawer({ onSearch })
     fireEvent.click(screen.getByLabelText('Augmenter le rayon'))
     fireEvent.click(screen.getByTestId('filters-close-btn'))
     expect(onSearch).not.toHaveBeenCalled()
   })
 
   it('closing via X persists modified speed to store', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.change(screen.getByTestId('input-speed'), { target: { value: '20' } })
     fireEvent.click(screen.getByTestId('filters-close-btn'))
     expect(mockSetSpeedKmh).toHaveBeenCalledWith(20)
   })
 
   it('closing via X persists modified departure time to store', () => {
-    render(<LiveFiltersDrawer open={true} onOpenChange={() => {}} />)
+    renderDrawer()
     fireEvent.click(screen.getByTestId('weather-accordion-header'))
     fireEvent.change(screen.getByTestId('input-departure-time'), { target: { value: '2026-04-01T09:00' } })
     fireEvent.click(screen.getByTestId('filters-close-btn'))

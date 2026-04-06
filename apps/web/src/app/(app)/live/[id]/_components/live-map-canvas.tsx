@@ -2,13 +2,15 @@
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useMemo } from 'react'
 import { useLiveStore } from '@/stores/live.store'
+import { useMapStore } from '@/stores/map.store'
 import { useLivePoiLayers } from '@/hooks/use-live-poi-layers'
 import { usePrefsStore } from '@/stores/prefs.store'
 import { MAP_STYLES } from '@/lib/map-styles'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
 import { findPointAtKm } from '@ridenrest/gpx'
 import { WeatherLayer, LINE_COLOR_EXPRESSIONS, type WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
-import type { Poi, MapSegmentData, MapWaypoint, WeatherPoint, AdventureStageResponse } from '@ridenrest/shared'
+import type { Poi, MapSegmentData, MapWaypoint, WeatherPoint, AdventureStageResponse, CoverageGapSummary, DensityStatus } from '@ridenrest/shared'
+import { addDensityLayer, removeDensityLayer } from '@/lib/density-layer'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import type maplibregl from 'maplibre-gl'
 
@@ -37,9 +39,11 @@ interface LiveMapCanvasProps {
   stageLayerActive?: boolean
   currentKmOnRoute?: number | null
   onStageLongPress?: (stageId: string) => void
+  coverageGaps?: CoverageGapSummary[]
+  densityStatus?: DensityStatus
 }
 
-export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, searchRadiusKm = 5, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress }: LiveMapCanvasProps, ref) {
+export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>(function LiveMapCanvas({ adventureId, segments, targetKm, searchRadiusKm = 5, pois = [], weatherPoints = [], weatherDimension = 'temperature', weatherActive = false, stages = [], stageLayerActive = false, currentKmOnRoute = null, onStageLongPress, coverageGaps, densityStatus }: LiveMapCanvasProps, ref) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const segmentsRef = useRef(segments)
@@ -72,6 +76,13 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
   useEffect(() => { onStageLongPressRef.current = onStageLongPress }, [onStageLongPress])
   useEffect(() => { searchRadiusKmRef.current = searchRadiusKm }, [searchRadiusKm])
 
+  // Density layer refs
+  const coverageGapsRef = useRef(coverageGaps)
+  const densityStatusRef = useRef(densityStatus)
+  const densityColorEnabledRef = useRef(false)
+  useEffect(() => { coverageGapsRef.current = coverageGaps }, [coverageGaps])
+  useEffect(() => { densityStatusRef.current = densityStatus }, [densityStatus])
+
   // Init MapLibre map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -100,6 +111,11 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
         fitToTrace(map, segmentsRef.current)
         updateLiveStageLayers(map, stagesRef.current, kmWaypointsRef.current, stageLayerActiveRef.current)
         updateLiveStageMarkers(map, stagesRef.current, kmWaypointsRef.current, currentKmOnRouteRef.current, stageLayerActiveRef.current, MarkerClassRef.current, (id) => onStageLongPressRef.current?.(id))
+        // Add density layer if already computed
+        densityColorEnabledRef.current = useMapStore.getState().densityColorEnabled
+        if (densityStatusRef.current === 'success' && coverageGapsRef.current && densityColorEnabledRef.current) {
+          addDensityLayer(map, segmentsRef.current, coverageGapsRef.current, { traceLayerId: 'live-trace-line' })
+        }
         setMapReady(true)
       })
 
@@ -150,6 +166,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       }
       updateLiveStageLayers(map, stagesRef.current, kmWaypointsRef.current, stageLayerActiveRef.current)
       updateLiveStageMarkers(map, stagesRef.current, kmWaypointsRef.current, currentKmOnRouteRef.current, stageLayerActiveRef.current, MarkerClassRef.current, (id) => onStageLongPressRef.current?.(id))
+      // Density layer is re-added by the density useEffect when mapReady becomes true
       setMapReady(true)
     }
     map.once('styledata', onStyleLoad)
@@ -167,6 +184,34 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       fitToTrace(map, segments)
     }
   }, [segments, mapReady])
+
+  // Density layer — show/hide based on densityStatus + coverageGaps
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !map.getSource('live-trace')) return
+
+    if (densityStatus === 'success' && densityColorEnabledRef.current && coverageGaps) {
+      addDensityLayer(map, segments, coverageGaps, { traceLayerId: 'live-trace-line' })
+    } else {
+      removeDensityLayer(map, 'live-trace-line')
+    }
+  }, [coverageGaps, densityStatus, segments, mapReady, styleUrl])
+
+  // Zustand subscription for densityColorEnabled toggle — immediate map update
+  useEffect(() => {
+    const unsubscribe = useMapStore.subscribe((state, prevState) => {
+      if (state.densityColorEnabled === prevState.densityColorEnabled) return
+      densityColorEnabledRef.current = state.densityColorEnabled
+      const map = mapRef.current
+      if (!map || !map.getSource('live-trace')) return
+      if (state.densityColorEnabled && densityStatusRef.current === 'success' && coverageGapsRef.current) {
+        addDensityLayer(map, segmentsRef.current, coverageGapsRef.current, { traceLayerId: 'live-trace-line' })
+      } else {
+        removeDensityLayer(map, 'live-trace-line')
+      }
+    })
+    return () => unsubscribe()
+  }, [])
 
   // Update GPS position dot when position changes OR map becomes ready
   useEffect(() => {

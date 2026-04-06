@@ -208,6 +208,7 @@ development_status:
   16-26-live-auto-zoom-search-radius-circle: done  # auto-zoom slider + cercle géographique searchRadiusKm
   16-27-gpx-upload-dialog: done  # formulaire upload GPX dans une dialog au lieu d'inline
   16-28-stage-departure-time-weather: done  # heure de départ par étape + météo ajustée par étape
+  16-29-density-accordion-calculate-cta: done  # CTA calculer densité dans accordéon (planning + live) au lieu de page détail uniquement
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

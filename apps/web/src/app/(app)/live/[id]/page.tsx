@@ -9,6 +9,7 @@ import { useLiveMode } from '@/hooks/use-live-mode'
 import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
 import { useNetworkStatus } from '@/hooks/use-network-status'
 import { useLiveWeather } from '@/hooks/use-live-weather'
+import { useDensity } from '@/hooks/use-density'
 import { useLiveStore } from '@/stores/live.store'
 import { useMapStore } from '@/stores/map.store'
 import { useUIStore } from '@/stores/ui.store'
@@ -83,6 +84,9 @@ export default function LivePage() {
   // Elevation strip data
   const readySegments = segments.filter((s) => s.parseStatus === 'done')
   const allCumulativeWaypoints = useAdventureWaypoints(readySegments)
+
+  // Density
+  const { coverageGaps, densityStatus } = useDensity(adventureId)
 
   // Network status
   const { isOnline } = useNetworkStatus()
@@ -311,6 +315,8 @@ export default function LivePage() {
           stageLayerActive={stageLayerActive}
           currentKmOnRoute={currentKmOnRoute}
           onStageLongPress={setStageLongPressStageId}
+          coverageGaps={coverageGaps}
+          densityStatus={densityStatus}
         />
 
         {/* POI popup — floating above the clicked pin */}
@@ -501,6 +507,8 @@ export default function LivePage() {
         accommodationPois={accommodationPois}
         onSearch={handleSearch}
         defaultSpeedKmh={adventure?.avgSpeedKmh}
+        adventureId={adventureId}
+        segments={readySegments}
       />
 
       {/* Stage position update confirmation modal */}

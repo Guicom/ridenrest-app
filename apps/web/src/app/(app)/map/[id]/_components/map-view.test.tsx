@@ -128,11 +128,6 @@ vi.mock('./sidebar-density-section', () => ({
   SidebarDensitySection: () => <div data-testid="sidebar-density-section" />,
 }))
 
-// Mock SidebarDensityCta
-vi.mock('./sidebar-density-cta', () => ({
-  SidebarDensityCta: () => <div data-testid="sidebar-density-cta" />,
-}))
-
 // Mock useStages
 vi.mock('@/hooks/use-stages', () => ({
   useStages: () => ({
@@ -363,13 +358,6 @@ describe('MapView — sidebar layout (Story 8.3, AC #2, #3)', () => {
     expect(sidebar.contains(control)).toBe(true)
   })
 
-  it('SidebarDensityCta is rendered inside the sidebar (AC #1, Story 16.4)', async () => {
-    renderWithData()
-    await screen.findByTestId('map-canvas')
-    const sidebar = screen.getByTestId('planning-sidebar')
-    const cta = within(sidebar).getByTestId('sidebar-density-cta')
-    expect(sidebar.contains(cta)).toBe(true)
-  })
 })
 
 describe('MapView — Story 8.4 AccommodationSubTypes', () => {

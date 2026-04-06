@@ -27,7 +27,6 @@ import { ResetZoomButton } from './reset-zoom-button'
 import { TraceClickCta } from './trace-click-cta'
 import { MapSearchOverlay } from './map-search-overlay'
 import { SidebarStagesSection } from './sidebar-stages-section'
-import { SidebarDensityCta } from './sidebar-density-cta'
 import { NoResultsSubTypeBanner } from './no-results-sub-type-banner'
 import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
 import { useStages } from '@/hooks/use-stages'
@@ -117,7 +116,7 @@ export function MapView({ adventureId }: MapViewProps) {
   }, [readySegments, adventureId])
 
   const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
-  const { coverageGaps, densityStatus, densityCategories } = useDensity(adventureId)
+  const { coverageGaps, densityStatus } = useDensity(adventureId)
 
   // Fetch weather for all ready segments as soon as layer is active.
   const weatherEnabled = weatherActive
@@ -385,8 +384,8 @@ export function MapView({ adventureId }: MapViewProps) {
         stagesMissingDepartureCount={stagesMissingDepartureCount}
       />
 
-      {/* Densité section — collapsible with legend (Story 8.4 correction / 8.5 merge) */}
-      <SidebarDensitySection />
+      {/* Densité section — collapsible with CTA/progress/legend (Story 16.29) */}
+      <SidebarDensitySection adventureId={adventureId} segments={readySegments} />
 
       {/* Stages list — Epic 11 */}
       <SidebarStagesSection
@@ -411,8 +410,6 @@ export function MapView({ adventureId }: MapViewProps) {
         speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
       />
 
-      {/* Density CTA — shown when idle or stale, below Stages (AC #1, Story 16.4) */}
-      <SidebarDensityCta adventureId={adventureId} segments={readySegments} />
     </div>
   )
 

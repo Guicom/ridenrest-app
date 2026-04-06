@@ -1,14 +1,20 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { X, ChevronDown, ChevronUp, CloudRain, LayoutGrid, Thermometer, Umbrella, Wind, Calendar } from 'lucide-react'
+import { X, ChevronDown, ChevronUp, CloudRain, LayoutGrid, Loader2, Thermometer, Umbrella, Wind, Calendar } from 'lucide-react'
 import { Drawer } from 'vaul'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { MAX_LIVE_RADIUS_KM } from '@ridenrest/shared'
-import type { Poi } from '@ridenrest/shared'
+import type { Poi, MapSegmentData } from '@ridenrest/shared'
 import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
 import { useMapStore } from '@/stores/map.store'
 import { useLiveStore } from '@/stores/live.store'
 import { PoiLayerGrid } from '@/app/(app)/map/[id]/_components/poi-layer-grid'
 import { AccommodationSubTypes } from '@/app/(app)/map/[id]/_components/accommodation-sub-types'
+import { DensityCategoryDialog } from '@/app/(app)/adventures/[id]/_components/density-category-dialog'
+import { triggerDensityAnalysis } from '@/lib/api-client'
+import { useDensity } from '@/hooks/use-density'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 
 const WEATHER_DIMS: { id: WeatherDimension; label: string; icon: typeof Thermometer }[] = [
@@ -23,9 +29,11 @@ interface LiveFiltersDrawerProps {
   accommodationPois?: Poi[]
   onSearch?: () => void
   defaultSpeedKmh?: number
+  adventureId: string
+  segments: MapSegmentData[]
 }
 
-export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch, defaultSpeedKmh }: LiveFiltersDrawerProps) {
+export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch, defaultSpeedKmh, adventureId, segments }: LiveFiltersDrawerProps) {
   const {
     visibleLayers,
     weatherActive, weatherDimension,
@@ -50,6 +58,27 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
   // Accordion expansion state
   const [weatherExpanded, setWeatherExpanded] = useState(false)
   const [densityExpanded, setDensityExpanded] = useState(false)
+  const [densityDialogOpen, setDensityDialogOpen] = useState(false)
+
+  // Density status + mutation
+  const { densityStatus, densityStale, densityProgress } = useDensity(adventureId)
+  const queryClient = useQueryClient()
+  const densityNeedsCalculation = densityStatus === 'idle' || densityStatus === 'error' || (densityStatus === 'success' && densityStale)
+  const densityIsAnalyzing = densityStatus === 'pending' || densityStatus === 'processing'
+  const densityIsDone = densityStatus === 'success' && !densityStale
+  const allSegmentsParsed = segments.every((s) => s.parseStatus === 'done') && segments.length > 0
+
+  const densityTriggerMutation = useMutation({
+    mutationFn: (categories: string[]) => triggerDensityAnalysis(adventureId, categories),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['density', adventureId] })
+      toast.success('Analyse de densité démarrée')
+      setDensityDialogOpen(false)
+    },
+    onError: (err: Error & { status?: number }) => {
+      toast.error(err.status === 409 ? 'Analyse déjà en cours' : "Erreur lors du lancement de l'analyse")
+    },
+  })
 
   // Reinitialize local state when drawer opens
   useEffect(() => {
@@ -94,6 +123,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
   }
 
   return (
+    <>
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
@@ -259,31 +289,79 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             </button>
             {densityExpanded && (
               <div className="px-4 pb-4 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Afficher sur la carte</span>
-                  <Switch
-                    checked={densityColorEnabled}
-                    onCheckedChange={toggleDensityColor}
-                    aria-label="Afficher la densité"
-                    data-testid="switch-density"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
-                    Densité hébergements / 10 km
-                  </p>
-                  {[
-                    { color: 'var(--density-high)',   label: 'Bonne disponibilité',   detail: '2+ hébergements / 10km' },
-                    { color: 'var(--density-medium)', label: 'Disponibilité limitée', detail: '1 hébergement / 10km' },
-                    { color: 'var(--density-low)',    label: 'Zone critique',          detail: 'Aucun hébergement / 10km' },
-                  ].map(({ color, label, detail }) => (
-                    <div key={label} className="flex items-center gap-2">
-                      <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} aria-hidden="true" />
-                      <span className="text-xs font-medium">{label}</span>
-                      <span className="text-xs text-muted-foreground">— {detail}</span>
+                {/* CTA — density not calculated or stale */}
+                {densityNeedsCalculation && (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {densityStatus === 'error'
+                        ? "L'analyse a échoué. Réessayez."
+                        : densityStale
+                          ? 'Les segments ont changé depuis la dernière analyse. Relancez pour mettre à jour.'
+                          : "Identifie les zones avec peu d'hébergements sur votre parcours."}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      className="w-full gap-2 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary"
+                      onClick={() => setDensityDialogOpen(true)}
+                      disabled={!allSegmentsParsed || densityTriggerMutation.isPending}
+                      data-testid="live-density-cta-btn"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                      {densityStatus === 'error' ? 'Réessayer' : 'Calculer la densité'}
+                    </Button>
+                  </>
+                )}
+
+                {/* Progress — analysis running */}
+                {densityIsAnalyzing && (
+                  <div className="flex items-center gap-3 py-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">
+                        Analyse en cours… {densityProgress > 0 ? `${densityProgress}%` : ''}
+                      </p>
+                      {densityProgress > 0 && (
+                        <div className="mt-1.5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all duration-300"
+                            style={{ width: `${densityProgress}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {/* Done — toggle + legend */}
+                {densityIsDone && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Afficher sur la carte</span>
+                      <Switch
+                        checked={densityColorEnabled}
+                        onCheckedChange={toggleDensityColor}
+                        aria-label="Afficher la densité"
+                        data-testid="switch-density"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-sm font-semibold text-foreground uppercase tracking-wide mb-1">
+                        Densité hébergements / 10 km
+                      </p>
+                      {[
+                        { color: 'var(--density-high)',   label: 'Bonne disponibilité',   detail: '2+ hébergements / 10km' },
+                        { color: 'var(--density-medium)', label: 'Disponibilité limitée', detail: '1 hébergement / 10km' },
+                        { color: 'var(--density-low)',    label: 'Zone critique',          detail: 'Aucun hébergement / 10km' },
+                      ].map(({ color, label, detail }) => (
+                        <div key={label} className="flex items-center gap-2">
+                          <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: color }} aria-hidden="true" />
+                          <span className="text-xs font-medium">{label}</span>
+                          <span className="text-xs text-muted-foreground">— {detail}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -307,5 +385,12 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+    <DensityCategoryDialog
+      open={densityDialogOpen}
+      onOpenChange={setDensityDialogOpen}
+      onConfirm={(cats) => densityTriggerMutation.mutate(cats)}
+      isLoading={densityTriggerMutation.isPending}
+    />
+    </>
   )
 }
