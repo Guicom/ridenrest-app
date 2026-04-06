@@ -20,5 +20,6 @@ declare global {
 }
 
 export function trackBookingClick(props: BookingClickProps): void {
-  window.plausible?.('booking_click', { props: props as Record<string, string> })
+  const p: Record<string, string> = { ...props }
+  window.plausible?.('booking_click', { props: p })
 }
