@@ -68,7 +68,7 @@ const makeWaypoints = (): MapWaypoint[] => [
 const makeStage = (overrides = {}) => ({
   id: 's1', name: 'Jour 1', endKm: 80, startKm: 0, distanceKm: 80,
   color: '#f97316', orderIndex: 0, adventureId: 'a1',
-  elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '',
+  elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
   ...overrides,
 })
 

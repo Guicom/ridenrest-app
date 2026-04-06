@@ -10,6 +10,7 @@ export const updateStageSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   endKm: z.number().min(0).optional(),
+  departureTime: z.string().datetime().optional().nullable(),
 })
 
 export type CreateStageInput = z.infer<typeof createStageSchema>

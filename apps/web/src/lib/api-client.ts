@@ -337,6 +337,7 @@ export interface GetWeatherParams {
   departureTime?: string  // ISO 8601
   speedKmh?: number
   fromKm?: number
+  stageDepartures?: string  // JSON-encoded array of {startKm, endKm, departureTime}
 }
 
 export async function getWeatherForecast(params: GetWeatherParams): Promise<WeatherForecast> {
@@ -344,6 +345,7 @@ export async function getWeatherForecast(params: GetWeatherParams): Promise<Weat
   if (params.departureTime) search.set('departureTime', params.departureTime)
   if (params.speedKmh != null) search.set('speedKmh', String(params.speedKmh))
   if (params.fromKm != null) search.set('fromKm', String(params.fromKm))
+  if (params.stageDepartures) search.set('stageDepartures', params.stageDepartures)
   return apiFetch<WeatherForecast>(`/api/weather?${search}`)
 }
 

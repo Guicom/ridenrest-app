@@ -147,6 +147,11 @@ export class StagesService {
     const stage = await this.stagesRepo.findByIdAndAdventureId(stageId, adventureId)
     if (!stage) throw new NotFoundException('Stage not found')
 
+    // Handle departureTime update (can be set independently of endKm)
+    const departureTimeUpdate = dto.departureTime !== undefined
+      ? { departureTime: dto.departureTime ? new Date(dto.departureTime) : null }
+      : {}
+
     if (dto.endKm !== undefined) {
       if (dto.endKm <= stage.startKm) {
         throw new BadRequestException('endKm must be > startKm')
@@ -170,6 +175,7 @@ export class StagesService {
         etaMinutes,
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
+        ...departureTimeUpdate,
       })
 
       // Cascade: update subsequent stages' startKm (endKm stays unchanged)
@@ -199,6 +205,7 @@ export class StagesService {
     const updated = await this.stagesRepo.update(stageId, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.color !== undefined ? { color: dto.color } : {}),
+      ...departureTimeUpdate,
     })
     return this.toResponse(updated)
   }
@@ -242,10 +249,27 @@ export class StagesService {
   ): Promise<StageWeatherPoint | null> {
     const stage = await this.stagesRepo.findByIdWithAdventureUserId(stageId, userId)
     if (!stage) throw new NotFoundException('Stage not found')
+
+    // Priority: stage.departureTime (per-stage) > dto.departureTime (global from query param)
+    const effectiveDepartureTime = stage.departureTime?.toISOString() ?? dto.departureTime
+
+    if (stage.departureTime) {
+      // When stage has its own departure time, compute ETA from stage start (not km 0)
+      // ETA = stage.departureTime + (stage.distanceKm / speedKmh) * 3600000ms
+      return this.weatherService.getWeatherAtKmWithEta(
+        stage.adventureId,
+        stage.endKm,
+        effectiveDepartureTime!,
+        stage.distanceKm,
+        dto.speedKmh,
+      )
+    }
+
+    // Fallback: use global departure time with original km-0-based calculation
     return this.weatherService.getWeatherAtKm(
       stage.adventureId,
       stage.endKm,
-      dto.departureTime,
+      effectiveDepartureTime,
       dto.speedKmh,
     )
   }
@@ -276,6 +300,7 @@ export class StagesService {
       distanceKm: s.distanceKm,
       elevationGainM: s.elevationGainM ?? null,
       etaMinutes: s.etaMinutes ?? null,
+      departureTime: s.departureTime?.toISOString() ?? null,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }

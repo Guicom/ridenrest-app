@@ -10,9 +10,11 @@ interface SidebarWeatherSectionProps {
   isPending: boolean
   initialDepartureTime?: string
   onPaceSubmit: (departureTime: string | null) => void
+  stagesHaveDepartures?: boolean
+  stagesMissingDepartureCount?: number
 }
 
-export function SidebarWeatherSection({ isPending, initialDepartureTime, onPaceSubmit }: SidebarWeatherSectionProps) {
+export function SidebarWeatherSection({ isPending, initialDepartureTime, onPaceSubmit, stagesHaveDepartures = false, stagesMissingDepartureCount = 0 }: SidebarWeatherSectionProps) {
   const [expanded, setExpanded] = useState(false)
   const { weatherActive, weatherDimension, setWeatherActive, setWeatherDimension } = useMapStore()
 
@@ -50,6 +52,8 @@ export function SidebarWeatherSection({ isPending, initialDepartureTime, onPaceS
             onDimensionChange={setWeatherDimension}
             initialDepartureTime={initialDepartureTime}
             onPaceSubmit={onPaceSubmit}
+            stagesHaveDepartures={stagesHaveDepartures}
+            stagesMissingDepartureCount={stagesMissingDepartureCount}
           />
         </div>
       )}

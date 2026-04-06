@@ -34,7 +34,7 @@ vi.mock('@/hooks/use-stages', () => ({
 }))
 
 // Mutable stages for stage update dialog tests
-let mockStages: { id: string; name: string; endKm: number; startKm: number; color: string; orderIndex: number; adventureId: string; distanceKm: number; elevationGainM: null; etaMinutes: null; createdAt: string; updatedAt: string }[] = []
+let mockStages: { id: string; name: string; endKm: number; startKm: number; color: string; orderIndex: number; adventureId: string; distanceKm: number; elevationGainM: null; etaMinutes: null; departureTime: null; createdAt: string; updatedAt: string }[] = []
 
 // Mutable live store state for Story 8.4 badge tests
 let mockLiveSearchRadiusKm = 5
@@ -435,7 +435,7 @@ describe('LivePage — Stage update dialog (AC #3)', () => {
 
   it('onStageLongPress opens dialog with stage name', () => {
     mockStages = [
-      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     render(<LivePage />)
@@ -448,7 +448,7 @@ describe('LivePage — Stage update dialog (AC #3)', () => {
 
   it('cancel button closes dialog without calling updateStage', () => {
     mockStages = [
-      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))
     render(<LivePage />)
@@ -463,7 +463,7 @@ describe('LivePage — Stage update dialog (AC #3)', () => {
 
   it('confirm button is disabled when currentKmOnRoute is null (no GPS)', () => {
     mockStages = [
-      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'stage-1', name: 'Étape 1', endKm: 25, startKm: 0, color: '#FF0000', orderIndex: 0, adventureId: 'adv-123', distanceKm: 25, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     // currentKmOnRoute = null (GPS not locked) — default in store mock
     mockUseLiveMode.mockReturnValue(defaultLiveMode({ hasConsented: true, isLiveModeActive: true }))

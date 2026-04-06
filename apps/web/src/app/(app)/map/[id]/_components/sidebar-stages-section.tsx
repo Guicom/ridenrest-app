@@ -1,6 +1,6 @@
 'use client'
-import { useState } from 'react'
-import { Pencil, Trash2, MapPin, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Pencil, Trash2, MapPin, X, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -28,6 +28,64 @@ import { StageWeatherBadge } from './stage-weather-badge'
 import { SectionTooltip } from '@/components/shared/section-tooltip'
 import { OfflineTooltipWrapper } from '@/components/shared/offline-tooltip-wrapper'
 
+/** Converts ISO 8601 string to datetime-local input value (YYYY-MM-DDTHH:mm) */
+function isoToDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function StageDepartureInput({
+  stage,
+  onUpdate,
+}: {
+  stage: AdventureStageResponse
+  onUpdate: (stageId: string, data: UpdateStageInput) => Promise<void>
+}) {
+  // Controlled local value — same pattern as weather-controls
+  const [localValue, setLocalValue] = useState(
+    stage.departureTime ? isoToDatetimeLocal(stage.departureTime) : '',
+  )
+
+  const handleBlur = useCallback(async (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    const currentIso = stage.departureTime ? isoToDatetimeLocal(stage.departureTime) : ''
+    if (val === currentIso) return // no change
+    if (val) {
+      await onUpdate(stage.id, { departureTime: new Date(val).toISOString() })
+    } else {
+      await onUpdate(stage.id, { departureTime: null })
+    }
+  }, [stage.id, stage.departureTime, onUpdate])
+
+  return (
+    <div className="flex items-center gap-1 pl-5">
+      <Clock className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" />
+      <input
+        type="datetime-local"
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={handleBlur}
+        className="text-xs bg-transparent text-muted-foreground w-full outline-none py-0.5"
+        data-testid={`stage-departure-input-${stage.id}`}
+      />
+      {localValue && (
+        <button
+          onClick={async () => {
+            setLocalValue('')
+            await onUpdate(stage.id, { departureTime: null })
+          }}
+          className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors shrink-0"
+          aria-label="Supprimer le départ"
+          data-testid={`stage-departure-clear-${stage.id}`}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  )
+}
+
 interface SidebarStagesSectionProps {
   stages: AdventureStageResponse[]
   onEnterClickMode: () => void
@@ -42,6 +100,7 @@ interface SidebarStagesSectionProps {
   onUpdateStage: (stageId: string, data: UpdateStageInput) => Promise<void>
   onDeleteStage: (stageId: string) => Promise<void>
   weatherActive?: boolean
+  stagesHaveDepartures?: boolean
   departureTime?: string
   speedKmh?: number
 }
@@ -60,6 +119,7 @@ export function SidebarStagesSection({
   onUpdateStage: updateStage,
   onDeleteStage: deleteStage,
   weatherActive = false,
+  stagesHaveDepartures = false,
   departureTime,
   speedKmh,
 }: SidebarStagesSectionProps) {
@@ -178,53 +238,62 @@ export function SidebarStagesSection({
               {stages.map((stage) => (
                 <div
                   key={stage.id}
-                  className="flex items-center gap-2 rounded-md border border-[--border] p-2"
+                  className="flex flex-col gap-1 rounded-md border border-[--border] p-2"
                   data-testid={`stage-item-${stage.id}`}
                 >
-                  <div
-                    className="h-3 w-3 rounded-full shrink-0"
-                    style={{ backgroundColor: stage.color }}
-                    aria-hidden="true"
-                  />
-                  <span className="flex-1 truncate text-sm font-medium">{stage.name}</span>
-                  <span className="text-xs text-muted-foreground">{stage.distanceKm.toFixed(1)} km</span>
-                  <span className="text-xs text-muted-foreground">
-                    {stage.elevationGainM !== null ? `D+ ${stage.elevationGainM} m` : 'D+ —'}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {stage.etaMinutes !== null
-                      ? stage.etaMinutes < 60
-                        ? `${stage.etaMinutes} min`
-                        : `${Math.floor(stage.etaMinutes / 60)}h${String(stage.etaMinutes % 60).padStart(2, '0')}`
-                      : '— min'}
-                  </span>
-                  {weatherActive && (
-                    <StageWeatherBadge
-                      stageId={stage.id}
-                      departureTime={departureTime}
-                      speedKmh={speedKmh}
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-3 w-3 rounded-full shrink-0"
+                      style={{ backgroundColor: stage.color }}
+                      aria-hidden="true"
                     />
-                  )}
-                  <OfflineTooltipWrapper>
-                    <button
-                      onClick={() => handleEditOpen(stage)}
-                      aria-label={`Modifier ${stage.name}`}
-                      className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-[0.85]"
-                      data-testid={`edit-stage-${stage.id}`}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  </OfflineTooltipWrapper>
-                  <OfflineTooltipWrapper>
-                    <button
-                      onClick={() => setDeleteTarget(stage)}
-                      aria-label={`Supprimer ${stage.name}`}
-                      className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors active:scale-[0.85]"
-                      data-testid={`delete-stage-${stage.id}`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </OfflineTooltipWrapper>
+                    <span className="flex-1 truncate text-sm font-medium">{stage.name}</span>
+                    <span className="text-xs text-muted-foreground">{stage.distanceKm.toFixed(1)} km</span>
+                    <span className="text-xs text-muted-foreground">
+                      {stage.elevationGainM !== null ? `D+ ${stage.elevationGainM} m` : 'D+ —'}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {stage.etaMinutes !== null
+                        ? stage.etaMinutes < 60
+                          ? `${stage.etaMinutes} min`
+                          : `${Math.floor(stage.etaMinutes / 60)}h${String(stage.etaMinutes % 60).padStart(2, '0')}`
+                        : '— min'}
+                    </span>
+                    {weatherActive && !stagesHaveDepartures && (
+                      <StageWeatherBadge
+                        stageId={stage.id}
+                        stageDepartureTime={stage.departureTime}
+                        departureTime={departureTime}
+                        speedKmh={speedKmh}
+                      />
+                    )}
+                    <OfflineTooltipWrapper>
+                      <button
+                        onClick={() => handleEditOpen(stage)}
+                        aria-label={`Modifier ${stage.name}`}
+                        className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-[0.85]"
+                        data-testid={`edit-stage-${stage.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </OfflineTooltipWrapper>
+                    <OfflineTooltipWrapper>
+                      <button
+                        onClick={() => setDeleteTarget(stage)}
+                        aria-label={`Supprimer ${stage.name}`}
+                        className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors active:scale-[0.85]"
+                        data-testid={`delete-stage-${stage.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </OfflineTooltipWrapper>
+                  </div>
+                  {/* Per-stage departure time */}
+                  <StageDepartureInput
+                    key={stage.id + (stage.departureTime ?? '')}
+                    stage={stage}
+                    onUpdate={updateStage}
+                  />
                 </div>
               ))}
             </div>

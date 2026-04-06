@@ -128,12 +128,14 @@ export class StagesRepository {
   async findByIdWithAdventureUserId(
     id: string,
     userId: string,
-  ): Promise<{ id: string; adventureId: string; endKm: number } | null> {
+  ): Promise<{ id: string; adventureId: string; endKm: number; distanceKm: number; departureTime: Date | null } | null> {
     const [row] = await db
       .select({
         id: adventureStages.id,
         adventureId: adventureStages.adventureId,
         endKm: adventureStages.endKm,
+        distanceKm: adventureStages.distanceKm,
+        departureTime: adventureStages.departureTime,
       })
       .from(adventureStages)
       .innerJoin(adventures, eq(adventureStages.adventureId, adventures.id))

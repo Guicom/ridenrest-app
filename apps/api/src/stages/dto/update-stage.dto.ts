@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, Min, Matches, MinLength, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsNumber, Min, Matches, MinLength, MaxLength, IsISO8601, ValidateIf } from 'class-validator'
 
 export class UpdateStageDto {
   @IsString()
@@ -16,4 +16,9 @@ export class UpdateStageDto {
   @IsOptional()
   @Min(0)
   endKm?: number
+
+  @IsOptional()
+  @ValidateIf((o) => o.departureTime !== null)
+  @IsISO8601()
+  departureTime?: string | null
 }

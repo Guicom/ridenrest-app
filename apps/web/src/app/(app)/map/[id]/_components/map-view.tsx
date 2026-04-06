@@ -121,27 +121,9 @@ export function MapView({ adventureId }: MapViewProps) {
 
   // Fetch weather for all ready segments as soon as layer is active.
   const weatherEnabled = weatherActive
-  const weatherQueries = useQueries({
-    queries: (weatherEnabled ? readySegments : []).map((segment) => ({
-      queryKey: ['weather', { segmentId: segment.id, departureTime: paceParams.departureTime ?? null, speedKmh: adventure?.avgSpeedKmh ?? 15 }],
-      queryFn: () => getWeatherForecast({
-        segmentId: segment.id,
-        departureTime: paceParams.departureTime ?? undefined,
-        speedKmh: adventure?.avgSpeedKmh ?? 15,
-      }),
-      staleTime: WEATHER_CACHE_TTL * 1000,
-    })),
-  })
-  const weatherPending = weatherQueries.some((q) => q.isFetching)
 
   // Combine all segments into one continuous trace with cumulative distKm (C7.5).
   const allCumulativeWaypoints = useAdventureWaypoints(readySegments)
-  const allWeatherPoints = weatherEnabled
-    ? weatherQueries.flatMap((q) => q.data?.waypoints ?? [])
-    : []
-  const segmentsWeather: SegmentWeatherData[] = weatherEnabled && allWeatherPoints.length > 0
-    ? [{ segmentId: 'adventure', weatherPoints: allWeatherPoints, waypoints: allCumulativeWaypoints }]
-    : []
 
   const { selectedPoiId } = useUIStore()
 
@@ -180,6 +162,40 @@ export function MapView({ adventureId }: MapViewProps) {
     : null
 
   const { stages, createStage, updateStage, deleteStage } = useStages(adventureId)
+
+  // Detect if any stage has a per-stage departure time → used for weather layer + controls
+  const stageDeparturesJson = useMemo(() => {
+    const withDeparture = stages.filter(s => s.departureTime != null)
+    if (withDeparture.length === 0) return null
+    return JSON.stringify(withDeparture.map(s => ({
+      startKm: s.startKm,
+      endKm: s.endKm,
+      departureTime: s.departureTime,
+    })))
+  }, [stages])
+  const hasAnyStageDeparture = stageDeparturesJson !== null
+  const stagesMissingDepartureCount = hasAnyStageDeparture ? stages.filter(s => s.departureTime == null).length : 0
+
+  // Weather queries — use stage departures when available, otherwise global departure time
+  const weatherQueries = useQueries({
+    queries: (weatherEnabled ? readySegments : []).map((segment) => ({
+      queryKey: ['weather', { segmentId: segment.id, departureTime: hasAnyStageDeparture ? null : (paceParams.departureTime ?? null), speedKmh: adventure?.avgSpeedKmh ?? 15, stageDepartures: stageDeparturesJson }],
+      queryFn: () => getWeatherForecast({
+        segmentId: segment.id,
+        departureTime: hasAnyStageDeparture ? undefined : (paceParams.departureTime ?? undefined),
+        speedKmh: adventure?.avgSpeedKmh ?? 15,
+        stageDepartures: stageDeparturesJson ?? undefined,
+      }),
+      staleTime: WEATHER_CACHE_TTL * 1000,
+    })),
+  })
+  const weatherPending = weatherQueries.some((q) => q.isFetching)
+  const allWeatherPoints = weatherEnabled
+    ? weatherQueries.flatMap((q) => q.data?.waypoints ?? [])
+    : []
+  const segmentsWeather: SegmentWeatherData[] = weatherEnabled && allWeatherPoints.length > 0
+    ? [{ segmentId: 'adventure', weatherPoints: allWeatherPoints, waypoints: allCumulativeWaypoints }]
+    : []
 
   // Read pace from localStorage once on mount — not reactive (acceptable per story dev notes)
   const stagePace = getStoredWeatherPace()
@@ -365,6 +381,8 @@ export function MapView({ adventureId }: MapViewProps) {
         isPending={weatherPending}
         initialDepartureTime={savedPace.departureTime}
         onPaceSubmit={(departureTime) => setPaceParams({ departureTime })}
+        stagesHaveDepartures={hasAnyStageDeparture}
+        stagesMissingDepartureCount={stagesMissingDepartureCount}
       />
 
       {/* Densité section — collapsible with legend (Story 8.4 correction / 8.5 merge) */}
@@ -388,6 +406,7 @@ export function MapView({ adventureId }: MapViewProps) {
         onUpdateStage={updateStage}
         onDeleteStage={deleteStage}
         weatherActive={weatherActive}
+        stagesHaveDepartures={hasAnyStageDeparture}
         departureTime={stagePace.departureTime}
         speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
       />

@@ -13,6 +13,7 @@ const makeStage = (
   endKm: number,
   elevationGainM: number | null = null,
   etaMinutes: number | null = null,
+  departureTime: Date | null = null,
 ): AdventureStage => ({
   id,
   adventureId: 'adv-1',
@@ -24,6 +25,7 @@ const makeStage = (
   distanceKm: endKm - startKm,
   elevationGainM,
   etaMinutes,
+  departureTime,
   createdAt: new Date(),
   updatedAt: new Date(),
 })
@@ -62,6 +64,7 @@ const mockAdventuresService = {
 
 const mockWeatherService = {
   getWeatherAtKm: jest.fn(),
+  getWeatherAtKmWithEta: jest.fn(),
 }
 
 const service = new StagesService(
@@ -84,6 +87,8 @@ const SAMPLE_STAGE_FOR_WEATHER = {
   id: 'stage-1',
   adventureId: 'adv-1',
   endKm: 95.4,
+  distanceKm: 45.4,
+  departureTime: null as Date | null,
 }
 
 const SAMPLE_WEATHER_POINT = {
@@ -96,7 +101,7 @@ const SAMPLE_WEATHER_POINT = {
 }
 
 describe('getStageWeather', () => {
-  it('calls stagesRepo and weatherService with correct args', async () => {
+  it('uses global departureTime (fallback) when stage has no departureTime', async () => {
     mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(SAMPLE_STAGE_FOR_WEATHER)
     mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
 
@@ -111,6 +116,48 @@ describe('getStageWeather', () => {
       95.4,
       '2026-03-22T08:00:00.000Z',
       15,
+    )
+    expect(mockWeatherService.getWeatherAtKmWithEta).not.toHaveBeenCalled()
+    expect(result).toEqual(SAMPLE_WEATHER_POINT)
+  })
+
+  it('uses stage.departureTime when defined (priority over global)', async () => {
+    const stageDepartureTime = new Date('2026-04-08T07:00:00.000Z')
+    const stageWithDeparture = {
+      ...SAMPLE_STAGE_FOR_WEATHER,
+      departureTime: stageDepartureTime,
+    }
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(stageWithDeparture)
+    mockWeatherService.getWeatherAtKmWithEta.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    const result = await service.getStageWeather('stage-1', 'user-1', {
+      departureTime: '2026-03-22T08:00:00.000Z',  // global — should be ignored
+      speedKmh: 15,
+    })
+
+    // Should call getWeatherAtKmWithEta with stage departure + stage distance
+    expect(mockWeatherService.getWeatherAtKmWithEta).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      stageDepartureTime.toISOString(),
+      45.4,  // stage.distanceKm
+      15,
+    )
+    expect(mockWeatherService.getWeatherAtKm).not.toHaveBeenCalled()
+    expect(result).toEqual(SAMPLE_WEATHER_POINT)
+  })
+
+  it('falls back to no departure time when neither stage nor global is set', async () => {
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(SAMPLE_STAGE_FOR_WEATHER)
+    mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    const result = await service.getStageWeather('stage-1', 'user-1', {})
+
+    expect(mockWeatherService.getWeatherAtKm).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      undefined,  // no departure time at all
+      undefined,
     )
     expect(result).toEqual(SAMPLE_WEATHER_POINT)
   })

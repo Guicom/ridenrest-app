@@ -1,0 +1,1 @@
+ALTER TABLE "adventure_stages" ADD COLUMN "departure_time" timestamp;

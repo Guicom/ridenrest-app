@@ -1,6 +1,12 @@
-import { IsUUID, IsOptional, IsISO8601, IsNumber, Min, Max } from 'class-validator'
+import { IsUUID, IsOptional, IsISO8601, IsNumber, Min, Max, IsString } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
+
+export interface StageDeparture {
+  startKm: number
+  endKm: number
+  departureTime: string  // ISO 8601
+}
 
 export class GetWeatherDto {
   @ApiProperty({ description: 'Segment UUID' })
@@ -26,4 +32,9 @@ export class GetWeatherDto {
   @IsNumber()
   @Min(0)
   fromKm?: number
+
+  @ApiPropertyOptional({ description: 'JSON-encoded array of stage departures [{startKm, endKm, departureTime}]' })
+  @IsOptional()
+  @IsString()
+  stageDepartures?: string
 }

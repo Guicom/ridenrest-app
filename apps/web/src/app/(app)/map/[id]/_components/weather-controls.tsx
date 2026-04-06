@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Calendar, Thermometer, Umbrella, Wind } from 'lucide-react'
+import { Calendar, Thermometer, Umbrella, Wind, AlertTriangle } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { LucideIcon } from 'lucide-react'
 import type { WeatherDimension } from './weather-layer'
@@ -13,6 +13,8 @@ interface WeatherControlsProps {
   dimension: WeatherDimension
   onDimensionChange: (dim: WeatherDimension) => void
   initialDepartureTime?: string
+  stagesHaveDepartures?: boolean
+  stagesMissingDepartureCount?: number
 }
 
 const DIMENSIONS: { id: WeatherDimension; label: string; icon: LucideIcon }[] = [
@@ -22,7 +24,7 @@ const DIMENSIONS: { id: WeatherDimension; label: string; icon: LucideIcon }[] = 
 ]
 
 
-export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensionChange, initialDepartureTime = '' }: WeatherControlsProps) {
+export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensionChange, initialDepartureTime = '', stagesHaveDepartures = false, stagesMissingDepartureCount = 0 }: WeatherControlsProps) {
   const [departureTime, setDepartureTime] = useState(initialDepartureTime)
 
   const submitPace = (dt: string) => {
@@ -55,18 +57,33 @@ export function WeatherControls({ isPending, onPaceSubmit, dimension, onDimensio
         })}
       </div>
 
-      {/* Departure date/time */}
-      <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
-        <Calendar className="h-5 w-5 text-muted-foreground shrink-0" />
-        <input
-          id="departure-time"
-          type="datetime-local"
-          value={departureTime}
-          onChange={(e) => setDepartureTime(e.target.value)}
-          onBlur={(e) => submitPace(e.target.value)}
-          className="bg-transparent text-sm text-foreground w-full outline-none"
-        />
-      </div>
+      {/* Departure date/time — hidden when stages have their own departure times */}
+      {stagesHaveDepartures ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
+            <Calendar className="h-5 w-5 text-muted-foreground shrink-0" />
+            <span className="text-sm text-muted-foreground">Dates définies par étape</span>
+          </div>
+          {stagesMissingDepartureCount > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 rounded-xl text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="text-xs">{stagesMissingDepartureCount} étape{stagesMissingDepartureCount > 1 ? 's' : ''} sans date de départ</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
+          <Calendar className="h-5 w-5 text-muted-foreground shrink-0" />
+          <input
+            id="departure-time"
+            type="datetime-local"
+            value={departureTime}
+            onChange={(e) => setDepartureTime(e.target.value)}
+            onBlur={(e) => submitPace(e.target.value)}
+            className="bg-transparent text-sm text-foreground w-full outline-none"
+          />
+        </div>
+      )}
 
       {isPending && <Skeleton className="h-2 w-full" data-testid="weather-submit" />}
     </div>

@@ -104,7 +104,7 @@ describe('ElevationProfile', () => {
 
   it('renders stage ReferenceLine with stage color when stagesVisible=true', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={true} />)
     const stageLine = screen.getByTestId('ref-line-10')
@@ -115,7 +115,7 @@ describe('ElevationProfile', () => {
 
   it('does not render stage ReferenceLine when stagesVisible=false', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={false} />)
     expect(screen.queryByTestId('ref-line-10')).not.toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('ElevationProfile', () => {
 
   it('stage label uses insideTopLeft position — distinct from segment boundary insideTopRight', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, elevationGainM: null, etaMinutes: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     const segments: MapSegmentData[] = [
       makeSegment('s1', 'Seg 1', 0, 10),

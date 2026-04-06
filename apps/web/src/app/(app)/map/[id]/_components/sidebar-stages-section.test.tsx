@@ -73,6 +73,7 @@ const makeStage = (overrides: Partial<AdventureStageResponse> = {}): AdventureSt
   distanceKm: 80,
   elevationGainM: null,
   etaMinutes: null,
+  departureTime: null,
   createdAt: '',
   updatedAt: '',
   ...overrides,

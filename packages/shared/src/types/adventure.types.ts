@@ -74,6 +74,7 @@ export interface AdventureStageResponse {
   distanceKm: number
   elevationGainM: number | null   // null if GPX has no elevation data
   etaMinutes: number | null       // null in legacy rows, always set on new rows
+  departureTime: string | null    // ISO 8601 per-stage departure time (overrides global)
   createdAt: string
   updatedAt: string
 }

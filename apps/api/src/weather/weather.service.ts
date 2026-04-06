@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { WeatherRepository } from './weather.repository.js'
 import { OpenMeteoProvider } from './providers/open-meteo.provider.js'
-import { GetWeatherDto } from './dto/get-weather.dto.js'
+import { GetWeatherDto, type StageDeparture } from './dto/get-weather.dto.js'
 import { WMO_ICON, WMO_ICON_FALLBACK, WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import type { WeatherForecast, WeatherPoint, StageWeatherPoint } from '@ridenrest/shared'
 
@@ -55,9 +55,40 @@ export class WeatherService {
     const departureTime = dto.departureTime ? new Date(dto.departureTime) : null
     const speedKmh = dto.speedKmh ?? null
 
+    // Parse stage departures if provided (per-stage departure times override global)
+    let parsedStageDepartures: StageDeparture[] | null = null
+    if (dto.stageDepartures) {
+      try {
+        const raw = JSON.parse(dto.stageDepartures) as unknown[]
+        if (Array.isArray(raw)) {
+          parsedStageDepartures = raw.filter((entry): entry is StageDeparture =>
+            typeof entry === 'object' && entry !== null &&
+            typeof (entry as StageDeparture).startKm === 'number' &&
+            typeof (entry as StageDeparture).endKm === 'number' &&
+            typeof (entry as StageDeparture).departureTime === 'string' &&
+            !isNaN(new Date((entry as StageDeparture).departureTime).getTime()),
+          )
+          if (parsedStageDepartures.length === 0) parsedStageDepartures = null
+        }
+      } catch { /* ignore malformed JSON */ }
+    }
+
     const etas: Date[] = filtered.map((wp) => {
+      const adventureKm = segment.cumulativeStartKm + wp.dist_km
+
+      // Try per-stage departure first
+      if (parsedStageDepartures && speedKmh) {
+        const stage = parsedStageDepartures.find(s => adventureKm >= s.startKm && adventureKm <= s.endKm)
+        if (stage) {
+          // ETA = stage departure + time to ride from stage start to this waypoint
+          const kmInStage = adventureKm - stage.startKm
+          const etaMs = new Date(stage.departureTime).getTime() + (kmInStage / speedKmh) * 3_600_000
+          return new Date(etaMs)
+        }
+      }
+
+      // Fallback: global departure time
       if (departureTime && speedKmh) {
-        const adventureKm = segment.cumulativeStartKm + wp.dist_km
         const etaMs = departureTime.getTime() + (adventureKm / speedKmh) * 3_600_000
         return new Date(etaMs)
       }
@@ -143,6 +174,42 @@ export class WeatherService {
     const etaMs = departureTime
       ? new Date(departureTime).getTime() + (targetKm / speed) * 3_600_000
       : Date.now()
+
+    const data = await this.openMeteoProvider.fetchHourlyForecast(closestWp.lat, closestWp.lng, new Date(etaMs))
+    if (!data) return null
+
+    const iconEmoji = WMO_ICON[data.weatherCode] ?? WMO_ICON_FALLBACK
+
+    return {
+      forecastAt: new Date(etaMs).toISOString(),
+      temperatureC: data.temperatureC,
+      precipitationMmH: data.precipitationMmH,
+      windSpeedKmh: data.windSpeedKmh,
+      windDirectionDeg: data.windDirection,
+      iconEmoji,
+    }
+  }
+
+  /** Fetch weather at targetKm using a stage-relative ETA.
+   *  ETA = departureTime + (stageDistanceKm / speedKmh) * 3600000ms
+   *  Used when a stage has its own departure time (not the global km-0 departure). */
+  async getWeatherAtKmWithEta(
+    adventureId: string,
+    targetKm: number,
+    departureTime: string,
+    stageDistanceKm: number,
+    speedKmh?: number,
+  ): Promise<StageWeatherPoint | null> {
+    const segment = await this.weatherRepo.findSegmentContainingKm(adventureId, targetKm)
+    if (!segment || segment.waypoints.length === 0) return null
+
+    const relativeKm = targetKm - segment.cumulativeStartKm
+    const closestWp = segment.waypoints.reduce((best, wp) => {
+      return Math.abs(wp.dist_km - relativeKm) < Math.abs(best.dist_km - relativeKm) ? wp : best
+    })
+
+    const speed = speedKmh ?? 15
+    const etaMs = new Date(departureTime).getTime() + (stageDistanceKm / speed) * 3_600_000
 
     const data = await this.openMeteoProvider.fetchHourlyForecast(closestWp.lat, closestWp.lng, new Date(etaMs))
     if (!data) return null
