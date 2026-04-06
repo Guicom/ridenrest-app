@@ -164,10 +164,12 @@ Claude Opus 4.6
 - **Plausible DB migrations** — First boot requires manual migration: `docker run ... /app/bin/plausible eval "Plausible.Release.createdb && Plausible.Release.interweave_migrate"`. Also need to create ClickHouse database first: `docker exec plausible-events-db clickhouse-client --query "CREATE DATABASE IF NOT EXISTS plausible_events"`.
 - **`.env` quoting** — `openssl rand -base64 64` output contains `+`, `/`, `=` characters that break bash `source` — values MUST be wrapped in double quotes in `.env`.
 - **Plausible script extensions** — Enabling outbound links, custom properties, and tagged events in Plausible dashboard changes the script URL from `script.js` to `script.outbound-links.pageview-props.tagged-events.js`. Updated `layout.tsx` accordingly.
+- **Caddy HTTP/2 → HTTP/1.1** — Plausible (Elixir/Cowboy) only speaks HTTP/1.1. Caddy defaults to HTTP/2 upstream, causing `ERR_HTTP2_PROTOCOL_ERROR` on POST `/api/event`. Fixed with `transport http { versions 1.1 }` in Caddyfile.
+- **Chrome blocking** — Some Chrome configurations (enhanced tracking protection, privacy settings) block the Plausible script cross-origin (`ERR_BLOCKED_BY_CLIENT`). Works correctly in Safari, curl, and most Chrome instances. Not a production issue — Plausible by design accepts partial tracking coverage.
 
 ### Completion Notes List
 - ✅ Task 1: Added 3 Docker services (plausible, plausible-db, plausible-events-db) with `profiles: ["production"]`, health checks, and dedicated volumes. Validated with `docker compose config`.
-- ✅ Task 2: Added `stats.ridenrest.app` Caddy block proxying to `plausible:8000` (Docker internal DNS). Security headers match existing blocks.
+- ✅ Task 2: Added `stats.ridenrest.app` Caddy block proxying to `plausible:8000` (Docker internal DNS). Security headers match existing blocks. Forced HTTP/1.1 upstream transport for Cowboy compatibility.
 - ✅ Task 3: Installed `next-plausible`, configured `PlausibleProvider` in `layout.tsx` `<head>` with self-hosted src/endpoint. TypeScript compiles clean.
 - ✅ Task 4: All steps are manual post-deploy (admin setup, site registration, Goals, API key). Documented in Dev Notes.
 - ✅ Task 5: Added `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` and `NEXT_PUBLIC_PLAUSIBLE_HOST` to `turbo.json` env array. VPS `.env` additions are manual.
@@ -189,7 +191,7 @@ Claude Opus 4.6
 
 ### File List
 - `docker-compose.yml` — added plausible, plausible-db, plausible-events-db services + 2 volumes + cap_add for KVM
-- `Caddyfile` — added stats.ridenrest.app reverse proxy block
+- `Caddyfile` — added stats.ridenrest.app reverse proxy block with HTTP/1.1 transport
 - `clickhouse/ipv4-only.xml` — NEW: ClickHouse config override to force IPv4-only (VPS has no IPv6)
 - `apps/web/src/app/layout.tsx` — added PlausibleProvider in `<head>`
 - `apps/web/src/app/layout.test.ts` — added 3 PlausibleProvider tests
