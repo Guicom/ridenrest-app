@@ -21,7 +21,11 @@ api.ridenrest.app {
 }
 
 stats.ridenrest.app {
-  reverse_proxy plausible:8000
+  reverse_proxy plausible:8000 {
+    transport http {
+      versions 1.1
+    }
+  }
   header {
     X-Frame-Options DENY
     X-Content-Type-Options nosniff
