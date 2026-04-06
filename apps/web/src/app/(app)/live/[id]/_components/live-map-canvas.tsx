@@ -245,16 +245,11 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
 
   // Auto-zoom when targetKm changes (slider move) — shows GPS + target + search radius circle
   // currentPosition read via ref to avoid re-triggering on every GPS update (1-3s interval)
-  // Slider move resets userInteractedRef so auto-zoom works after fitToSearchZone (AC #5: only
-  // manual map interaction inhibits auto-zoom; centerOnGps is not the only way to re-enable it)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || targetKm == null) return
     const pos = currentPositionRef.current
     if (!pos) return
-
-    // Slider move = intentional action → re-enable auto-zoom (was disabled by drag/pinch/fitToSearchZone)
-    userInteractedRef.current = false
 
     const timer = setTimeout(() => {
       const targetPoint = findPointAtKm(kmWaypointsRef.current, targetKm)
@@ -278,6 +273,12 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
         ],
         { padding: { top: 60, right: 60, bottom: 240, left: 60 }, maxZoom: 16, animate: true, duration: 400 },
       )
+
+      // Pause GPS auto-follow after fitBounds — prevents the next GPS update (1-3s later)
+      // from calling easeTo and shifting the map away from the GPS+target view.
+      // User must tap "Recentrer GPS" to resume tracking (same as manual pan/pinch).
+      userInteractedRef.current = true
+      useLiveStore.getState().setGpsTrackingActive(false)
     }, 150) // Debounce 150ms
 
     return () => clearTimeout(timer)

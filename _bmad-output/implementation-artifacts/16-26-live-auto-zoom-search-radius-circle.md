@@ -216,12 +216,22 @@ Appeler `addSearchRadiusLayer(map)` dans `initMapLayers()` apres `addTraceLine()
 - [x] [Review][Defer] Test négatif setTimeout(200) fragile en CI — amélioration qualité, deferred
 - [x] [Review][Defer] fitToSearchZone appelée avec targetKm??0 quand GPS perdu — pré-existant dans page.tsx, deferred
 
+### Post-deploy bugfix (2026-04-06)
+
+- [x] [Bugfix] Double-zoom sur mobile après slider — le review patch `userInteractedRef = false` réactivait le GPS auto-follow, causant un `easeTo` 1-3s après le `fitBounds`. FIXED: supprimé le reset anticipé, ajouté `userInteractedRef = true` + `setGpsTrackingActive(false)` APRÈS le `fitBounds` dans le debounce timer.
+
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
 ### Debug Log References
 
 ### Completion Notes List
+- Story 16.26 implémentée : cercle géographique search-radius + auto-zoom slider
+- Bugfix post-deploy : double-zoom mobile corrigé (GPS auto-follow interférait avec fitBounds)
 
 ### File List
+- `apps/web/src/app/(app)/live/[id]/_components/live-map-canvas.tsx` — addSearchRadiusLayer, createCirclePolygon, auto-zoom useEffect, searchRadiusKm prop, bugfix double-zoom
+- `apps/web/src/app/(app)/live/[id]/page.tsx` — passage searchRadiusKm prop
+- `apps/web/src/app/(app)/live/[id]/_components/live-map-canvas.test.tsx` — 7 nouveaux tests (cercle, auto-zoom, guards)
