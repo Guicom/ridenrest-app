@@ -18,7 +18,7 @@ export class UpdateStageDto {
   endKm?: number
 
   @IsOptional()
-  @ValidateIf((o) => o.departureTime !== null)
+  @ValidateIf((o: UpdateStageDto) => o.departureTime !== null)
   @IsISO8601()
   departureTime?: string | null
 }
