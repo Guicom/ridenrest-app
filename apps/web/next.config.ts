@@ -27,6 +27,15 @@ export default withPWA({
     ],
     runtimeCaching: [
       {
+        // Plausible proxy — bypass SW, let Caddy handle
+        urlPattern: /^\/js\/script.*\.js$/,
+        handler: "NetworkOnly",
+      },
+      {
+        urlPattern: /^\/api\/event$/,
+        handler: "NetworkOnly",
+      },
+      {
         urlPattern: /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/,
         handler: "CacheFirst",
         options: {
