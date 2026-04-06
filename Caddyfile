@@ -20,6 +20,15 @@ api.ridenrest.app {
   }
 }
 
+stats.ridenrest.app {
+  reverse_proxy plausible:8000
+  header {
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  }
+}
+
 status.ridenrest.app {
   basic_auth {
     {$STATUS_USER} {$STATUS_HASHED_PASSWORD}

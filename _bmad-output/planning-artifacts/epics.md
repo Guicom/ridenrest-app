@@ -2367,6 +2367,84 @@ So that search results target the correct location — especially for common cit
 
 ---
 
+### Story 16.22: Landing Page — Dynamic Auth CTA (Se connecter / Mes aventures)
+
+> **Ajouté 2026-04-06** — Retour utilisateur Guillaume : le bouton "Se connecter" dans le header de la landing page reste affiché même lorsque l'utilisateur est déjà authentifié. Le label devrait changer en "Accéder à mes aventures" pour les utilisateurs connectés.
+
+As a **cyclist who is already logged in**,
+I want the landing page header CTA to show "Mes aventures" instead of "Se connecter",
+So that I can go straight to my dashboard without being presented with a login prompt I don't need.
+
+**Acceptance Criteria:**
+
+**Given** the user is NOT authenticated (no active session),
+**When** the landing page (`/`) renders (header desktop + mobile menu),
+**Then** the CTA button displays "Se connecter" and links to `/adventures` (existing behavior preserved — auth middleware redirects to `/login`).
+
+**Given** the user IS authenticated (active Better Auth session via `useSession()`),
+**When** the landing page header renders,
+**Then** the CTA button label changes to "Mes aventures" and links to `/adventures`.
+
+**Given** the session is loading (`useSession()` returns `isPending: true`),
+**When** the header renders,
+**Then** the CTA button renders in a neutral/skeleton state (no label flash from "Se connecter" to "Mes aventures") — e.g., a shimmer placeholder or the button is hidden until session status resolves.
+
+**Given** the `MarketingHeader` component is a client component (`'use client'`),
+**When** `useSession()` is called,
+**Then** the session check is performed client-side only — no SSR session fetch needed (landing page remains fully cacheable/static).
+
+**Technical notes:**
+- Component: `apps/web/src/app/(marketing)/_components/marketing-header.tsx`
+- Auth hook: `useSession` from `@/lib/auth/client`
+- Both desktop nav (line ~32) and mobile menu (line ~73) must be updated
+- No new API endpoint needed — `useSession()` already handles session detection via Better Auth cookie
+
+---
+
+### Story 16.23: Mobile Sidebar Toggle — Responsive Planning Mode
+
+> **Ajouté 2026-04-06** — Retour utilisateur Guillaume : sur mobile/tablette, la sidebar planning disparaît complètement (hidden lg:flex). Aucun moyen d'accéder aux outils de planification (recherche, météo, densité, étapes) sans écran desktop.
+
+As a **cyclist using the planning map on mobile or tablet**,
+I want a visible toggle button on the left edge of the screen to open/close the sidebar,
+So that I can access all planning tools (search, weather, density, stages) without needing a desktop screen.
+
+**Acceptance Criteria:**
+
+**Given** the user is on the planning map page on a viewport < `lg` breakpoint (< 1024px),
+**When** the page renders,
+**Then** a floating CTA button is visible on the left edge of the screen (vertically centered, z-index above map), with a `ChevronRight` icon indicating the sidebar can be opened.
+
+**Given** the mobile toggle button is visible,
+**When** the user taps the button,
+**Then** the sidebar slides in from the left as a full-height overlay panel (width: 85vw, max 360px) over the map, with a semi-transparent backdrop. The toggle icon switches to `ChevronLeft`.
+
+**Given** the sidebar overlay is open on mobile,
+**When** the user taps the backdrop area, taps the toggle button again, OR taps the close chevron inside the sidebar,
+**Then** the sidebar slides closed and the map is fully visible again.
+
+**Given** the mobile sidebar overlay is open,
+**When** rendered,
+**Then** it contains all the same sections as the desktop sidebar: vitesse moyenne, search range, météo, densité, étapes, density CTA — in the same order, fully scrollable.
+
+**Given** the user is on a viewport ≥ `lg` breakpoint,
+**When** the page renders,
+**Then** the existing desktop sidebar behavior (inline, collapse/expand toggle on map edge) remains unchanged.
+
+**Given** the mobile sidebar is open and the user triggers a POI search,
+**When** the search is committed,
+**Then** the sidebar auto-closes so the user can see the map results.
+
+**Technical notes:**
+- Component: `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx`
+- Le `<aside>` actuel `hidden lg:flex` → refactorer : sur mobile, overlay `fixed`/`absolute` avec `transition-transform duration-300`
+- Nouveau state `mobileOpen` (distinct de `collapsed` qui reste pour desktop)
+- Backdrop: `<div>` avec `bg-black/30` et `onClick` pour fermer
+- Bouton toggle mobile: `lg:hidden`, bouton desktop toggle: `hidden lg:flex` (inchangé)
+- Auto-close sur `searchCommitted` change (useEffect)
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.
@@ -2460,6 +2538,38 @@ So that I can trigger the analysis, close the app, and be notified when the colo
 **Given** push notifications are not supported by the browser (e.g., iOS Safari < 16.4),
 **When** the analysis completes,
 **Then** the in-app notification (via polling au prochain focus de l'app) is the only channel used — no error is thrown for missing push support.
+
+---
+
+### Story 12.4: PWA Install Prompt — Mobile Banner
+
+> **Ajouté 2026-04-06** — Bannière custom d'aide à l'installation PWA, visible uniquement sur mobile navigateur.
+
+As a **cyclist user browsing on mobile**,
+I want to see a discreet banner explaining how to install the app on my home screen,
+So that I can quickly install Ride'n'Rest and use it like a native app — without guessing the browser-specific steps.
+
+**Acceptance Criteria:**
+
+**Given** a user visits the app on a mobile browser (Chrome Android, Safari iOS, Firefox Mobile),
+**When** the page loads,
+**Then** a collapsed banner appears at the bottom of the screen with "Pour une meilleure experience, installez Ride'n'Rest", a chevron to expand, and a close button (FR-070).
+
+**Given** the collapsed banner is visible,
+**When** the user taps the chevron,
+**Then** the banner expands to show step-by-step install instructions for both iPhone/iPad (Safari) and Android (Chrome). A second tap collapses it.
+
+**Given** a user has already installed the app and opens it in standalone mode (PWA),
+**When** the app loads,
+**Then** the banner is NOT shown — detected via `display-mode: standalone` media query or `navigator.standalone`.
+
+**Given** the user taps the close button on the banner,
+**When** it is dismissed,
+**Then** it is NOT shown again for this browser (persisted in `localStorage`).
+
+**Given** the user is on desktop (viewport >= 1024px),
+**When** the page loads,
+**Then** the banner is NOT shown.
 
 ---
 
