@@ -11,7 +11,9 @@ export default withPWA({
   register: true,
   cacheStartUrl: false,
   dynamicStartUrl: false,
-  // SW minimal pour story 12.1 — cache statique seulement, pas de tiles MapLibre (→ 12.2)
+  fallbacks: {
+    document: "/offline.html",
+  },
   workboxOptions: {
     skipWaiting: true,
     clientsClaim: true,
@@ -26,15 +28,90 @@ export default withPWA({
       /^\/mentions-legales(\/|$)/,
     ],
     runtimeCaching: [
+      // ── Plausible analytics — never cache ──
+      // Note: patterns without ^ anchor — Workbox matches against full URL, not pathname
       {
-        // Plausible proxy — bypass SW, let Caddy handle
-        urlPattern: /^\/js\/script.*\.js$/,
+        urlPattern: /\/js\/script.*\.js$/,
         handler: "NetworkOnly",
       },
       {
-        urlPattern: /^\/api\/event$/,
+        urlPattern: /\/api\/event$/,
         handler: "NetworkOnly",
       },
+      // ── OpenFreeMap tiles (PBF vector tiles) — SWR for offline map ──
+      {
+        urlPattern:
+          /^https:\/\/tiles\.openfreemap\.org\/.*\.(pbf|png|jpg)(\?.*)?$/,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "map-tiles-v1",
+          expiration: {
+            maxEntries: 2000,
+            maxAgeSeconds: 7 * 24 * 60 * 60,
+          },
+        },
+      },
+      // ── OpenFreeMap style JSON ──
+      {
+        urlPattern: /^https:\/\/tiles\.openfreemap\.org\/styles\/.*/,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "map-styles-v1",
+          expiration: {
+            maxEntries: 10,
+            maxAgeSeconds: 7 * 24 * 60 * 60,
+          },
+        },
+      },
+      // ── API: adventure map data (GPX trace + segments) — network-first with offline fallback ──
+      {
+        urlPattern: /\/api\/adventures\/[^/]+\/map(\?.*)?$/,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "adventure-map-data-v1",
+          expiration: {
+            maxEntries: 20,
+            maxAgeSeconds: 24 * 60 * 60,
+          },
+        },
+      },
+      // ── API: POI search results ──
+      {
+        urlPattern: /\/api\/pois(\?.*)?$/,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "poi-data-v1",
+          expiration: {
+            maxEntries: 50,
+            maxAgeSeconds: 24 * 60 * 60,
+          },
+        },
+      },
+      // ── API: adventure stages ──
+      {
+        urlPattern: /\/api\/adventures\/[^/]+\/stages(\?.*)?$/,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "stage-data-v1",
+          expiration: {
+            maxEntries: 20,
+            maxAgeSeconds: 24 * 60 * 60,
+          },
+        },
+      },
+      // ── API: weather data (short TTL) ──
+      {
+        urlPattern: /\/api\/weather(\?.*)?$/,
+        handler: "NetworkFirst",
+        options: {
+          cacheName: "weather-data-v1",
+          expiration: {
+            maxEntries: 30,
+            maxAgeSeconds: 60 * 60,
+          },
+        },
+      },
+      // ── Static assets (JS/CSS/fonts/images) — cache-first ──
       {
         urlPattern: /\.(js|css|png|jpg|jpeg|svg|woff2|ico)$/,
         handler: "CacheFirst",

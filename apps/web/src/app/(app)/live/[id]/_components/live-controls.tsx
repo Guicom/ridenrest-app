@@ -5,6 +5,8 @@ import { Search, SlidersHorizontal, MountainSnow, Clock } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useLiveStore } from '@/stores/live.store'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
+import { useOfflineGate } from '@/hooks/use-offline-ready'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 /** Round down to nearest multiple of step */
 export function roundDownToStep(value: number, step: number): number {
@@ -30,6 +32,7 @@ const SLIDER_STEP = 5
 const DEFAULT_MAX = 100
 
 export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, postcode, maxAheadKm }: LiveControlsProps) {
+  const { isOnline, disabledReason } = useOfflineGate()
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const setTargetAheadKm = useLiveStore((s) => s.setTargetAheadKm)
@@ -102,14 +105,21 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
 
       {/* Action buttons */}
       <div className="flex gap-3">
-        <button
-          onClick={onSearch}
-          data-testid="btn-search"
-          className="flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2 cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
-        >
-          <Search className="h-4 w-4" aria-hidden="true" />
-          RECHERCHER
-        </button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              onClick={isOnline ? onSearch : undefined}
+              data-testid="btn-search"
+              className={`flex-1 h-11 bg-primary text-primary-foreground rounded-full font-medium flex items-center justify-center gap-2 cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97] ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              RECHERCHER
+            </TooltipTrigger>
+            {!isOnline && (
+              <TooltipContent>{disabledReason}</TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
         <SearchOnDropdown center={center} city={city} postcode={postcode} variant="action" className="flex-1" page="live" />
       </div>
     </div>

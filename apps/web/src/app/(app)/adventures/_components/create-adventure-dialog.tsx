@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { OfflineTooltipWrapper } from '@/components/shared/offline-tooltip-wrapper'
 
 interface Props {
   onSubmit: (name: string) => void
@@ -41,10 +42,12 @@ export function CreateAdventureDialog({ onSubmit, isPending }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="ghost" size="lg" className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary" />}>
-        <Plus className="h-4 w-4" />
-        Nouvelle aventure
-      </DialogTrigger>
+      <OfflineTooltipWrapper>
+        <DialogTrigger render={<Button variant="ghost" size="lg" className="rounded-full gap-2 px-6 py-6 bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary" />}>
+          <Plus className="h-4 w-4" />
+          Nouvelle aventure
+        </DialogTrigger>
+      </OfflineTooltipWrapper>
       <DialogContent>
         <DialogTitle>Nouvelle aventure</DialogTitle>
         <form onSubmit={handleSubmit(handleCreate)} className="space-y-4 mt-2">

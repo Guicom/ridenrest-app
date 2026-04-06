@@ -7,6 +7,7 @@ import { LayoutGrid, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { triggerDensityAnalysis, getDensityStatus } from '@/lib/api-client'
 import { DensityCategoryDialog } from './density-category-dialog'
+import { OfflineTooltipWrapper } from '@/components/shared/offline-tooltip-wrapper'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 interface Props {
@@ -58,20 +59,22 @@ export function DensityTriggerButton({ adventureId, segments }: Props) {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="lg"
-        className={`w-full sm:w-auto rounded-full gap-2 px-6 py-6 ${isDone ? doneClasses : defaultClasses}`}
-        onClick={isDone ? undefined : () => setDialogOpen(true)}
-        disabled={isAnalyzing || !allSegmentsParsed || isDone}
-      >
-        {isDone ? <CheckCircle2 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-        {isAnalyzing
-          ? `Analyse en cours… ${progress}%`
-          : isDone
-            ? 'Densité analysée'
-            : 'Calculer la densité'}
-      </Button>
+      <OfflineTooltipWrapper>
+        <Button
+          variant="ghost"
+          size="lg"
+          className={`w-full sm:w-auto rounded-full gap-2 px-6 py-6 ${isDone ? doneClasses : defaultClasses}`}
+          onClick={isDone ? undefined : () => setDialogOpen(true)}
+          disabled={isAnalyzing || !allSegmentsParsed || isDone}
+        >
+          {isDone ? <CheckCircle2 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+          {isAnalyzing
+            ? `Analyse en cours… ${progress}%`
+            : isDone
+              ? 'Densité analysée'
+              : 'Calculer la densité'}
+        </Button>
+      </OfflineTooltipWrapper>
       <DensityCategoryDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}

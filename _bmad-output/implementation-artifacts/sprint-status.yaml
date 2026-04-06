@@ -211,7 +211,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-12: in-progress
   12-1-pwa-manifest-app-install: done
-  12-2-service-worker-partial-offline-support: backlog
+  12-2-service-worker-partial-offline-support: done
   12-3-push-notifications-for-density-analysis: backlog
   12-4-pwa-install-prompt-mobile-banner: done  # bannière install PWA mobile-only, non visible en mode standalone
   epic-12-retrospective: optional

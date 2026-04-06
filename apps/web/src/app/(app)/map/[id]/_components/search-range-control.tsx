@@ -7,6 +7,8 @@ import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { useReverseCity } from '@/hooks/use-reverse-city'
 import { computeElevationGain } from '@ridenrest/gpx'
 import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
+import { useOfflineGate } from '@/hooks/use-offline-ready'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
@@ -56,6 +58,7 @@ export function SearchRangeControl({
     [searchCommitted, visibleLayers, waypoints, fromKm, toKm],
   )
   const { city: corridorCity, postcode: corridorPostcode } = useReverseCity(corridorCenter)
+  const { isOnline, disabledReason } = useOfflineGate()
 
   // rangeKm local state — initialized from store values
   const [rangeKm, setRangeKm] = useState(() => toKm - fromKm)
@@ -266,15 +269,21 @@ export function SearchRangeControl({
           </div>
 
           {/* Search CTA — explicit trigger (AC #2) */}
-          <button
-            type="button"
-            data-testid="search-commit-btn"
-            onClick={() => setSearchCommitted(true)}
-            disabled={fromKm >= toKm || totalDistanceKm === 0}
-            className="w-full py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            Rechercher
-          </button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                data-testid="search-commit-btn"
+                onClick={!isOnline ? undefined : () => setSearchCommitted(true)}
+                disabled={isOnline && (fromKm >= toKm || totalDistanceKm === 0)}
+                className={`w-full py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-40 ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Rechercher
+              </TooltipTrigger>
+              {!isOnline && (
+                <TooltipContent>{disabledReason}</TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
 
           {/* Rechercher sur CTA — shown after search completes with accommodations layer active */}
           {searchCommitted && !isPoisPending && visibleLayers.has('accommodations') && (

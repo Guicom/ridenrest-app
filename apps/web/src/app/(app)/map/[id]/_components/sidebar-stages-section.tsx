@@ -26,6 +26,7 @@ import { STAGE_COLORS } from '@ridenrest/shared'
 import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
 import { StageWeatherBadge } from './stage-weather-badge'
 import { SectionTooltip } from '@/components/shared/section-tooltip'
+import { OfflineTooltipWrapper } from '@/components/shared/offline-tooltip-wrapper'
 
 interface SidebarStagesSectionProps {
   stages: AdventureStageResponse[]
@@ -158,15 +159,17 @@ export function SidebarStagesSection({
               Annuler le placement
             </Button>
           ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => { e.stopPropagation(); onEnterClickMode() }}
-              className="w-full h-8 text-xs"
-              data-testid="add-stage-btn"
-            >
-              + Ajouter une étape
-            </Button>
+            <OfflineTooltipWrapper>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onEnterClickMode() }}
+                className="w-full h-8 text-xs"
+                data-testid="add-stage-btn"
+              >
+                + Ajouter une étape
+              </Button>
+            </OfflineTooltipWrapper>
           )}
 
           {/* Stage list */}
@@ -202,22 +205,26 @@ export function SidebarStagesSection({
                       speedKmh={speedKmh}
                     />
                   )}
-                  <button
-                    onClick={() => handleEditOpen(stage)}
-                    aria-label={`Modifier ${stage.name}`}
-                    className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-[0.85]"
-                    data-testid={`edit-stage-${stage.id}`}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(stage)}
-                    aria-label={`Supprimer ${stage.name}`}
-                    className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors active:scale-[0.85]"
-                    data-testid={`delete-stage-${stage.id}`}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                  <OfflineTooltipWrapper>
+                    <button
+                      onClick={() => handleEditOpen(stage)}
+                      aria-label={`Modifier ${stage.name}`}
+                      className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-[0.85]"
+                      data-testid={`edit-stage-${stage.id}`}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  </OfflineTooltipWrapper>
+                  <OfflineTooltipWrapper>
+                    <button
+                      onClick={() => setDeleteTarget(stage)}
+                      aria-label={`Supprimer ${stage.name}`}
+                      className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors active:scale-[0.85]"
+                      data-testid={`delete-stage-${stage.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </OfflineTooltipWrapper>
                 </div>
               ))}
             </div>
@@ -252,7 +259,9 @@ export function SidebarStagesSection({
           </div>
           <DialogFooter>
             <Button variant="outline" size="lg" onClick={onNamingDialogClose}>Annuler</Button>
-            <Button size="lg" onClick={handleNamingConfirm}>Sauvegarder</Button>
+            <OfflineTooltipWrapper>
+              <Button size="lg" onClick={handleNamingConfirm}>Sauvegarder</Button>
+            </OfflineTooltipWrapper>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -293,7 +302,9 @@ export function SidebarStagesSection({
           </div>
           <DialogFooter>
             <Button variant="outline" size="lg" onClick={() => setEditStage(null)}>Annuler</Button>
-            <Button size="lg" onClick={handleEditSave}>Sauvegarder</Button>
+            <OfflineTooltipWrapper>
+              <Button size="lg" onClick={handleEditSave}>Sauvegarder</Button>
+            </OfflineTooltipWrapper>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -309,7 +320,9 @@ export function SidebarStagesSection({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel size="lg">Annuler</AlertDialogCancel>
-            <AlertDialogAction size="lg" onClick={handleDeleteConfirm}>Supprimer</AlertDialogAction>
+            <OfflineTooltipWrapper>
+              <AlertDialogAction size="lg" onClick={handleDeleteConfirm}>Supprimer</AlertDialogAction>
+            </OfflineTooltipWrapper>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
