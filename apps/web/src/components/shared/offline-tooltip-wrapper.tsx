@@ -34,15 +34,14 @@ export function OfflineTooltipWrapper({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            className={`opacity-50 cursor-not-allowed ${className ?? ''}`}
-            onClickCapture={blockEvent}
-            onPointerDownCapture={blockEvent}
-            onMouseDownCapture={blockEvent}
-          >
-            {children}
-          </div>
+        <TooltipTrigger
+          render={<div />}
+          className={`opacity-50 cursor-not-allowed ${className ?? ''}`}
+          onClickCapture={blockEvent}
+          onPointerDownCapture={blockEvent}
+          onMouseDownCapture={blockEvent}
+        >
+          {children}
         </TooltipTrigger>
         <TooltipContent>{disabledReason}</TooltipContent>
       </Tooltip>
