@@ -219,7 +219,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   # Epic 13: Marketing Assets & Production Polish
   # (après Epic 12 PWA — capture de l'app réelle pour la landing)
-  # ─────────────────────────────────────────────────────────────
+  # ──────────────────────────────────1───────────────────────────
   epic-13: backlog
   13-1-real-app-asset-capture: backlog
   13-2-landing-page-real-assets-update: backlog
@@ -232,7 +232,7 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-15: in-progress
   15-1-plausible-ce-setup-vps-nextjs: done           # Docker Plausible CE + stats.ridenrest.app + pageviews auto
-  15-2-click-tracking-enrichi-booking-links: ready-for-dev  # event booking_click avec poi_id, source, page, user_tier
+  15-2-click-tracking-enrichi-booking-links: done  # event booking_click avec source, poi_type, page, user_tier — reviewed 2026-04-06
   15-3-funnel-tracking-complet: ready-for-dev               # gpx_uploaded → map_opened → poi_search → poi_detail → booking_click
   15-4-admin-analytics-dashboard: ready-for-dev             # /admin/analytics protégé, embed Plausible, métriques affilié
   15-5-admin-cache-invalidation-by-geographic-zone: ready-for-dev  # déplacé depuis 10-4 — DELETE /admin/cache/zone, SCAN+DEL pipeline

@@ -1,7 +1,20 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { SearchOnDropdown } from './search-on-dropdown'
 
+vi.mock('@/hooks/use-profile', () => ({
+  useProfile: () => ({ data: { overpassEnabled: false, tier: 'free' } }),
+}))
+
+vi.mock('@/lib/auth/client', () => ({
+  useSession: () => ({ data: { user: { id: 'u1', email: 'test@test.com' } } }),
+}))
+
+vi.mock('@/lib/analytics', () => ({
+  trackBookingClick: vi.fn(),
+}))
+
+beforeEach(() => vi.clearAllMocks())
 afterEach(cleanup)
 
 const center = { lat: 43.5, lng: 1.4 }
@@ -147,5 +160,53 @@ describe('SearchOnDropdown', () => {
     expect(screen.getByTestId('search-on-menu')).toBeDefined()
     fireEvent.mouseDown(screen.getByTestId('outside'))
     expect(screen.queryByTestId('search-on-menu')).toBeNull()
+  })
+
+  // ── Analytics tracking (Story 15.2) ────────────────────────────────────────
+
+  it('fires booking_click event with booking.com source on Booking link click', async () => {
+    const { trackBookingClick } = await import('@/lib/analytics')
+    render(<SearchOnDropdown center={center} city="Toulouse" page="map" poiType="hotel" />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    fireEvent.click(screen.getByTestId('search-on-booking'))
+    expect(trackBookingClick).toHaveBeenCalledWith({
+      source: 'booking.com',
+      poi_type: 'hotel',
+      page: 'map',
+      user_tier: 'free',
+    })
+  })
+
+  it('fires booking_click event with airbnb source on Airbnb link click', async () => {
+    const { trackBookingClick } = await import('@/lib/analytics')
+    render(<SearchOnDropdown center={center} page="live" poiType="camp_site" />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    fireEvent.click(screen.getByTestId('search-on-airbnb'))
+    expect(trackBookingClick).toHaveBeenCalledWith({
+      source: 'airbnb',
+      poi_type: 'camp_site',
+      page: 'live',
+      user_tier: 'free',
+    })
+  })
+
+  it('uses none as poi_type when poiType prop not provided', async () => {
+    const { trackBookingClick } = await import('@/lib/analytics')
+    render(<SearchOnDropdown center={center} page="map" />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    fireEvent.click(screen.getByTestId('search-on-airbnb'))
+    expect(trackBookingClick).toHaveBeenCalledWith(
+      expect.objectContaining({ poi_type: 'none' }),
+    )
+  })
+
+  it('defaults page to map when not specified', async () => {
+    const { trackBookingClick } = await import('@/lib/analytics')
+    render(<SearchOnDropdown center={center} />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    fireEvent.click(screen.getByTestId('search-on-airbnb'))
+    expect(trackBookingClick).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 'map' }),
+    )
   })
 })

@@ -284,6 +284,7 @@ export function SearchRangeControl({
               postcode={corridorPostcode}
               variant="outline"
               className="w-full"
+              page="map"
             />
           )}
         </div>

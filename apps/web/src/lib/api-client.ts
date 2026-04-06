@@ -210,6 +210,7 @@ export type { AdventureStageResponse, CreateStageInput, UpdateStageInput }
 
 export interface ProfileResponse {
   overpassEnabled: boolean
+  tier: 'free' | 'pro' | 'team'
 }
 
 export async function getProfile(): Promise<ProfileResponse> {
@@ -283,17 +284,6 @@ export async function getPoiGoogleDetails(
   } catch {
     return null  // Enrichment is optional — never throw to caller
   }
-}
-
-export async function trackBookingClick(
-  externalId: string,
-  platform: 'booking_com' | 'hotels_com' | 'airbnb',
-): Promise<void> {
-  // Fire-and-forget — do NOT await in the click handler
-  void apiFetch('/api/pois/booking-click', {
-    method: 'POST',
-    body: JSON.stringify({ externalId, platform }),
-  }).catch(() => {/* ignore tracking errors */})
 }
 
 export type { GooglePlaceDetails }

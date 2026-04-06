@@ -110,7 +110,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
           <Search className="h-4 w-4" aria-hidden="true" />
           RECHERCHER
         </button>
-        <SearchOnDropdown center={center} city={city} postcode={postcode} variant="action" className="flex-1" />
+        <SearchOnDropdown center={center} city={city} postcode={postcode} variant="action" className="flex-1" page="live" />
       </div>
     </div>
   )

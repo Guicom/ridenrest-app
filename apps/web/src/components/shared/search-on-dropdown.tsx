@@ -3,6 +3,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl } from '@/lib/booking-url'
+import { trackBookingClick } from '@/lib/analytics'
+import type { UserTier } from '@/lib/analytics'
+import { useProfile } from '@/hooks/use-profile'
+import { useSession } from '@/lib/auth/client'
 
 interface SearchOnDropdownProps {
   /** Waypoint center for the search area. null = disabled (no URL to open). */
@@ -17,9 +21,16 @@ interface SearchOnDropdownProps {
    */
   variant?: 'outline' | 'action'
   className?: string
+  /** Current page context for analytics */
+  page?: 'map' | 'live'
+  /** POI type for analytics (e.g. 'hotel', 'hostel', 'camp_site') */
+  poiType?: string
 }
 
-export function SearchOnDropdown({ center, city, postcode, variant = 'outline', className }: SearchOnDropdownProps) {
+export function SearchOnDropdown({ center, city, postcode, variant = 'outline', className, page = 'map', poiType }: SearchOnDropdownProps) {
+  const { data: session } = useSession()
+  const { data: profile } = useProfile(!!session)
+  const userTier: UserTier = session ? (profile?.tier ?? 'free') : 'anonymous'
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -89,7 +100,10 @@ export function SearchOnDropdown({ center, city, postcode, variant = 'outline', 
               rel="noopener noreferrer"
               role="menuitem"
               data-testid="search-on-booking"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                trackBookingClick({ source: 'booking.com', poi_type: poiType ?? 'none', page, user_tier: userTier })
+                setOpen(false)
+              }}
               className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white bg-[#003580] hover:bg-[#00296b] active:scale-[0.98] transition-all duration-75 cursor-pointer"
             >
               Rechercher sur Booking.com
@@ -101,7 +115,10 @@ export function SearchOnDropdown({ center, city, postcode, variant = 'outline', 
             rel="noopener noreferrer"
             role="menuitem"
             data-testid="search-on-airbnb"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              trackBookingClick({ source: 'airbnb', poi_type: poiType ?? 'none', page, user_tier: userTier })
+              setOpen(false)
+            }}
             className="flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-white bg-[#FF5A5F] hover:bg-[#e0484d] active:scale-[0.98] transition-all duration-75 cursor-pointer"
           >
             Rechercher sur Airbnb

@@ -214,6 +214,8 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
                   postcode={poiPostcode}
                   variant="action"
                   className="w-full"
+                  page={isLiveMode ? 'live' : 'map'}
+                  poiType={poi.category}
                 />
                 {displayWebsite && (
                   <a

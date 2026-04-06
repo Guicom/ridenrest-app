@@ -3,6 +3,7 @@ import { ProfileRepository } from './profile.repository.js'
 
 export interface ProfileResponse {
   overpassEnabled: boolean
+  tier: 'free' | 'pro' | 'team'
 }
 
 @Injectable()
@@ -11,7 +12,7 @@ export class ProfileService {
 
   async getProfile(userId: string): Promise<ProfileResponse> {
     const row = await this.profileRepository.findByUserId(userId)
-    return { overpassEnabled: row?.overpassEnabled ?? false }
+    return { overpassEnabled: row?.overpassEnabled ?? false, tier: row?.tier ?? 'free' }
   }
 
   async updateOverpassEnabled(userId: string, enabled: boolean): Promise<ProfileResponse> {

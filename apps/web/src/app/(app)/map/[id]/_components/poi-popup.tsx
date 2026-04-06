@@ -353,6 +353,8 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
                   postcode={poiPostcode}
                   variant="action"
                   className="w-full"
+                  page={isLiveMode ? 'live' : 'map'}
+                  poiType={poi.category}
                 />
                 {displayWebsite && (
                   <a

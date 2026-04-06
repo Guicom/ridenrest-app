@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 export class ProfileRepository {
   async findByUserId(userId: string) {
     const [row] = await db
-      .select({ overpassEnabled: profiles.overpassEnabled })
+      .select({ overpassEnabled: profiles.overpassEnabled, tier: profiles.tier })
       .from(profiles)
       .where(eq(profiles.id, userId))
     return row ?? null
