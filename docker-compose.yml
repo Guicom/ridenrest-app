@@ -65,6 +65,7 @@ services:
     profiles: ["production"]
     volumes:
       - plausible-events-data:/var/lib/clickhouse
+      - ./clickhouse/ipv4-only.xml:/etc/clickhouse-server/config.d/ipv4-only.xml:ro
     ulimits:
       nofile:
         soft: 262144
