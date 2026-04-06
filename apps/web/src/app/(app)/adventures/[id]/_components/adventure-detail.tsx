@@ -443,7 +443,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             <AlertDialogAction
               onClick={() => deleteAdventureMutation.mutate()}
               disabled={deleteConfirmName !== adventure.name || deleteAdventureMutation.isPending}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-primary-foreground hover:bg-destructive/90"
             >
               {deleteAdventureMutation.isPending ? 'Suppression...' : 'Supprimer définitivement'}
             </AlertDialogAction>

@@ -164,7 +164,7 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
                           size="lg"
                           onClick={onDelete}
                           disabled={isDeleting}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          className="text-primary-foreground bg-destructive hover:bg-destructive/90"
                         >
                           {isDeleting ? 'Suppression...' : 'Supprimer'}
                         </AlertDialogAction>

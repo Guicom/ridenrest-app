@@ -11,7 +11,7 @@ const sections = [
     id: 'auth',
     title: 'Connexion & Compte',
     description:
-      "Ride'n'Rest supporte plusieurs méthodes de connexion : email/mot de passe, Google OAuth et Strava OAuth. Vous pouvez réinitialiser votre mot de passe depuis la page de connexion. Votre compte vous permet de gérer vos préférences et vos aventures.",
+      "Ride'n'Rest supporte plusieurs méthodes de connexion : email/mot de passe et Google OAuth et Strava OAuth. Vous pouvez réinitialiser votre mot de passe depuis la page de connexion. Votre compte vous permet de gérer vos préférences et vos aventures.",
     tips: [
       "Connectez-vous avec Strava pour importer directement vos activités GPS.",
       "La réinitialisation du mot de passe se fait par email — vérifiez vos spams.",
@@ -24,22 +24,22 @@ const sections = [
     description:
       "Une aventure regroupe plusieurs segments GPX représentant votre itinéraire complet. Vous pouvez importer des fichiers GPX depuis votre ordinateur ou depuis vos activités Strava. Les segments sont ordonnables par glisser-déposer.",
     tips: [
-      "Créez une aventure depuis la page \"Mes aventures\" avec le bouton +.",
+      "Créez une aventure depuis la page \"Mes aventures\" avec le bouton + Nouvelle aventure.",
       "Importez plusieurs segments GPX pour un itinéraire multi-jours.",
       "Réordonnez vos segments par glisser-déposer pour ajuster l'itinéraire.",
       "Importez depuis Strava en sélectionnant plusieurs activités à la fois.",
+      "Remplacer vos segments GPX par un nouveau fichier GPX est possible depuis la page de l'aventure.",
     ],
   },
   {
     id: 'planning',
-    title: 'Mode Planning (Carte)',
+    title: 'Mode Planning',
     description:
-      "Le mode Planning vous permet de visualiser votre trace GPX sur une carte interactive. Recherchez des points d'intérêt (hébergements, restaurants, ravitaillement, vélo) dans un corridor autour de votre trace. Choisissez votre plage kilométrique et lancez la recherche.",
+      "Le mode Planning est optimisé pour un usage sur ordinateur ou tablette. Il vous permet de visualiser votre trace GPX sur une carte interactive. Recherchez des points d'intérêt (hébergements, restaurants, ravitaillement, vélo) dans un corridor autour de votre trace. Choisissez votre plage kilométrique et lancez la recherche. Créez des étapes pour plannifer votre voyage et regarder la météo pour chacune des étapes.",
     tips: [
       "Cliquez sur la trace pour centrer la recherche autour d'un point précis.",
       "Activez ou désactivez les couches (hébergement, nourriture, vélo) selon vos besoins.",
-      "La météo par étape est visible dans le panneau latéral après une recherche.",
-      "Le zoom s'ajuste automatiquement après chaque recherche de POIs.",
+      "Créez, modifiez ou supprimez des étapes depuis le panneau latéral.",
     ],
   },
   {
@@ -51,6 +51,7 @@ const sections = [
       "Sélectionnez les catégories d'hébergement à analyser avant de lancer.",
       "Les zones rouges (faible densité) nécessitent une planification anticipée.",
       "Re-lancez l'analyse après avoir ajouté ou retiré des segments.",
+      "Visualisez la densité de l'itinéraire depuis le panneau latéral en mode planning ou depuis le volet filtre en mode live.",
     ],
   },
   {
@@ -59,7 +60,8 @@ const sections = [
     description:
       "Les prévisions météo sont calculées via Open-Meteo sur 16 jours pour chaque étape de votre aventure. La météo tient compte de l'heure de départ estimée et de votre vitesse moyenne pour afficher les conditions au moment de votre passage.",
     tips: [
-      "Configurez votre heure de départ et votre vitesse dans le panneau météo.",
+      "Configurez votre heure de départ et votre vitesse dans le panneau météo en mode planning ou depuis le volet filtre en mode live.",
+      "Si des étapes sont définies avec des heures de départ, la météo sera calculé par rapport à ces informations.",
       "Les prévisions sont disponibles jusqu'à 16 jours à l'avance.",
       "La météo est recalculée automatiquement en changeant les paramètres de vitesse.",
     ],
@@ -70,9 +72,12 @@ const sections = [
     description:
       "Le mode Live active la géolocalisation GPS de votre appareil pour afficher les points d'intérêt à proximité de votre position en temps réel. Votre position GPS ne quitte jamais votre appareil — tout est calculé en local.",
     tips: [
-      "Activez le mode Live depuis la page de votre aventure.",
+      "Accédez au mode Live depuis la page listant vos aventures.",
       "Acceptez la demande de géolocalisation pour démarrer le suivi.",
       "Ajustez le rayon de recherche autour de votre position avec le curseur.",
+      "Visualisez et mettez à jour les étapes de votre aventure en temps réel sur la carte.",
+      "Visualisez la densité.",
+      "Visualisez la météo de chaque étape en temps réel depuis le volet filtre.",
     ],
   },
   {

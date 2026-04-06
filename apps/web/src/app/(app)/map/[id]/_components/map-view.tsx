@@ -375,18 +375,6 @@ export function MapView({ adventureId }: MapViewProps) {
         stages={stages.length > 0 ? stages : undefined}
       />
 
-      {/* Météo section — collapsible accordion (Story 8.4 correction) */}
-      <SidebarWeatherSection
-        isPending={weatherPending}
-        initialDepartureTime={savedPace.departureTime}
-        onPaceSubmit={(departureTime) => setPaceParams({ departureTime })}
-        stagesHaveDepartures={hasAnyStageDeparture}
-        stagesMissingDepartureCount={stagesMissingDepartureCount}
-      />
-
-      {/* Densité section — collapsible with CTA/progress/legend (Story 16.29) */}
-      <SidebarDensitySection adventureId={adventureId} segments={readySegments} />
-
       {/* Stages list — Epic 11 */}
       <SidebarStagesSection
         stages={stages}
@@ -409,6 +397,18 @@ export function MapView({ adventureId }: MapViewProps) {
         departureTime={stagePace.departureTime}
         speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
       />
+
+      {/* Météo section — collapsible accordion (Story 8.4 correction) */}
+      <SidebarWeatherSection
+        isPending={weatherPending}
+        initialDepartureTime={savedPace.departureTime}
+        onPaceSubmit={(departureTime) => setPaceParams({ departureTime })}
+        stagesHaveDepartures={hasAnyStageDeparture}
+        stagesMissingDepartureCount={stagesMissingDepartureCount}
+      />
+
+      {/* Densité section — collapsible with CTA/progress/legend (Story 16.29) */}
+      <SidebarDensitySection adventureId={adventureId} segments={readySegments} />
 
     </div>
   )

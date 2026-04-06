@@ -25,7 +25,7 @@ export function SidebarWeatherSection({ isPending, initialDepartureTime, onPaceS
         onClick={() => setExpanded((v) => !v)}
         data-testid="weather-section-header"
       >
-        <SectionTooltip content="Prévisions météo calées sur votre allure estimée. Saisissez une heure de départ et une vitesse pour des prévisions personnalisées.">
+        <SectionTooltip content="Prévisions météo calées sur votre allure estimée. Saisissez une heure de départ et une vitesse pour des prévisions personnalisées. Si des étapes sont définies avec des heures de départ, la météo sera calculé par rapport à ces informations.">
           <div className="flex items-center gap-2">
             <CloudRain className="h-5 w-5" aria-hidden="true" />
             <span className="text-sm font-medium">Météo</span>
