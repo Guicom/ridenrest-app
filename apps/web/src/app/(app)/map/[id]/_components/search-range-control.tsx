@@ -156,7 +156,7 @@ export function SearchRangeControl({
         onClick={() => setExpanded((v) => !v)}
         data-testid="search-range-header"
       >
-        <SectionTooltip content="Définissez une plage kilométrique sur la trace. Cliquez 'Rechercher' pour afficher les hébergements, restaurants et autres POIs dans ce corridor.">
+        <SectionTooltip content="Définissez une plage kilométrique sur la trace. Cliquez 'Rechercher' pour afficher les hébergements, restaurants et autres POIs dans ce corridor. ATTENTION: les résultats ne sont pas exhaustifs et ne sont pas garantis. Utilisez le bouton 'Rechercher sur' pour afficher les résultats sur Booking ou Airbnb.">
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4" aria-hidden="true" />
             <span className="text-sm font-medium">Recherche</span>
