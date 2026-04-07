@@ -613,7 +613,7 @@ export function MapView({ adventureId }: MapViewProps) {
         </div>
 
         {/* Elevation profile — desktop only (AC6: hidden on mobile) */}
-        <div className={`hidden lg:block relative shrink-0 border-t border-[--border] bg-background transition-all duration-200 ${elevationCollapsed ? 'h-0' : 'h-[180px]'}`}>
+        <div className={`hidden lg:block relative w-full shrink-0 border-t border-[--border] bg-background transition-all duration-200 overflow-hidden ${elevationCollapsed ? 'h-0' : 'h-[180px]'}`}>
           {/* Collapse toggle — circle button at top edge, centered */}
           <button
             onClick={() => setElevationCollapsed((v) => !v)}

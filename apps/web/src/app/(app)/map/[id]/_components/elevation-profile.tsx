@@ -1,6 +1,6 @@
 'use client'
-import { useCallback, useEffect, useRef } from 'react'
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine } from 'recharts'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import type { ElevationPoint } from '@/hooks/use-elevation-profile'
 import type { MapWaypoint, MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
@@ -48,6 +48,21 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
 export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false, isClickModeActive, onClickKm }: ElevationProfileProps) {
   const { points, boundaries, hasElevationData } = useElevationProfile(waypoints, segments)
 
+  // Measure container — bypasses ResponsiveContainer which creates a 0×0 wrapper
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      setSize({ width: Math.floor(width), height: Math.floor(height) })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Track last hovered km — recharts onClick is unreliable (activePayload can be null).
   // We update this ref via the wrapped onHoverKm which is called from ElevationTooltip
   // on every hover (this already drives the map crosshair, so it's definitely reliable).
@@ -75,13 +90,16 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
 
   return (
     <div
+      ref={containerRef}
       data-testid="elevation-profile"
       className={className}
       onClick={handleContainerClick}
       style={isClickModeActive ? { cursor: 'crosshair' } : undefined}
     >
-      <ResponsiveContainer width="100%" height="100%">
+      {size.width > 0 && size.height > 0 && (
         <AreaChart
+          width={size.width}
+          height={size.height}
           data={points}
           margin={{ top: 4, right: 8, bottom: 16, left: 32 }}
           onMouseLeave={() => wrappedOnHoverKm(null)}
@@ -89,7 +107,7 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
           <XAxis
             dataKey="distKm"
             type="number"
-            domain={['auto', 'auto']}
+            domain={['dataMin', 'dataMax']}
             tickFormatter={(v: number) => `${v.toFixed(0)}`}
             unit=" km"
             tick={{ fontSize: 10 }}
@@ -130,7 +148,7 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
             />
           ))}
         </AreaChart>
-      </ResponsiveContainer>
+      )}
     </div>
   )
 }
