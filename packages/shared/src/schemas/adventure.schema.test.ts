@@ -3,7 +3,7 @@ import { createAdventureSchema, updateAdventureSchema, reorderSegmentsSchema } f
 
 describe('createAdventureSchema', () => {
   it('accepts valid name', () => {
-    expect(createAdventureSchema.safeParse({ name: 'Transcantabrique 2026' }).success).toBe(true)
+    expect(createAdventureSchema.safeParse({ name: 'Desertus Bikus 2026' }).success).toBe(true)
   })
 
   it('rejects empty name', () => {

@@ -56,7 +56,7 @@ afterEach(() => {
 const makeAdventure = (overrides: Partial<AdventureResponse> = {}): AdventureResponse => ({
   id: 'adv-1',
   userId: 'user-1',
-  name: 'Transcantabrique 2026',
+  name: 'Desertus Bikus 2026',
   totalDistanceKm: 850.5,
   status: 'planning',
   densityStatus: 'idle',
@@ -144,7 +144,7 @@ describe('AppHeader', () => {
 
       renderHeader()
 
-      expect(screen.queryByText('Transcantabrique 2026')).not.toBeInTheDocument()
+      expect(screen.queryByText('Desertus Bikus 2026')).not.toBeInTheDocument()
       const skeletons = document.querySelectorAll('[data-slot="skeleton"], .animate-pulse')
       expect(skeletons.length).toBe(0)
     })
@@ -188,12 +188,12 @@ describe('AppHeader', () => {
     it('renders Planning badge when on a map page and adventure data is loaded', () => {
       mockPathname = '/map/adv-1'
       mockParams = { id: 'adv-1' }
-      mockQueryResolved(makeAdventure({ name: 'Transcantabrique 2026' }))
+      mockQueryResolved(makeAdventure({ name: 'Desertus Bikus 2026' }))
 
       renderHeader()
 
       expect(screen.getByText('Planning')).toBeInTheDocument()
-      expect(screen.getByText('Transcantabrique 2026')).toBeInTheDocument()
+      expect(screen.getByText('Desertus Bikus 2026')).toBeInTheDocument()
     })
 
     it('does not render Planning badge while adventure is loading', () => {

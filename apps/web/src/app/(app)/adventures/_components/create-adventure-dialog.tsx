@@ -55,7 +55,7 @@ export function CreateAdventureDialog({ onSubmit, isPending }: Props) {
             <Label htmlFor="adventure-name">Nom de l&apos;aventure</Label>
             <Input
               id="adventure-name"
-              placeholder="Ex: Transcantabrique 2026"
+              placeholder="Ex: Desertus Bikus 2026"
               autoFocus
               {...register('name')}
             />
