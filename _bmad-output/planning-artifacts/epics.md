@@ -2599,6 +2599,46 @@ So that the weather forecast shows the conditions I'll actually encounter when I
 
 ---
 
+### Story 16.31: Booking URL — Ajouter Région/Province et Pays au Paramètre de Recherche
+
+> **Ajouté 2026-04-08** — Suite de 16.16 (city-based) et 16.21 (postal code). Enrichit le `?ss=` Booking avec région/province (`administrative_area_level_1`) et pays (`country`) pour éliminer les ambiguïtés géographiques restantes. Zéro coût API additionnel.
+
+As a **cyclist using Booking.com deep links from the app**,
+I want the Booking search URL to include the region/province and country alongside city and postal code,
+So that search results always target the correct geographic location — even for ambiguous city names across countries.
+
+**Format final :** `?ss={ville} {codepostal}, {région}, {pays}` — composants manquants omis (dégradation gracieuse).
+
+**Acceptance Criteria:**
+
+**Given** un POI hébergement avec Google Places details chargés,
+**When** `getPlaceDetails()` retourne les `addressComponents`,
+**Then** le `administrative_area_level_1` est extrait en `GooglePlaceDetails.adminArea` et le `country` en `GooglePlaceDetails.country`.
+
+**Given** un POI hébergement avec `details.adminArea` et `details.country` disponibles (Google Places = source primaire),
+**When** l'URL Booking est construite,
+**Then** le `?ss=` vaut `{ville} {codepostal}, {région}, {pays}` (ex: `?ss=Valencia%2046001%2C%20Comunidad%20Valenciana%2C%20Spain`).
+
+**Given** le `SearchOnDropdown` global (sidebar ou live — pas de POI spécifique),
+**When** `useReverseCity` résout la zone via Geoapify,
+**Then** le `state` et `country` Geoapify sont aussi retournés et inclus dans `?ss=`.
+
+**Given** une ville disponible MAIS région ou pays absent (partiel),
+**When** l'URL Booking est construite,
+**Then** seuls les composants disponibles sont inclus (pas de virgules vides, pas de régression).
+
+**Given** le cache Redis `geo:cityv2:`,
+**When** le service est déployé,
+**Then** la clé cache passe à `geo:cityv3:` avec `{ city, postcode, state, country }`. Anciennes entrées expirent en 7j.
+
+**Technical notes:**
+- Google Places : `addressComponents` déjà dans le fieldMask — extraction identique à `locality` / `postal_code`
+- Geoapify : `state` et `country` déjà dans `results[0]` — ignorés jusqu'ici
+- Chaîne priorité : Google Places (primary) → Geoapify reverse (fallback)
+- Pas de fallback OSM pour region/country (`addr:state`/`addr:country` rarement renseignés)
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

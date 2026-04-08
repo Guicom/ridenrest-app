@@ -117,8 +117,8 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     segmentId,
   )
 
-  // City + Postcode for Booking URL: Geoapify = source primaire (noms natifs, compatibles Booking)
-  // Google Places francise les noms (Valencia→Valence) → mauvais résultats Booking
+  // City + Postcode for Booking URL: Geoapify reverse geocoding from lat/lng
+  // POI data (Google Places / Overpass) is owner-provided and inconsistent — Geoapify gives normalized results
   const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
   const { city: reverseCity, postcode: reversePostcode, state: reverseState, country: reverseCountry } = useReverseCity(isAccommodation ? { lat: poi.lat, lng: poi.lng } : null)
   const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null

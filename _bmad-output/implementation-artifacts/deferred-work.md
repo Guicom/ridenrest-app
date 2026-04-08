@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of story 16-31-booking-url-region-country-enrichment.md (2026-04-08)
+
+- Champs `GooglePlaceDetails.adminArea`/`country` extraits côté API mais non utilisés pour l’URL Booking web : aligné avec le choix Geoapify pour des noms compatibles Booking ; réutilisation future possible.
+
 ## Deferred from: code review of story 16-24 (2026-04-06)
 
 - First-render visual inconsistency: header shows raw `targetAheadKm` before `useEffect` clamp fires (pre-existing from story 16.20, `live-controls.tsx:58`)

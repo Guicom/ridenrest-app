@@ -52,8 +52,8 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
     segmentId,
   )
 
-  // City + Postcode for Booking URL: Geoapify = source primaire (noms natifs, compatibles Booking)
-  // Google Places francise les noms (Valencia→Valence) → mauvais résultats Booking
+  // City + Postcode for Booking URL: Geoapify reverse geocoding from lat/lng
+  // POI data (Google Places / Overpass) is owner-provided and inconsistent — Geoapify gives normalized results
   const isAccommodation = poi ? ACCOMMODATION_CATEGORIES.includes(poi.category) : false
   const rawData = poi ? (poi as Poi & { rawData?: Record<string, string> }).rawData : undefined
   const { city: reverseCity, postcode: reversePostcode, state: reverseState, country: reverseCountry } = useReverseCity(
