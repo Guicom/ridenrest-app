@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo } from 'react'
-import { ChevronDown, ChevronUp, Search } from 'lucide-react'
+import { ChevronDown, ChevronUp, Minus, Plus, Search } from 'lucide-react'
 import { useMapStore } from '@/stores/map.store'
 import { getCorridorCenter } from '@/lib/booking-url'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
@@ -201,19 +201,45 @@ export function SearchRangeControl({
             )}
           </div>
 
-          {/* Slider */}
+          {/* Slider with +/- buttons */}
           <div className="flex flex-col gap-2">
-            <input
-              type="range"
-              min={0}
-              max={sliderMax}
-              step={1}
-              value={sliderValue}
-              onChange={handleSliderChange}
-              data-testid="from-km-slider"
-              className="w-full"
-            />
-            <div className="flex justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const newValue = Math.max(0, sliderValue - 1)
+                  handleSliderChange({ target: { value: String(newValue) } } as React.ChangeEvent<HTMLInputElement>)
+                }}
+                disabled={sliderValue <= 0}
+                data-testid="slider-minus"
+                aria-label="Reculer de 1 km"
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary text-primary transition-all duration-75 ${sliderValue <= 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-primary/10 active:scale-95'}`}
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={sliderMax}
+                step={1}
+                value={sliderValue}
+                onChange={handleSliderChange}
+                data-testid="from-km-slider"
+                className="flex-1"
+              />
+              <button
+                onClick={() => {
+                  const newValue = Math.min(sliderMax, sliderValue + 1)
+                  handleSliderChange({ target: { value: String(newValue) } } as React.ChangeEvent<HTMLInputElement>)
+                }}
+                disabled={sliderValue >= sliderMax}
+                data-testid="slider-plus"
+                aria-label="Avancer de 1 km"
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary text-primary transition-all duration-75 ${sliderValue >= sliderMax ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-primary/10 active:scale-95'}`}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex justify-between px-9">
               <span className="text-[10px] text-muted-foreground">0 km</span>
               <span className="text-[10px] text-muted-foreground">
                 {stageEndKm != null
