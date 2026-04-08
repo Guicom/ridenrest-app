@@ -59,4 +59,49 @@ export class GeoService {
     await redis.set(key, JSON.stringify({ city, postcode }), 'EX', GEOAPIFY_CACHE_TTL)
     return { city, postcode }
   }
+
+  async reverseAddress(lat: number, lng: number): Promise<{ address: string | null }> {
+    if (!this.geoapifyApiKey) {
+      return { address: null }
+    }
+
+    const redis = this.redisProvider.getClient()
+    const key = `geo:addr:${lat.toFixed(4)}:${lng.toFixed(4)}`
+
+    const cached = await redis.get(key)
+    if (cached !== null) {
+      try {
+        return JSON.parse(cached) as { address: string | null }
+      } catch {
+        this.logger.warn(`Invalid Redis JSON for reverse-address cache key=${key}`)
+      }
+    }
+
+    const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lng}&format=json&apiKey=${this.geoapifyApiKey}`
+
+    let res: Response
+    try {
+      res = await fetch(url)
+    } catch {
+      this.logger.warn(`Geoapify fetch failed for reverse-address lat=${lat} lng=${lng}`)
+      return { address: null }
+    }
+
+    if (!res.ok) {
+      this.logger.warn(`Geoapify returned HTTP ${res.status} for reverse-address lat=${lat} lng=${lng}`)
+      return { address: null }
+    }
+
+    let data: { results: Array<{ formatted?: string }> }
+    try {
+      data = await res.json() as { results: Array<{ formatted?: string }> }
+    } catch {
+      this.logger.warn(`Geoapify returned invalid JSON for reverse-address lat=${lat} lng=${lng}`)
+      return { address: null }
+    }
+    const address = data.results?.[0]?.formatted ?? null
+
+    await redis.set(key, JSON.stringify({ address }), 'EX', GEOAPIFY_CACHE_TTL)
+    return { address }
+  }
 }

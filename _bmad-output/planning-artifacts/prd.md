@@ -141,7 +141,7 @@ projectDocsCount: 0
 Thomas a son fichier GPX. Il a déjà fait le tour de Komoot pour mémoriser
 le terrain. Mais il sait qu'il ne connaît pas les zones où il risque de
 se retrouver sans lit. Il ouvre Ride'n'Rest pour la première fois.
-Il crée une aventure "Transcantabrique 2026", importe son GPX depuis Strava
+Il crée une aventure "Desertus Bikus 2026", importe son GPX depuis Strava
 en 2 clics. La trace apparaît sur la carte. Il lance l'analyse de densité
 et ferme son ordi. Demain matin, une notification : "Analyse terminée."
 

@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { X, Globe, Phone, Navigation, Milestone, TrendingUp, Clock, ChevronDown } from 'lucide-react'
+import { X, Globe, Phone, Navigation, Milestone, TrendingUp, Clock, ChevronDown, Copy, Check } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
 import { computeElevationGain } from '@ridenrest/gpx'
@@ -8,6 +8,7 @@ import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH, POI_CATEGORY_COLORS } from
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { extractCityFromOsmRawData } from '@/lib/booking-url'
 import { useReverseCity } from '@/hooks/use-reverse-city'
+import { useReverseAddress } from '@/hooks/use-reverse-address'
 import type { Poi, PoiCategory } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
@@ -108,6 +109,8 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   onCloseRef.current = onClose
 
   const [hoursExpanded, setHoursExpanded] = useState(false)
+  const [addressCopied, setAddressCopied] = useState(false)
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { details, isPending: detailsPending } = usePoiGoogleDetails(
     poi.externalId,
@@ -127,7 +130,15 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     ? (details?.postalCode ?? osmData?.postcode ?? reversePostcode)
     : null
 
-
+  // Reverse address for Overpass POIs only when no local address is available.
+  const isOverpass = poi.source === 'overpass'
+  const osmAddress = rawData
+    ? [rawData['addr:housenumber'], rawData['addr:street']].filter(Boolean).join(' ')
+      || rawData['addr:full']
+      || null
+    : null
+  const shouldReverseAddress = isOverpass && !osmAddress
+  const { address: reverseAddress } = useReverseAddress(shouldReverseAddress ? { lat: poi.lat, lng: poi.lng } : null)
 
   // Project lat/lng → screen pixels (relative to map container)
   const project = useCallback(() => {
@@ -161,12 +172,25 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   // Reset hours state when POI changes (use externalId — category alone doesn't detect same-category switch)
   useEffect(() => {
     setHoursExpanded(false)
+    setAddressCopied(false)
+    if (copyResetTimeoutRef.current !== null) {
+      clearTimeout(copyResetTimeoutRef.current)
+      copyResetTimeoutRef.current = null
+    }
     // Track POI detail opened (AC #4, Story 15.3)
     trackPoiDetailOpened({
       poi_type: poi.category,
       source: poi.source === 'overpass' ? 'overpass' : 'google',
     })
   }, [poi.externalId, poi.category, poi.source])
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current !== null) {
+        clearTimeout(copyResetTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Close on Escape
   useEffect(() => {
@@ -203,6 +227,30 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   const displayPhone = details?.phone ?? osmPhone
   const displayWebsite = details?.website ?? osmWebsite
   const displayName = details?.displayName ?? poi.name
+
+  // Address: Google Places (primary) → OSM rawData → reverse geocoding (Overpass only)
+  const rawAddress = details?.formattedAddress ?? osmAddress ?? (isOverpass ? reverseAddress : null)
+  // Strip POI name prefix from address (Geoapify often returns "Hotel X, Calle ...")
+  const displayAddress = rawAddress && rawAddress.toLowerCase().startsWith(displayName.toLowerCase())
+    ? rawAddress.slice(displayName.length).replace(/^[,\s]+/, '') || null
+    : rawAddress
+
+  const handleCopyAddress = async () => {
+    if (!displayAddress) return
+    try {
+      await navigator.clipboard.writeText(displayAddress)
+      setAddressCopied(true)
+      if (copyResetTimeoutRef.current !== null) {
+        clearTimeout(copyResetTimeoutRef.current)
+      }
+      copyResetTimeoutRef.current = setTimeout(() => {
+        setAddressCopied(false)
+        copyResetTimeoutRef.current = null
+      }, 2000)
+    } catch {
+      // Fallback silencieux — clipboard peut échouer en iframe/insecure context
+    }
+  }
 
   const distanceLabel = poi.distFromTraceM < 1000
     ? `${Math.round(poi.distFromTraceM)} m de la trace`
@@ -271,8 +319,29 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
               )}
             </div>
 
-            {/* Row 3 : Distance de la trace */}
-            <p className="mt-1.5 text-sm text-[--text-secondary]">{distanceLabel}</p>
+            {/* Row 3 : Adresse (cliquable pour copier) */}
+            {displayAddress && (
+              <button
+                onClick={handleCopyAddress}
+                className="mt-3 mb-1 flex items-center gap-2 text-left text-xs text-[--text-secondary] hover:text-[--text-primary] transition-colors cursor-pointer group w-full min-w-0"
+                title="Copier l'adresse"
+                aria-label={addressCopied ? 'Adresse copiée' : "Copier l'adresse"}
+              >
+                <span className="truncate">{displayAddress}</span>
+                <span className={iconBtnClass}>
+                  {addressCopied
+                    ? <Check className="h-4 w-4 text-green-600" />
+                    : <Copy className="h-4 w-4" />
+                  }
+                </span>
+              </button>
+            )}
+            <span className="sr-only" aria-live="polite">
+              {addressCopied ? 'Adresse copiée' : ''}
+            </span>
+
+            {/* Row 4 : Distance de la trace */}
+            <p className="mt-2.5 text-sm text-[--text-secondary]">{distanceLabel}</p>
           </div>
 
           {/* Séparateur */}

@@ -20,6 +20,6 @@ trace_output: _bmad-output/test-artifacts/traceability
 
 # Core Configuration Values
 user_name: Guillaume
-communication_language: Frensh
-document_output_language: Frensh
+communication_language: French
+document_output_language: French
 output_folder: "{project-root}/_bmad-output"

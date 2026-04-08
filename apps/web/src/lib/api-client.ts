@@ -400,6 +400,10 @@ export async function getReverseCity(lat: number, lng: number): Promise<{ city: 
   return apiFetch<{ city: string | null; postcode: string | null }>(`/api/geo/reverse-city?lat=${lat}&lng=${lng}`)
 }
 
+export async function getReverseAddress(lat: number, lng: number): Promise<{ address: string | null }> {
+  return apiFetch<{ address: string | null }>(`/api/geo/reverse-address?lat=${lat}&lng=${lng}`)
+}
+
 // ── Feedbacks ─────────────────────────────────────────────────────────────────
 
 export async function submitFeedback(data: {
