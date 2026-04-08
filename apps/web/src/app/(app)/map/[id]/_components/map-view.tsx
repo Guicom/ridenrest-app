@@ -533,6 +533,9 @@ export function MapView({ adventureId }: MapViewProps) {
           {/* Loading overlay while POI search is pending (AC #4, Story 16.3) */}
           <MapSearchOverlay visible={searchCommitted && poisPending} />
 
+          {/* Loading overlay while weather data is fetching */}
+          <MapSearchOverlay visible={weatherActive && weatherPending} message="Chargement météo…" />
+
           {/* Contextual sub-type filter banner — blue, shown when accommodations exist but none match active filter (Story 16.17) */}
           {hasUnfilteredResults && alternativeCounts.length > 0 && (
             <NoResultsSubTypeBanner

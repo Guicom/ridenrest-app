@@ -15,6 +15,11 @@ describe('MapSearchOverlay', () => {
     expect(screen.getByText('Recherche en cours…')).toBeInTheDocument()
   })
 
+  it('renders custom message when provided', () => {
+    render(<MapSearchOverlay visible={true} message="Chargement météo…" />)
+    expect(screen.getByText('Chargement météo…')).toBeInTheDocument()
+  })
+
   it('renders Loader2 spinner when visible=true', () => {
     const { container } = render(<MapSearchOverlay visible={true} />)
     // Loader2 renders as an svg with animate-spin class

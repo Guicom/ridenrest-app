@@ -121,7 +121,7 @@ export default function LivePage() {
 
   // Live weather — data still fetched for map layer (toggle removed)
   const weatherDepartureTime = useLiveStore((s) => s.weatherDepartureTime)
-  const { weatherPoints } = useLiveWeather(segmentId, {
+  const { weatherPoints, isPending: weatherPending } = useLiveWeather(segmentId, {
     departureTime: weatherDepartureTime ?? undefined,
   })
 
@@ -454,6 +454,9 @@ export default function LivePage() {
 
         {/* POI search loading overlay (same as planning mode) */}
         <MapSearchOverlay visible={poisFetching && isLiveModeActive} />
+
+        {/* Weather loading overlay */}
+        <MapSearchOverlay visible={mapWeatherActive && weatherPending && isLiveModeActive} message="Chargement météo…" />
 
         {/* Reset zoom button — below style picker */}
         <div className="absolute top-14 right-4 z-10">
