@@ -664,7 +664,7 @@ function updateCorridorHighlight(
         type: 'line',
         source: 'corridor',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#FBBF24', 'line-width': 8, 'line-opacity': 0.9 },
+        paint: { 'line-color': '#3498db', 'line-width': 8, 'line-opacity': 0.9 },
       })
     }
     return
@@ -680,7 +680,7 @@ function updateCorridorHighlight(
     source: 'corridor',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': '#FBBF24',   // amber — high contrast against green trace
+      'line-color': '#3498db',   // blue — no conflict with OSM orange roads
       'line-width': 8,
       'line-opacity': 0.9,
     },
