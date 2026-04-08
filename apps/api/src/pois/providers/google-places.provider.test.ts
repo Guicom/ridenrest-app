@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing'
-import { GooglePlacesProvider } from './google-places.provider.js'
+import { GooglePlacesProvider, mapGoogleTypesToCategory, LAYER_GOOGLE_TYPES } from './google-places.provider.js'
 
 const mockBbox = { minLat: 43.0, maxLat: 43.5, minLng: 1.0, maxLng: 1.5 }
 
@@ -100,7 +100,7 @@ describe('GooglePlacesProvider', () => {
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
-      // accommodations layer queries ['lodging', 'campground']
+      // accommodations layer queries 16 types — mock only 2 responses for dedup test
       // Both return overlapping IDs
       jest.spyOn(global, 'fetch')
         .mockResolvedValueOnce({
@@ -245,6 +245,78 @@ describe('GooglePlacesProvider', () => {
 
       const result = await providerWithKey.findPlaceId('Hotel Test', 43.1, 1.1)
       expect(result).toBeNull()
+    })
+  })
+
+  describe('LAYER_GOOGLE_TYPES', () => {
+    it('accommodations layer contains 16 types', () => {
+      expect(LAYER_GOOGLE_TYPES['accommodations']).toHaveLength(16)
+    })
+
+    it('accommodations layer includes all expected types', () => {
+      const types = LAYER_GOOGLE_TYPES['accommodations']
+      const expected = [
+        'lodging', 'hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel',
+        'campground', 'camping_cabin', 'rv_park', 'mobile_home_park',
+        'bed_and_breakfast', 'guest_house', 'private_guest_room', 'cottage', 'farmstay',
+        'hostel',
+      ]
+      for (const t of expected) {
+        expect(types).toContain(t)
+      }
+    })
+  })
+
+  describe('mapGoogleTypesToCategory', () => {
+    // Hotel types
+    it.each(['hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel', 'lodging'])(
+      'maps %s → hotel',
+      (type) => {
+        expect(mapGoogleTypesToCategory([type], 'accommodations')).toBe('hotel')
+      },
+    )
+
+    // Camp site types
+    it.each(['campground', 'camping_cabin', 'rv_park', 'mobile_home_park'])(
+      'maps %s → camp_site',
+      (type) => {
+        expect(mapGoogleTypesToCategory([type], 'accommodations')).toBe('camp_site')
+      },
+    )
+
+    // Guesthouse types
+    it.each(['guest_house', 'bed_and_breakfast', 'private_guest_room', 'farmstay', 'cottage'])(
+      'maps %s → guesthouse',
+      (type) => {
+        expect(mapGoogleTypesToCategory([type], 'accommodations')).toBe('guesthouse')
+      },
+    )
+
+    // Hostel
+    it('maps hostel → hostel', () => {
+      expect(mapGoogleTypesToCategory(['hostel'], 'accommodations')).toBe('hostel')
+    })
+
+    // Fallback for unknown types
+    it('falls back to hotel for unknown accommodation types', () => {
+      expect(mapGoogleTypesToCategory(['unknown_type'], 'accommodations')).toBe('hotel')
+    })
+
+    // Non-accommodation layers
+    it('maps restaurant layer → restaurant', () => {
+      expect(mapGoogleTypesToCategory(['restaurant'], 'restaurants')).toBe('restaurant')
+    })
+
+    it('maps bike layer → bike_shop', () => {
+      expect(mapGoogleTypesToCategory(['bicycle_store'], 'bike')).toBe('bike_shop')
+    })
+
+    it('maps grocery_or_supermarket → supermarket', () => {
+      expect(mapGoogleTypesToCategory(['grocery_or_supermarket'], 'supplies')).toBe('supermarket')
+    })
+
+    it('maps convenience_store → convenience', () => {
+      expect(mapGoogleTypesToCategory(['convenience_store'], 'supplies')).toBe('convenience')
     })
   })
 

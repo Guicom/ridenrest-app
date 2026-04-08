@@ -4,9 +4,10 @@ import type { GooglePlaceDetails } from '@ridenrest/shared'
 // Google place types mapped to our MapLayer categories
 // Using includedType for accurate category filtering
 export const GOOGLE_PLACE_TYPES: Record<string, string[]> = {
-  hotel:        ['lodging'],
-  hostel:       ['lodging'],
-  camp_site:    ['campground', 'rv_park'],
+  hotel:        ['lodging', 'hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel'],
+  hostel:       ['hostel'],
+  guesthouse:   ['bed_and_breakfast', 'guest_house', 'private_guest_room', 'cottage', 'farmstay'],
+  camp_site:    ['campground', 'camping_cabin', 'rv_park', 'mobile_home_park'],
   shelter:      ['lodging'],
   restaurant:   ['restaurant', 'food'],
   supermarket:  ['grocery_or_supermarket', 'supermarket'],
@@ -18,7 +19,12 @@ export const GOOGLE_PLACE_TYPES: Record<string, string[]> = {
 // Deduplicated Google types per MapLayer (for batching queries by layer)
 // Google Places API (New) types — each becomes a separate Text Search query (IDs Only)
 export const LAYER_GOOGLE_TYPES: Record<string, string[]> = {
-  accommodations: ['lodging', 'campground', 'bed_and_breakfast', 'hostel', 'guest_house', 'camping_cabin', 'private_guest_room'],
+  accommodations: [
+    'lodging', 'hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel',
+    'campground', 'camping_cabin', 'rv_park', 'mobile_home_park',
+    'bed_and_breakfast', 'guest_house', 'private_guest_room', 'cottage', 'farmstay',
+    'hostel',
+  ],
   restaurants:    ['restaurant'],
   supplies:       ['grocery_or_supermarket', 'convenience_store'],
   bike:           ['bicycle_store'],
@@ -50,9 +56,10 @@ export function mapGoogleTypesToCategory(types: string[], layer: string): string
     return 'convenience'
   }
   // accommodations layer
-  if (types.some((t) => ['campground', 'rv_park', 'camping_cabin'].includes(t))) return 'camp_site'
+  if (types.some((t) => ['campground', 'camping_cabin', 'rv_park', 'mobile_home_park'].includes(t))) return 'camp_site'
   if (types.some((t) => ['hostel'].includes(t))) return 'hostel'
-  if (types.some((t) => ['guest_house', 'bed_and_breakfast', 'private_guest_room', 'farmstay'].includes(t))) return 'guesthouse'
+  if (types.some((t) => ['guest_house', 'bed_and_breakfast', 'private_guest_room', 'farmstay', 'cottage'].includes(t))) return 'guesthouse'
+  if (types.some((t) => ['hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel', 'lodging'].includes(t))) return 'hotel'
   return 'hotel'
 }
 

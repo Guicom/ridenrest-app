@@ -209,6 +209,7 @@ development_status:
   16-27-gpx-upload-dialog: done  # formulaire upload GPX dans une dialog au lieu d'inline
   16-28-stage-departure-time-weather: done  # heure de départ par étape + météo ajustée par étape
   16-29-density-accordion-calculate-cta: done  # CTA calculer densité dans accordéon (planning + live) au lieu de page détail uniquement
+  16-30-google-places-missing-accommodation-types: done  # ajouter 9 types Google Places manquants (hotel, motel, inn, cottage, farmstay, rv_park...)
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
