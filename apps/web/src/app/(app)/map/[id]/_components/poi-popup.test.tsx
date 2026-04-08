@@ -13,6 +13,10 @@ vi.mock('@/hooks/use-reverse-city', () => ({
   useReverseCity: () => ({ city: null, postcode: null, isPending: false }),
 }))
 
+vi.mock('@/hooks/use-reverse-address', () => ({
+  useReverseAddress: () => ({ address: null, isPending: false }),
+}))
+
 let mockDetails: {
   placeId: string
   displayName: string | null
