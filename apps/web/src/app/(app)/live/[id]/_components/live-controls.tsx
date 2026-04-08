@@ -24,6 +24,10 @@ interface LiveControlsProps {
   city?: string | null
   /** Postal code appended to city in Booking.com ?ss= param for disambiguation. */
   postcode?: string | null
+  /** Region/province for Booking.com ?ss= param. */
+  adminArea?: string | null
+  /** Country for Booking.com ?ss= param. */
+  country?: string | null
   /** Max km ahead based on remaining distance. Defaults to 100 when undefined (GPS not snapped). */
   maxAheadKm?: number
 }
@@ -31,7 +35,7 @@ interface LiveControlsProps {
 const SLIDER_STEP = 5
 const DEFAULT_MAX = 100
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, postcode, maxAheadKm }: LiveControlsProps) {
+export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, postcode, adminArea, country, maxAheadKm }: LiveControlsProps) {
   const { isOnline, disabledReason } = useOfflineGate()
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
@@ -146,7 +150,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
             )}
           </Tooltip>
         </TooltipProvider>
-        <SearchOnDropdown center={center} city={city} postcode={postcode} variant="action" className="flex-1" page="live" />
+        <SearchOnDropdown center={center} city={city} postcode={postcode} adminArea={adminArea} country={country} variant="action" className="flex-1" page="live" />
       </div>
     </div>
   )

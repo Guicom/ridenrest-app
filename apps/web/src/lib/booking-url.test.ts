@@ -83,6 +83,51 @@ describe('buildBookingSearchUrl', () => {
   it('ignores undefined postcode', () => {
     expect(buildBookingSearchUrl('Toulouse', undefined)).toBe('https://www.booking.com/searchresults.html?ss=Toulouse')
   })
+
+  it('appends adminArea and country to city + postcode', () => {
+    const url = buildBookingSearchUrl('Valencia', '46001', 'Comunidad Valenciana', 'Spain')
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001%2C%20Comunidad%20Valenciana%2C%20Spain')
+  })
+
+  it('appends adminArea without country', () => {
+    const url = buildBookingSearchUrl('Valencia', '46001', 'Comunidad Valenciana', null)
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001%2C%20Comunidad%20Valenciana')
+  })
+
+  it('appends country without adminArea', () => {
+    const url = buildBookingSearchUrl('Valencia', '46001', null, 'Spain')
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001%2C%20Spain')
+  })
+
+  it('appends adminArea and country without postcode', () => {
+    const url = buildBookingSearchUrl('Valencia', null, 'Comunidad Valenciana', 'Spain')
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2C%20Comunidad%20Valenciana%2C%20Spain')
+  })
+
+  it('ignores null adminArea and null country (no regression)', () => {
+    const url = buildBookingSearchUrl('Valencia', '46001', null, null)
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001')
+  })
+
+  it('ignores undefined adminArea and undefined country', () => {
+    const url = buildBookingSearchUrl('Valencia', '46001', undefined, undefined)
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001')
+  })
+
+  it('full chain: city + postcode + adminArea + country with accented chars', () => {
+    const url = buildBookingSearchUrl('Saint-Jean-de-Luz', '64500', 'Nouvelle-Aquitaine', 'France')
+    expect(url).toContain('ss=Saint-Jean-de-Luz%2064500%2C%20Nouvelle-Aquitaine%2C%20France')
+  })
+
+  it('ignores whitespace-only adminArea and country', () => {
+    const url = buildBookingSearchUrl('Valencia', '46001', '   ', '  ')
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001')
+  })
+
+  it('ignores whitespace-only postcode', () => {
+    const url = buildBookingSearchUrl('Valencia', '  ', 'Comunidad Valenciana', 'Spain')
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2C%20Comunidad%20Valenciana%2C%20Spain')
+  })
 })
 
 describe('buildBookingCoordUrl', () => {

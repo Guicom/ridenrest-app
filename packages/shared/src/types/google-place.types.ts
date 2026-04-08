@@ -11,6 +11,10 @@ export interface GooglePlaceDetails {
   locality: string | null
   /** Postal code extracted from addressComponents (postal_code type). */
   postalCode: string | null
+  /** Region/province extracted from addressComponents (administrative_area_level_1 type). */
+  adminArea: string | null
+  /** Country extracted from addressComponents (country type). */
+  country: string | null
   lat: number | null
   lng: number | null
   rating: number | null

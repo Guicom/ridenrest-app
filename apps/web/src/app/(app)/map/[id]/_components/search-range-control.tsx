@@ -57,7 +57,7 @@ export function SearchRangeControl({
         : null,
     [searchCommitted, visibleLayers, waypoints, fromKm, toKm],
   )
-  const { city: corridorCity, postcode: corridorPostcode } = useReverseCity(corridorCenter)
+  const { city: corridorCity, postcode: corridorPostcode, state: corridorState, country: corridorCountry } = useReverseCity(corridorCenter)
   const { isOnline, disabledReason } = useOfflineGate()
 
   // rangeKm local state — initialized from store values
@@ -317,6 +317,8 @@ export function SearchRangeControl({
               center={corridorCenter}
               city={corridorCity}
               postcode={corridorPostcode}
+              adminArea={corridorState}
+              country={corridorCountry}
               variant="outline"
               className="w-full"
               page="map"

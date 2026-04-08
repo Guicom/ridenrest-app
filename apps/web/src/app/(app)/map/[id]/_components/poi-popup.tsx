@@ -117,18 +117,19 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     segmentId,
   )
 
-  // City + Postcode: Google Places (primary) → OSM rawData (Overpass POIs) → Geoapify reverse geocoding
+  // City + Postcode for Booking URL: Geoapify = source primaire (noms natifs, compatibles Booking)
+  // Google Places francise les noms (Valencia→Valence) → mauvais résultats Booking
   const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
+  const { city: reverseCity, postcode: reversePostcode, state: reverseState, country: reverseCountry } = useReverseCity(isAccommodation ? { lat: poi.lat, lng: poi.lng } : null)
   const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
-  const extractedCity = isAccommodation
-    ? (details?.locality ?? osmData?.city ?? null)
+  const poiCity = isAccommodation
+    ? (reverseCity ?? details?.locality ?? osmData?.city ?? null)
     : null
-  const needsReverseCity = isAccommodation && !extractedCity
-  const { city: reverseCity, postcode: reversePostcode } = useReverseCity(needsReverseCity ? { lat: poi.lat, lng: poi.lng } : null)
-  const poiCity = extractedCity ?? reverseCity
   const poiPostcode = isAccommodation
-    ? (details?.postalCode ?? osmData?.postcode ?? reversePostcode)
+    ? (reversePostcode ?? details?.postalCode ?? osmData?.postcode ?? null)
     : null
+  const poiAdminArea = isAccommodation ? (reverseState ?? null) : null
+  const poiCountry = isAccommodation ? (reverseCountry ?? null) : null
 
   // Reverse address for Overpass POIs only when no local address is available.
   const isOverpass = poi.source === 'overpass'
@@ -426,6 +427,8 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
                   center={{ lat: poi.lat, lng: poi.lng }}
                   city={poiCity}
                   postcode={poiPostcode}
+                  adminArea={poiAdminArea}
+                  country={poiCountry}
                   variant="action"
                   className="w-full"
                   page={isLiveMode ? 'live' : 'map'}

@@ -391,8 +391,9 @@ describe('GooglePlacesProvider', () => {
             { longText: '1', types: ['street_number'] },
             { longText: 'Rue Test', types: ['route'] },
             { longText: 'Paris', types: ['locality', 'political'] },
-            { longText: 'France', types: ['country', 'political'] },
             { longText: '75001', types: ['postal_code'] },
+            { longText: 'Île-de-France', types: ['administrative_area_level_1', 'political'] },
+            { longText: 'France', types: ['country', 'political'] },
           ],
           location: { latitude: 48.8566, longitude: 2.3522 },
           rating: 4.2,
@@ -411,6 +412,8 @@ describe('GooglePlacesProvider', () => {
         formattedAddress: '1 Rue Test, Paris',
         locality: 'Paris',
         postalCode: '75001',
+        adminArea: 'Île-de-France',
+        country: 'France',
         lat: 48.8566,
         lng: 2.3522,
         rating: 4.2,
@@ -440,6 +443,8 @@ describe('GooglePlacesProvider', () => {
       expect(result.displayName).toBeNull()
       expect(result.formattedAddress).toBeNull()
       expect(result.postalCode).toBeNull()
+      expect(result.adminArea).toBeNull()
+      expect(result.country).toBeNull()
       expect(result.lat).toBeNull()
       expect(result.lng).toBeNull()
       expect(result.rating).toBeNull()

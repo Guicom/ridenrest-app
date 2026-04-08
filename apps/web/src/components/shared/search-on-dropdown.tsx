@@ -15,6 +15,10 @@ interface SearchOnDropdownProps {
   city?: string | null
   /** Postal code appended to city in Booking.com ?ss= param for disambiguation. */
   postcode?: string | null
+  /** Region/province for Booking.com ?ss= param (typically Geoapify state). */
+  adminArea?: string | null
+  /** Country for Booking.com ?ss= param (typically Geoapify country). */
+  country?: string | null
   /**
    * 'outline' — planning sidebar style (border, text, rounded-lg)
    * 'action'  — live controls action row style (rounded-full, bg-primary)
@@ -27,7 +31,7 @@ interface SearchOnDropdownProps {
   poiType?: string
 }
 
-export function SearchOnDropdown({ center, city, postcode, variant = 'outline', className, page = 'map', poiType }: SearchOnDropdownProps) {
+export function SearchOnDropdown({ center, city, postcode, adminArea, country, variant = 'outline', className, page = 'map', poiType }: SearchOnDropdownProps) {
   const { data: session } = useSession()
   const { data: profile } = useProfile(!!session)
   const userTier: UserTier = session ? (profile?.tier ?? 'free') : 'anonymous'
@@ -44,7 +48,7 @@ export function SearchOnDropdown({ center, city, postcode, variant = 'outline', 
   }, [open])
 
   const bookingUrl = city
-    ? buildBookingSearchUrl(city, postcode)
+    ? buildBookingSearchUrl(city, postcode, adminArea, country)
     : center
       ? buildBookingCoordUrl(center)
       : null

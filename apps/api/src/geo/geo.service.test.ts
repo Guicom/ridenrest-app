@@ -39,58 +39,58 @@ describe('GeoService', () => {
 
   describe('reverseCity', () => {
     it('returns cached city and postcode on cache hit', async () => {
-      mockRedis.get.mockResolvedValue(JSON.stringify({ city: 'Pamplona', postcode: '31001' }))
+      mockRedis.get.mockResolvedValue(JSON.stringify({ city: 'Pamplona', postcode: '31001', state: null, country: null }))
 
       const result = await service.reverseCity(43.123, -1.456)
 
-      expect(result).toEqual({ city: 'Pamplona', postcode: '31001' })
+      expect(result).toEqual({ city: 'Pamplona', postcode: '31001', state: null, country: null })
       expect(mockRedis.set).not.toHaveBeenCalled()
     })
 
     it('returns null city/postcode on cache hit with nulls', async () => {
-      mockRedis.get.mockResolvedValue(JSON.stringify({ city: null, postcode: null }))
+      mockRedis.get.mockResolvedValue(JSON.stringify({ city: null, postcode: null, state: null, country: null }))
 
       const result = await service.reverseCity(43.123, -1.456)
 
-      expect(result).toEqual({ city: null, postcode: null })
+      expect(result).toEqual({ city: null, postcode: null, state: null, country: null })
       expect(mockRedis.set).not.toHaveBeenCalled()
     })
 
-    it('uses geo:cityv2: cache key with 3 decimal places', async () => {
+    it('uses geo:cityv3: cache key with 3 decimal places', async () => {
       mockRedis.get.mockResolvedValue(JSON.stringify({ city: 'Toulouse', postcode: '31000' }))
 
       await service.reverseCity(43.1234, -1.4567)
 
-      expect(mockRedis.get).toHaveBeenCalledWith('geo:cityv2:43.123:-1.457')
+      expect(mockRedis.get).toHaveBeenCalledWith('geo:cityv3:43.123:-1.457')
     })
 
     it('two requests within ~44m use the same cache key', async () => {
-      mockRedis.get.mockResolvedValue(JSON.stringify({ city: 'Pamplona', postcode: '31001' }))
+      mockRedis.get.mockResolvedValue(JSON.stringify({ city: 'Pamplona', postcode: '31001', state: null, country: null }))
 
       await service.reverseCity(43.1230, -1.4560)
       await service.reverseCity(43.1234, -1.4562)
 
-      expect(mockRedis.get).toHaveBeenCalledWith('geo:cityv2:43.123:-1.456')
+      expect(mockRedis.get).toHaveBeenCalledWith('geo:cityv3:43.123:-1.456')
       expect(mockRedis.get).toHaveBeenCalledTimes(2)
       const calls = mockRedis.get.mock.calls.map(([k]: [string]) => k)
       expect(calls[0]).toBe(calls[1])
     })
 
-    it('calls Geoapify API and returns city + postcode on cache miss', async () => {
+    it('calls Geoapify API and returns city + postcode + state + country on cache miss', async () => {
       const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
-          results: [{ city: 'Toulouse', postcode: '31000' }],
+          results: [{ city: 'Toulouse', postcode: '31000', state: 'Occitanie', country: 'France' }],
         }),
       } as Response)
 
       const result = await service.reverseCity(43.6, 1.4)
 
-      expect(result).toEqual({ city: 'Toulouse', postcode: '31000' })
+      expect(result).toEqual({ city: 'Toulouse', postcode: '31000', state: 'Occitanie', country: 'France' })
       expect(fetchSpy).toHaveBeenCalledWith(expect.stringContaining('geoapify.com'))
       expect(mockRedis.set).toHaveBeenCalledWith(
-        expect.stringContaining('geo:cityv2:'),
-        JSON.stringify({ city: 'Toulouse', postcode: '31000' }),
+        expect.stringContaining('geo:cityv3:'),
+        JSON.stringify({ city: 'Toulouse', postcode: '31000', state: 'Occitanie', country: 'France' }),
         'EX',
         GEOAPIFY_CACHE_TTL,
       )
@@ -101,11 +101,11 @@ describe('GeoService', () => {
     it('falls back to town when city absent', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ results: [{ town: 'Saint-Girons', postcode: '09200' }] }),
+        json: () => Promise.resolve({ results: [{ town: 'Saint-Girons', postcode: '09200', state: 'Occitanie', country: 'France' }] }),
       } as Response)
 
       const result = await service.reverseCity(42.98, 1.15)
-      expect(result).toEqual({ city: 'Saint-Girons', postcode: '09200' })
+      expect(result).toEqual({ city: 'Saint-Girons', postcode: '09200', state: 'Occitanie', country: 'France' })
     })
 
     it('caches nulls and returns them when Geoapify returns no city/postcode', async () => {
@@ -116,10 +116,10 @@ describe('GeoService', () => {
 
       const result = await service.reverseCity(43.0, 1.0)
 
-      expect(result).toEqual({ city: null, postcode: null })
+      expect(result).toEqual({ city: null, postcode: null, state: null, country: null })
       expect(mockRedis.set).toHaveBeenCalledWith(
-        expect.stringContaining('geo:cityv2:'),
-        JSON.stringify({ city: null, postcode: null }),
+        expect.stringContaining('geo:cityv3:'),
+        JSON.stringify({ city: null, postcode: null, state: null, country: null }),
         'EX',
         GEOAPIFY_CACHE_TTL,
       )
@@ -130,7 +130,7 @@ describe('GeoService', () => {
 
       const result = await service.reverseCity(43.0, 1.0)
 
-      expect(result).toEqual({ city: null, postcode: null })
+      expect(result).toEqual({ city: null, postcode: null, state: null, country: null })
       expect(mockRedis.set).not.toHaveBeenCalled()
     })
 
@@ -142,7 +142,7 @@ describe('GeoService', () => {
 
       const result = await service.reverseCity(43.0, 1.0)
 
-      expect(result).toEqual({ city: null, postcode: null })
+      expect(result).toEqual({ city: null, postcode: null, state: null, country: null })
       expect(mockRedis.set).not.toHaveBeenCalled()
     })
 
@@ -160,7 +160,7 @@ describe('GeoService', () => {
       const serviceWithoutKey = module.get<GeoService>(GeoService)
       const result = await serviceWithoutKey.reverseCity(43.0, 1.0)
 
-      expect(result).toEqual({ city: null, postcode: null })
+      expect(result).toEqual({ city: null, postcode: null, state: null, country: null })
       expect(mockRedis.get).not.toHaveBeenCalled()
     })
   })

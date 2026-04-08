@@ -18,18 +18,18 @@ export class GeoService {
     }
   }
 
-  async reverseCity(lat: number, lng: number): Promise<{ city: string | null; postcode: string | null }> {
+  async reverseCity(lat: number, lng: number): Promise<{ city: string | null; postcode: string | null; state: string | null; country: string | null }> {
     if (!this.geoapifyApiKey) {
       this.logger.debug(`reverseCity(${lat}, ${lng}): GEOAPIFY_API_KEY not set`)
-      return { city: null, postcode: null }
+      return { city: null, postcode: null, state: null, country: null }
     }
 
     const redis = this.redisProvider.getClient()
-    const key = `geo:cityv2:${lat.toFixed(3)}:${lng.toFixed(3)}`
+    const key = `geo:cityv3:${lat.toFixed(3)}:${lng.toFixed(3)}`
 
     const cached = await redis.get(key)
     if (cached !== null) {
-      const parsed = JSON.parse(cached) as { city: string | null; postcode: string | null }
+      const parsed = JSON.parse(cached) as { city: string | null; postcode: string | null; state: string | null; country: string | null }
       return parsed
     }
 
@@ -40,24 +40,26 @@ export class GeoService {
       res = await fetch(url)
     } catch {
       this.logger.warn(`Geoapify fetch failed for lat=${lat} lng=${lng}`)
-      return { city: null, postcode: null }
+      return { city: null, postcode: null, state: null, country: null }
     }
 
     if (!res.ok) {
       this.logger.warn(`Geoapify returned HTTP ${res.status} for lat=${lat} lng=${lng}`)
-      return { city: null, postcode: null }
+      return { city: null, postcode: null, state: null, country: null }
     }
 
     const data = await res.json() as {
-      results: Array<{ city?: string; town?: string; village?: string; municipality?: string; postcode?: string }>
+      results: Array<{ city?: string; town?: string; village?: string; municipality?: string; postcode?: string; state?: string; country?: string }>
     }
     const result = data.results?.[0]
     const city = result?.city ?? result?.town ?? result?.village ?? result?.municipality ?? null
     const postcode = result?.postcode ?? null
-    this.logger.debug(`reverseCity(${lat}, ${lng}): result=${JSON.stringify(result)}, city=${city}, postcode=${postcode}`)
+    const state = result?.state ?? null
+    const country = result?.country ?? null
+    this.logger.debug(`reverseCity(${lat}, ${lng}): result=${JSON.stringify(result)}, city=${city}, postcode=${postcode}, state=${state}, country=${country}`)
 
-    await redis.set(key, JSON.stringify({ city, postcode }), 'EX', GEOAPIFY_CACHE_TTL)
-    return { city, postcode }
+    await redis.set(key, JSON.stringify({ city, postcode, state, country }), 'EX', GEOAPIFY_CACHE_TTL)
+    return { city, postcode, state, country }
   }
 
   async reverseAddress(lat: number, lng: number): Promise<{ address: string | null }> {

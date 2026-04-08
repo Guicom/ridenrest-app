@@ -86,6 +86,21 @@ describe('SearchOnDropdown', () => {
     expect(link.href).toContain('ss=Saint-Jean-de-Luz%2064500')
   })
 
+  it('Booking.com link includes adminArea and country in ss param (Story 16.31)', () => {
+    render(<SearchOnDropdown center={center} city="Valencia" postcode="46001" adminArea="Comunidad Valenciana" country="España" />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
+    expect(link.href).toContain('ss=Valencia%2046001%2C%20Comunidad%20Valenciana%2C%20Espa')
+  })
+
+  it('Booking.com link omits null adminArea/country gracefully', () => {
+    render(<SearchOnDropdown center={center} city="Toulouse" postcode="31000" adminArea={null} country={null} />)
+    fireEvent.click(screen.getByTestId('search-on-trigger'))
+    const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
+    expect(link.href).toContain('ss=Toulouse%2031000')
+    expect(link.href).not.toContain('%2C')
+  })
+
   it('Booking.com link uses coordinates fallback when city is null but center available (AC #6)', () => {
     render(<SearchOnDropdown center={center} city={null} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))

@@ -133,12 +133,24 @@ export class GooglePlacesProvider {
       (c) => c.types?.includes('postal_code'),
     )?.longText ?? null
 
+    // Extract region/province from addressComponents
+    const adminArea = data.addressComponents?.find(
+      (c) => c.types?.includes('administrative_area_level_1'),
+    )?.longText ?? null
+
+    // Extract country from addressComponents
+    const country = data.addressComponents?.find(
+      (c) => c.types?.includes('country'),
+    )?.longText ?? null
+
     return {
       placeId,
       displayName: data.displayName?.text ?? null,
       formattedAddress: data.formattedAddress ?? null,
       locality,
       postalCode,
+      adminArea,
+      country,
       lat: data.location?.latitude ?? null,
       lng: data.location?.longitude ?? null,
       rating: data.rating ?? null,

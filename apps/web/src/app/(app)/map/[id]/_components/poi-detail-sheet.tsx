@@ -52,21 +52,22 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
     segmentId,
   )
 
-  // City + Postcode extraction — hooks must be called before early return (Rules of Hooks)
+  // City + Postcode for Booking URL: Geoapify = source primaire (noms natifs, compatibles Booking)
+  // Google Places francise les noms (Valencia→Valence) → mauvais résultats Booking
   const isAccommodation = poi ? ACCOMMODATION_CATEGORIES.includes(poi.category) : false
   const rawData = poi ? (poi as Poi & { rawData?: Record<string, string> }).rawData : undefined
-  const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
-  const extractedCity = isAccommodation
-    ? (details?.locality ?? osmData?.city ?? null)
-    : null
-  const needsReverseCity = isAccommodation && !extractedCity && poi !== null
-  const { city: reverseCity, postcode: reversePostcode } = useReverseCity(
-    needsReverseCity ? { lat: poi!.lat, lng: poi!.lng } : null,
+  const { city: reverseCity, postcode: reversePostcode, state: reverseState, country: reverseCountry } = useReverseCity(
+    isAccommodation && poi ? { lat: poi.lat, lng: poi.lng } : null,
   )
-  const poiCity = extractedCity ?? reverseCity
-  const poiPostcode = isAccommodation
-    ? (details?.postalCode ?? osmData?.postcode ?? reversePostcode)
+  const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
+  const poiCity = isAccommodation
+    ? (reverseCity ?? details?.locality ?? osmData?.city ?? null)
     : null
+  const poiPostcode = isAccommodation
+    ? (reversePostcode ?? details?.postalCode ?? osmData?.postcode ?? null)
+    : null
+  const poiAdminArea = isAccommodation ? (reverseState ?? null) : null
+  const poiCountry = isAccommodation ? (reverseCountry ?? null) : null
 
   if (!poi) return null
 
@@ -212,6 +213,8 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
                   center={{ lat: poi.lat, lng: poi.lng }}
                   city={poiCity}
                   postcode={poiPostcode}
+                  adminArea={poiAdminArea}
+                  country={poiCountry}
                   variant="action"
                   className="w-full"
                   page={isLiveMode ? 'live' : 'map'}

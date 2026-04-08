@@ -210,6 +210,7 @@ development_status:
   16-28-stage-departure-time-weather: done  # heure de départ par étape + météo ajustée par étape
   16-29-density-accordion-calculate-cta: done  # CTA calculer densité dans accordéon (planning + live) au lieu de page détail uniquement
   16-30-google-places-missing-accommodation-types: done  # ajouter 9 types Google Places manquants (hotel, motel, inn, cottage, farmstay, rv_park...)
+  16-31-booking-url-region-country-enrichment: in-progress  # ajouter région/province + pays au ?ss= Booking pour éliminer ambiguïtés géographiques — code review 2026-04-08: findings ouverts
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────

@@ -396,8 +396,8 @@ export const apiClient = {
 
 // ── Geo ───────────────────────────────────────────────────────────────────────
 
-export async function getReverseCity(lat: number, lng: number): Promise<{ city: string | null; postcode: string | null }> {
-  return apiFetch<{ city: string | null; postcode: string | null }>(`/api/geo/reverse-city?lat=${lat}&lng=${lng}`)
+export async function getReverseCity(lat: number, lng: number): Promise<{ city: string | null; postcode: string | null; state: string | null; country: string | null }> {
+  return apiFetch<{ city: string | null; postcode: string | null; state: string | null; country: string | null }>(`/api/geo/reverse-city?lat=${lat}&lng=${lng}`)
 }
 
 export async function getReverseAddress(lat: number, lng: number): Promise<{ address: string | null }> {
