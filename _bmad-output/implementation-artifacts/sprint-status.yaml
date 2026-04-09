@@ -203,15 +203,15 @@ development_status:
   16-21-booking-url-postal-code: done  # ajouter code postal au ?ss= Booking pour désambiguïser les villes
   16-22-landing-page-dynamic-auth-cta: done  # bouton Se connecter → Mes aventures si session active
   16-23-mobile-sidebar-toggle-responsive-planning: done  # bouton flottant gauche pour ouvrir sidebar en overlay sur mobile/tablette
-  16-24-live-slider-plus-minus-buttons: review  # boutons − / + autour du slider live mode pour ajustement précis
+  16-24-live-slider-plus-minus-buttons: done  # boutons − / + autour du slider live mode pour ajustement précis
   16-25-live-filter-distance-persist-on-close: done  # persister distance/vitesse/départ à la fermeture du drawer filtres sans recherche
   16-26-live-auto-zoom-search-radius-circle: done  # auto-zoom slider + cercle géographique searchRadiusKm
   16-27-gpx-upload-dialog: done  # formulaire upload GPX dans une dialog au lieu d'inline
   16-28-stage-departure-time-weather: done  # heure de départ par étape + météo ajustée par étape
   16-29-density-accordion-calculate-cta: done  # CTA calculer densité dans accordéon (planning + live) au lieu de page détail uniquement
   16-30-google-places-missing-accommodation-types: done  # ajouter 9 types Google Places manquants (hotel, motel, inn, cottage, farmstay, rv_park...)
-  16-31-booking-url-region-country-enrichment: in-progress  # ajouter région/province + pays au ?ss= Booking pour éliminer ambiguïtés géographiques — code review 2026-04-08: findings ouverts
-  16-32-strava-attribution-badge: review  # conformité Strava Brand Guidelines complète: assets officiels + bouton OAuth + deauthorize + privacy policy
+  16-31-booking-url-region-country-enrichment: done  # ajouter région/province + pays au ?ss= Booking pour éliminer ambiguïtés géographiques — code review 2026-04-08: findings ouverts
+  16-32-strava-attribution-badge: done  # conformité Strava Brand Guidelines complète: assets officiels + bouton OAuth + deauthorize + privacy policy
   epic-16-retrospective: optional
 
   # ─────────────────────────────────────────────────────────────
@@ -247,3 +247,16 @@ development_status:
   15-5-admin-cache-invalidation-by-geographic-zone: ready-for-dev  # déplacé depuis 10-4 — DELETE /admin/cache/zone, SCAN+DEL pipeline
   15-6-plausible-reverse-proxy-bypass-adblockers: done  # proxy script+events via ridenrest.app pour bypass ad blockers — reviewed 2026-04-06
   epic-15-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic 17: Quality of Life — Multi-Upload, Elevation UX & Release Notes
+  # (ajouté 2026-04-09 — features UX demandées par Guillaume)
+  # Deploy unique en fin d'epic (pas de deploy intermédiaire)
+  # ─────────────────────────────────────────────────────────────
+  epic-17: in-progress
+  17-1-versioning-app-release-notes-popup: done            # système version + CHANGELOG.md + popin nouvelle release
+  17-2-multi-gpx-upload-drag-and-drop: backlog              # upload multi-fichiers + zone DnD dans dialog
+  17-3-search-zone-elevation-profile: backlog               # ReferenceArea bleu sur profil élévation = corridor recherche
+  17-4-elevation-loss-d-minus-everywhere: backlog            # D- partout où D+ est affiché (API + DB + frontend)
+  17-5-stage-cartouche-redesign-planning-live: backlog       # refonte 3 lignes + ajout cartouches en live mode
+  epic-17-retrospective: optional

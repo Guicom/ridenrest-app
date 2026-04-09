@@ -6,6 +6,7 @@ import { StravaConnectionCard } from './_components/strava-connection-card'
 import { SignOutButton } from './_components/sign-out-button'
 import { DeleteAccountDialog } from './_components/delete-account-dialog'
 import { OverpassToggle } from './_components/overpass-toggle'
+import { AboutSection } from './_components/about-section'
 import { Card, CardContent } from '@/components/ui/card'
 
 export const metadata = {
@@ -59,6 +60,8 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
       </section>
+
+      <AboutSection />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-destructive uppercase tracking-wide px-1">Zone dangereuse</h2>

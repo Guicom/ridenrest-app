@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of 17-1-versioning-app-release-notes-popup.md (2026-04-09)
+
+- Règle webpack `CHANGELOG.md asset/source` non portée vers Turbopack — import cassé en mode dev Turbopack (`next.config.ts:12-18`)
+- Labels français codés en dur dans les composants release notes — non actionnable sans i18n (`release-notes-dialog.tsx`, `about-section.tsx`)
+- Comportement multi-onglets : `localStorage` mis à jour dans un onglet mais autre onglet garde `showReleaseNotes=true` — hors périmètre story (`use-release-notes.ts`)
+
 ## Deferred from: code review of story 16-31-booking-url-region-country-enrichment.md (2026-04-08)
 
 - Champs `GooglePlaceDetails.adminArea`/`country` extraits côté API mais non utilisés pour l’URL Booking web : aligné avec le choix Geoapify pour des noms compatibles Booking ; réutilisation future possible.

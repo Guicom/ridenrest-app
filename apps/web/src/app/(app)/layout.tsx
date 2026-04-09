@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { AppHeader } from '@/components/layout/app-header'
 import { PwaInstallBanner } from '@/components/shared/pwa-install-banner'
 import { ReconnectionHandler } from '@/components/providers/reconnection-handler'
+import { ReleaseNotesWrapper } from '@/components/shared/release-notes-wrapper'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -14,6 +15,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <Toaster />
       <PwaInstallBanner />
       <ReconnectionHandler />
+      <ReleaseNotesWrapper />
     </QueryProvider>
   )
 }

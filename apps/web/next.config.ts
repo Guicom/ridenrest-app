@@ -1,8 +1,26 @@
 import type { NextConfig } from "next";
 import withPWA from "@ducanh2912/next-pwa";
+import { readFileSync } from "fs";
+
+let pkg: { version?: string } = {}
+try {
+  pkg = JSON.parse(readFileSync("./package.json", "utf-8"))
+} catch {
+  throw new Error("[next.config.ts] Impossible de lire apps/web/package.json — vérifiez le répertoire de travail.")
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    NEXT_PUBLIC_APP_VERSION: pkg.version,
+  },
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /CHANGELOG\.md$/,
+      type: "asset/source",
+    });
+    return config;
+  },
 };
 
 export default withPWA({

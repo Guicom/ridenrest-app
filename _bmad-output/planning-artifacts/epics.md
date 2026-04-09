@@ -3214,3 +3214,288 @@ So that when a significant OSM data update occurs in a region, the stale POI and
 **Given** the zone invalidation runs on a large bbox,
 **When** many keys match,
 **Then** deletion is batched in groups of 100 using Redis `SCAN` + `DEL` pipeline — never uses `FLUSHDB`.
+
+---
+
+## Epic 17: Quality of Life — Multi-Upload, Elevation UX & Release Notes
+
+> **Ajouté 2026-04-09** — Améliorations UX et fonctionnalités demandées par Guillaume pour améliorer l'expérience quotidienne : système de release notes, upload multi-GPX, enrichissement du profil d'élévation, affichage du D-, et refonte des cartouches étapes. **Deploy unique en fin d'epic** (pas de deploy intermédiaire par story).
+
+5 stories ordonnées : versioning/changelog d'abord (pour documenter les évolutions suivantes), puis upload, élévation, dénivelé, et cartouches.
+
+### Story 17.1: Système de versioning app & popin "Nouvelle release"
+
+As a **user returning to the app after an update**,
+I want to see a changelog popup explaining what changed in the new version,
+So that I'm aware of new features, improvements, and bug fixes without having to search for release notes.
+
+**Acceptance Criteria:**
+
+**Given** the app is built,
+**When** `next.config.ts` resolves `NEXT_PUBLIC_APP_VERSION`,
+**Then** the value is read from `apps/web/package.json` `version` field (semver format, e.g. `"1.0.0"`).
+
+**Given** a `CHANGELOG.md` file exists at the root of `apps/web/`,
+**When** a developer prepares a release,
+**Then** the file follows a human-readable format with sections per version:
+
+```markdown
+## 1.1.0 — 2026-04-15
+
+### Nouveautés
+- Upload de plusieurs fichiers GPX en une fois avec drag & drop
+
+### Améliorations
+- Affichage du D- (dénivelé négatif) partout où le D+ est affiché
+- Cartouches étapes redesignées pour une meilleure lisibilité
+
+### Corrections
+- Fix du calcul d'élévation sur segments courts
+```
+
+**Given** the `CHANGELOG.md` is maintained,
+**When** the app build runs,
+**Then** a build-time script (or Next.js import) parses the latest version entry from `CHANGELOG.md` and makes it available as a static JSON import (e.g. `lib/changelog.ts` exporting `{ version, date, sections }` for the current version only — NOT the entire history).
+
+**Given** a user opens the app,
+**When** `NEXT_PUBLIC_APP_VERSION` differs from `localStorage.getItem('lastSeenVersion')`,
+**Then** a modal Dialog (`<ReleaseNotesDialog />`) is displayed with:
+- Title: "Nouveautés — v{version}"
+- Content: the parsed changelog entry (Nouveautés, Améliorations, Corrections sections)
+- A single "OK" / "Compris" button to dismiss
+
+**Given** the user closes the release notes dialog (clicks "Compris" or presses Escape or clicks outside),
+**When** the dialog closes,
+**Then** `localStorage.setItem('lastSeenVersion', currentVersion)` is called — the dialog will NOT reopen until the next version change.
+
+**Given** it's the user's very first visit (no `lastSeenVersion` in localStorage),
+**When** the app loads,
+**Then** the dialog does NOT show — `lastSeenVersion` is initialized to the current version silently. Release notes are only for returning users after an update.
+
+**Given** a developer wants to prepare release notes,
+**When** they open `CHANGELOG.md`,
+**Then** a template section is available at the top (commented or as the latest entry) with the three categories pre-filled:
+
+```markdown
+## X.Y.Z — YYYY-MM-DD
+
+### Nouveautés
+- 
+
+### Améliorations
+- 
+
+### Corrections
+- 
+```
+
+**Given** the user wants to review past release notes,
+**When** they navigate to the Settings page,
+**Then** the current app version is displayed (e.g. "Version 1.1.0") and a link/button "Voir les notes de version" reopens the `<ReleaseNotesDialog />` for the current version.
+
+**Technical notes:**
+- `NEXT_PUBLIC_APP_VERSION` injected via `next.config.ts` reading `package.json`
+- Changelog parsing: simple regex or remark-based parser at build time — output a typed `ReleaseEntry` object
+- Dialog: shadcn/ui `Dialog` component, rendered in the app layout (e.g. `(app)/layout.tsx`)
+- First-visit detection: absence of `lastSeenVersion` key in localStorage
+
+---
+
+### Story 17.2: Upload multi-GPX & drag'n'drop de fichiers
+
+As a **cyclist preparing a multi-day adventure**,
+I want to upload multiple GPX files at once via file picker or drag & drop,
+So that I can quickly add all my daily segments without repeating the upload process for each file.
+
+**Acceptance Criteria:**
+
+**Given** the user opens the GPX upload dialog (`<GpxUploadDialog />`),
+**When** the dialog renders,
+**Then** a drop zone is displayed with a dashed border, an upload icon, and the text "Glissez vos fichiers GPX ici ou cliquez pour sélectionner" (or similar).
+
+**Given** the user clicks on the drop zone,
+**When** the file picker opens,
+**Then** the `multiple` attribute is set on the `<input type="file">` — the user can select multiple `.gpx` files at once.
+
+**Given** the user drags one or more `.gpx` files over the drop zone,
+**When** the files are dropped,
+**Then** the files are added to a pending upload list displayed below the drop zone, each showing: file name, file size, and a remove (✕) button.
+
+**Given** files are in the pending list,
+**When** the user clicks "Envoyer" (or equivalent submit button),
+**Then** the files are uploaded **sequentially** (one API call per file to `POST /adventures/:id/segments`), with:
+- A progress indicator per file (pending → uploading → success ✓ / error ✗)
+- The overall progress (e.g. "2 / 5 fichiers envoyés")
+- Each successful upload creates a segment and triggers BullMQ parsing as today
+
+**Given** a file in the batch fails validation (wrong extension, exceeds 10 MB),
+**When** the user adds it to the pending list,
+**Then** the file is immediately flagged with an error message (e.g. "Fichier trop volumineux (max 10 Mo)") and excluded from the upload batch — other valid files are not affected.
+
+**Given** an API error occurs during sequential upload (e.g. network failure on file 3 of 5),
+**When** the error is caught,
+**Then** the failed file shows an error state with a "Réessayer" button — already-uploaded files keep their success state — remaining files are paused and the user can resume or cancel.
+
+**Given** all files in the batch are uploaded successfully,
+**When** the last upload completes,
+**Then** the dialog closes automatically, the segment list is refreshed (TanStack Query invalidation on `['adventures', adventureId, 'segments']`), and a success toast is shown (e.g. "5 segments ajoutés").
+
+**Given** the user drops non-GPX files (e.g. `.pdf`, `.jpg`),
+**When** the drop event fires,
+**Then** non-GPX files are rejected with a visible warning — only `.gpx` files are added to the pending list.
+
+**Given** the existing single-file upload workflow,
+**When** this story is implemented,
+**Then** the API endpoint (`POST /adventures/:id/segments`) is NOT modified — the frontend handles multi-file by looping sequential calls.
+
+**Technical notes:**
+- Drop zone: native HTML5 drag & drop API (`onDragOver`, `onDrop`) + `useRef` for the input
+- Sequential upload: `for...of` loop with `await` per file (not `Promise.all`) to avoid overwhelming BullMQ
+- Existing `gpx-upload-form.tsx` refactored into the new multi-file component within `<GpxUploadDialog />`
+- File validation remains client-side (extension + size) as today
+
+---
+
+### Story 17.3: Zone de recherche sur le profil d'élévation (planning)
+
+As a **cyclist using the planning map**,
+I want to see my current search range `[fromKm, toKm]` highlighted on the elevation profile,
+So that I can visually correlate the POI search corridor with the terrain profile (elevation, slope).
+
+**Acceptance Criteria:**
+
+**Given** the elevation profile is displayed in planning mode,
+**When** `fromKm` and `toKm` are defined in `useMapStore` (i.e. the search range slider has been interacted with),
+**Then** a semi-transparent blue overlay (`ReferenceArea` in Recharts) is rendered on the elevation chart between `fromKm` and `toKm` on the X-axis, spanning the full Y-axis height.
+
+**Given** the search range overlay is displayed,
+**When** the color is rendered,
+**Then** it uses the same blue as the corridor highlight on the map (the trace corridor color) with ~20% opacity — visually consistent with the map corridor.
+
+**Given** the user moves the search range slider,
+**When** `fromKm` or `toKm` changes in the store,
+**Then** the `ReferenceArea` updates in real-time on the elevation profile (no debounce — follows the slider live).
+
+**Given** the `searchRangeInteracted` flag is `false` (user hasn't touched the slider yet),
+**When** the elevation profile renders,
+**Then** no search range overlay is shown — the profile displays the raw elevation data only.
+
+**Given** the search range overlay is shown,
+**When** the user hovers over the elevation profile within the highlighted zone,
+**Then** the existing tooltip (km, altitude, slope, D+) still works normally — the overlay does not interfere with tooltip interaction.
+
+**Given** stages are visible on the elevation profile,
+**When** the search range overlay is also active,
+**Then** both are visible simultaneously — stage markers (dashed lines) render on top of the search range overlay (z-order: overlay behind, stage markers in front).
+
+**Technical notes:**
+- Recharts `<ReferenceArea>` component with `x1={fromKm}`, `x2={toKm}`, `fill={corridorColor}`, `fillOpacity={0.2}`, `stroke="none"`
+- Read `fromKm`, `toKm`, `searchRangeInteracted` from `useMapStore`
+- Corridor color: reuse from existing trace corridor styling (or from a shared constant)
+- No backend changes required — purely frontend/presentational
+
+---
+
+### Story 17.4: D- (dénivelé négatif) partout où D+ est affiché
+
+As a **cyclist planning a multi-day adventure**,
+I want to see the cumulative descent (D-) alongside the ascent (D+) everywhere elevation data is displayed,
+So that I have a complete picture of the terrain difficulty for each segment and stage.
+
+**Acceptance Criteria:**
+
+**Given** the API computes elevation gain for a stage or segment,
+**When** `computeElevationGainForRange()` (or equivalent) processes waypoints,
+**Then** it also computes the cumulative descent (D-) by summing absolute values of negative elevation deltas — returned as a separate field `elevationLossM` (alongside existing `elevationGainM`).
+
+**Given** the `adventure_stages` table,
+**When** the schema is inspected,
+**Then** a new column `elevation_loss_m` (integer, nullable, default null) stores the computed D- per stage — added via `drizzle-kit generate`.
+
+**Given** an adventure card renders in the adventures list,
+**When** D+ is shown (e.g. "↑ 4 200 m"),
+**Then** D- is shown alongside (e.g. "↑ 4 200 m · ↓ 3 800 m") — same line, same styling.
+
+**Given** a segment card renders in the adventure detail page,
+**When** D+ is shown (e.g. "1 200m D+"),
+**Then** D- is shown alongside (e.g. "1 200m D+ · 980m D-").
+
+**Given** a stage cartouche renders in the planning sidebar,
+**When** D+ is shown,
+**Then** D- is shown on the same line (e.g. "D+ 850 m · D- 720 m") — or "D+ — · D- —" if elevation data is unavailable.
+
+**Given** the elevation profile tooltip is shown on hover,
+**When** cumulative D+ is displayed,
+**Then** cumulative D- is also displayed (e.g. "D+ 1 200 m | D- 980 m").
+
+**Given** the live controls panel shows D+ for the lookahead range,
+**When** D+ is displayed (e.g. "D+ 320m"),
+**Then** D- is shown alongside (e.g. "D+ 320m · D- 280m").
+
+**Given** the `adventure_segments` response includes `elevationGainM`,
+**When** the API returns segment data,
+**Then** it also includes `elevationLossM` (number | null) in the response.
+
+**Given** the adventures list endpoint returns `totalElevationGainM`,
+**When** the API aggregates across segments,
+**Then** it also returns `totalElevationLossM` (sum of all segment D-).
+
+**Technical notes:**
+- Backend: modify `computeElevationGainForRange()` in `stages.service.ts` to track both positive and negative deltas in a single pass
+- DB migration: `drizzle-kit generate` for `elevation_loss_m` on `adventure_stages`
+- Add `total_elevation_loss_m` to `adventures` table (or compute on the fly from segments — TBD based on perf)
+- Frontend: update all display components (adventure-card, segment-card, sidebar-stages-section, elevation-profile tooltip, live-controls)
+- Shared types: add `elevationLossM` to relevant DTOs and response types
+
+---
+
+### Story 17.5: Refonte des cartouches étapes (planning + live)
+
+As a **cyclist reviewing stages in planning or live mode**,
+I want stage cards with a clearer layout and better information hierarchy,
+So that I can quickly scan stage details without visual clutter.
+
+**Acceptance Criteria:**
+
+**Given** a stage cartouche renders in the planning sidebar,
+**When** the stage data is displayed,
+**Then** the layout follows a 3-line structure:
+
+- **Ligne 1** : Nom de l'étape (texte principal, tronqué si trop long avec `truncate`) — à droite : boutons modifier (✏️) et supprimer (🗑️), compacts
+- **Ligne 2** : Kilométrage (e.g. "42.5 km") + D+ et D- (e.g. "↑ 850 m · ↓ 720 m") — informations techniques sur une ligne
+- **Ligne 3** : Date/heure de départ (e.g. "Jeu 15 avril · 07:30") — si définie, sinon ligne absente ou "Départ non défini"
+
+**Given** the current stage cartouche layout,
+**When** compared to the new design,
+**Then** the following changes are made:
+- Stage name is promoted to a full-width first line (not inline with stats)
+- Action buttons (edit, delete) are moved to the right of line 1 (not at the end of a mixed-content line)
+- Distance and elevation are grouped on line 2 for quick scanning
+- Date/time moves to line 3 (lower priority info, below the essentials)
+- The colored dot (stage color) remains at the start of line 1
+
+**Given** the weather badge exists per stage,
+**When** weather data is available,
+**Then** the weather badge is shown inline on line 3 after the date (or on a 4th line if space is tight on mobile).
+
+**Given** the live mode currently has NO stage cartouches (only map markers),
+**When** stages exist for the adventure,
+**Then** a collapsible "Étapes" section is added to the live mode UI (in the bottom drawer or as a panel), showing the same 3-line cartouche layout as planning mode but:
+- Action buttons (edit, delete) are hidden in live mode (read-only)
+- The current stage (based on GPS position) is visually highlighted (e.g. bold border, accent background)
+- Stages already passed are dimmed (lower opacity)
+- ETA from current position is shown instead of absolute departure time
+
+**Given** the stage cartouches in planning mode,
+**When** rendered on mobile (< 768px),
+**Then** the layout remains readable — line 1 truncates the name, buttons stay compact, lines 2-3 wrap gracefully.
+
+**Given** the cartouche redesign is applied,
+**When** comparing planning and live mode,
+**Then** both use the same base component (`<StageCard />`) with a `mode: 'planning' | 'live'` prop controlling action visibility and highlight behavior.
+
+**Technical notes:**
+- Extract a shared `<StageCard />` component from `sidebar-stages-section.tsx`
+- Live mode: integrate `<StageCard />` list into the live bottom drawer (alongside existing filters/controls) or as a separate collapsible section
+- Current stage detection in live: compare `currentKm` (from GPS) with stage `startKm`/`endKm` boundaries
+- Depends on 17.4 (D- available) for the elevation display on line 2
