@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { snapToTrace, computeElevationGain } from '@ridenrest/gpx'
+import { snapToTrace, computeElevationGain, computeElevationLoss } from '@ridenrest/gpx'
 import type { KmWaypoint } from '@ridenrest/gpx'
 import { useLiveMode } from '@/hooks/use-live-mode'
 import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
@@ -203,16 +203,19 @@ export default function LivePage() {
     return Math.ceil(remaining)
   }, [currentKmOnRoute, allCumulativeWaypoints])
 
-  // D+ computation for LiveControls
-  const elevationGain = useMemo(() => {
+  // D+ / D- computation for LiveControls
+  const elevationSlice = useMemo(() => {
     if (currentKmOnRoute === null || allCumulativeWaypoints.length === 0) return null
     const targetDistKm = currentKmOnRoute + targetAheadKm
     const slice = allCumulativeWaypoints.filter(
       (wp) => wp.distKm >= currentKmOnRoute && wp.distKm <= targetDistKm,
     )
     if (slice.length < 2) return null
-    return computeElevationGain(slice.map((wp) => ({ lat: wp.lat, lng: wp.lng, elevM: wp.ele ?? undefined })))
+    const gpxPoints = slice.map((wp) => ({ lat: wp.lat, lng: wp.lng, elevM: wp.ele ?? undefined }))
+    return { gain: computeElevationGain(gpxPoints), loss: computeElevationLoss(gpxPoints) }
   }, [allCumulativeWaypoints, currentKmOnRoute, targetAheadKm])
+  const elevationGain = elevationSlice?.gain ?? null
+  const elevationLoss = elevationSlice?.loss ?? null
 
   // Convert MapWaypoint[] → KmWaypoint[] for snapToTrace
   const kmWaypoints: KmWaypoint[] = useMemo(
@@ -410,6 +413,7 @@ export default function LivePage() {
                 onSearch={handleSearch}
                 activeFilterCount={activeFilterCount}
                 elevationGain={elevationGain}
+                elevationLoss={elevationLoss}
                 center={liveSearchCenter}
                 city={liveCity}
                 postcode={livePostcode}

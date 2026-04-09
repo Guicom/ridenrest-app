@@ -34,6 +34,7 @@ const defaultProps = {
   onSearch: vi.fn(),
   activeFilterCount: 0,
   elevationGain: null,
+  elevationLoss: null,
   center: null,
 }
 

@@ -44,7 +44,7 @@ export class StagesRepository {
     return row as AdventureStage
   }
 
-  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'startKm' | 'orderIndex' | 'distanceKm' | 'elevationGainM' | 'etaMinutes'>>): Promise<AdventureStage> {
+  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'startKm' | 'orderIndex' | 'distanceKm' | 'elevationGainM' | 'elevationLossM' | 'etaMinutes'>>): Promise<AdventureStage> {
     const [row] = await db
       .update(adventureStages)
       .set({ ...data, updatedAt: new Date() })
@@ -88,7 +88,7 @@ export class StagesRepository {
     splitTargetId: string
     splitTargetOrderIndex: number
     newStageData: NewAdventureStage
-    remainderUpdate: Partial<Pick<AdventureStage, 'orderIndex' | 'startKm' | 'distanceKm' | 'elevationGainM' | 'etaMinutes'>>
+    remainderUpdate: Partial<Pick<AdventureStage, 'orderIndex' | 'startKm' | 'distanceKm' | 'elevationGainM' | 'elevationLossM' | 'etaMinutes'>>
   }): Promise<AdventureStage> {
     const { adventureId, splitTargetId, splitTargetOrderIndex, newStageData, remainderUpdate } = params
     return db.transaction(async (tx) => {
@@ -155,17 +155,19 @@ export class StagesRepository {
   async updateMany(
     stages: Array<Pick<AdventureStage, 'id' | 'startKm' | 'distanceKm' | 'orderIndex'> & {
       elevationGainM?: number | null
+      elevationLossM?: number | null
       etaMinutes?: number | null
     }>,
   ): Promise<void> {
     if (stages.length === 0) return
     await Promise.all(
-      stages.map(({ id, startKm, distanceKm, orderIndex, elevationGainM, etaMinutes }) =>
+      stages.map(({ id, startKm, distanceKm, orderIndex, elevationGainM, elevationLossM, etaMinutes }) =>
         db
           .update(adventureStages)
           .set({
             startKm, distanceKm, orderIndex,
             ...(elevationGainM !== undefined ? { elevationGainM } : {}),
+            ...(elevationLossM !== undefined ? { elevationLossM } : {}),
             ...(etaMinutes !== undefined ? { etaMinutes } : {}),
             updatedAt: new Date(),
           })

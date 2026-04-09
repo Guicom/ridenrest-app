@@ -200,6 +200,7 @@ describe('StravaImportModal', () => {
       cumulativeStartKm: 0,
       distanceKm: 30,
       elevationGainM: 500,
+      elevationLossM: null,
       parseStatus: 'pending',
       source: 'strava',
       boundingBox: null,

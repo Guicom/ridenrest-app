@@ -24,6 +24,7 @@ const makeStage = (
   endKm,
   distanceKm: endKm - startKm,
   elevationGainM,
+  elevationLossM: null,
   etaMinutes,
   departureTime,
   createdAt: new Date(),
@@ -193,19 +194,19 @@ describe('computeElevationGainForRange', () => {
     expect(computeElevationGainForRange(wps, 0, 10)).toBeNull()
   })
 
-  it('counts only positive deltas', () => {
-    // +150 at km5, -50 at km10 → gain = 150
-    expect(computeElevationGainForRange(defaultWaypoints, 0, 10)).toBe(150)
+  it('returns gain and loss for range with mixed deltas', () => {
+    // +150 at km5, -50 at km10 → gain = 150, loss = 50
+    expect(computeElevationGainForRange(defaultWaypoints, 0, 10)).toEqual({ gain: 150, loss: 50 })
   })
 
   it('counts two positive deltas across full range', () => {
-    // +150 at km5, -50 at km10, +150 at km15 → gain = 300
-    expect(computeElevationGainForRange(defaultWaypoints, 0, 15)).toBe(300)
+    // +150 at km5, -50 at km10, +150 at km15 → gain = 300, loss = 50
+    expect(computeElevationGainForRange(defaultWaypoints, 0, 15)).toEqual({ gain: 300, loss: 50 })
   })
 
   it('filters by distKm range boundaries (inclusive)', () => {
-    // km5→350, km10→300 in [5, 10]: delta = -50 → no positive gain → 0
-    expect(computeElevationGainForRange(defaultWaypoints, 5, 10)).toBe(0)
+    // km5→350, km10→300 in [5, 10]: delta = -50 → gain = 0, loss = 50
+    expect(computeElevationGainForRange(defaultWaypoints, 5, 10)).toEqual({ gain: 0, loss: 50 })
   })
 
   it('returns null when range contains no waypoints', () => {
@@ -301,7 +302,7 @@ describe('createStage — normal case', () => {
     await service.createStage('adv-1', 'user-1', { name: 'S1', endKm: 10, color: '#f97316' })
 
     expect(mockStagesRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ elevationGainM: 150, etaMinutes: 49 }),
+      expect.objectContaining({ elevationGainM: 150, elevationLossM: 50, etaMinutes: 49 }),
     )
   })
 
@@ -320,7 +321,7 @@ describe('createStage — normal case', () => {
     await service.createStage('adv-1', 'user-1', { name: 'S1', endKm: 5, color: '#f97316' })
 
     expect(mockStagesRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ elevationGainM: null, etaMinutes: 20 }),
+      expect.objectContaining({ elevationGainM: null, elevationLossM: null, etaMinutes: 20 }),
     )
   })
 
@@ -373,6 +374,7 @@ describe('createStage — split case', () => {
           endKm: 40,
           distanceKm: 40,
           elevationGainM: 300,
+          elevationLossM: 50,
           etaMinutes: 178,
         }),
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -381,6 +383,7 @@ describe('createStage — split case', () => {
           startKm: 40,
           distanceKm: 60,
           elevationGainM: null,
+          elevationLossM: null,
           etaMinutes: 240,
         }),
       }),
@@ -446,6 +449,7 @@ describe('updateStage', () => {
       endKm: 10,
       distanceKm: 10,
       elevationGainM: 150,
+      elevationLossM: 50,
       etaMinutes: 49,
     }))
     expect(result.endKm).toBe(10)
@@ -464,8 +468,8 @@ describe('updateStage', () => {
     await service.updateStage('adv-1', 's1', 'user-1', { endKm: 10 })
 
     expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 's2', startKm: 10, distanceKm: 90, elevationGainM: 150 }),
-      expect.objectContaining({ id: 's3', startKm: 100, distanceKm: 50, elevationGainM: null }),
+      expect.objectContaining({ id: 's2', startKm: 10, distanceKm: 90, elevationGainM: 150, elevationLossM: 0 }),
+      expect.objectContaining({ id: 's3', startKm: 100, distanceKm: 50, elevationGainM: null, elevationLossM: null }),
     ])
   })
 
@@ -509,8 +513,8 @@ describe('deleteStage', () => {
 
     expect(mockStagesRepo.delete).toHaveBeenCalledWith('s1')
     expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 's2', startKm: 0, distanceKm: 100, orderIndex: 0, elevationGainM: 300 }),
-      expect.objectContaining({ id: 's3', startKm: 100, distanceKm: 50, orderIndex: 1, elevationGainM: null }),
+      expect.objectContaining({ id: 's2', startKm: 0, distanceKm: 100, orderIndex: 0, elevationGainM: 300, elevationLossM: 50 }),
+      expect.objectContaining({ id: 's3', startKm: 100, distanceKm: 50, orderIndex: 1, elevationGainM: null, elevationLossM: null }),
     ])
   })
 

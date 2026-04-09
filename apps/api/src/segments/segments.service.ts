@@ -161,7 +161,13 @@ export class SegmentsService {
       ? segments.reduce((sum, s) => sum + (s.elevationGainM ?? 0), 0)
       : null
 
-    await this.adventuresService.updateTotals(adventureId, cumulative, totalElevationGainM)
+    // Compute total D- (null if no segment has loss data)
+    const hasLossData = segments.some((s) => s.elevationLossM !== null)
+    const totalElevationLossM = hasLossData
+      ? segments.reduce((sum, s) => sum + (s.elevationLossM ?? 0), 0)
+      : null
+
+    await this.adventuresService.updateTotals(adventureId, cumulative, totalElevationGainM, totalElevationLossM)
   }
 
   private toResponse(s: AdventureSegment): AdventureSegmentResponse {
@@ -173,6 +179,7 @@ export class SegmentsService {
       cumulativeStartKm: s.cumulativeStartKm,
       distanceKm: s.distanceKm,
       elevationGainM: s.elevationGainM ?? null,
+      elevationLossM: s.elevationLossM ?? null,
       parseStatus: s.parseStatus,
       source: s.source ?? null,
       boundingBox: (s.boundingBox as AdventureSegmentResponse['boundingBox']) ?? null,

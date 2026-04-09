@@ -257,6 +257,6 @@ development_status:
   17-1-versioning-app-release-notes-popup: done            # système version + CHANGELOG.md + popin nouvelle release
   17-2-multi-gpx-upload-drag-and-drop: review              # upload multi-fichiers + zone DnD dans dialog
   17-3-search-zone-elevation-profile: review               # ReferenceArea bleu sur profil élévation = corridor recherche
-  17-4-elevation-loss-d-minus-everywhere: ready-for-dev       # D- partout où D+ est affiché (API + DB + frontend)
-  17-5-stage-cartouche-redesign-planning-live: backlog       # refonte 3 lignes + ajout cartouches en live mode
+  17-4-elevation-loss-d-minus-everywhere: done              # D- partout où D+ est affiché (API + DB + frontend)
+  17-5-stage-cartouche-redesign-planning-live: ready-for-dev       # refonte 3 lignes + ajout cartouches en live mode
   epic-17-retrospective: optional

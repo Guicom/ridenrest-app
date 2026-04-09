@@ -42,6 +42,7 @@ vi.mock('@/hooks/use-poi-google-details', () => ({
 
 vi.mock('@ridenrest/gpx', () => ({
   computeElevationGain: () => 0,
+  computeElevationLoss: () => 0,
 }))
 
 vi.mock('@/components/ui/skeleton', () => ({

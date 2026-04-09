@@ -197,6 +197,7 @@ function makeMapResponse(overrides: Partial<AdventureMapResponse> = {}): Adventu
     adventureName: 'Test',
     totalDistanceKm: 100,
     totalElevationGainM: null,
+    totalElevationLossM: null,
     segments: [],
     ...overrides,
   }

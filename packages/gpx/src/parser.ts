@@ -48,3 +48,20 @@ export function computeElevationGain(points: GpxPoint[]): number {
   }
   return gain
 }
+
+/** Compute total elevation loss in meters from GPX points (absolute value) */
+export function computeElevationLoss(points: GpxPoint[]): number {
+  let loss = 0
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]!.elevM
+    const curr = points[i]!.elevM
+    if (
+      prev !== undefined && curr !== undefined &&
+      Number.isFinite(prev) && Number.isFinite(curr) &&
+      curr < prev
+    ) {
+      loss += prev - curr
+    }
+  }
+  return Math.round(loss)
+}

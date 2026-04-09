@@ -8,13 +8,13 @@ import type { GetStageWeatherDto } from './dto/get-stage-weather.dto.js'
 import type { AdventureStageResponse, MapWaypoint, StageWeatherPoint } from '@ridenrest/shared'
 import type { AdventureStage } from '@ridenrest/database'
 
-/** Compute D+ (elevation gain) for waypoints in the [startKm, endKm] range.
+/** Compute D+ (elevation gain) and D- (elevation loss) for waypoints in the [startKm, endKm] range.
  *  Returns null if no waypoints in range have elevation data. */
 export function computeElevationGainForRange(
   waypoints: MapWaypoint[],
   startKm: number,
   endKm: number,
-): number | null {
+): { gain: number; loss: number } | null {
   const rangeWps = waypoints
     .filter(
       (wp): wp is MapWaypoint & { ele: number } =>
@@ -28,11 +28,13 @@ export function computeElevationGainForRange(
   if (rangeWps.length < 2) return null  // Need at least 2 points with ele
 
   let gain = 0
+  let loss = 0
   for (let i = 1; i < rangeWps.length; i++) {
     const delta = rangeWps[i].ele - rangeWps[i - 1].ele
     if (delta > 0) gain += delta
+    else loss += Math.abs(delta)
   }
-  return Math.round(gain)  // Round to whole meters
+  return { gain: Math.round(gain), loss: Math.round(loss) }
 }
 
 /** Compute ETA in minutes using Naismith's rule approximation.
@@ -71,12 +73,12 @@ export class StagesService {
     const splitTarget = await this.stagesRepo.findContaining(adventureId, dto.endKm)
     if (splitTarget) {
       const newDistKm = dto.endKm - splitTarget.startKm
-      const newElevGain = computeElevationGainForRange(waypoints, splitTarget.startKm, dto.endKm)
-      const newEta = computeEtaMinutes(newDistKm, newElevGain, speedKmh)
+      const newElev = computeElevationGainForRange(waypoints, splitTarget.startKm, dto.endKm)
+      const newEta = computeEtaMinutes(newDistKm, newElev?.gain ?? null, speedKmh)
 
       const remDistKm = splitTarget.endKm - dto.endKm
-      const remElevGain = computeElevationGainForRange(waypoints, dto.endKm, splitTarget.endKm)
-      const remEta = computeEtaMinutes(remDistKm, remElevGain, speedKmh)
+      const remElev = computeElevationGainForRange(waypoints, dto.endKm, splitTarget.endKm)
+      const remEta = computeEtaMinutes(remDistKm, remElev?.gain ?? null, speedKmh)
 
       const newStage = await this.stagesRepo.createWithSplit({
         adventureId,
@@ -90,14 +92,16 @@ export class StagesService {
           startKm: splitTarget.startKm,
           endKm: dto.endKm,
           distanceKm: newDistKm,
-          elevationGainM: newElevGain,
+          elevationGainM: newElev?.gain ?? null,
+          elevationLossM: newElev?.loss ?? null,
           etaMinutes: newEta,
         },
         remainderUpdate: {
           orderIndex: splitTarget.orderIndex + 1,
           startKm: dto.endKm,
           distanceKm: remDistKm,
-          elevationGainM: remElevGain,
+          elevationGainM: remElev?.gain ?? null,
+          elevationLossM: remElev?.loss ?? null,
           etaMinutes: remEta,
         },
       })
@@ -117,8 +121,8 @@ export class StagesService {
       )
     }
 
-    const elevationGainM = computeElevationGainForRange(waypoints, startKm, dto.endKm)
-    const etaMinutes = computeEtaMinutes(distanceKm, elevationGainM, speedKmh)
+    const elev = computeElevationGainForRange(waypoints, startKm, dto.endKm)
+    const etaMinutes = computeEtaMinutes(distanceKm, elev?.gain ?? null, speedKmh)
 
     const stage = await this.stagesRepo.create({
       adventureId,
@@ -128,7 +132,8 @@ export class StagesService {
       startKm,
       endKm: dto.endKm,
       distanceKm,
-      elevationGainM,
+      elevationGainM: elev?.gain ?? null,
+      elevationLossM: elev?.loss ?? null,
       etaMinutes,
     })
 
@@ -165,13 +170,14 @@ export class StagesService {
 
       const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
       const newDistanceKm = dto.endKm - stage.startKm
-      const elevationGainM = computeElevationGainForRange(waypoints, stage.startKm, dto.endKm)
-      const etaMinutes = computeEtaMinutes(newDistanceKm, elevationGainM, speedKmh)
+      const elev = computeElevationGainForRange(waypoints, stage.startKm, dto.endKm)
+      const etaMinutes = computeEtaMinutes(newDistanceKm, elev?.gain ?? null, speedKmh)
 
       const updated = await this.stagesRepo.update(stageId, {
         endKm: dto.endKm,
         distanceKm: newDistanceKm,
-        elevationGainM,
+        elevationGainM: elev?.gain ?? null,
+        elevationLossM: elev?.loss ?? null,
         etaMinutes,
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
@@ -184,15 +190,16 @@ export class StagesService {
         const updates = subsequentStages.map((s) => {
           const newStartKm = prevEndKm
           const cascadeDistKm = s.endKm - newStartKm
-          const cascadeElevGain = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
-          const cascadeEta = computeEtaMinutes(cascadeDistKm, cascadeElevGain, speedKmh)
+          const cascadeElev = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
+          const cascadeEta = computeEtaMinutes(cascadeDistKm, cascadeElev?.gain ?? null, speedKmh)
           prevEndKm = s.endKm
           return {
             id: s.id,
             startKm: newStartKm,
             distanceKm: cascadeDistKm,
             orderIndex: s.orderIndex,
-            elevationGainM: cascadeElevGain,
+            elevationGainM: cascadeElev?.gain ?? null,
+            elevationLossM: cascadeElev?.loss ?? null,
             etaMinutes: cascadeEta,
           }
         })
@@ -226,15 +233,15 @@ export class StagesService {
     // Recalculate start_km, distanceKm, D+, ETA and normalize orderIndex for remaining stages (cascade)
     const remaining = await this.stagesRepo.findByAdventureId(adventureId)
     const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
-    const updates: Array<{ id: string; startKm: number; distanceKm: number; orderIndex: number; elevationGainM: number | null; etaMinutes: number }> = []
+    const updates: Array<{ id: string; startKm: number; distanceKm: number; orderIndex: number; elevationGainM: number | null; elevationLossM: number | null; etaMinutes: number }> = []
     let prevEndKm = 0
     for (let i = 0; i < remaining.length; i++) {
       const s = remaining[i]
       const newStartKm = prevEndKm
       const newDistKm = s.endKm - newStartKm
-      const elevGain = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
-      const eta = computeEtaMinutes(newDistKm, elevGain, speedKmh)
-      updates.push({ id: s.id, startKm: newStartKm, distanceKm: newDistKm, orderIndex: i, elevationGainM: elevGain, etaMinutes: eta })
+      const elev = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
+      const eta = computeEtaMinutes(newDistKm, elev?.gain ?? null, speedKmh)
+      updates.push({ id: s.id, startKm: newStartKm, distanceKm: newDistKm, orderIndex: i, elevationGainM: elev?.gain ?? null, elevationLossM: elev?.loss ?? null, etaMinutes: eta })
       prevEndKm = s.endKm
     }
     await this.stagesRepo.updateMany(updates)
@@ -299,6 +306,7 @@ export class StagesService {
       endKm: s.endKm,
       distanceKm: s.distanceKm,
       elevationGainM: s.elevationGainM ?? null,
+      elevationLossM: s.elevationLossM ?? null,
       etaMinutes: s.etaMinutes ?? null,
       departureTime: s.departureTime?.toISOString() ?? null,
       createdAt: s.createdAt.toISOString(),

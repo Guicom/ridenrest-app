@@ -40,10 +40,10 @@ export class AdventuresRepository {
     return row ?? null
   }
 
-  async updateTotals(id: string, totalDistanceKm: number, totalElevationGainM: number | null): Promise<void> {
+  async updateTotals(id: string, totalDistanceKm: number, totalElevationGainM: number | null, totalElevationLossM: number | null): Promise<void> {
     await db
       .update(adventures)
-      .set({ totalDistanceKm, totalElevationGainM, updatedAt: new Date() })
+      .set({ totalDistanceKm, totalElevationGainM, totalElevationLossM, updatedAt: new Date() })
       .where(eq(adventures.id, id))
   }
 
@@ -141,6 +141,7 @@ export class AdventuresRepository {
       adventureName: adventure.name,
       totalDistanceKm: adventure.totalDistanceKm,
       totalElevationGainM: adventure.totalElevationGainM ?? null,
+      totalElevationLossM: adventure.totalElevationLossM ?? null,
       segments: segments.map((s) => ({
         id: s.id,
         name: s.name,

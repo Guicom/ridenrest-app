@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Trash2, Map, Navigation, Route, TrendingUp, Info, Upload } from 'lucide-react'
+import { ArrowLeft, Trash2, Map, Navigation, Route, TrendingUp, TrendingDown, Info, Upload } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -350,6 +350,13 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
               <span className="flex items-center gap-1">
                 <TrendingUp className="h-4 w-4" />
                 {adventure.totalElevationGainM.toFixed(0)} m D+
+                {adventure.totalElevationLossM != null && adventure.totalElevationLossM > 0 && (
+                  <>
+                    <span className="mx-0.5">·</span>
+                    <TrendingDown className="h-4 w-4" />
+                    {adventure.totalElevationLossM.toFixed(0)} m D-
+                  </>
+                )}
               </span>
             )}
           </div>

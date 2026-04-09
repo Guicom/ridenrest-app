@@ -251,6 +251,8 @@ export function SidebarStagesSection({
                     <span className="text-xs text-muted-foreground">{stage.distanceKm.toFixed(1)} km</span>
                     <span className="text-xs text-muted-foreground">
                       {stage.elevationGainM !== null ? `D+ ${stage.elevationGainM} m` : 'D+ —'}
+                      {' · '}
+                      {stage.elevationLossM !== null ? `D- ${stage.elevationLossM} m` : 'D- —'}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {stage.etaMinutes !== null

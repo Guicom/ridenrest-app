@@ -20,6 +20,7 @@ import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 import { GeoModule } from './geo/geo.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
+import { BackfillElevationLossService } from './common/backfill-elevation-loss.service.js'
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
   controllers: [AppController],
   providers: [
     AppService,
+    BackfillElevationLossService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],

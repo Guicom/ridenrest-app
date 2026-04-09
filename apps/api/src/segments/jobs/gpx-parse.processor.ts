@@ -6,6 +6,7 @@ import {
   parseGpx,
   computeCumulativeDistances,
   computeElevationGain,
+  computeElevationLoss,
   computeBoundingBox,
   rdpSimplify,
 } from '@ridenrest/gpx'
@@ -68,8 +69,9 @@ export class GpxParseProcessor extends WorkerHost {
         ...(wp.elevM !== undefined ? { ele: wp.elevM } : {}),
       }))
 
-      // 6. Compute elevation gain and bounding box
+      // 6. Compute elevation gain, elevation loss, and bounding box
       const elevationGainM = computeElevationGain(rawPoints)
+      const elevationLossM = computeElevationLoss(rawPoints)
       const boundingBox = computeBoundingBox(rawPoints)
 
       // 7. Build WKT LINESTRING — apply RDP simplification if needed to keep geometry lean
@@ -83,6 +85,7 @@ export class GpxParseProcessor extends WorkerHost {
         waypoints,
         distanceKm,
         elevationGainM: elevationGainM > 0 ? elevationGainM : null,
+        elevationLossM: elevationLossM > 0 ? elevationLossM : null,
         boundingBox,
         parseStatus: 'done',
       })

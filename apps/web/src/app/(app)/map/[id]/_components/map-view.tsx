@@ -301,6 +301,12 @@ export function MapView({ adventureId }: MapViewProps) {
     const toPt = [...elevationPoints].reverse().find((p) => p.distKm <= overlayKm) ?? elevationPoints[0]
     return Math.max(0, toPt.cumulativeDPlus - fromPt.cumulativeDPlus)
   }, [overlayKm, overlayFromKm, elevationPoints])
+  const previewDMinus = useMemo(() => {
+    if (overlayKm === null || elevationPoints.length === 0) return null
+    const fromPt = elevationPoints.find((p) => p.distKm >= overlayFromKm) ?? elevationPoints[0]
+    const toPt = [...elevationPoints].reverse().find((p) => p.distKm <= overlayKm) ?? elevationPoints[0]
+    return Math.max(0, toPt.cumulativeDMinus - fromPt.cumulativeDMinus)
+  }, [overlayKm, overlayFromKm, elevationPoints])
 
   // Retry handler — invalidates all POI queries for the current adventure segments
   const handlePoiRetry = () => {
@@ -601,6 +607,12 @@ export function MapView({ adventureId }: MapViewProps) {
               <span className="font-mono font-semibold">+{previewDeltaKm.toFixed(1)} km</span>
               {previewDPlus !== null && (
                 <span className="ml-6 text-muted-foreground">D+ <span className="font-mono font-semibold">{previewDPlus.toFixed(0)} m</span></span>
+              )}
+              {previewDPlus !== null && previewDMinus !== null && (
+                <span className="ml-3 text-muted-foreground">·</span>
+              )}
+              {previewDMinus !== null && (
+                <span className="ml-3 text-muted-foreground">D- <span className="font-mono font-semibold">{previewDMinus.toFixed(0)} m</span></span>
               )}
             </div>
           )}

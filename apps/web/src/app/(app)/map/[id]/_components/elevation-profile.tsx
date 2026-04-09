@@ -36,7 +36,7 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
   useEffect(() => { onHoverKm?.(km) }, [km])
 
   if (!data) return null
-  const { distKm, ele, cumulativeDPlus, slope } = data
+  const { distKm, ele, cumulativeDPlus, cumulativeDMinus, slope } = data
   const slopeColor = slope > 8 ? 'text-red-500' : slope > 4 ? 'text-orange-400' : slope < -4 ? 'text-blue-400' : undefined
   return (
     <div className="rounded border border-[--border] bg-background px-2 py-1 text-xs shadow-sm">
@@ -44,6 +44,7 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
       <p><span className="text-muted-foreground">alt </span><span className="font-mono font-medium">{ele.toFixed(0)} m</span></p>
       <p><span className="text-muted-foreground">pente </span><span className={`font-mono font-medium ${slopeColor ?? ''}`}>{slope > 0 ? '+' : ''}{slope.toFixed(1)} %</span></p>
       <p><span className="text-muted-foreground">D+ </span><span className="font-mono font-medium">{cumulativeDPlus.toFixed(0)} m</span></p>
+      <p><span className="text-muted-foreground">D- </span><span className="font-mono font-medium">{cumulativeDMinus.toFixed(0)} m</span></p>
     </div>
   )
 }

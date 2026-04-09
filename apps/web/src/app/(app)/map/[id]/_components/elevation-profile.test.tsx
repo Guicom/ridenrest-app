@@ -27,7 +27,7 @@ vi.mock('recharts', () => ({
     if (!content) return null
     return React.cloneElement(content, {
       active: true,
-      payload: [{ payload: { distKm: 42, ele: 500, cumulativeDPlus: 100, slope: 5.2 } }],
+      payload: [{ payload: { distKm: 42, ele: 500, cumulativeDPlus: 100, cumulativeDMinus: 30, slope: 5.2 } }],
     })
   },
   ReferenceLine: ({ x, stroke, label }: { x: number; stroke?: string; label?: { value?: string; position?: string } }) => (
@@ -107,7 +107,7 @@ describe('ElevationProfile', () => {
 
   it('renders stage ReferenceLine with stage color when stagesVisible=true', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={true} />)
     const stageLine = screen.getByTestId('ref-line-10')
@@ -118,7 +118,7 @@ describe('ElevationProfile', () => {
 
   it('does not render stage ReferenceLine when stagesVisible=false', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     render(<ElevationProfile waypoints={validWaypoints} segments={[]} stages={stages} stagesVisible={false} />)
     expect(screen.queryByTestId('ref-line-10')).not.toBeInTheDocument()
@@ -126,7 +126,7 @@ describe('ElevationProfile', () => {
 
   it('stage label uses insideTopLeft position — distinct from segment boundary insideTopRight', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 7, distanceKm: 7, elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     const segments: MapSegmentData[] = [
       makeSegment('s1', 'Seg 1', 0, 10),
@@ -253,7 +253,7 @@ describe('ElevationProfile — search range overlay', () => {
 
   it('renders stage ReferenceLines alongside search range ReferenceArea', () => {
     const stages = [
-      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
     ]
     render(
       <ElevationProfile

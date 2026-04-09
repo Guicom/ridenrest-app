@@ -38,6 +38,7 @@ function makeDoneSegment(overrides: Partial<AdventureSegmentResponse> = {}): Adv
     cumulativeStartKm: 0,
     distanceKm: 45.2,
     elevationGainM: null,
+    elevationLossM: null,
     parseStatus: 'done',
     source: null,
     boundingBox: null,

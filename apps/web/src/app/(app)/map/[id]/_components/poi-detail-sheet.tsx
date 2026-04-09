@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useUIStore } from '@/stores/ui.store'
 import { useMapStore } from '@/stores/map.store'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
-import { computeElevationGain } from '@ridenrest/gpx'
+import { computeElevationGain, computeElevationLoss } from '@ridenrest/gpx'
 import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH } from '@ridenrest/shared'
 import { extractCityFromOsmRawData } from '@/lib/booking-url'
 import { useReverseCity } from '@/hooks/use-reverse-city'
@@ -94,6 +94,9 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
   const elevationGainM = rangeWaypoints.length > 1
     ? Math.round(computeElevationGain(rangeWaypoints))
     : null
+  const elevationLossM = rangeWaypoints.length > 1
+    ? Math.round(computeElevationLoss(rangeWaypoints))
+    : null
 
   const distanceKm = Math.max(0, poiKm - startKm)
 
@@ -158,6 +161,9 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
               )}
               {elevationGainM !== null && elevationGainM > 0 && (
                 <StatItem label="D+" value={`↑ ${elevationGainM} m`} />
+              )}
+              {elevationLossM !== null && elevationLossM > 0 && (
+                <StatItem label="D-" value={`↓ ${elevationLossM} m`} />
               )}
               <StatItem
                 label="Temps estimé"

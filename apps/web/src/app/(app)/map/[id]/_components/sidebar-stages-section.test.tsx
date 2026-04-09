@@ -72,6 +72,7 @@ const makeStage = (overrides: Partial<AdventureStageResponse> = {}): AdventureSt
   endKm: 80,
   distanceKm: 80,
   elevationGainM: null,
+  elevationLossM: null,
   etaMinutes: null,
   departureTime: null,
   createdAt: '',
@@ -137,8 +138,8 @@ describe('SidebarStagesSection', () => {
     expect(screen.getByText('80.0 km')).toBeDefined()
     expect(screen.getByText('Jour 2')).toBeDefined()
     expect(screen.getByText('70.0 km')).toBeDefined()
-    // D+ and ETA placeholders
-    const dashPlusList = screen.getAllByText('D+ —')
+    // D+, D- and ETA placeholders
+    const dashPlusList = screen.getAllByText('D+ — · D- —')
     expect(dashPlusList.length).toBe(2)
     const etaList = screen.getAllByText('— min')
     expect(etaList.length).toBe(2)

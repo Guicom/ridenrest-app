@@ -1,9 +1,9 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { X, Globe, Phone, Navigation, Milestone, TrendingUp, Clock, ChevronDown, Copy, Check } from 'lucide-react'
+import { X, Globe, Phone, Navigation, Milestone, TrendingUp, TrendingDown, Clock, ChevronDown, Copy, Check } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
-import { computeElevationGain } from '@ridenrest/gpx'
+import { computeElevationGain, computeElevationLoss } from '@ridenrest/gpx'
 import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH, POI_CATEGORY_COLORS } from '@ridenrest/shared'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { extractCityFromOsmRawData } from '@/lib/booking-url'
@@ -220,6 +220,9 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   const elevationGainM = rangeWaypoints.length > 1
     ? Math.round(computeElevationGain(rangeWaypoints))
     : null
+  const elevationLossM = rangeWaypoints.length > 1
+    ? Math.round(computeElevationLoss(rangeWaypoints))
+    : null
 
   const distanceKm = Math.max(0, poiKm - fromKm)
 
@@ -349,7 +352,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
           <div className="mx-4 h-px bg-[--border]" />
 
           {/* Stats row avec icônes */}
-          <div className={`px-4 py-3 grid gap-2 text-center ${elevationGainM ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className={`px-4 py-3 grid gap-2 text-center ${elevationGainM !== null && elevationGainM > 0 ? (elevationLossM !== null && elevationLossM > 0 ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
             <div className="flex flex-col items-center gap-0.5">
               <Milestone className="h-4 w-4 text-primary" />
               <span className="text-xs font-medium text-[--text-primary]">{distanceKm.toFixed(1)} km</span>
@@ -358,6 +361,12 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
               <div className="flex flex-col items-center gap-0.5">
                 <TrendingUp className="h-4 w-4 text-primary" />
                 <span className="text-xs font-medium text-[--text-primary]">{elevationGainM} m D+</span>
+              </div>
+            )}
+            {elevationLossM !== null && elevationLossM > 0 && (
+              <div className="flex flex-col items-center gap-0.5">
+                <TrendingDown className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-[--text-primary]">{elevationLossM} m D-</span>
               </div>
             )}
             {distanceKm > 0 && speed > 0 && (

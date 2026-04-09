@@ -55,6 +55,7 @@ const makeSegment = (overrides: Partial<AdventureSegmentResponse> = {}): Adventu
   parseStatus: 'done',
   distanceKm: 42.5,
   elevationGainM: 1200,
+  elevationLossM: null,
   orderIndex: 0,
   cumulativeStartKm: 0,
   source: null,

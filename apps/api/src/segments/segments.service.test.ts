@@ -47,6 +47,7 @@ const makeSegment = (id: string, distanceKm: number, orderIndex: number) => ({
   cumulativeStartKm: 0,
   distanceKm,
   elevationGainM: null,
+  elevationLossM: null,
   storageUrl: `/data/gpx/${id}.gpx`,
   parseStatus: 'done' as const,
   geom: null,
@@ -138,7 +139,7 @@ describe('deleteSegment', () => {
 
     expect(mockSegmentsRepo.delete).toHaveBeenCalledWith('seg-1')
     expect(fsPromises.unlink).toHaveBeenCalledWith(seg.storageUrl)
-    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null)
+    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null, null)
     expect(result).toEqual({ deleted: true })
   })
 
@@ -201,7 +202,7 @@ describe('recomputeCumulativeDistances', () => {
       { id: 's2', cumulativeStartKm: 100 },
       { id: 's3', cumulativeStartKm: 250 },
     ])
-    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 300, null)
+    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 300, null, null)
   })
 
   it('sets total distance to 0 for pending segments (distanceKm = 0)', async () => {
@@ -213,6 +214,6 @@ describe('recomputeCumulativeDistances', () => {
 
     await service.recomputeCumulativeDistances('adv-1')
 
-    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null)
+    expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null, null)
   })
 })

@@ -18,6 +18,7 @@ interface LiveControlsProps {
   onSearch: () => void
   activeFilterCount: number
   elevationGain: number | null
+  elevationLoss: number | null
   /** Center point for the search area. null = Booking/Airbnb buttons disabled. */
   center: { lat: number; lng: number } | null
   /** City name for Booking.com search. If provided, uses ?ss=city instead of coordinates. */
@@ -35,7 +36,7 @@ interface LiveControlsProps {
 const SLIDER_STEP = 5
 const DEFAULT_MAX = 100
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, center, city, postcode, adminArea, country, maxAheadKm }: LiveControlsProps) {
+export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, elevationLoss, center, city, postcode, adminArea, country, maxAheadKm }: LiveControlsProps) {
   const { isOnline, disabledReason } = useOfflineGate()
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
@@ -67,6 +68,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
             <div className="flex items-center gap-1">
               <span className="font-mono text-sm font-bold" data-testid="elevation-gain-display">
                 {elevationGain != null ? `D+ ${Math.round(elevationGain)}m` : '—'}
+                {elevationLoss != null ? ` · D- ${Math.round(elevationLoss)}m` : ''}
               </span>
               <MountainSnow className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
             </div>

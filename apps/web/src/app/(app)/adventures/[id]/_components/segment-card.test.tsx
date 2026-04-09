@@ -12,6 +12,7 @@ function makeSegment(overrides: Partial<AdventureSegmentResponse> = {}): Adventu
     cumulativeStartKm: 0,
     distanceKm: 45.2,
     elevationGainM: 1200,
+    elevationLossM: null,
     parseStatus: 'done',
     source: null,
     boundingBox: null,

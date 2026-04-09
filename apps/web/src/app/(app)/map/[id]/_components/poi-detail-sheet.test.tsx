@@ -60,6 +60,16 @@ vi.mock('@ridenrest/gpx', () => ({
     }
     return gain
   },
+  computeElevationLoss: (points: Array<{ elevM?: number }>) => {
+    if (points.length < 2) return 0
+    let loss = 0
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1].elevM ?? 0
+      const curr = points[i].elevM ?? 0
+      if (curr < prev) loss += prev - curr
+    }
+    return loss
+  },
 }))
 
 // Vaul Drawer mock

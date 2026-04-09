@@ -120,6 +120,7 @@ const makeSeg = (overrides: Partial<AdventureSegmentResponse> = {}): AdventureSe
   parseStatus: 'pending',
   distanceKm: 0,
   elevationGainM: null,
+  elevationLossM: null,
   orderIndex: 0,
   cumulativeStartKm: 0,
   source: null,

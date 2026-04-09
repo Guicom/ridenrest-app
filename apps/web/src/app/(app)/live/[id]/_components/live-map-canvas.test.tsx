@@ -152,7 +152,7 @@ describe('LiveMapCanvas', () => {
       {
         id: 'stage-1', adventureId: 'adv-1', name: 'Étape 1', color: '#FF0000',
         orderIndex: 0, startKm: 0, endKm: 25, distanceKm: 25,
-        elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
+        elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
       },
     ]
 
@@ -185,7 +185,7 @@ describe('LiveMapCanvas', () => {
       {
         id: 'stage-1', adventureId: 'adv-1', name: 'Étape 1', color: '#FF0000',
         orderIndex: 0, startKm: 0, endKm: 25, distanceKm: 25,
-        elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
+        elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
       },
     ]
 
@@ -217,7 +217,7 @@ describe('LiveMapCanvas', () => {
       {
         id: 'stage-1', adventureId: 'adv-1', name: 'Étape 1', color: '#FF0000',
         orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10,
-        elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
+        elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
       },
     ]
 

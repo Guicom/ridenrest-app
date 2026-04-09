@@ -18,6 +18,7 @@ export const adventureSegments = pgTable('adventure_segments', {
   cumulativeStartKm: real('cumulative_start_km').notNull().default(0),
   distanceKm: real('distance_km').notNull().default(0),
   elevationGainM: real('elevation_gain_m'),
+  elevationLossM: real('elevation_loss_m'),
   storageUrl: text('storage_url'),
   source: text('source'),  // null = manual upload, 'strava' = Strava route import
   parseStatus: parseStatusEnum('parse_status').notNull().default('pending'),

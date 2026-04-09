@@ -40,8 +40,8 @@ export class AdventuresService {
     return this.adventuresRepo.getAdventureWaypoints(adventureId)
   }
 
-  async updateTotals(id: string, totalDistanceKm: number, totalElevationGainM: number | null): Promise<void> {
-    await this.adventuresRepo.updateTotals(id, totalDistanceKm, totalElevationGainM)
+  async updateTotals(id: string, totalDistanceKm: number, totalElevationGainM: number | null, totalElevationLossM: number | null): Promise<void> {
+    await this.adventuresRepo.updateTotals(id, totalDistanceKm, totalElevationGainM, totalElevationLossM)
   }
 
   async updateAdventure(id: string, userId: string, dto: UpdateAdventureDto): Promise<AdventureResponse> {
@@ -92,6 +92,7 @@ export class AdventuresService {
       name: a.name,
       totalDistanceKm: a.totalDistanceKm,
       totalElevationGainM: a.totalElevationGainM ?? null,
+      totalElevationLossM: a.totalElevationLossM ?? null,
       startDate: a.startDate ?? null,
       endDate: a.endDate ?? null,
       status: a.status,

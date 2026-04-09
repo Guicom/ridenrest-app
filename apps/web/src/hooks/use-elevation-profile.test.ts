@@ -21,11 +21,11 @@ function makeSegment(id: string, name: string, cumulativeStartKm: number, distan
 }
 
 describe('useElevationProfile', () => {
-  it('accumulates D+ only on positive gains (ignores descents)', () => {
+  it('accumulates D+ and D- correctly', () => {
     const waypoints: MapWaypoint[] = [
       makeWaypoint(0, 100),
       makeWaypoint(1, 200), // +100
-      makeWaypoint(2, 150), // -50 → ignored
+      makeWaypoint(2, 150), // -50
       makeWaypoint(3, 250), // +100
     ]
     const { result } = renderHook(() => useElevationProfile(waypoints, []))
@@ -36,6 +36,12 @@ describe('useElevationProfile', () => {
     expect(result.current.points[2].cumulativeDPlus).toBe(100) // descent not counted
     expect(result.current.points[3].cumulativeDPlus).toBe(200)
     expect(result.current.totalDPlus).toBe(200)
+    // D- accumulates descents
+    expect(result.current.points[0].cumulativeDMinus).toBe(0)
+    expect(result.current.points[1].cumulativeDMinus).toBe(0)
+    expect(result.current.points[2].cumulativeDMinus).toBe(50)
+    expect(result.current.points[3].cumulativeDMinus).toBe(50)
+    expect(result.current.totalDMinus).toBe(50)
   })
 
   it('computes slope correctly (% gradient)', () => {
@@ -76,6 +82,7 @@ describe('useElevationProfile', () => {
     expect(result.current.hasElevationData).toBe(false)
     expect(result.current.points).toHaveLength(0)
     expect(result.current.totalDPlus).toBe(0)
+    expect(result.current.totalDMinus).toBe(0)
   })
 
   it('returns empty result for empty waypoints', () => {
@@ -84,6 +91,7 @@ describe('useElevationProfile', () => {
     expect(result.current.points).toHaveLength(0)
     expect(result.current.boundaries).toHaveLength(0)
     expect(result.current.totalDPlus).toBe(0)
+    expect(result.current.totalDMinus).toBe(0)
   })
 
   it('filters out waypoints with undefined ele', () => {

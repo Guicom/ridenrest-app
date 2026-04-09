@@ -57,6 +57,7 @@ export class SegmentsRepository {
       waypoints: object
       distanceKm: number
       elevationGainM: number | null
+      elevationLossM: number | null
       boundingBox: object
       parseStatus: 'done' | 'error'
     },
@@ -68,6 +69,7 @@ export class SegmentsRepository {
         waypoints: data.waypoints as Record<string, unknown>[],
         distanceKm: data.distanceKm,
         elevationGainM: data.elevationGainM,
+        elevationLossM: data.elevationLossM,
         boundingBox: data.boundingBox as Record<string, unknown>,
         parseStatus: data.parseStatus,
         updatedAt: new Date(),

@@ -10,6 +10,7 @@ export const adventures = pgTable('adventures', {
   name: text('name').notNull(),
   totalDistanceKm: real('total_distance_km').notNull().default(0),
   totalElevationGainM: real('total_elevation_gain_m'),
+  totalElevationLossM: real('total_elevation_loss_m'),
   status: adventureStatusEnum('status').notNull().default('planning'),
   densityStatus: densityStatusEnum('density_status').notNull().default('idle'),
   densityProgress: integer('density_progress').notNull().default(0),

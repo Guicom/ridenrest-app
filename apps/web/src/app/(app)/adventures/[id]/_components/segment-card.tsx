@@ -31,7 +31,7 @@ export interface SegmentCardProps {
 }
 
 export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, isDeleting, dragHandle }: SegmentCardProps) {
-  const { parseStatus, name, distanceKm, elevationGainM } = segment
+  const { parseStatus, name, distanceKm, elevationGainM, elevationLossM } = segment
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showRetryConfirm, setShowRetryConfirm] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
@@ -44,7 +44,9 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
   const isDone = parseStatus === 'done'
 
   const distanceLabel = distanceKm != null ? `${distanceKm.toFixed(1)} km` : '— km'
-  const elevationLabel = elevationGainM != null ? `${Math.round(elevationGainM)}m D+` : 'N/A'
+  const elevationLabel = elevationGainM != null
+    ? `${Math.round(elevationGainM)}m D+${elevationLossM != null ? ` · ${Math.round(elevationLossM)}m D-` : ''}`
+    : 'N/A'
 
   return (
     <div className="rounded-lg border p-4 flex items-center gap-3">

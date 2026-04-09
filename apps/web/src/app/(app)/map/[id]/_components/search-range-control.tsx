@@ -5,7 +5,7 @@ import { useMapStore } from '@/stores/map.store'
 import { getCorridorCenter } from '@/lib/booking-url'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { useReverseCity } from '@/hooks/use-reverse-city'
-import { computeElevationGain } from '@ridenrest/gpx'
+import { computeElevationGain, computeElevationLoss } from '@ridenrest/gpx'
 import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
 import { useOfflineGate } from '@/hooks/use-offline-ready'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -38,6 +38,20 @@ function computeElevationInRange(waypoints: MapWaypoint[], fromKm: number, toKm:
   if (inRange.length < 2) return null
   if (inRange.every((w) => w.ele == null)) return null
   return computeElevationGain(inRange.map((w) => ({ lat: w.lat, lng: w.lng, elevM: w.ele ?? undefined })))
+}
+
+function computeLossToStart(waypoints: MapWaypoint[], fromKm: number): number | null {
+  const toStart = waypoints.filter((w) => w.distKm <= fromKm)
+  if (toStart.length < 2) return null
+  if (toStart.every((w) => w.ele == null)) return null
+  return computeElevationLoss(toStart.map((w) => ({ lat: w.lat, lng: w.lng, elevM: w.ele ?? undefined })))
+}
+
+function computeLossInRange(waypoints: MapWaypoint[], fromKm: number, toKm: number): number | null {
+  const inRange = waypoints.filter((w) => w.distKm >= fromKm && w.distKm <= toKm)
+  if (inRange.length < 2) return null
+  if (inRange.every((w) => w.ele == null)) return null
+  return computeElevationLoss(inRange.map((w) => ({ lat: w.lat, lng: w.lng, elevM: w.ele ?? undefined })))
 }
 
 export function SearchRangeControl({
@@ -79,6 +93,13 @@ export function SearchRangeControl({
     if (!waypoints || waypoints.length < 2) return null
     if (stageEndKm != null) return computeElevationInRange(waypoints, stageEndKm, fromKm)
     return computeElevationToStart(waypoints, fromKm)
+  }, [waypoints, fromKm, stageEndKm])
+
+  // D- : même logique que D+
+  const elevationLoss = useMemo(() => {
+    if (!waypoints || waypoints.length < 2) return null
+    if (stageEndKm != null) return computeLossInRange(waypoints, stageEndKm, fromKm)
+    return computeLossToStart(waypoints, fromKm)
   }, [waypoints, fromKm, stageEndKm])
 
   const applyRange = (newRange: number) => {
@@ -195,9 +216,10 @@ export function SearchRangeControl({
             {elevationGain != null ? (
               <span data-testid="elevation-gain" className="font-mono">
                 {Math.round(elevationGain).toLocaleString('fr')}m D+
+                {elevationLoss != null && ` · ${Math.round(elevationLoss).toLocaleString('fr')}m D-`}
               </span>
             ) : (
-              <span className="text-[--text-muted]">↑ — m D+</span>
+              <span className="text-[--text-muted]">↑ — m D+ · ↓ — m D-</span>
             )}
           </div>
 

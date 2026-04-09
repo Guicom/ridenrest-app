@@ -35,6 +35,14 @@ vi.mock('@ridenrest/gpx', () => ({
     }
     return gain
   },
+  computeElevationLoss: (points: Array<{ elevM?: number }>) => {
+    let loss = 0
+    for (let i = 1; i < points.length; i++) {
+      const diff = (points[i]!.elevM ?? 0) - (points[i - 1]!.elevM ?? 0)
+      if (diff < 0) loss += Math.abs(diff)
+    }
+    return loss
+  },
 }))
 
 vi.mock('./poi-layer-grid', () => ({
@@ -68,7 +76,7 @@ const makeWaypoints = (): MapWaypoint[] => [
 const makeStage = (overrides = {}) => ({
   id: 's1', name: 'Jour 1', endKm: 80, startKm: 0, distanceKm: 80,
   color: '#f97316', orderIndex: 0, adventureId: 'a1',
-  elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
+  elevationGainM: null, elevationLossM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '',
   ...overrides,
 })
 
@@ -108,7 +116,7 @@ describe('SearchRangeControl', () => {
 
   it('shows placeholder D+ when waypoints is null', () => {
     render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
-    expect(screen.getByText('↑ — m D+')).toBeDefined()
+    expect(screen.getByText('↑ — m D+ · ↓ — m D-')).toBeDefined()
   })
 
   it('shows computed D+ when waypoints have elevation data (normal mode)', () => {
@@ -123,7 +131,7 @@ describe('SearchRangeControl', () => {
       { lat: 0, lng: 0, ele: null, distKm: 5 },
     ]
     render(<SearchRangeControl totalDistanceKm={100} waypoints={noEle} isPoisPending={false} />)
-    expect(screen.getByText('↑ — m D+')).toBeDefined()
+    expect(screen.getByText('↑ — m D+ · ↓ — m D-')).toBeDefined()
   })
 
   it('defaults rangeKm to 15 (from store initial values toKm - fromKm = 15 - 0)', () => {

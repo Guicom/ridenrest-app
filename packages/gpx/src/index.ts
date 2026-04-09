@@ -9,7 +9,7 @@ export { rdpSimplify } from './rdp'
 export { extractSegment, computeBoundingBox } from './corridor'
 export type { BoundingBox } from './corridor'
 
-export { parseGpx, computeElevationGain } from './parser'
+export { parseGpx, computeElevationGain, computeElevationLoss } from './parser'
 
 export { snapToTrace } from './snap-to-trace'
 export type { SnapResult } from './snap-to-trace'

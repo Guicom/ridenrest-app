@@ -29,6 +29,7 @@ export interface AdventureMapResponse {
   adventureName: string
   totalDistanceKm: number
   totalElevationGainM: number | null
+  totalElevationLossM: number | null
   segments: MapSegmentData[]
 }
 
@@ -39,6 +40,7 @@ export interface AdventureResponse {
   name: string
   totalDistanceKm: number
   totalElevationGainM?: number | null
+  totalElevationLossM?: number | null
   startDate?: string | null
   endDate?: string | null
   status: AdventureStatus
@@ -75,6 +77,7 @@ export interface AdventureStageResponse {
   endKm: number
   distanceKm: number
   elevationGainM: number | null   // null if GPX has no elevation data
+  elevationLossM: number | null   // null if GPX has no elevation data
   etaMinutes: number | null       // null in legacy rows, always set on new rows
   departureTime: string | null    // ISO 8601 per-stage departure time (overrides global)
   createdAt: string
@@ -89,6 +92,7 @@ export interface AdventureSegmentResponse {
   cumulativeStartKm: number
   distanceKm: number
   elevationGainM: number | null
+  elevationLossM: number | null
   parseStatus: ParseStatus
   source: string | null  // null = manual upload, 'strava' = Strava import
   boundingBox: { minLat: number; maxLat: number; minLng: number; maxLng: number } | null

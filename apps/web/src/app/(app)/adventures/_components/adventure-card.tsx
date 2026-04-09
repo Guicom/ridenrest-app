@@ -38,6 +38,8 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
           {adventure.totalElevationGainM != null && adventure.totalElevationGainM > 0 && (
             <span className="text-text-secondary text-sm">
               ↑ {Math.round(adventure.totalElevationGainM).toLocaleString('fr-FR')} m
+              {adventure.totalElevationLossM != null && adventure.totalElevationLossM > 0 &&
+                ` · ↓ ${Math.round(adventure.totalElevationLossM).toLocaleString('fr-FR')} m`}
             </span>
           )}
           {adventure.hasStravaSegment && (
