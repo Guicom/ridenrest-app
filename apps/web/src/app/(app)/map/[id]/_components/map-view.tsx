@@ -634,6 +634,9 @@ export function MapView({ adventureId }: MapViewProps) {
             stagesVisible={stagesVisible}
             isClickModeActive={stageClickMode}
             onClickKm={(km) => { setPendingEndKm(km); setShowNamingDialog(true); setStageClickMode(false) }}
+            searchFromKm={mapFromKm}
+            searchToKm={mapToKm}
+            searchRangeActive={searchRangeInteracted}
           />
         </div>
       </div>

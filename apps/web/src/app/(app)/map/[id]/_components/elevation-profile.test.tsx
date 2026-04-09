@@ -33,6 +33,9 @@ vi.mock('recharts', () => ({
   ReferenceLine: ({ x, stroke, label }: { x: number; stroke?: string; label?: { value?: string; position?: string } }) => (
     <div data-testid={`ref-line-${x}`} data-stroke={stroke} data-position={label?.position}>{label?.value}</div>
   ),
+  ReferenceArea: ({ x1, x2, fill, fillOpacity }: { x1: number; x2: number; fill: string; fillOpacity: number }) => (
+    <div data-testid="reference-area" data-x1={x1} data-x2={x2} data-fill={fill} data-fill-opacity={fillOpacity} />
+  ),
 }))
 
 function makeWaypoint(distKm: number, ele: number | null): MapWaypoint {
@@ -198,5 +201,73 @@ describe('ElevationProfile — click mode', () => {
       />,
     )
     expect(screen.getByTestId('elevation-profile')).not.toHaveStyle({ cursor: 'crosshair' })
+  })
+})
+
+describe('ElevationProfile — search range overlay', () => {
+  const validWaypoints: MapWaypoint[] = [
+    { lat: 0, lng: 0, distKm: 0, ele: 100 },
+    { lat: 0, lng: 0, distKm: 25, ele: 200 },
+  ]
+
+  it('does NOT render ReferenceArea when searchRangeActive is false', () => {
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        searchRangeActive={false}
+        searchFromKm={5}
+        searchToKm={15}
+      />,
+    )
+    expect(screen.queryByTestId('reference-area')).not.toBeInTheDocument()
+  })
+
+  it('does NOT render ReferenceArea when searchRangeActive is not provided', () => {
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+      />,
+    )
+    expect(screen.queryByTestId('reference-area')).not.toBeInTheDocument()
+  })
+
+  it('renders ReferenceArea with correct props when searchRangeActive is true', () => {
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        searchRangeActive={true}
+        searchFromKm={5}
+        searchToKm={15}
+      />,
+    )
+    const area = screen.getByTestId('reference-area')
+    expect(area).toBeInTheDocument()
+    expect(area.getAttribute('data-x1')).toBe('5')
+    expect(area.getAttribute('data-x2')).toBe('15')
+    expect(area.getAttribute('data-fill')).toBe('#3498db')
+    expect(area.getAttribute('data-fill-opacity')).toBe('0.2')
+  })
+
+  it('renders stage ReferenceLines alongside search range ReferenceArea', () => {
+    const stages = [
+      { id: 'st1', adventureId: 'adv-1', name: 'Étape 1', color: '#f97316', orderIndex: 0, startKm: 0, endKm: 10, distanceKm: 10, elevationGainM: null, etaMinutes: null, departureTime: null, createdAt: '', updatedAt: '' },
+    ]
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        stages={stages}
+        stagesVisible={true}
+        searchRangeActive={true}
+        searchFromKm={5}
+        searchToKm={20}
+      />,
+    )
+    expect(screen.getByTestId('reference-area')).toBeInTheDocument()
+    expect(screen.getByTestId('ref-line-10')).toBeInTheDocument()
+    expect(screen.getByText('Étape 1')).toBeInTheDocument()
   })
 })

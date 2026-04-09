@@ -1,6 +1,6 @@
 'use client'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ReferenceArea } from 'recharts'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import type { ElevationPoint } from '@/hooks/use-elevation-profile'
 import type { MapWaypoint, MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
@@ -14,6 +14,9 @@ interface ElevationProfileProps {
   stagesVisible?: boolean
   isClickModeActive?: boolean
   onClickKm?: (km: number) => void
+  searchFromKm?: number
+  searchToKm?: number
+  searchRangeActive?: boolean
 }
 
 interface TooltipEntry {
@@ -45,7 +48,7 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
   )
 }
 
-export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false, isClickModeActive, onClickKm }: ElevationProfileProps) {
+export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false, isClickModeActive, onClickKm, searchFromKm, searchToKm, searchRangeActive }: ElevationProfileProps) {
   const { points, boundaries, hasElevationData } = useElevationProfile(waypoints, segments)
 
   // Measure container — bypasses ResponsiveContainer which creates a 0×0 wrapper
@@ -129,6 +132,15 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
             dot={false}
             isAnimationActive={false}
           />
+          {searchRangeActive && searchFromKm != null && searchToKm != null && (
+            <ReferenceArea
+              x1={searchFromKm}
+              x2={searchToKm}
+              fill="#3498db"
+              fillOpacity={0.2}
+              stroke="none"
+            />
+          )}
           {boundaries.map((b) => (
             <ReferenceLine
               key={b.distKm}
