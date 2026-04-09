@@ -160,8 +160,8 @@ describe('GpxUploadForm', () => {
     let resolveUpload2!: () => void
 
     mockCreateSegment
-      .mockImplementationOnce(() => new Promise<any>((resolve) => { resolveUpload1 = () => resolve({}) }))
-      .mockImplementationOnce(() => new Promise<any>((resolve) => { resolveUpload2 = () => resolve({}) }))
+      .mockImplementationOnce(() => new Promise<unknown>((resolve) => { resolveUpload1 = () => resolve({}) }))
+      .mockImplementationOnce(() => new Promise<unknown>((resolve) => { resolveUpload2 = () => resolve({}) }))
 
     renderForm()
 
@@ -222,7 +222,7 @@ describe('GpxUploadForm', () => {
   // 6.7 — Tous succès → onSuccess appelé
   it('calls onSuccess when all files are uploaded successfully', async () => {
     const user = userEvent.setup()
-    mockCreateSegment.mockResolvedValue({} as any)
+    mockCreateSegment.mockResolvedValue({} as unknown)
 
     const { onSuccess } = renderForm()
 
@@ -240,7 +240,7 @@ describe('GpxUploadForm', () => {
   // Review finding: fichiers invalides (>10Mo) exclus du batch d'upload
   it('excludes validation-error files from upload batch', async () => {
     const user = userEvent.setup()
-    mockCreateSegment.mockResolvedValue({} as any)
+    mockCreateSegment.mockResolvedValue({} as unknown)
 
     const { onSuccess } = renderForm()
 
@@ -268,11 +268,11 @@ describe('GpxUploadForm', () => {
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     mockCreateSegment
-      .mockResolvedValueOnce({} as any) // first file succeeds
+      .mockResolvedValueOnce({} as unknown) // first file succeeds
       .mockRejectedValueOnce(new Error('fail')) // second file fails
 
     const { QueryClientProvider } = await import('@tanstack/react-query')
-    const { rerender } = render(
+    render(
       <QueryClientProvider client={queryClient}>
         <GpxUploadForm adventureId="adv-1" onSuccess={vi.fn()} onPendingChange={vi.fn()} />
       </QueryClientProvider>,
