@@ -514,7 +514,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Ajouter un segment GPX</DialogTitle>
-            <DialogDescription>Sélectionnez un fichier .gpx depuis votre appareil.</DialogDescription>
+            <DialogDescription>Glissez vos fichiers GPX ou sélectionnez-les depuis votre appareil.</DialogDescription>
           </DialogHeader>
           <GpxUploadForm
             adventureId={adventureId}
