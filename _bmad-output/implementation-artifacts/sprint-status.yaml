@@ -255,8 +255,9 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-17: in-progress
   17-1-versioning-app-release-notes-popup: done            # système version + CHANGELOG.md + popin nouvelle release
-  17-2-multi-gpx-upload-drag-and-drop: review              # upload multi-fichiers + zone DnD dans dialog
-  17-3-search-zone-elevation-profile: review               # ReferenceArea bleu sur profil élévation = corridor recherche
+  17-2-multi-gpx-upload-drag-and-drop: done              # upload multi-fichiers + zone DnD dans dialog
+  17-3-search-zone-elevation-profile: done               # ReferenceArea bleu sur profil élévation = corridor recherche
   17-4-elevation-loss-d-minus-everywhere: done              # D- partout où D+ est affiché (API + DB + frontend)
-  17-5-stage-cartouche-redesign-planning-live: ready-for-dev       # refonte 3 lignes + ajout cartouches en live mode
+  17-5-stage-cartouche-redesign-planning-live: done         # review complète — 7 patches appliqués, max-h-90 voulu
+  17-6-live-filter-stage-badges: done                  # badges étapes dans drawer filtres live mode — reviewed 2026-04-09
   epic-17-retrospective: optional

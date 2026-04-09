@@ -521,6 +521,9 @@ export default function LivePage() {
         defaultSpeedKmh={adventure?.avgSpeedKmh}
         adventureId={adventureId}
         segments={readySegments}
+        stages={stages}
+        currentKmOnRoute={currentKmOnRoute}
+        liveSpeedKmh={speedKmh}
       />
 
       {/* Stage position update confirmation modal */}

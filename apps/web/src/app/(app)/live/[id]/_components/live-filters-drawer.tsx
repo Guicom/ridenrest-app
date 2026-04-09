@@ -1,11 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { X, ChevronDown, ChevronUp, CloudRain, LayoutGrid, Loader2, Thermometer, Umbrella, Wind, Calendar } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { X, ChevronDown, ChevronUp, CloudRain, LayoutGrid, Loader2, Thermometer, Umbrella, Wind, Calendar, MapPin } from 'lucide-react'
 import { Drawer } from 'vaul'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { MAX_LIVE_RADIUS_KM } from '@ridenrest/shared'
-import type { Poi, MapSegmentData } from '@ridenrest/shared'
+import type { Poi, MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { useMapStore } from '@/stores/map.store'
@@ -15,6 +15,7 @@ import { AccommodationSubTypes } from '@/app/(app)/map/[id]/_components/accommod
 import { DensityCategoryDialog } from '@/app/(app)/adventures/[id]/_components/density-category-dialog'
 import { triggerDensityAnalysis } from '@/lib/api-client'
 import { useDensity } from '@/hooks/use-density'
+import { StageCard } from '@/components/shared/stage-card'
 import type { WeatherDimension } from '@/app/(app)/map/[id]/_components/weather-layer'
 
 const WEATHER_DIMS: { id: WeatherDimension; label: string; icon: typeof Thermometer }[] = [
@@ -31,9 +32,12 @@ interface LiveFiltersDrawerProps {
   defaultSpeedKmh?: number
   adventureId: string
   segments: MapSegmentData[]
+  stages?: AdventureStageResponse[]
+  currentKmOnRoute?: number | null
+  liveSpeedKmh?: number
 }
 
-export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch, defaultSpeedKmh, adventureId, segments }: LiveFiltersDrawerProps) {
+export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch, defaultSpeedKmh, adventureId, segments, stages = [], currentKmOnRoute = null, liveSpeedKmh = 0 }: LiveFiltersDrawerProps) {
   const {
     visibleLayers,
     weatherActive, weatherDimension,
@@ -56,9 +60,18 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
   const [localDepartureTime, setLocalDepartureTime] = useState(weatherDepartureTime ?? '')
 
   // Accordion expansion state
+  const [stagesExpanded, setStagesExpanded] = useState(false)
   const [weatherExpanded, setWeatherExpanded] = useState(false)
   const [densityExpanded, setDensityExpanded] = useState(false)
   const [densityDialogOpen, setDensityDialogOpen] = useState(false)
+
+  // Auto-scroll to current stage when accordion expands, drawer opens, or GPS position changes
+  const currentStageRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (stagesExpanded && open && currentStageRef.current?.scrollIntoView) {
+      currentStageRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [stagesExpanded, open, currentKmOnRoute])
 
   // Density status + mutation
   const { densityStatus, densityStale, densityProgress } = useDensity(adventureId)
@@ -127,12 +140,12 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
     <Drawer.Root open={open} onOpenChange={handleOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 z-40" />
-        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl p-4 pb-8 max-h-[95vh] overflow-y-auto">
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl max-h-[95vh] flex flex-col">
           {/* Drag handle */}
-          <div className="w-12 h-1.5 bg-[--border] rounded-full mx-auto mb-4" />
+          <div className="w-12 h-1.5 bg-[--border] rounded-full mx-auto mt-4 mb-4 shrink-0" />
 
           {/* Title + X close */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 px-4 shrink-0">
             <Drawer.Title className="text-base font-semibold">Filtres</Drawer.Title>
             <button
               onClick={handleClose}
@@ -143,6 +156,9 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
               <X className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-4 min-h-0">
 
           {/* Section 1: Vitesse moyenne */}
           <div className="flex items-center justify-between mb-4">
@@ -201,16 +217,68 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             </div>
           )}
 
-          {/* Section: Étapes — immediate toggle (no Apply) */}
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-foreground">Étapes</p>
-            <Switch
-              checked={stageLayerActive}
-              onCheckedChange={setStageLayerActive}
-              aria-label="Afficher les étapes"
-              data-testid="switch-stages"
-            />
-          </div>
+          {/* Section: Étapes — accordion with StageCards when stages exist, simple toggle otherwise */}
+          {stages.length > 0 ? (
+            <div className="rounded-xl border border-[--border] overflow-hidden mb-3" data-testid="stages-accordion">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 select-none cursor-pointer hover:bg-[--surface-raised] active:bg-[--border] transition-colors"
+                onClick={() => setStagesExpanded((v) => !v)}
+                data-testid="stages-accordion-header"
+              >
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" aria-hidden="true" />
+                  <span className="text-sm font-medium">Étapes ({stages.length})</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Switch
+                      checked={stageLayerActive}
+                      onCheckedChange={setStageLayerActive}
+                      aria-label="Afficher les étapes"
+                      data-testid="switch-stages"
+                    />
+                  </div>
+                  {stagesExpanded
+                    ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </div>
+              </button>
+              {stagesExpanded && (
+                <div className="px-4 pb-4 flex flex-col gap-2 max-h-64 overflow-y-auto" data-testid="stages-list">
+                  {stages.map((stage) => {
+                    const isPassed = currentKmOnRoute !== null && currentKmOnRoute >= stage.endKm
+                    const isCurrent = currentKmOnRoute !== null && currentKmOnRoute >= stage.startKm && currentKmOnRoute < stage.endKm
+                    const hasPosition = currentKmOnRoute !== null && liveSpeedKmh > 0
+                    const etaFromCurrentMinutes = hasPosition && (isCurrent || !isPassed)
+                      ? Math.round(((stage.endKm - currentKmOnRoute!) / liveSpeedKmh) * 60)
+                      : null
+
+                    return (
+                      <div key={stage.id} ref={isCurrent ? currentStageRef : undefined}>
+                        <StageCard
+                          stage={stage}
+                          mode="live"
+                          isCurrent={isCurrent}
+                          isPassed={isPassed}
+                          etaFromCurrentMinutes={etaFromCurrentMinutes}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold text-foreground">Étapes</p>
+              <Switch
+                checked={stageLayerActive}
+                onCheckedChange={setStageLayerActive}
+                aria-label="Afficher les étapes"
+                data-testid="switch-stages"
+              />
+            </div>
+          )}
 
           {/* Section 3: Météo (accordion) */}
           <div className="rounded-xl border border-[--border] overflow-hidden mb-3">
@@ -366,22 +434,27 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             )}
           </div>
 
-          {/* Validation message */}
-          {!hasPoi && (
-            <p className="text-sm text-destructive text-center mb-2">
-              Sélectionne au moins un type de lieu
-            </p>
-          )}
+          </div>{/* end scrollable content */}
 
-          {/* Search button */}
-          <button
-            disabled={!hasPoi}
-            onClick={handleApply}
-            data-testid="search-btn"
-            className="w-full h-12 bg-primary text-primary-foreground rounded-full font-medium cursor-pointer transition-all duration-75 hover:enabled:brightness-90 active:enabled:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Rechercher
-          </button>
+          {/* Fixed bottom section */}
+          <div className="shrink-0 px-4 pb-8 pt-3">
+            {/* Validation message */}
+            {!hasPoi && (
+              <p className="text-sm text-destructive text-center mb-2">
+                Sélectionne au moins un type de lieu
+              </p>
+            )}
+
+            {/* Search button */}
+            <button
+              disabled={!hasPoi}
+              onClick={handleApply}
+              data-testid="search-btn"
+              className="w-full h-12 bg-primary text-primary-foreground rounded-full font-medium cursor-pointer transition-all duration-75 hover:enabled:brightness-90 active:enabled:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Rechercher
+            </button>
+          </div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

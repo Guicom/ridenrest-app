@@ -94,6 +94,28 @@ vi.mock('@/app/(app)/map/[id]/_components/accommodation-sub-types', () => ({
   computeAccCountByType: () => null,
 }))
 
+// ── StageCard mock ───────────────────────────────────────────────────────────
+
+vi.mock('@/components/shared/stage-card', () => ({
+  StageCard: ({ stage, mode, isCurrent, isPassed, etaFromCurrentMinutes }: {
+    stage: { id: string; name: string }
+    mode: string
+    isCurrent?: boolean
+    isPassed?: boolean
+    etaFromCurrentMinutes?: number | null
+  }) => (
+    <div
+      data-testid={`stage-card-${stage.id}`}
+      data-mode={mode}
+      data-current={isCurrent ?? false}
+      data-passed={isPassed ?? false}
+      data-eta={etaFromCurrentMinutes ?? ''}
+    >
+      {stage.name}
+    </div>
+  ),
+}))
+
 // ── UI mocks ──────────────────────────────────────────────────────────────────
 
 vi.mock('@/components/ui/switch', () => ({
@@ -460,5 +482,112 @@ describe('LiveFiltersDrawer', () => {
     fireEvent.change(screen.getByTestId('input-departure-time'), { target: { value: '2026-04-01T09:00' } })
     fireEvent.click(screen.getByTestId('filters-close-btn'))
     expect(mockSetWeatherDepartureTime).toHaveBeenCalledWith('2026-04-01T09:00')
+  })
+
+  // ── Story 17.6: Stages accordion with StageCards ───────────────────────────
+
+  const stageFixtures = [
+    { id: 's1', adventureId: 'adv-1', name: 'Étape 1', startKm: 0, endKm: 30, distanceKm: 30, elevationGainM: 500, elevationLossM: 300, color: '#e11d48', orderIndex: 0, departureTime: null, createdAt: '', updatedAt: '' },
+    { id: 's2', adventureId: 'adv-1', name: 'Étape 2', startKm: 30, endKm: 60, distanceKm: 30, elevationGainM: 200, elevationLossM: 400, color: '#2563eb', orderIndex: 1, departureTime: null, createdAt: '', updatedAt: '' },
+    { id: 's3', adventureId: 'adv-1', name: 'Étape 3', startKm: 60, endKm: 100, distanceKm: 40, elevationGainM: 800, elevationLossM: 600, color: '#16a34a', orderIndex: 2, departureTime: null, createdAt: '', updatedAt: '' },
+  ]
+
+  it('shows accordion with StageCards when stages are provided', () => {
+    renderDrawer({ stages: stageFixtures })
+    expect(screen.getByTestId('stages-accordion')).toBeDefined()
+    expect(screen.getByTestId('stages-accordion-header')).toBeDefined()
+    expect(screen.getByText('Étapes (3)')).toBeDefined()
+  })
+
+  it('stages accordion is collapsed by default — StageCards not visible', () => {
+    renderDrawer({ stages: stageFixtures })
+    expect(screen.queryByTestId('stages-list')).toBeNull()
+    expect(screen.queryByTestId('stage-card-s1')).toBeNull()
+  })
+
+  it('expanding stages accordion shows all StageCards', () => {
+    renderDrawer({ stages: stageFixtures })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    expect(screen.getByTestId('stages-list')).toBeDefined()
+    expect(screen.getByTestId('stage-card-s1')).toBeDefined()
+    expect(screen.getByTestId('stage-card-s2')).toBeDefined()
+    expect(screen.getByTestId('stage-card-s3')).toBeDefined()
+  })
+
+  it('StageCards receive mode="live"', () => {
+    renderDrawer({ stages: stageFixtures })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    expect(screen.getByTestId('stage-card-s1').getAttribute('data-mode')).toBe('live')
+  })
+
+  it('switch-stages is in accordion header and still toggles stageLayerActive', () => {
+    mockStageLayerActive = false
+    renderDrawer({ stages: stageFixtures })
+    // Switch is visible even when accordion is collapsed
+    const sw = screen.getByTestId('switch-stages')
+    expect(sw).toBeDefined()
+    fireEvent.click(sw)
+    expect(mockSetStageLayerActive).toHaveBeenCalledWith(true)
+  })
+
+  it('toggling switch in header does NOT expand accordion', () => {
+    renderDrawer({ stages: stageFixtures })
+    fireEvent.click(screen.getByTestId('switch-stages'))
+    // Accordion should remain collapsed
+    expect(screen.queryByTestId('stages-list')).toBeNull()
+  })
+
+  it('shows simple toggle (no accordion) when stages array is empty', () => {
+    renderDrawer({ stages: [] })
+    expect(screen.queryByTestId('stages-accordion')).toBeNull()
+    expect(screen.getByText('Étapes')).toBeDefined()
+    expect(screen.getByTestId('switch-stages')).toBeDefined()
+  })
+
+  it('shows simple toggle when stages prop is not provided', () => {
+    renderDrawer()
+    expect(screen.queryByTestId('stages-accordion')).toBeNull()
+    expect(screen.getByText('Étapes')).toBeDefined()
+    expect(screen.getByTestId('switch-stages')).toBeDefined()
+  })
+
+  it('marks current stage with isCurrent=true based on currentKmOnRoute', () => {
+    renderDrawer({ stages: stageFixtures, currentKmOnRoute: 40, liveSpeedKmh: 15 })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    // s2 is current (40 >= 30 && 40 < 60)
+    expect(screen.getByTestId('stage-card-s2').getAttribute('data-current')).toBe('true')
+    expect(screen.getByTestId('stage-card-s2').getAttribute('data-passed')).toBe('false')
+  })
+
+  it('marks passed stages with isPassed=true', () => {
+    renderDrawer({ stages: stageFixtures, currentKmOnRoute: 40, liveSpeedKmh: 15 })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    // s1 is passed (40 >= 30)
+    expect(screen.getByTestId('stage-card-s1').getAttribute('data-passed')).toBe('true')
+    expect(screen.getByTestId('stage-card-s1').getAttribute('data-current')).toBe('false')
+  })
+
+  it('computes ETA for non-passed stages when GPS position is available', () => {
+    renderDrawer({ stages: stageFixtures, currentKmOnRoute: 40, liveSpeedKmh: 20 })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    // s2 ETA: (60 - 40) / 20 * 60 = 60 min
+    expect(screen.getByTestId('stage-card-s2').getAttribute('data-eta')).toBe('60')
+    // s3 ETA: (100 - 40) / 20 * 60 = 180 min
+    expect(screen.getByTestId('stage-card-s3').getAttribute('data-eta')).toBe('180')
+  })
+
+  it('does not compute ETA for passed stages', () => {
+    renderDrawer({ stages: stageFixtures, currentKmOnRoute: 40, liveSpeedKmh: 20 })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    // s1 is passed — no ETA
+    expect(screen.getByTestId('stage-card-s1').getAttribute('data-eta')).toBe('')
+  })
+
+  it('stages list has max-h-64 overflow-y-auto for scrollability', () => {
+    renderDrawer({ stages: stageFixtures })
+    fireEvent.click(screen.getByTestId('stages-accordion-header'))
+    const list = screen.getByTestId('stages-list')
+    expect(list.className).toContain('max-h-64')
+    expect(list.className).toContain('overflow-y-auto')
   })
 })

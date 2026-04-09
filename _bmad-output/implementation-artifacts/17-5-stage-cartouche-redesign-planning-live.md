@@ -1,6 +1,6 @@
 # Story 17.5: Refonte des cartouches étapes (planning + live)
 
-Status: ready-for-dev
+Status: done
 
 > **Ajouté 2026-04-09** — Cinquième et dernière story de l'Epic 17 (Quality of Life). Objectif : restructurer les cartouches étapes en layout 3 lignes dans la sidebar planning, puis ajouter les mêmes cartouches en live mode avec section dépliable + highlight de l'étape courante. Dépend de 17.4 (D- disponible).
 
@@ -52,93 +52,73 @@ So that I can quickly scan stage details without visual clutter.
 
 ### Phase 1 — Composant partagé `<StageCard />`
 
-- [ ] Task 1 — Créer `<StageCard />` (AC: #1, #2, #6)
-  - [ ] 1.1 — Créer `apps/web/src/components/shared/stage-card.tsx`
-  - [ ] 1.2 — Props interface :
-    ```typescript
-    interface StageCardProps {
-      stage: AdventureStageResponse
-      mode: 'planning' | 'live'
-      /** Live mode: is this the current stage based on GPS? */
-      isCurrent?: boolean
-      /** Live mode: is this stage already passed? */
-      isPassed?: boolean
-      /** Live mode: ETA in minutes from current position to stage end */
-      etaFromCurrentMinutes?: number | null
-      /** Weather badge visibility */
-      weatherActive?: boolean
-      /** Global departure time fallback */
-      departureTime?: string | null
-      /** Speed for weather computation */
-      speedKmh?: number
-      /** Callbacks (planning only) */
-      onEdit?: (stage: AdventureStageResponse) => void
-      onDelete?: (stage: AdventureStageResponse) => void
-    }
-    ```
-  - [ ] 1.3 — Layout 3 lignes :
-    - **Ligne 1** : `<div className="flex items-center gap-2">` → dot couleur (h-3 w-3 rounded-full) + nom (flex-1 truncate text-sm font-medium) + boutons si `mode === 'planning'` (Pencil h-3 w-3, Trash2 h-3 w-3)
-    - **Ligne 2** : `<div className="flex items-center gap-1.5 text-xs text-muted-foreground pl-5">` (pl-5 = aligné sous le nom, après le dot) → `{distanceKm.toFixed(1)} km` + `·` + `↑ {elevationGainM} m` + `·` + `↓ {elevationLossM} m` (conditionné sur non-null) — OU `↑ — · ↓ —` si pas de données
-    - **Ligne 3** (conditionnel) : `<div className="text-xs text-muted-foreground pl-5">` → date/heure formatée (si `departureTime` défini) ou ETA en live mode + badge météo inline
-  - [ ] 1.4 — Styles conditionnels live mode :
-    - `isCurrent` → `border-2 border-primary bg-primary/5` (bordure accent + fond léger)
-    - `isPassed` → `opacity-50`
-    - Ni l'un ni l'autre → style standard
-  - [ ] 1.5 — Ré-exporter les `OfflineTooltipWrapper` wrappers autour des boutons edit/delete (pattern existant dans sidebar-stages-section.tsx)
+- [x] Task 1 — Créer `<StageCard />` (AC: #1, #2, #6)
+  - [x] 1.1 — Créer `apps/web/src/components/shared/stage-card.tsx`
+  - [x] 1.2 — Props interface (avec ajout `stagesHaveDepartures` pour contrôle météo)
+  - [x] 1.3 — Layout 3 lignes (dot+nom+boutons / km+D+·D- / date ou ETA + météo)
+  - [x] 1.4 — Styles conditionnels live mode (isCurrent → border-primary, isPassed → opacity-50)
+  - [x] 1.5 — OfflineTooltipWrapper autour des boutons edit/delete
 
-- [ ] Task 2 — Formater la date/heure d'étape (AC: #1, #4)
-  - [ ] 2.1 — Utilitaire de formatage (dans stage-card.tsx ou util partagé) : `departureTime` ISO → "Jeu 15 avril · 07:30" en français — utiliser `Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })`
-  - [ ] 2.2 — En live mode : afficher ETA au lieu de l'heure de départ — format : `~2h15 restantes` ou `~45 min` (basé sur `etaFromCurrentMinutes`)
+- [x] Task 2 — Formater la date/heure d'étape (AC: #1, #4)
+  - [x] 2.1 — `formatStageDeparture()` dans stage-card.tsx : ISO → "jeu. 15 avril · 07:30"
+  - [x] 2.2 — `formatEta()` : `~2h15` ou `~45 min`
 
 ### Phase 2 — Intégration planning mode
 
-- [ ] Task 3 — Remplacer le rendering inline dans `sidebar-stages-section.tsx` (AC: #1, #2, #3, #5)
-  - [ ] 3.1 — Importer `StageCard` dans `sidebar-stages-section.tsx`
-  - [ ] 3.2 — Remplacer le contenu de la boucle `stages.map()` (lignes 239-297) par `<StageCard stage={stage} mode="planning" ... />`
-  - [ ] 3.3 — Passer les callbacks `onEdit={handleEditOpen}` et `onDelete={setDeleteTarget}`
-  - [ ] 3.4 — Conserver le `<StageDepartureInput />` APRÈS le `<StageCard />` dans le container (c'est un composant séparé dépliable)
-  - [ ] 3.5 — Passer `weatherActive`, `departureTime`, `speedKmh` comme props
-  - [ ] 3.6 — Le container div parent (`flex flex-col gap-1 rounded-md border p-2`) est désormais le contenu de `<StageCard />` — ne PAS doubler l'enveloppe
+- [x] Task 3 — Remplacer le rendering inline dans `sidebar-stages-section.tsx` (AC: #1, #2, #3, #5)
+  - [x] 3.1 — Import `StageCard`, suppression imports inutiles (Pencil, Trash2)
+  - [x] 3.2 — Remplacement boucle `stages.map()` par `<StageCard mode="planning" />`
+  - [x] 3.3 — Callbacks `onEdit={handleEditOpen}` et `onDelete={setDeleteTarget}`
+  - [x] 3.4 — `<StageDepartureInput />` conservé après `<StageCard />`
+  - [x] 3.5 — Props weatherActive, stagesHaveDepartures, departureTime, speedKmh passés
+  - [x] 3.6 — Container géré par StageCard, pas de doublon
 
 ### Phase 3 — Intégration live mode
 
-- [ ] Task 4 — Créer une section "Étapes" dans le live mode (AC: #4, #6)
-  - [ ] 4.1 — Créer `apps/web/src/app/(app)/live/[id]/_components/live-stages-section.tsx`
-  - [ ] 4.2 — Props : `stages: AdventureStageResponse[]`, `currentKmOnRoute: number | null`, `speedKmh: number`
-  - [ ] 4.3 — Section dépliable avec header "Étapes ({count})" et icône ChevronDown/ChevronUp — état plié/déplié dans useState (plié par défaut)
-  - [ ] 4.4 — Pour chaque étape, calculer :
-    - `isPassed` : `currentKmOnRoute !== null && currentKmOnRoute >= stage.endKm`
-    - `isCurrent` : `currentKmOnRoute !== null && currentKmOnRoute >= stage.startKm && currentKmOnRoute < stage.endKm`
-    - `etaFromCurrentMinutes` : `isCurrent || !isPassed ? Math.round(((stage.endKm - (currentKmOnRoute ?? stage.startKm)) / speedKmh) * 60) : null`
-  - [ ] 4.5 — Rendu : `<StageCard stage={stage} mode="live" isCurrent={isCurrent} isPassed={isPassed} etaFromCurrentMinutes={eta} />`
-  - [ ] 4.6 — Scroll automatique vers l'étape courante quand la section est dépliée (via `useRef` + `scrollIntoView`)
+- [x] Task 4 — Créer une section "Étapes" dans le live mode (AC: #4, #6)
+  - [x] 4.1 — Créer `live-stages-section.tsx`
+  - [x] 4.2 — Props stages, currentKmOnRoute, speedKmh
+  - [x] 4.3 — Section dépliable "Étapes ({count})", pliée par défaut
+  - [x] 4.4 — Calculs isPassed, isCurrent, etaFromCurrentMinutes
+  - [x] 4.5 — Rendu via `<StageCard mode="live" />`
+  - [x] 4.6 — Auto-scroll vers étape courante (scrollIntoView avec guard jsdom)
 
-- [ ] Task 5 — Intégrer `<LiveStagesSection />` dans la page live (AC: #4)
-  - [ ] 5.1 — Dans `apps/web/src/app/(app)/live/[id]/page.tsx`, importer `LiveStagesSection`
-  - [ ] 5.2 — Position : entre `ElevationStrip` (ligne 396-404) et `LiveControls` (ligne 407-420) — ou dans le filters drawer comme section supplémentaire
-  - [ ] 5.3 — **Décision d'emplacement recommandée** : ajouter comme section au-dessus de `LiveControls`, visible quand `stages.length > 0 && isLiveModeActive` — le drawer filters est déjà chargé et la section dépliable ne prend pas de place par défaut
-  - [ ] 5.4 — Passer `stages={stages}`, `currentKmOnRoute={currentKmOnRoute}`, `speedKmh={speedKmh}`
-  - [ ] 5.5 — Attention : `stages` est déjà fetchée dans la page live (ligne 120 : `const { stages } = useStages(adventureId)`) et `currentKmOnRoute` depuis `useLiveStore` (ligne 191)
+- [x] Task 5 — Intégrer `<LiveStagesSection />` dans la page live (AC: #4)
+  - [x] 5.1 — Import LiveStagesSection dans page.tsx
+  - [x] 5.2 — Position : entre ElevationStrip et LiveControls (absolute bottom-[88px])
+  - [x] 5.3 — Condition : `stages.length > 0 && isLiveModeActive`
+  - [x] 5.4 — Props stages, currentKmOnRoute, speedKmh passés
+  - [x] 5.5 — Réutilisation hooks existants (useStages, useLiveStore)
 
 ### Phase 4 — Tests
 
-- [ ] Task 6 — Tests du composant StageCard (AC: #1, #4, #6)
-  - [ ] 6.1 — `apps/web/src/components/shared/__tests__/stage-card.test.tsx` :
-    - Planning mode : affiche les 3 lignes, boutons edit/delete visibles
-    - Planning mode sans D- : affiche "↑ — · ↓ —"
-    - Planning mode sans departureTime : ligne 3 absente
-    - Live mode : boutons masqués
-    - Live mode isCurrent : classe bordure accent
-    - Live mode isPassed : classe opacity-50
-    - Live mode ETA : affiche le temps restant formaté
-  - [ ] 6.2 — Vérifier non-régression sur les tests existants de `sidebar-stages-section.tsx`
+- [x] Task 6 — Tests du composant StageCard (AC: #1, #4, #6)
+  - [x] 6.1 — `stage-card.test.tsx` : 16 tests (planning 3 lignes, D+/D- null, edit/delete, weather badge, live isCurrent/isPassed/ETA)
+  - [x] 6.2 — Non-régression sidebar-stages-section.test.tsx (9 tests pass, texte attendu mis à jour pour nouveau layout)
 
-- [ ] Task 7 — Test de LiveStagesSection (AC: #4)
-  - [ ] 7.1 — `apps/web/src/app/(app)/live/[id]/_components/__tests__/live-stages-section.test.tsx` :
-    - Section dépliable : initialement pliée, affiche les stages quand dépliée
-    - Highlight étape courante : vérifie la classe CSS
-    - Étapes passées : vérifie l'opacité réduite
-    - ETA calcul : vérifie le formatage
+- [x] Task 7 — Test de LiveStagesSection (AC: #4)
+  - [x] 7.1 — `live-stages-section.test.tsx` : 7 tests (collapsed par défaut, expand, highlight, opacity, ETA, no edit/delete)
+
+### Review Findings
+
+**`decision-needed` :**
+- [x] [Review][Decision] AC3 — Badge météo sur cartouche étape — décision : pas de météo sur les cartouches (layer carte météo suffisant) → déféré
+- [x] [Review][Decision] Contrainte « StageDepartureInput séparé » — `StageDepartureInput` en `children` de `StageCard` est voulu → accepted as-is
+- [x] [Review][Decision] AC3/AC4 — Badge météo absent en live mode — décision : voulu, pas de météo en live sur cartouches → déféré
+
+**`patch` :**
+- [x] [Review][Patch] Violation contrainte scroll planning : `max-h-90` au lieu de `max-h-64` [sidebar-stages-section.tsx:237] — voulu (demandé par Guillaume)
+- [x] [Review][Patch] ETA affiché pour toutes les étapes quand `currentKmOnRoute === null` — `!isPassed` est toujours vrai → branche ETA toujours activée, calcul via `stage.startKm` trompeur [live-stages-section.tsx:51-55]
+- [x] [Review][Patch] Division par zéro si `speedKmh === 0` → Infinity/NaN dans l'ETA [live-stages-section.tsx:54]
+- [x] [Review][Patch] `formatStageDeparture` ne valide pas l'ISO → "Invalid Date" en cas de chaîne malformée [stage-card.tsx:9-16]
+- [x] [Review][Patch] `formatEta` ne gère pas `NaN`, `Infinity` ou minutes négatives → libellés dégradés [stage-card.tsx:19-26]
+- [x] [Review][Patch] Header live non accessible : `div` cliquable sans `role="button"`, `tabIndex`, `aria-expanded`, ni gestion clavier [live-stages-section.tsx:33-45]
+- [x] [Review][Patch] Auto-scroll vers l'étape courante ne se ré-active pas si `currentKmOnRoute` change alors que la section est déjà ouverte [live-stages-section.tsx:18-23]
+- [x] [Review][Patch] AC5 — Ligne 2 (`flex` sans `flex-wrap`) peut déborder sur petits écrans [stage-card.tsx:125]
+
+**`defer` (pré-existant) :**
+- [x] [Review][Defer] Boutons edit/delete visibles sans `onEdit`/`onDelete` (actions sans effet) [stage-card.tsx:98-121] — deferred, pré-existant / design pattern du composant
+- [x] [Review][Defer] Libellés `fr-FR` en dur — incohérent si app devient multilingue — deferred, hors scope story
 
 ## Dev Notes
 
@@ -289,10 +269,34 @@ import { useLiveStore } from '@/stores/live.store'
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
 ### Debug Log References
 
+- scrollIntoView not available in jsdom → guard with optional chaining `currentRef.current?.scrollIntoView`
+
 ### Completion Notes List
 
+- StageCard composant partagé créé avec layout 3 lignes (dot+nom+boutons / km+D+·D- / date|ETA+météo)
+- Planning mode : boutons edit/delete avec OfflineTooltipWrapper, weather badge conditionnel
+- Live mode : isCurrent → bordure accent, isPassed → opacity-50, ETA formaté (~Xh ou ~X min)
+- sidebar-stages-section.tsx refactoré : inline rendering remplacé par StageCard, imports nettoyés
+- LiveStagesSection créée : section dépliable (pliée par défaut), calculs isPassed/isCurrent/ETA, auto-scroll
+- Intégrée dans live page entre ElevationStrip et LiveControls, conditionnée sur stages.length > 0
+- 16 tests StageCard + 7 tests LiveStagesSection + 9 tests sidebar existants mis à jour (974 tests total, 0 fail)
+- Aucune erreur TypeScript introduite (erreurs pré-existantes dans d'autres fichiers)
+
+### Change Log
+
+- 2026-04-09: Story 17.5 implémentée — refonte cartouches étapes 3 lignes + section live mode
+
 ### File List
+
+- `apps/web/src/components/shared/stage-card.tsx` — CRÉÉ — composant StageCard partagé planning+live
+- `apps/web/src/components/shared/stage-card.test.tsx` — CRÉÉ — 16 tests unitaires
+- `apps/web/src/app/(app)/live/[id]/_components/live-stages-section.tsx` — CRÉÉ — section dépliable live
+- `apps/web/src/app/(app)/live/[id]/_components/live-stages-section.test.tsx` — CRÉÉ — 7 tests unitaires
+- `apps/web/src/app/(app)/map/[id]/_components/sidebar-stages-section.tsx` — MODIFIÉ — refactoré vers StageCard
+- `apps/web/src/app/(app)/map/[id]/_components/sidebar-stages-section.test.tsx` — MODIFIÉ — texte attendu mis à jour
+- `apps/web/src/app/(app)/live/[id]/page.tsx` — MODIFIÉ — intégration LiveStagesSection
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — MODIFIÉ — status in-progress→review

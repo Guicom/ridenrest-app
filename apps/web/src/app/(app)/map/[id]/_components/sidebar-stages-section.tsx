@@ -1,6 +1,6 @@
 'use client'
 import { useState, useCallback } from 'react'
-import { Pencil, Trash2, MapPin, X, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { MapPin, X, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -24,9 +24,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { STAGE_COLORS } from '@ridenrest/shared'
 import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
-import { StageWeatherBadge } from './stage-weather-badge'
 import { SectionTooltip } from '@/components/shared/section-tooltip'
 import { OfflineTooltipWrapper } from '@/components/shared/offline-tooltip-wrapper'
+import { StageCard } from '@/components/shared/stage-card'
 
 /** Converts ISO 8601 string to datetime-local input value (YYYY-MM-DDTHH:mm) */
 function isoToDatetimeLocal(iso: string): string {
@@ -234,69 +234,26 @@ export function SidebarStagesSection({
 
           {/* Stage list */}
           {stages.length > 0 && (
-            <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+            <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
               {stages.map((stage) => (
-                <div
+                <StageCard
                   key={stage.id}
-                  className="flex flex-col gap-1 rounded-md border border-[--border] p-2"
-                  data-testid={`stage-item-${stage.id}`}
+                  stage={stage}
+                  mode="planning"
+                  weatherActive={weatherActive}
+                  stagesHaveDepartures={stagesHaveDepartures}
+                  departureTime={departureTime}
+                  speedKmh={speedKmh}
+                  onEdit={handleEditOpen}
+                  onDelete={setDeleteTarget}
                 >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-3 w-3 rounded-full shrink-0"
-                      style={{ backgroundColor: stage.color }}
-                      aria-hidden="true"
-                    />
-                    <span className="flex-1 truncate text-sm font-medium">{stage.name}</span>
-                    <span className="text-xs text-muted-foreground">{stage.distanceKm.toFixed(1)} km</span>
-                    <span className="text-xs text-muted-foreground">
-                      {stage.elevationGainM !== null ? `D+ ${stage.elevationGainM} m` : 'D+ —'}
-                      {' · '}
-                      {stage.elevationLossM !== null ? `D- ${stage.elevationLossM} m` : 'D- —'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {stage.etaMinutes !== null
-                        ? stage.etaMinutes < 60
-                          ? `${stage.etaMinutes} min`
-                          : `${Math.floor(stage.etaMinutes / 60)}h${String(stage.etaMinutes % 60).padStart(2, '0')}`
-                        : '— min'}
-                    </span>
-                    {weatherActive && !stagesHaveDepartures && (
-                      <StageWeatherBadge
-                        stageId={stage.id}
-                        stageDepartureTime={stage.departureTime}
-                        departureTime={departureTime}
-                        speedKmh={speedKmh}
-                      />
-                    )}
-                    <OfflineTooltipWrapper>
-                      <button
-                        onClick={() => handleEditOpen(stage)}
-                        aria-label={`Modifier ${stage.name}`}
-                        className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-[0.85]"
-                        data-testid={`edit-stage-${stage.id}`}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    </OfflineTooltipWrapper>
-                    <OfflineTooltipWrapper>
-                      <button
-                        onClick={() => setDeleteTarget(stage)}
-                        aria-label={`Supprimer ${stage.name}`}
-                        className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors active:scale-[0.85]"
-                        data-testid={`delete-stage-${stage.id}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </OfflineTooltipWrapper>
-                  </div>
-                  {/* Per-stage departure time */}
+                  {/* Per-stage departure time — inside card */}
                   <StageDepartureInput
                     key={stage.id + (stage.departureTime ?? '')}
                     stage={stage}
                     onUpdate={updateStage}
                   />
-                </div>
+                </StageCard>
               ))}
             </div>
           )}

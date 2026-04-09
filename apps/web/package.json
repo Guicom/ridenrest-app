@@ -1,6 +1,6 @@
 {
   "name": "@ridenrest/web",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 next dev --port 3011",

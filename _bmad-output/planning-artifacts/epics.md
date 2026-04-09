@@ -3221,7 +3221,7 @@ So that when a significant OSM data update occurs in a region, the stale POI and
 
 > **Ajouté 2026-04-09** — Améliorations UX et fonctionnalités demandées par Guillaume pour améliorer l'expérience quotidienne : système de release notes, upload multi-GPX, enrichissement du profil d'élévation, affichage du D-, et refonte des cartouches étapes. **Deploy unique en fin d'epic** (pas de deploy intermédiaire par story).
 
-5 stories ordonnées : versioning/changelog d'abord (pour documenter les évolutions suivantes), puis upload, élévation, dénivelé, et cartouches.
+6 stories ordonnées : versioning/changelog d'abord (pour documenter les évolutions suivantes), puis upload, élévation, dénivelé, cartouches, et badges filtres live.
 
 ### Story 17.1: Système de versioning app & popin "Nouvelle release"
 
@@ -3499,3 +3499,35 @@ So that I can quickly scan stage details without visual clutter.
 - Live mode: integrate `<StageCard />` list into the live bottom drawer (alongside existing filters/controls) or as a separate collapsible section
 - Current stage detection in live: compare `currentKm` (from GPS) with stage `startKm`/`endKm` boundaries
 - Depends on 17.4 (D- available) for the elevation display on line 2
+
+---
+
+### Story 17.6: Badges des étapes dans le drawer filtres en live mode
+
+As a **cyclist using live mode**,
+I want to see the stage badges (cards) directly in the filter drawer,
+So that I can quickly review my stages while adjusting my search settings, without opening a separate section.
+
+**Acceptance Criteria:**
+
+**Given** le drawer filtres est ouvert en live mode,
+**When** des étapes existent pour l'aventure,
+**Then** la section "Étapes" affiche les cartouches `<StageCard mode="live" />` au lieu du simple toggle Switch actuel.
+
+**Given** la section "Étapes" dans le drawer filtres,
+**When** des étapes sont présentes,
+**Then** la section est un accordéon dépliable (comme Météo et Densité) avec header icône + titre + toggle Switch (couche carte) + chevron.
+
+**Given** les cartouches étapes dans le drawer filtres,
+**When** le GPS a une position,
+**Then** l'étape courante est surlignée, les étapes passées sont estompées, et l'ETA est affiché.
+
+**Given** aucune étape n'existe pour l'aventure,
+**When** le drawer filtres est ouvert,
+**Then** la section "Étapes" reste un simple toggle Switch sans accordéon.
+
+**Technical notes:**
+- Réutilise `<StageCard mode="live" />` créé en 17.5
+- Transformer la section Étapes (toggle) en accordéon dépliable dans `live-filters-drawer.tsx`
+- Passer `stages`, `currentKmOnRoute`, `speedKmh` depuis `page.tsx`
+- Dépend de 17.5 (StageCard composant)

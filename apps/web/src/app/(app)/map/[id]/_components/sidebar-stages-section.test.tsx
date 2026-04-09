@@ -126,7 +126,7 @@ describe('SidebarStagesSection', () => {
     expect(screen.queryByTestId('add-stage-btn')).toBeNull()
   })
 
-  it('renders stage list with distance and — placeholders for D+ and ETA', () => {
+  it('renders stage list with distance and — placeholders for D+ and D-', () => {
     const stages = [
       makeStage({ id: 's1', name: 'Jour 1', distanceKm: 80, endKm: 80 }),
       makeStage({ id: 's2', name: 'Jour 2', orderIndex: 1, startKm: 80, endKm: 150, distanceKm: 70 }),
@@ -138,11 +138,11 @@ describe('SidebarStagesSection', () => {
     expect(screen.getByText('80.0 km')).toBeDefined()
     expect(screen.getByText('Jour 2')).toBeDefined()
     expect(screen.getByText('70.0 km')).toBeDefined()
-    // D+, D- and ETA placeholders
-    const dashPlusList = screen.getAllByText('D+ — · D- —')
-    expect(dashPlusList.length).toBe(2)
-    const etaList = screen.getAllByText('— min')
-    expect(etaList.length).toBe(2)
+    // New 3-line layout: D+ and D- are separate spans with arrows
+    const gainPlaceholders = screen.getAllByText('↑ —')
+    expect(gainPlaceholders.length).toBe(2)
+    const lossPlaceholders = screen.getAllByText('↓ —')
+    expect(lossPlaceholders.length).toBe(2)
   })
 
   it('opens edit dialog when pencil icon is clicked', () => {
