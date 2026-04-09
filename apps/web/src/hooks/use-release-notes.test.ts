@@ -31,6 +31,14 @@ describe('useReleaseNotes', () => {
     expect(localStorageMock.getItem(STORAGE_KEY)).toBe(APP_VERSION)
   })
 
+  it('first visit on version > 1.0.0 — shows release notes', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', '1.1.0')
+    const { result } = renderHook(() => useReleaseNotes())
+
+    expect(result.current.showReleaseNotes).toBe(true)
+    vi.stubEnv('NEXT_PUBLIC_APP_VERSION', APP_VERSION)
+  })
+
   it('different version — shows release notes', () => {
     localStorageMock.setItem(STORAGE_KEY, '0.9.0')
 

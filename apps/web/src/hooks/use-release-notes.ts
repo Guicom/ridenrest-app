@@ -12,8 +12,8 @@ export function useReleaseNotes() {
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored === null) {
-        // First visit — initialize silently, no popup
+      if (stored === null && appVersion === '1.0.0') {
+        // True first visit on initial release — initialize silently, no popup
         localStorage.setItem(STORAGE_KEY, appVersion)
       } else if (stored !== appVersion) {
         setShowReleaseNotes(true)
