@@ -434,6 +434,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
     fitToSearchZone,
   }), [centerOnGps, fitToSearchZone])
 
+
   return (
     <div className="relative h-full w-full">
       <div

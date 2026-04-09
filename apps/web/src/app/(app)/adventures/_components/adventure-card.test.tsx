@@ -21,6 +21,7 @@ const makeAdventure = (overrides: Partial<AdventureResponse> = {}): AdventureRes
   densityStatus: 'idle',
   densityProgress: 0,
   avgSpeedKmh: 15,
+  hasStravaSegment: false,
   createdAt: '2026-03-15T00:00:00.000Z',
   updatedAt: '2026-03-15T00:00:00.000Z',
   ...overrides,
@@ -111,5 +112,33 @@ describe('AdventureCard — D+ display', () => {
     )
     expect(screen.getByText('01/06/2026')).toBeInTheDocument()
     expect(screen.queryByText(/→/)).toBeNull()
+  })
+})
+
+describe('AdventureCard — Strava badge', () => {
+  it('shows Powered by Strava badge when hasStravaSegment is true', () => {
+    render(
+      <AdventureCard
+        adventure={makeAdventure({ hasStravaSegment: true })}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    )
+    const img = screen.getByAltText('Powered by Strava') as HTMLImageElement
+    expect(img).toBeInTheDocument()
+    expect(img.src).toContain('powered-by-strava.svg')
+  })
+
+  it('does not show Strava badge when hasStravaSegment is false', () => {
+    render(
+      <AdventureCard
+        adventure={makeAdventure({ hasStravaSegment: false })}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onNavigate={vi.fn()}
+      />,
+    )
+    expect(screen.queryByAltText('Powered by Strava')).toBeNull()
   })
 })

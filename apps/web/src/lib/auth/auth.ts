@@ -2,8 +2,8 @@ import { betterAuth } from 'better-auth'
 import { jwt, genericOAuth } from 'better-auth/plugins'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { Resend } from 'resend'
-import { authDb, profiles } from '@ridenrest/database'
-import { eq } from 'drizzle-orm'
+import { authDb, profiles, account } from '@ridenrest/database'
+import { eq, and } from 'drizzle-orm'
 
 // Lazy singleton — Resend throws if API key is missing, so don't instantiate at module load
 // (sendOnSignUp: false for MVP, so this function is never called until domain is verified)
@@ -120,6 +120,25 @@ export const auth = betterAuth({
           } catch (err) {
             // Log but don't rethrow — profile creation failure must not block sign-in
             console.error('[auth] Failed to create profile for user', user.id, err)
+          }
+        },
+      },
+      delete: {
+        before: async (user) => {
+          // Best-effort: revoke Strava token before account cascade-delete
+          try {
+            const [stravaAccount] = await authDb
+              .select({ accessToken: account.accessToken })
+              .from(account)
+              .where(and(eq(account.userId, user.id), eq(account.providerId, 'strava')))
+            if (stravaAccount?.accessToken) {
+              await fetch('https://www.strava.com/oauth/deauthorize', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${stravaAccount.accessToken}` },
+              })
+            }
+          } catch (err) {
+            console.warn('[auth] Strava deauthorize on account delete failed (best-effort):', err)
           }
         },
       },

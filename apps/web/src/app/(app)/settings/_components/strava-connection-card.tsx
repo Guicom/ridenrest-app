@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { disconnectStrava } from '../actions'
+import { isStravaEnabled } from '@/lib/strava-config'
 
 interface StravaConnectionCardProps {
   isConnected: boolean
@@ -13,6 +14,8 @@ export function StravaConnectionCard({ isConnected }: StravaConnectionCardProps)
   const [isPending, setIsPending] = useState(false)
   const [disconnectError, setDisconnectError] = useState<string | null>(null)
   const [isDisconnecting, startDisconnect] = useTransition()
+  const stravaEnabled = isStravaEnabled()
+  const connectDisabled = !stravaEnabled && !isConnected
 
   const handleConnect = async () => {
     setIsPending(true)
@@ -44,13 +47,6 @@ export function StravaConnectionCard({ isConnected }: StravaConnectionCardProps)
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Strava logo mark */}
-          <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0 4 13.828h4.17"
-              fill="#FC4C02"
-            />
-          </svg>
           <div>
             <p className="font-medium">Strava</p>
             <p className="text-sm text-muted-foreground">
@@ -69,16 +65,22 @@ export function StravaConnectionCard({ isConnected }: StravaConnectionCardProps)
             {isDisconnecting ? 'Déconnexion...' : 'Déconnecter'}
           </Button>
         ) : (
-          <Button
-            variant="default"
-            size="sm"
+          <button
+            type="button"
             onClick={handleConnect}
-            disabled={isPending}
+            disabled={isPending || connectDisabled}
+            className={connectDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer disabled:opacity-70'}
           >
-            {isPending ? 'Redirection...' : 'Connecter Strava'}
-          </Button>
+            <img src="/btn_strava_connect_with_white.svg" alt="Connect with Strava" className="h-12" />
+          </button>
         )}
       </div>
+
+      {connectDisabled && (
+        <p className="text-xs text-muted-foreground">
+          L&apos;intégration Strava est temporairement indisponible. L&apos;import GPX manuel reste disponible.
+        </p>
+      )}
 
       {disconnectError && (
         <p className="text-sm text-destructive" role="alert">

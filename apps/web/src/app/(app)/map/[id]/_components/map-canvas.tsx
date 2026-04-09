@@ -473,10 +473,17 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [styleUrl])
 
+  const hasStrava = segments.some((s) => s.source === 'strava')
+
   return (
     <div className="relative h-full w-full">
       <div ref={mapContainerRef} className="h-full w-full" aria-label={`Carte de l'aventure ${adventureName}`} role="application" />
       <OsmAttribution />
+      {hasStrava && (
+        <div className="absolute bottom-5 left-2 z-10 bg-white/80 dark:bg-black/60 px-1.5 py-0.5 rounded pointer-events-none select-none">
+          <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
+        </div>
+      )}
       {weatherActive && segmentsWeather?.map((sw) => (
         <WeatherLayer
           key={sw.segmentId}

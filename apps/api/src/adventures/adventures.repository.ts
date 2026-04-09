@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { db } from '@ridenrest/database'
 import { adventures, adventureSegments } from '@ridenrest/database'
 import type { Adventure, NewAdventure } from '@ridenrest/database'
-import { eq, and, desc, asc } from 'drizzle-orm'
+import { eq, and, desc, asc, inArray } from 'drizzle-orm'
 import type { AdventureMapResponse, MapWaypoint, MapSegmentData } from '@ridenrest/shared'
 
 @Injectable()
@@ -18,6 +18,18 @@ export class AdventuresRepository {
       .from(adventures)
       .where(eq(adventures.userId, userId))
       .orderBy(desc(adventures.createdAt))
+  }
+
+  async findAdventureIdsWithStravaSegments(adventureIds: string[]): Promise<Set<string>> {
+    if (adventureIds.length === 0) return new Set()
+    const rows = await db
+      .selectDistinct({ adventureId: adventureSegments.adventureId })
+      .from(adventureSegments)
+      .where(and(
+        eq(adventureSegments.source, 'strava'),
+        inArray(adventureSegments.adventureId, adventureIds),
+      ))
+    return new Set(rows.map((r) => r.adventureId))
   }
 
   async findByIdAndUserId(id: string, userId: string): Promise<Adventure | null> {
@@ -136,6 +148,7 @@ export class AdventuresRepository {
         cumulativeStartKm: s.cumulativeStartKm,
         distanceKm: s.distanceKm,
         parseStatus: s.parseStatus as MapSegmentData['parseStatus'],
+        source: s.source ?? null,
         waypoints: s.waypoints
           ? (s.waypoints as Array<{ lat: number; lng: number; ele?: number; dist_km?: number; distKm?: number }>).map(
               (wp): MapWaypoint => ({

@@ -48,6 +48,24 @@ export async function disconnectStrava(): Promise<{ success: boolean; error?: st
   const userId = session.user.id
 
   try {
+    // Retrieve the Strava access token BEFORE deleting the account record
+    const [stravaAccount] = await authDb
+      .select({ accessToken: account.accessToken })
+      .from(account)
+      .where(and(eq(account.userId, userId), eq(account.providerId, 'strava')))
+
+    // Best-effort deauthorize — revoke token with Strava API
+    if (stravaAccount?.accessToken) {
+      try {
+        await fetch('https://www.strava.com/oauth/deauthorize', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${stravaAccount.accessToken}` },
+        })
+      } catch (err) {
+        console.warn('[disconnectStrava] Strava deauthorize failed (best-effort), continuing:', err)
+      }
+    }
+
     await authDb.transaction(async (tx) => {
       // Delete Better Auth account record for Strava
       await tx

@@ -71,7 +71,7 @@ const emptyPoisByLayer: Record<MapLayer, Poi[]> = {
   bike: [],
 }
 
-function makeSegment(parseStatus = 'done'): MapSegmentData {
+function makeSegment(parseStatus = 'done', source: string | null = null): MapSegmentData {
   return {
     id: 'seg-1',
     name: 'S1',
@@ -79,6 +79,7 @@ function makeSegment(parseStatus = 'done'): MapSegmentData {
     cumulativeStartKm: 0,
     distanceKm: 50,
     parseStatus: parseStatus as MapSegmentData['parseStatus'],
+    source,
     waypoints: [
       { lat: 43.0, lng: 1.0, ele: 100, distKm: 0 },
       { lat: 43.5, lng: 1.5, ele: 200, distKm: 50 },
@@ -663,10 +664,25 @@ describe('buildCorridorFeatures', () => {
       cumulativeStartKm: 0,
       distanceKm: 50,
       parseStatus: 'done',
+      source: null,
       waypoints: null,
       boundingBox: null,
     }
     const features = buildCorridorFeatures([segment], 0, 30)
     expect(features).toHaveLength(0)
+  })
+})
+
+describe('MapCanvas — Strava badge overlay', () => {
+  it('shows Powered by Strava badge when a segment has source=strava', () => {
+    render(<MapCanvas segments={[makeSegment('done', 'strava')]} adventureName="Test" poisByLayer={emptyPoisByLayer} />)
+    const img = screen.getByAltText('Powered by Strava') as HTMLImageElement
+    expect(img).toBeDefined()
+    expect(img.src).toContain('powered-by-strava.svg')
+  })
+
+  it('does not show Strava badge when no segment has source=strava', () => {
+    render(<MapCanvas segments={[makeSegment()]} adventureName="Test" poisByLayer={emptyPoisByLayer} />)
+    expect(screen.queryByAltText('Powered by Strava')).toBeNull()
   })
 })

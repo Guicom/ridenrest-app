@@ -181,10 +181,7 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
             <span>{distanceLabel}</span>
             <span>{elevationLabel}</span>
             {segment.source === 'strava' && (
-              <span className="flex items-center gap-1">
-                <img src="/strava-logo.svg" alt="Strava" className="h-3 w-3" />
-                Via Strava
-              </span>
+              <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
             )}
           </div>
         )}

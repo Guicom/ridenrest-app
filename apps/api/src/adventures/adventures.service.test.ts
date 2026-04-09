@@ -13,6 +13,7 @@ const mockRepo = {
   create: jest.fn(),
   findAllByUserId: jest.fn(),
   findByIdAndUserId: jest.fn(),
+  findAdventureIdsWithStravaSegments: jest.fn().mockResolvedValue(new Set()),
   updateTotalDistance: jest.fn(),
   updateName: jest.fn(),
   updateStartDate: jest.fn(),
@@ -40,10 +41,11 @@ const makeAdventure = (overrides = {}) => ({
 beforeEach(() => jest.clearAllMocks())
 
 describe('createAdventure', () => {
-  it('creates and returns an adventure response', async () => {
+  it('creates and returns an adventure response with hasStravaSegment false', async () => {
     mockRepo.create.mockResolvedValue(makeAdventure())
     const result = await service.createAdventure('user-1', 'Test')
     expect(result.id).toBe('adv-1')
+    expect(result.hasStravaSegment).toBe(false)
     expect(result.createdAt).toBe('2026-03-15T00:00:00.000Z')
     expect(mockRepo.create).toHaveBeenCalledWith({ userId: 'user-1', name: 'Test' })
   })
@@ -77,10 +79,19 @@ describe('verifyOwnership', () => {
 describe('listAdventures', () => {
   it('returns mapped adventure responses', async () => {
     mockRepo.findAllByUserId.mockResolvedValue([makeAdventure(), makeAdventure({ id: 'adv-2', name: 'Test 2' })])
+    mockRepo.findAdventureIdsWithStravaSegments.mockResolvedValue(new Set())
     const result = await service.listAdventures('user-1')
     expect(result).toHaveLength(2)
     expect(result[0].id).toBe('adv-1')
     expect(result[1].id).toBe('adv-2')
+  })
+
+  it('sets hasStravaSegment true for adventures with strava segments', async () => {
+    mockRepo.findAllByUserId.mockResolvedValue([makeAdventure(), makeAdventure({ id: 'adv-2', name: 'Test 2' })])
+    mockRepo.findAdventureIdsWithStravaSegments.mockResolvedValue(new Set(['adv-1']))
+    const result = await service.listAdventures('user-1')
+    expect(result[0].hasStravaSegment).toBe(true)
+    expect(result[1].hasStravaSegment).toBe(false)
   })
 })
 
@@ -190,6 +201,7 @@ const makeMapResponse = (overrides = {}): AdventureMapResponse => ({
   adventureId: 'adv-1',
   adventureName: 'Test Adventure',
   totalDistanceKm: 100,
+  totalElevationGainM: null,
   segments: [
     {
       id: 'seg-1',
@@ -198,6 +210,7 @@ const makeMapResponse = (overrides = {}): AdventureMapResponse => ({
       cumulativeStartKm: 0,
       distanceKm: 50,
       parseStatus: 'done',
+      source: null,
       waypoints: [
         { lat: 43.0, lng: 1.0, ele: 100, distKm: 0 },
         { lat: 43.5, lng: 1.5, ele: 200, distKm: 50 },
@@ -211,6 +224,7 @@ const makeMapResponse = (overrides = {}): AdventureMapResponse => ({
       cumulativeStartKm: 50,
       distanceKm: 50,
       parseStatus: 'pending',
+      source: 'strava',
       waypoints: null,
       boundingBox: null,
     },

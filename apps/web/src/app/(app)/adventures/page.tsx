@@ -2,6 +2,10 @@ import { Suspense } from 'react'
 import { AdventureList, AdventureListSkeleton } from './_components/adventure-list'
 import { CreateAdventureButton } from './_components/create-adventure-button'
 
+// Client components import better-auth/react which fails during static prerender (no browser context).
+// This page requires auth anyway, so static generation is never useful.
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: "Mes aventures — Ride'n'Rest",
 }

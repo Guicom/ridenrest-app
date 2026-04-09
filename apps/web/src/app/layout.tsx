@@ -9,8 +9,9 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Ride'n'Rest — Find accommodation along your route",
-  description: "Plan your bikepacking adventure. Find hotels, hostels and camping along your GPX route.",
+  title: "Ride'n'Rest — Planifis tes nuits à vélo",
+  description:
+    "L'outil de navigation essentiel pour les cyclistes longue distance. Planifie tes nuits sans quitter ton itinéraire.",
 };
 
 export const viewport: Viewport = {

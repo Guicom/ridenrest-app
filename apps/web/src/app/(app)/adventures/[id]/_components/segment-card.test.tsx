@@ -236,7 +236,7 @@ describe('SegmentCard — rename Escape cancels without saving', () => {
 })
 
 describe('SegmentCard — Strava badge', () => {
-  it('shows "Via Strava" badge when source === "strava"', () => {
+  it('shows "Powered by Strava" badge when source === "strava"', () => {
     render(
       <SegmentCard
         segment={makeSegment({ source: 'strava' })}
@@ -244,8 +244,9 @@ describe('SegmentCard — Strava badge', () => {
       />,
     )
 
-    expect(screen.getByText('Via Strava')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Strava' })).toBeInTheDocument()
+    const img = screen.getByAltText('Powered by Strava') as HTMLImageElement
+    expect(img).toBeInTheDocument()
+    expect(img.src).toContain('powered-by-strava.svg')
   })
 
   it('does NOT show badge when source is null (manual upload)', () => {
@@ -256,7 +257,7 @@ describe('SegmentCard — Strava badge', () => {
       />,
     )
 
-    expect(screen.queryByText('Via Strava')).not.toBeInTheDocument()
+    expect(screen.queryByAltText('Powered by Strava')).not.toBeInTheDocument()
   })
 
   it('does NOT show badge when segment is in pending state', () => {
@@ -267,6 +268,6 @@ describe('SegmentCard — Strava badge', () => {
       />,
     )
 
-    expect(screen.queryByText('Via Strava')).not.toBeInTheDocument()
+    expect(screen.queryByAltText('Powered by Strava')).not.toBeInTheDocument()
   })
 })

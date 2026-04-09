@@ -111,7 +111,30 @@ export default function MentionsLegalesPage() {
 
             <section>
               <h2 className="text-xl font-semibold text-[#4A7C44] uppercase tracking-wider mb-4">
-                8. Limitation de responsabilité
+                8. Données Strava
+              </h2>
+              <div className="text-sage leading-relaxed space-y-3">
+                <p>
+                  <strong className="text-earth-dark">Types de données collectées :</strong> Routes GPS (tracés GPX) importées depuis votre compte Strava.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Méthode :</strong> Via OAuth 2.0, scope read-only (<code>read,read_all</code>), à votre initiative uniquement.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Déconnexion :</strong> Paramètres &gt; Déconnecter Strava — supprime le token et révoque l&apos;accès auprès de Strava.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Conservation :</strong> Les routes importées restent dans vos aventures. Le token OAuth est supprimé et révoqué à la déconnexion.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Pas de partage :</strong> Vos données Strava ne sont jamais partagées avec des tiers.
+                </p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-xl font-semibold text-[#4A7C44] uppercase tracking-wider mb-4">
+                9. Limitation de responsabilité
               </h2>
               <p className="text-sage leading-relaxed">
                 L&apos;éditeur s&apos;efforce d&apos;assurer l&apos;exactitude et la mise à jour des informations diffusées sur le

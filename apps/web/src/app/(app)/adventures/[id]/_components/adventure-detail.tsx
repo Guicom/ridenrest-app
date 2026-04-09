@@ -55,6 +55,7 @@ import { trackGpxUploaded } from '@/lib/analytics'
 import { GpxUploadForm } from './gpx-upload-form'
 import { SortableSegmentCard } from './sortable-segment-card'
 import { StravaImportModal } from './strava-import-modal'
+import { isStravaEnabled } from '@/lib/strava-config'
 import { DensityTriggerButton } from './density-trigger-button'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
@@ -455,14 +456,22 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
           <h2 className="text-lg font-semibold">Segments</h2>
           <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full sm:w-auto rounded-full gap-2 px-6 py-6 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
-              onClick={() => setStravaImportOpen(true)}
-            >
-              Importer depuis Strava
-            </Button>
+            <div className="relative group">
+              <Button
+                variant="outline"
+                size="lg"
+                className={`w-full sm:w-auto rounded-full gap-2 px-6 py-6 border-primary/30 text-primary hover:bg-primary/10 hover:text-primary${!isStravaEnabled() && !stravaConnected ? ' opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => setStravaImportOpen(true)}
+                disabled={!isStravaEnabled() && !stravaConnected}
+              >
+                Importer depuis Strava
+              </Button>
+              {!isStravaEnabled() && !stravaConnected && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 hidden group-hover:block whitespace-nowrap rounded bg-foreground px-2 py-1 text-xs text-background shadow pointer-events-none">
+                  L&apos;intégration Strava est temporairement indisponible
+                </div>
+              )}
+            </div>
             <Button
               variant="ghost"
               size="lg"
@@ -470,7 +479,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
               onClick={() => { setUploadPending(false); setShowUploadForm(true) }}
             >
               <Upload className="h-4 w-4" />
-              {segments.length > 0 ? '+ Ajouter un segment' : 'Ajouter un segment GPX'}
+              {segments.length > 0 ? 'Ajouter un segment' : 'Ajouter un segment GPX'}
             </Button>
           </div>
         </div>

@@ -2639,6 +2639,36 @@ So that search results always target the correct geographic location — even fo
 
 ---
 
+### Story 16.32: Attribution Strava — Badge et Logo sur Carte et Liste des Aventures
+
+> **Ajouté 2026-04-09** — Conformité Strava Brand Guidelines + UX. Afficher le logo Strava sur la carte (planning + live) et le badge dans la liste des aventures quand des segments Strava sont présents.
+
+As a **cyclist who imports routes from Strava**,
+I want to see the Strava logo on the map and in my adventures list when Strava data is present,
+So that I can quickly identify which adventures use Strava imports and the app respects Strava brand attribution requirements.
+
+**Acceptance Criteria:**
+
+**Given** la carte Planning et au moins un segment a `source === 'strava'`,
+**When** la carte est rendue,
+**Then** le logo Strava est affiché en bas à gauche de la carte.
+
+**Given** la carte Live et au moins un segment a `source === 'strava'`,
+**When** la carte est rendue,
+**Then** le logo Strava est affiché en haut à droite, avant les boutons layers/zoom/recentre.
+
+**Given** la liste des aventures,
+**When** une aventure possède au moins un segment `source = 'strava'`,
+**Then** le picto Strava + "Via Strava" est affiché sous le kilométrage et le D+.
+
+**Technical notes:**
+- Ajouter `hasStravaSegment: boolean` à `AdventureResponse` (subquery EXISTS côté repository)
+- Ajouter `source: string | null` à `MapSegmentData` (déjà en DB, manque dans le type partagé)
+- Réutiliser `/public/strava-logo.svg` existant (pattern `segment-card.tsx`)
+- Positionnement carte : modèle `OsmAttribution` (`absolute` + `z-10`)
+
+---
+
 ## Epic 12: PWA & Offline Capability
 
 > **Note 2026-03-18 : renommé depuis Epic 8 / Epic 11** — numérotation mise à jour suite à l'insertion des épics 8, 9 (App Shell, Redesign) et 11 (Stage Planning). Contenu inchangé.

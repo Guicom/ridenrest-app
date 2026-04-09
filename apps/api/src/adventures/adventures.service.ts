@@ -15,18 +15,20 @@ export class AdventuresService {
 
   async createAdventure(userId: string, name: string): Promise<AdventureResponse> {
     const adventure = await this.adventuresRepo.create({ userId, name })
-    return this.toResponse(adventure)
+    return this.toResponse(adventure, false)
   }
 
   async listAdventures(userId: string): Promise<AdventureResponse[]> {
     const rows = await this.adventuresRepo.findAllByUserId(userId)
-    return rows.map((a) => this.toResponse(a))
+    const stravaIds = await this.adventuresRepo.findAdventureIdsWithStravaSegments(rows.map((a) => a.id))
+    return rows.map((a) => this.toResponse(a, stravaIds.has(a.id)))
   }
 
   async getAdventure(id: string, userId: string): Promise<AdventureResponse> {
     const adventure = await this.adventuresRepo.findByIdAndUserId(id, userId)
     if (!adventure) throw new NotFoundException('Adventure not found')
-    return this.toResponse(adventure)
+    const stravaIds = await this.adventuresRepo.findAdventureIdsWithStravaSegments([id])
+    return this.toResponse(adventure, stravaIds.has(id))
   }
 
   async verifyOwnership(id: string, userId: string): Promise<void> {
@@ -65,7 +67,8 @@ export class AdventuresService {
       adventure = (await this.adventuresRepo.findByIdAndUserId(id, userId))!
     }
 
-    return this.toResponse(adventure)
+    const stravaIds = await this.adventuresRepo.findAdventureIdsWithStravaSegments([id])
+    return this.toResponse(adventure, stravaIds.has(id))
   }
 
   async getMapData(adventureId: string, userId: string): Promise<AdventureMapResponse> {
@@ -82,7 +85,7 @@ export class AdventuresService {
     return { deleted: true }
   }
 
-  private toResponse(a: Adventure): AdventureResponse {
+  private toResponse(a: Adventure, hasStravaSegment: boolean): AdventureResponse {
     return {
       id: a.id,
       userId: a.userId,
@@ -95,6 +98,7 @@ export class AdventuresService {
       densityStatus: a.densityStatus,
       densityProgress: a.densityProgress,
       avgSpeedKmh: a.avgSpeedKmh,
+      hasStravaSegment,
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),
     }

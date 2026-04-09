@@ -19,6 +19,7 @@ export interface MapSegmentData {
   cumulativeStartKm: number
   distanceKm: number
   parseStatus: ParseStatus
+  source: string | null
   waypoints: MapWaypoint[] | null  // null if not parsed yet
   boundingBox: { minLat: number; maxLat: number; minLng: number; maxLng: number } | null
 }
@@ -44,6 +45,7 @@ export interface AdventureResponse {
   densityStatus: DensityStatus
   densityProgress: number  // 0–100
   avgSpeedKmh: number
+  hasStravaSegment: boolean
   createdAt: string  // ISO 8601
   updatedAt: string
 }

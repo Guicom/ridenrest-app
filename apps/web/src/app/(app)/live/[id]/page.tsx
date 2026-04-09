@@ -350,6 +350,9 @@ export default function LivePage() {
           >
             Live
           </Badge>
+          {readySegments.some((s) => s.source === 'strava') && (
+            <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
+          )}
         </div>
 
         {/* Consent modal — z-60 */}
