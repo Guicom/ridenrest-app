@@ -31,6 +31,8 @@ ridenrest.app {
 }
 
 api.ridenrest.app {
+  # Force HTTP/1.1 to browser — prevents ERR_HTTP2_PROTOCOL_ERROR on stale HTTP/2 streams
+  protocols h1
   reverse_proxy host.docker.internal:3010
   header {
     X-Frame-Options DENY
