@@ -13,20 +13,46 @@ class ApiError extends Error {
   }
 }
 
+// In-memory JWT cache — avoids a network round-trip to /api/auth/token before every API call.
+// This also prevents concurrent HTTP/2 requests (token + actual call) that can cause stream resets.
+let cachedToken: string | null = null
+let cachedTokenExp = 0
+
 export function invalidateAuthTokenCache(): void {
-  // No-op — authClient.getToken() handles caching internally
+  cachedToken = null
+  cachedTokenExp = 0
 }
 
-// Use Better Auth jwtClient plugin to get JWT — handles session cookie + caching
+function parseJwtExp(token: string): number {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]!))
+    return (payload.exp ?? 0) * 1000 // seconds → ms
+  } catch {
+    return 0
+  }
+}
+
 async function getAuthToken(): Promise<string | null> {
+  // Return cached token if still valid (with 30s safety margin)
+  if (cachedToken && cachedTokenExp > Date.now() + 30_000) {
+    return cachedToken
+  }
   try {
     const result = await authClient.token()
-    // Better Auth jwtClient returns either { data: { token } } or { data: tokenString }
     const data = result?.data
-    if (typeof data === 'string') return data
-    if (data && typeof data === 'object' && 'token' in data) return (data as { token: string }).token
-    return null
+    const token = typeof data === 'string'
+      ? data
+      : (data && typeof data === 'object' && 'token' in data)
+        ? (data as { token: string }).token
+        : null
+    if (token) {
+      cachedToken = token
+      cachedTokenExp = parseJwtExp(token)
+    }
+    return token
   } catch {
+    cachedToken = null
+    cachedTokenExp = 0
     return null
   }
 }
@@ -47,7 +73,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     if (res.status === 401) {
-      // Token expired — next call to getAuthToken() will fetch a fresh one
+      invalidateAuthTokenCache()
     }
     const body = await res.json().catch(() => ({}))
     throw new ApiError(

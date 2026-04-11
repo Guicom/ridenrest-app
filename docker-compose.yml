@@ -29,7 +29,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --stop-writes-on-bgsave-error no
 
   uptime-kuma:
     image: louislam/uptime-kuma:1
