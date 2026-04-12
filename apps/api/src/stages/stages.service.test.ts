@@ -225,9 +225,13 @@ describe('getStageWeather', () => {
       speedKmh: 15,
     })
 
-    const calledSpeed = mockWeatherService.getWeatherAtKm.mock.calls[0]![3] as number
     // effectiveSpeed = 45.4 / (45.4/20 + 2) = 45.4 / 4.27 ≈ 10.632
-    expect(calledSpeed).toBeCloseTo(10.632, 2)
+    expect(mockWeatherService.getWeatherAtKm).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      '2026-03-22T08:00:00.000Z',
+      expect.closeTo(10.632, 2),
+    )
   })
 
   it('adds pauseHours to ETA via effective slower speed (with departureTime branch)', async () => {
@@ -246,8 +250,6 @@ describe('getStageWeather', () => {
     })
 
     // effectiveSpeed = 45.4 / (45.4/18 + 1.5) = 45.4 / (2.5222 + 1.5) = 45.4 / 4.0222 ≈ 11.286
-    const calledSpeed = mockWeatherService.getWeatherAtKmWithEta.mock.calls[0]![4] as number
-    expect(calledSpeed).toBeCloseTo(11.286, 2)
     expect(mockWeatherService.getWeatherAtKmWithEta).toHaveBeenCalledWith(
       'adv-1',
       95.4,
