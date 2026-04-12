@@ -47,8 +47,6 @@ interface StageCardProps {
   /** Callbacks (planning only) */
   onEdit?: (stage: AdventureStageResponse) => void
   onDelete?: (stage: AdventureStageResponse) => void
-  /** Slot for extra content inside the card (e.g. StageDepartureInput) */
-  children?: React.ReactNode
 }
 
 export function StageCard({
@@ -63,7 +61,6 @@ export function StageCard({
   speedKmh,
   onEdit,
   onDelete,
-  children,
 }: StageCardProps) {
   const isPlanning = mode === 'planning'
 
@@ -152,8 +149,18 @@ export function StageCard({
         </div>
       )}
 
-      {/* Slot for extra content (e.g. StageDepartureInput in planning mode) */}
-      {children}
+      {/* Line 4: ETA (planning mode) */}
+      {isPlanning && stage.etaMinutes != null && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground pl-5">
+          <span>
+            ETA {formatEta(stage.etaMinutes)}
+            {stage.pauseHours != null && stage.pauseHours > 0 && (
+              <> (dont {formatEta(stage.pauseHours * 60)} pause)</>
+            )}
+          </span>
+        </div>
+      )}
+
     </div>
   )
 }

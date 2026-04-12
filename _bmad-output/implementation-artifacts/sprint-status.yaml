@@ -260,4 +260,5 @@ development_status:
   17-4-elevation-loss-d-minus-everywhere: done              # D- partout où D+ est affiché (API + DB + frontend)
   17-5-stage-cartouche-redesign-planning-live: done         # review complète — 7 patches appliqués, max-h-90 voulu
   17-6-live-filter-stage-badges: done                  # badges étapes dans drawer filtres live mode — reviewed 2026-04-09
+  17-7-stage-per-stage-speed-pause-eta: done  # vitesse + pause par étape, ETA individuelle, suppression doublon date — code review 2026-04-12
   epic-17-retrospective: optional

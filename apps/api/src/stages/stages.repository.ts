@@ -44,7 +44,7 @@ export class StagesRepository {
     return row as AdventureStage
   }
 
-  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'startKm' | 'orderIndex' | 'distanceKm' | 'elevationGainM' | 'elevationLossM' | 'etaMinutes'>>): Promise<AdventureStage> {
+  async update(id: string, data: Partial<Pick<AdventureStage, 'name' | 'color' | 'endKm' | 'startKm' | 'orderIndex' | 'distanceKm' | 'elevationGainM' | 'elevationLossM' | 'etaMinutes' | 'speedKmh' | 'pauseHours' | 'departureTime'>>): Promise<AdventureStage> {
     const [row] = await db
       .update(adventureStages)
       .set({ ...data, updatedAt: new Date() })
@@ -128,7 +128,7 @@ export class StagesRepository {
   async findByIdWithAdventureUserId(
     id: string,
     userId: string,
-  ): Promise<{ id: string; adventureId: string; endKm: number; distanceKm: number; departureTime: Date | null } | null> {
+  ): Promise<{ id: string; adventureId: string; endKm: number; distanceKm: number; departureTime: Date | null; speedKmh: number | null; pauseHours: number | null } | null> {
     const [row] = await db
       .select({
         id: adventureStages.id,
@@ -136,6 +136,8 @@ export class StagesRepository {
         endKm: adventureStages.endKm,
         distanceKm: adventureStages.distanceKm,
         departureTime: adventureStages.departureTime,
+        speedKmh: adventureStages.speedKmh,
+        pauseHours: adventureStages.pauseHours,
       })
       .from(adventureStages)
       .innerJoin(adventures, eq(adventureStages.adventureId, adventures.id))

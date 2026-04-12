@@ -14,6 +14,8 @@ const makeStage = (
   elevationGainM: number | null = null,
   etaMinutes: number | null = null,
   departureTime: Date | null = null,
+  speedKmh: number | null = null,
+  pauseHours: number | null = null,
 ): AdventureStage => ({
   id,
   adventureId: 'adv-1',
@@ -27,6 +29,8 @@ const makeStage = (
   elevationLossM: null,
   etaMinutes,
   departureTime,
+  speedKmh,
+  pauseHours,
   createdAt: new Date(),
   updatedAt: new Date(),
 })
@@ -90,6 +94,8 @@ const SAMPLE_STAGE_FOR_WEATHER = {
   endKm: 95.4,
   distanceKm: 45.4,
   departureTime: null as Date | null,
+  speedKmh: null as number | null,
+  pauseHours: null as number | null,
 }
 
 const SAMPLE_WEATHER_POINT = {
@@ -148,7 +154,7 @@ describe('getStageWeather', () => {
     expect(result).toEqual(SAMPLE_WEATHER_POINT)
   })
 
-  it('falls back to no departure time when neither stage nor global is set', async () => {
+  it('falls back to no departure time and default 15km/h when neither stage nor global is set', async () => {
     mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(SAMPLE_STAGE_FOR_WEATHER)
     mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
 
@@ -158,7 +164,7 @@ describe('getStageWeather', () => {
       'adv-1',
       95.4,
       undefined,  // no departure time at all
-      undefined,
+      15,         // default speed fallback
     )
     expect(result).toEqual(SAMPLE_WEATHER_POINT)
   })
@@ -178,6 +184,100 @@ describe('getStageWeather', () => {
 
     const result = await service.getStageWeather('stage-1', 'user-1', {})
     expect(result).toBeNull()
+  })
+
+  it('uses stage.speedKmh when defined (priority over dto.speedKmh)', async () => {
+    const stageWithSpeed = {
+      ...SAMPLE_STAGE_FOR_WEATHER,
+      speedKmh: 20,
+    }
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(stageWithSpeed)
+    mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    await service.getStageWeather('stage-1', 'user-1', {
+      departureTime: '2026-03-22T08:00:00.000Z',
+      speedKmh: 15, // global — should be overridden by stage.speedKmh
+    })
+
+    // Should use stage.speedKmh (20) not dto.speedKmh (15)
+    expect(mockWeatherService.getWeatherAtKm).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      '2026-03-22T08:00:00.000Z',
+      20,
+    )
+  })
+
+  it('adds pauseHours to ETA via effective slower speed (no departureTime branch)', async () => {
+    // distanceKm=45.4, speedKmh=20, pauseHours=2
+    // ridingHours = 45.4/20 = 2.27h, totalHours = 2.27+2 = 4.27h
+    // effectiveSpeed = 45.4/4.27 ≈ 10.632...
+    const stageWithPause = {
+      ...SAMPLE_STAGE_FOR_WEATHER,
+      speedKmh: 20,
+      pauseHours: 2,
+    }
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(stageWithPause)
+    mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    await service.getStageWeather('stage-1', 'user-1', {
+      departureTime: '2026-03-22T08:00:00.000Z',
+      speedKmh: 15,
+    })
+
+    const calledSpeed = mockWeatherService.getWeatherAtKm.mock.calls[0]![3] as number
+    // effectiveSpeed = 45.4 / (45.4/20 + 2) = 45.4 / 4.27 ≈ 10.632
+    expect(calledSpeed).toBeCloseTo(10.632, 2)
+  })
+
+  it('adds pauseHours to ETA via effective slower speed (with departureTime branch)', async () => {
+    const stageDepartureTime = new Date('2026-04-08T07:00:00.000Z')
+    const stageWithDepartureAndPause = {
+      ...SAMPLE_STAGE_FOR_WEATHER,
+      departureTime: stageDepartureTime,
+      speedKmh: 18,
+      pauseHours: 1.5,
+    }
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(stageWithDepartureAndPause)
+    mockWeatherService.getWeatherAtKmWithEta.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    await service.getStageWeather('stage-1', 'user-1', {
+      speedKmh: 15,
+    })
+
+    // effectiveSpeed = 45.4 / (45.4/18 + 1.5) = 45.4 / (2.5222 + 1.5) = 45.4 / 4.0222 ≈ 11.286
+    const calledSpeed = mockWeatherService.getWeatherAtKmWithEta.mock.calls[0]![4] as number
+    expect(calledSpeed).toBeCloseTo(11.286, 2)
+    expect(mockWeatherService.getWeatherAtKmWithEta).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      stageDepartureTime.toISOString(),
+      45.4,
+      expect.closeTo(11.286, 2),
+    )
+  })
+
+  it('does not adjust speed when pauseHours is 0', async () => {
+    const stageWithZeroPause = {
+      ...SAMPLE_STAGE_FOR_WEATHER,
+      speedKmh: 20,
+      pauseHours: 0,
+    }
+    mockStagesRepo.findByIdWithAdventureUserId.mockResolvedValue(stageWithZeroPause)
+    mockWeatherService.getWeatherAtKm.mockResolvedValue(SAMPLE_WEATHER_POINT)
+
+    await service.getStageWeather('stage-1', 'user-1', {
+      departureTime: '2026-03-22T08:00:00.000Z',
+      speedKmh: 15,
+    })
+
+    // Should use stage.speedKmh (20) directly, no slowdown
+    expect(mockWeatherService.getWeatherAtKm).toHaveBeenCalledWith(
+      'adv-1',
+      95.4,
+      '2026-03-22T08:00:00.000Z',
+      20,
+    )
   })
 })
 
@@ -220,9 +320,9 @@ describe('computeEtaMinutes', () => {
     expect(computeEtaMinutes(15, null)).toBe(60)
   })
 
-  it('adds climb penalty', () => {
-    // 10km/15*60 + 150/100*6 = 40 + 9 = 49
-    expect(computeEtaMinutes(10, 150)).toBe(49)
+  it('ignores elevationGainM — D+ is managed by the user via per-stage speed', () => {
+    // 10km at 15km/h = 40 min — D+ ignored
+    expect(computeEtaMinutes(10, 150)).toBe(40)
   })
 
   it('uses speedKmh param when provided — differs from default', () => {
@@ -231,9 +331,9 @@ describe('computeEtaMinutes', () => {
     expect(computeEtaMinutes(10, null, 20)).toBe(30)
   })
 
-  it('uses speedKmh param in eta calculation', () => {
-    // 10km at 20km/h + 150m D+ → 30 + 9 = 39
-    expect(computeEtaMinutes(10, 150, 20)).toBe(39)
+  it('uses speedKmh param in eta calculation — D+ ignored', () => {
+    // 10km at 20km/h = 30 min — D+ ignored
+    expect(computeEtaMinutes(10, 150, 20)).toBe(30)
   })
 })
 
@@ -293,16 +393,16 @@ describe('createStage — normal case', () => {
   it('computes elevationGainM and etaMinutes from waypoints (startKm=0, endKm=10)', async () => {
     // Waypoints: [0→200ele, 5→350ele(+150), 10→300ele(-50 ignored)]
     // elevationGainM = 150, distanceKm = 10
-    // etaMinutes = round((10/15)*60 + (150/100)*6) = round(40 + 9) = 49
+    // etaMinutes = round((10/15)*60) = round(40) = 40 — D+ ignored
     mockStagesRepo.findLastByAdventureId.mockResolvedValue(undefined)
     mockStagesRepo.countByAdventureId.mockResolvedValue(0)
-    const created = makeStage('s1', 0, 0, 10, 150, 49)
+    const created = makeStage('s1', 0, 0, 10, 150, 40)
     mockStagesRepo.create.mockResolvedValue(created)
 
     await service.createStage('adv-1', 'user-1', { name: 'S1', endKm: 10, color: '#f97316' })
 
     expect(mockStagesRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ elevationGainM: 150, elevationLossM: 50, etaMinutes: 49 }),
+      expect.objectContaining({ elevationGainM: 150, elevationLossM: 50, etaMinutes: 40 }),
     )
   })
 
@@ -334,9 +434,9 @@ describe('createStage — normal case', () => {
 
     await service.createStage('adv-1', 'user-1', { name: 'S1', endKm: 10, color: '#f97316' })
 
-    // 10km at 20km/h + 150m D+ → 30 + 9 = 39
+    // 10km at 20km/h = 30 min — D+ ignored
     expect(mockStagesRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ etaMinutes: 39 }),
+      expect.objectContaining({ etaMinutes: 30 }),
     )
   })
 })
@@ -349,11 +449,11 @@ describe('createStage — split case', () => {
     // New stage: endKm=40, splits into [0,40] at idx 0 and [40,100] at idx 1
     // defaultWaypoints go to km15 — all fall in [0,40], so elevationGainM for new stage = 300
     // remainder [40,100]: no waypoints → elevationGainM = null
-    // etaMinutes new: round((40/15)*60 + (300/100)*6) = round(160+18) = 178
-    // etaMinutes remainder: round((60/15)*60 + 0) = 240
+    // etaMinutes new: round((40/15)*60) = round(160) = 160 — D+ ignored
+    // etaMinutes remainder: round((60/15)*60) = 240
     const splitTarget = makeStage('s1', 0, 0, 100)
     mockStagesRepo.findContaining.mockResolvedValue(splitTarget)
-    const newStage = makeStage('new', 0, 0, 40, 300, 178)
+    const newStage = makeStage('new', 0, 0, 40, 300, 160)
     mockStagesRepo.createWithSplit.mockResolvedValue(newStage)
 
     const result = await service.createStage('adv-1', 'user-1', {
@@ -375,7 +475,7 @@ describe('createStage — split case', () => {
           distanceKm: 40,
           elevationGainM: 300,
           elevationLossM: 50,
-          etaMinutes: 178,
+          etaMinutes: 160,
         }),
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         remainderUpdate: expect.objectContaining({
@@ -436,9 +536,9 @@ describe('updateStage', () => {
   it('updateStage with endKm updates distanceKm and computes elevationGainM+etaMinutes', async () => {
     // Stage [0, 50] → endKm becomes 10
     // elevationGainM for [0, 10] = 150 (km5: +150, km10: -50 ignored)
-    // etaMinutes = round((10/15)*60 + (150/100)*6) = 49
+    // etaMinutes = round((10/15)*60) = 40 — D+ ignored
     const stage = makeStage('s1', 0, 0, 50)
-    const updated = makeStage('s1', 0, 0, 10, 150, 49)
+    const updated = makeStage('s1', 0, 0, 10, 150, 40)
     mockStagesRepo.findByIdAndAdventureId.mockResolvedValueOnce(stage)
     mockStagesRepo.findSubsequent.mockResolvedValue([])
     mockStagesRepo.update.mockResolvedValue(updated)
@@ -450,7 +550,7 @@ describe('updateStage', () => {
       distanceKm: 10,
       elevationGainM: 150,
       elevationLossM: 50,
-      etaMinutes: 49,
+      etaMinutes: 40,
     }))
     expect(result.endKm).toBe(10)
   })
@@ -539,10 +639,9 @@ describe('deleteStage', () => {
 // ─── recomputeAllEtasForAdventure ─────────────────────────────────────────────
 
 describe('recomputeAllEtasForAdventure', () => {
-  it('recomputes etaMinutes for all stages using stored elevationGainM and new speedKmh', async () => {
-    // recomputeAllEtasForAdventure uses the stored elevationGainM (not re-derived from waypoints)
-    // stage1 [0,15] elevationGainM=300: etaMinutes at 20km/h = round((15/20)*60 + (300/100)*6) = round(45+18) = 63
-    // stage2 [15,50] elevationGainM=null: etaMinutes at 20km/h = round((35/20)*60) = round(105) = 105
+  it('recomputes etaMinutes for all stages using new speedKmh — D+ ignored', async () => {
+    // stage1 [0,15] at 20km/h = round((15/20)*60) = round(45) = 45 — D+ ignored
+    // stage2 [15,50] at 20km/h = round((35/20)*60) = round(105) = 105
     const stage1 = makeStage('s1', 0, 0, 15, 300)
     const stage2 = makeStage('s2', 1, 15, 50, null)
     mockStagesRepo.findByAdventureId.mockResolvedValue([stage1, stage2])
@@ -551,7 +650,7 @@ describe('recomputeAllEtasForAdventure', () => {
     await service.recomputeAllEtasForAdventure('adv-1', 20)
 
     expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 's1', etaMinutes: 63 }),
+      expect.objectContaining({ id: 's1', etaMinutes: 45 }),
       expect.objectContaining({ id: 's2', etaMinutes: 105 }),
     ])
   })
@@ -563,5 +662,145 @@ describe('recomputeAllEtasForAdventure', () => {
 
     expect(mockStagesRepo.updateMany).not.toHaveBeenCalled()
     expect(mockAdventuresService.getAdventureWaypoints).not.toHaveBeenCalled()
+  })
+
+  it('uses per-stage speedKmh and pauseHours when set', async () => {
+    // stage1: speedKmh=10, pauseHours=2 → round((15/10)*60) + round(2*60) = 90 + 120 = 210
+    // stage2: speedKmh=null (fallback to global 20), pauseHours=0.5 → round((35/20)*60) + round(0.5*60)
+    //   = 105 + 30 = 135
+    const stage1 = makeStage('s1', 0, 0, 15, 300, null, null, 10, 2)
+    const stage2 = makeStage('s2', 1, 15, 50, null, null, null, null, 0.5)
+    mockStagesRepo.findByAdventureId.mockResolvedValue([stage1, stage2])
+    mockStagesRepo.updateMany.mockResolvedValue(undefined)
+
+    await service.recomputeAllEtasForAdventure('adv-1', 20)
+
+    expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 's1', etaMinutes: 210 }),
+      expect.objectContaining({ id: 's2', etaMinutes: 135 }),
+    ])
+  })
+})
+
+// ─── createStage with speedKmh/pauseHours ────────────────────────────────────
+
+describe('createStage — with speedKmh and pauseHours', () => {
+  it('uses dto.speedKmh for ETA and stores it in DB', async () => {
+    mockStagesRepo.findLastByAdventureId.mockResolvedValue(undefined)
+    mockStagesRepo.countByAdventureId.mockResolvedValue(0)
+    const created = makeStage('s1', 0, 0, 10, 150, null, null, 20, null)
+    mockStagesRepo.create.mockResolvedValue(created)
+
+    await service.createStage('adv-1', 'user-1', {
+      name: 'S1', endKm: 10, color: '#f97316', speedKmh: 20,
+    })
+
+    // 10km at 20km/h = 30 min — D+ ignored
+    expect(mockStagesRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ speedKmh: 20, pauseHours: null, etaMinutes: 30 }),
+    )
+  })
+
+  it('adds pauseHours to ETA', async () => {
+    mockStagesRepo.findLastByAdventureId.mockResolvedValue(undefined)
+    mockStagesRepo.countByAdventureId.mockResolvedValue(0)
+    const created = makeStage('s1', 0, 0, 10)
+    mockStagesRepo.create.mockResolvedValue(created)
+
+    await service.createStage('adv-1', 'user-1', {
+      name: 'S1', endKm: 10, color: '#f97316', pauseHours: 1.5,
+    })
+
+    // 10km at 15km/h = 40 min riding + 90 min pause = 130 — D+ ignored
+    expect(mockStagesRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ speedKmh: null, pauseHours: 1.5, etaMinutes: 130 }),
+    )
+  })
+
+  it('passes departureTime to create', async () => {
+    mockStagesRepo.findLastByAdventureId.mockResolvedValue(undefined)
+    mockStagesRepo.countByAdventureId.mockResolvedValue(0)
+    const created = makeStage('s1', 0, 0, 10)
+    mockStagesRepo.create.mockResolvedValue(created)
+
+    await service.createStage('adv-1', 'user-1', {
+      name: 'S1', endKm: 10, color: '#f97316',
+      departureTime: '2026-04-15T07:00:00.000Z',
+    })
+
+    expect(mockStagesRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ departureTime: new Date('2026-04-15T07:00:00.000Z') }),
+    )
+  })
+})
+
+// ─── updateStage with speedKmh/pauseHours ────────────────────────────────────
+
+describe('updateStage — with speedKmh and pauseHours', () => {
+  it('recomputes ETA when speedKmh changes (no endKm change)', async () => {
+    const stage = makeStage('s1', 0, 0, 10, 150, 40)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValue(stage)
+    mockStagesRepo.update.mockResolvedValue({ ...stage, speedKmh: 20, etaMinutes: 30 })
+
+    await service.updateStage('adv-1', 's1', 'user-1', { speedKmh: 20 })
+
+    // 10km at 20km/h = 30 min — D+ ignored
+    expect(mockStagesRepo.update).toHaveBeenCalledWith('s1', expect.objectContaining({
+      etaMinutes: 30, speedKmh: 20,
+    }))
+  })
+
+  it('recomputes ETA when pauseHours changes (no endKm change)', async () => {
+    const stage = makeStage('s1', 0, 0, 10, 150, 40)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValue(stage)
+    mockStagesRepo.update.mockResolvedValue({ ...stage, pauseHours: 2, etaMinutes: 160 })
+
+    await service.updateStage('adv-1', 's1', 'user-1', { pauseHours: 2 })
+
+    // 10km at 15km/h = 40 min riding + 120 min pause = 160 — D+ ignored
+    expect(mockStagesRepo.update).toHaveBeenCalledWith('s1', expect.objectContaining({
+      etaMinutes: 160, pauseHours: 2,
+    }))
+  })
+
+  it('uses per-stage speedKmh in cascade when endKm changes', async () => {
+    const stage1 = makeStage('s1', 0, 0, 50)
+    const stage2 = makeStage('s2', 1, 50, 100, null, null, null, 20, 1)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValueOnce(stage1)
+    mockStagesRepo.findSubsequent.mockResolvedValue([stage2])
+    mockStagesRepo.update.mockResolvedValue(makeStage('s1', 0, 0, 10))
+    mockStagesRepo.updateMany.mockResolvedValue(undefined)
+
+    await service.updateStage('adv-1', 's1', 'user-1', { endKm: 10 })
+
+    // stage2 cascaded: startKm=10, distKm=90, speed=20 (per-stage), pause=1h=60min
+    // riding = round((90/20)*60) = round(270) = 270 — D+ ignored
+    // total = 270 + 60 = 330
+    expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 's2', etaMinutes: 330 }),
+    ])
+  })
+})
+
+// ─── deleteStage with per-stage speed/pause ────────���─────────────────────────
+
+describe('deleteStage — with per-stage speed/pause', () => {
+  it('uses per-stage speedKmh and pauseHours when recalculating cascade', async () => {
+    const stage1 = makeStage('s1', 0, 0, 50)
+    mockStagesRepo.findByIdAndAdventureId.mockResolvedValue(stage1)
+    mockStagesRepo.delete.mockResolvedValue(undefined)
+    // After deleting s1, remaining: s2 (has per-stage speed/pause)
+    const stage2 = makeStage('s2', 1, 50, 100, null, null, null, 10, 0.5)
+    mockStagesRepo.findByAdventureId.mockResolvedValue([stage2])
+    mockStagesRepo.updateMany.mockResolvedValue(undefined)
+
+    await service.deleteStage('adv-1', 's1', 'user-1')
+
+    // stage2 cascaded: startKm=0, endKm=100, distKm=100, speed=10 (per-stage), pause=0.5h=30min
+    // riding = round((100/10)*60) = round(600) = 600 — D+ ignored
+    // total = 600 + 30 = 630
+    expect(mockStagesRepo.updateMany).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 's2', etaMinutes: 630 }),
+    ])
   })
 })

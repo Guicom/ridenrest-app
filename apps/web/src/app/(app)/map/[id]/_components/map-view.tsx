@@ -402,6 +402,7 @@ export function MapView({ adventureId }: MapViewProps) {
         stagesHaveDepartures={hasAnyStageDeparture}
         departureTime={stagePace.departureTime}
         speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
+        defaultSpeedKmh={adventure?.avgSpeedKmh ?? 15}
       />
 
       {/* Météo section — collapsible accordion (Story 8.4 correction) */}

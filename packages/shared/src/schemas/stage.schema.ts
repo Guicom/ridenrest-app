@@ -4,6 +4,9 @@ export const createStageSchema = z.object({
   name: z.string().min(1).max(100),
   endKm: z.number().min(0),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  departureTime: z.string().datetime().optional().nullable(),
+  speedKmh: z.number().min(5).max(50).optional().nullable(),
+  pauseHours: z.number().min(0).max(12).optional().nullable(),
 })
 
 export const updateStageSchema = z.object({
@@ -11,6 +14,8 @@ export const updateStageSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   endKm: z.number().min(0).optional(),
   departureTime: z.string().datetime().optional().nullable(),
+  speedKmh: z.number().min(5).max(50).optional().nullable(),
+  pauseHours: z.number().min(0).max(12).optional().nullable(),
 })
 
 export type CreateStageInput = z.infer<typeof createStageSchema>

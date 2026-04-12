@@ -1,6 +1,6 @@
 'use client'
-import { useState, useCallback } from 'react'
-import { MapPin, X, ChevronDown, ChevronUp, Clock } from 'lucide-react'
+import { useState } from 'react'
+import { MapPin, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -35,56 +35,6 @@ function isoToDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function StageDepartureInput({
-  stage,
-  onUpdate,
-}: {
-  stage: AdventureStageResponse
-  onUpdate: (stageId: string, data: UpdateStageInput) => Promise<void>
-}) {
-  // Controlled local value — same pattern as weather-controls
-  const [localValue, setLocalValue] = useState(
-    stage.departureTime ? isoToDatetimeLocal(stage.departureTime) : '',
-  )
-
-  const handleBlur = useCallback(async (e: React.FocusEvent<HTMLInputElement>) => {
-    const val = e.target.value
-    const currentIso = stage.departureTime ? isoToDatetimeLocal(stage.departureTime) : ''
-    if (val === currentIso) return // no change
-    if (val) {
-      await onUpdate(stage.id, { departureTime: new Date(val).toISOString() })
-    } else {
-      await onUpdate(stage.id, { departureTime: null })
-    }
-  }, [stage.id, stage.departureTime, onUpdate])
-
-  return (
-    <div className="flex items-center gap-1 pl-5">
-      <Clock className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" />
-      <input
-        type="datetime-local"
-        value={localValue}
-        onChange={(e) => setLocalValue(e.target.value)}
-        onBlur={handleBlur}
-        className="text-xs bg-transparent text-muted-foreground w-full outline-none py-0.5"
-        data-testid={`stage-departure-input-${stage.id}`}
-      />
-      {localValue && (
-        <button
-          onClick={async () => {
-            setLocalValue('')
-            await onUpdate(stage.id, { departureTime: null })
-          }}
-          className="text-muted-foreground hover:text-destructive cursor-pointer transition-colors shrink-0"
-          aria-label="Supprimer le départ"
-          data-testid={`stage-departure-clear-${stage.id}`}
-        >
-          <X className="h-3 w-3" />
-        </button>
-      )}
-    </div>
-  )
-}
 
 interface SidebarStagesSectionProps {
   stages: AdventureStageResponse[]
@@ -103,6 +53,7 @@ interface SidebarStagesSectionProps {
   stagesHaveDepartures?: boolean
   departureTime?: string
   speedKmh?: number
+  defaultSpeedKmh?: number
 }
 
 export function SidebarStagesSection({
@@ -122,25 +73,35 @@ export function SidebarStagesSection({
   stagesHaveDepartures = false,
   departureTime,
   speedKmh,
+  defaultSpeedKmh = 15,
 }: SidebarStagesSectionProps) {
 
   const [expanded, setExpanded] = useState(false)
 
   // State for naming dialog (called after a map click)
   const [namingInput, setNamingInput] = useState('')
+  const [namingDepartureTime, setNamingDepartureTime] = useState('')
+  const [namingSpeedKmh, setNamingSpeedKmh] = useState<string>(String(defaultSpeedKmh))
+  const [namingPauseHours, setNamingPauseHours] = useState<string>('0')
 
   // State for edit dialog
   const [editStage, setEditStage] = useState<AdventureStageResponse | null>(null)
   const [editName, setEditName] = useState('')
   const [editColor, setEditColor] = useState('')
+  const [editDepartureTime, setEditDepartureTime] = useState('')
+  const [editSpeedKmh, setEditSpeedKmh] = useState<string>('')
+  const [editPauseHours, setEditPauseHours] = useState<string>('0')
 
   // State for delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<AdventureStageResponse | null>(null)
 
-  // When naming dialog opens, pre-fill default name
+  // When naming dialog opens, pre-fill default name and reset fields
   const handleNamingDialogOpenChange = (open: boolean) => {
     if (open) {
       setNamingInput(`Étape ${stages.length + 1}`)
+      setNamingDepartureTime('')
+      setNamingSpeedKmh(String(defaultSpeedKmh))
+      setNamingPauseHours('0')
     } else {
       onNamingDialogClose()
     }
@@ -151,7 +112,16 @@ export function SidebarStagesSection({
   const handleNamingConfirm = async () => {
     if (pendingEndKm === null) return
     const name = namingInput.trim() || `Étape ${stages.length + 1}`
-    await createStage({ name, endKm: pendingEndKm, color: autoColor })
+    const speed = parseFloat(namingSpeedKmh)
+    const pause = parseFloat(namingPauseHours)
+    await createStage({
+      name,
+      endKm: pendingEndKm,
+      color: autoColor,
+      departureTime: namingDepartureTime ? new Date(namingDepartureTime).toISOString() : null,
+      speedKmh: !isNaN(speed) && speed !== defaultSpeedKmh ? speed : null,
+      pauseHours: !isNaN(pause) && pause > 0 ? pause : null,
+    })
     onNamingDialogClose()
     onExitClickMode()
   }
@@ -160,11 +130,22 @@ export function SidebarStagesSection({
     setEditStage(stage)
     setEditName(stage.name)
     setEditColor(stage.color)
+    setEditDepartureTime(stage.departureTime ? isoToDatetimeLocal(stage.departureTime) : '')
+    setEditSpeedKmh(stage.speedKmh != null ? String(stage.speedKmh) : String(defaultSpeedKmh))
+    setEditPauseHours(stage.pauseHours != null ? String(stage.pauseHours) : '0')
   }
 
   const handleEditSave = async () => {
     if (!editStage) return
-    await updateStage(editStage.id, { name: editName, color: editColor })
+    const speed = parseFloat(editSpeedKmh)
+    const pause = parseFloat(editPauseHours)
+    await updateStage(editStage.id, {
+      name: editName,
+      color: editColor,
+      departureTime: editDepartureTime ? new Date(editDepartureTime).toISOString() : null,
+      speedKmh: !isNaN(speed) && speed !== defaultSpeedKmh ? speed : null,
+      pauseHours: !isNaN(pause) && pause > 0 ? pause : null,
+    })
     setEditStage(null)
   }
 
@@ -246,14 +227,7 @@ export function SidebarStagesSection({
                   speedKmh={speedKmh}
                   onEdit={handleEditOpen}
                   onDelete={setDeleteTarget}
-                >
-                  {/* Per-stage departure time — inside card */}
-                  <StageDepartureInput
-                    key={stage.id + (stage.departureTime ?? '')}
-                    stage={stage}
-                    onUpdate={updateStage}
-                  />
-                </StageCard>
+                />
               ))}
             </div>
           )}
@@ -282,6 +256,38 @@ export function SidebarStagesSection({
               <div
                 className="h-5 w-5 rounded-full border-2 border-white shadow"
                 style={{ backgroundColor: autoColor }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="stage-departure">Date de début</Label>
+              <Input
+                id="stage-departure"
+                type="datetime-local"
+                value={namingDepartureTime}
+                onChange={(e) => setNamingDepartureTime(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="stage-speed">Vitesse moyenne (km/h)</Label>
+              <Input
+                id="stage-speed"
+                type="number"
+                min={5}
+                max={50}
+                value={namingSpeedKmh}
+                onChange={(e) => setNamingSpeedKmh(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="stage-pause">Temps de pause (heures)</Label>
+              <Input
+                id="stage-pause"
+                type="number"
+                min={0}
+                max={12}
+                step={0.5}
+                value={namingPauseHours}
+                onChange={(e) => setNamingPauseHours(e.target.value)}
               />
             </div>
           </div>
@@ -326,6 +332,38 @@ export function SidebarStagesSection({
                   />
                 ))}
               </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-stage-departure">Date de début</Label>
+              <Input
+                id="edit-stage-departure"
+                type="datetime-local"
+                value={editDepartureTime}
+                onChange={(e) => setEditDepartureTime(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-stage-speed">Vitesse moyenne (km/h)</Label>
+              <Input
+                id="edit-stage-speed"
+                type="number"
+                min={5}
+                max={50}
+                value={editSpeedKmh}
+                onChange={(e) => setEditSpeedKmh(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="edit-stage-pause">Temps de pause (heures)</Label>
+              <Input
+                id="edit-stage-pause"
+                type="number"
+                min={0}
+                max={12}
+                step={0.5}
+                value={editPauseHours}
+                onChange={(e) => setEditPauseHours(e.target.value)}
+              />
             </div>
           </div>
           <DialogFooter>

@@ -80,6 +80,8 @@ export interface AdventureStageResponse {
   elevationLossM: number | null   // null if GPX has no elevation data
   etaMinutes: number | null       // null in legacy rows, always set on new rows
   departureTime: string | null    // ISO 8601 per-stage departure time (overrides global)
+  speedKmh: number | null         // per-stage speed override (null = use adventure.avgSpeedKmh)
+  pauseHours: number | null       // hours of pause/rest per stage (null or 0 = no pause)
   createdAt: string
   updatedAt: string
 }

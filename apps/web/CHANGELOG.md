@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — 2026-04-12
+
+### Nouveautés
+- Maintenant il est possible de définir une vitesse moyene, et une durée de pause par étape. La météo sera calculer en tenant compte de ces informaitons.
+
+
 ## 1.1.0 — 2026-04-09
 
 ### Nouveautés

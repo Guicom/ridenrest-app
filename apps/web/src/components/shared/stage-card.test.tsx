@@ -25,6 +25,8 @@ const makeStage = (overrides: Partial<AdventureStageResponse> = {}): AdventureSt
   elevationLossM: 720,
   etaMinutes: 300,
   departureTime: null,
+  speedKmh: null,
+  pauseHours: null,
   createdAt: '',
   updatedAt: '',
   ...overrides,
@@ -78,18 +80,17 @@ describe('StageCard', () => {
     it('does not show line 3 when departureTime is null', () => {
       render(<StageCard stage={makeStage({ departureTime: null })} mode="planning" />)
 
-      // Only 2 lines rendered (name + stats), no date line
+      // Line 1 + line 2 + line 4 (ETA) — no line 3 (no date)
       const container = screen.getByTestId('stage-item-s1')
-      // Should have exactly 2 child divs (line 1 + line 2)
-      expect(container.children.length).toBe(2)
+      expect(container.children.length).toBe(3) // line 1 + line 2 + line 4 ETA
     })
 
     it('shows formatted departure time on line 3 when set', () => {
       render(<StageCard stage={makeStage({ departureTime: '2026-04-15T07:30:00.000Z' })} mode="planning" />)
 
       const container = screen.getByTestId('stage-item-s1')
-      // Should have 3 child divs (line 1 + line 2 + line 3)
-      expect(container.children.length).toBe(3)
+      // line 1 + line 2 + line 3 (date) + line 4 (ETA)
+      expect(container.children.length).toBe(4)
     })
 
     it('shows weather badge when weatherActive is true', () => {
@@ -123,6 +124,39 @@ describe('StageCard', () => {
       )
 
       expect(screen.queryByTestId('weather-badge-s1')).not.toBeInTheDocument()
+    })
+
+    it('shows ETA on line 4 when etaMinutes is set (planning)', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: 390 })} mode="planning" />)
+
+      expect(screen.getByText(/ETA ~6h30/)).toBeInTheDocument()
+    })
+
+    it('does not show line 4 ETA when etaMinutes is null', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: null })} mode="planning" />)
+
+      expect(screen.queryByText(/ETA/)).not.toBeInTheDocument()
+    })
+
+    it('shows pause info in ETA when pauseHours > 0', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: 390, pauseHours: 1 })} mode="planning" />)
+
+      expect(screen.getByText(/ETA ~6h30/)).toBeInTheDocument()
+      expect(screen.getByText(/dont ~1h00 pause/)).toBeInTheDocument()
+    })
+
+    it('does not show pause info when pauseHours is 0', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: 300, pauseHours: 0 })} mode="planning" />)
+
+      expect(screen.getByText(/ETA ~5h00/)).toBeInTheDocument()
+      expect(screen.queryByText(/pause/)).not.toBeInTheDocument()
+    })
+
+    it('does not show pause info when pauseHours is null', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: 300, pauseHours: null })} mode="planning" />)
+
+      expect(screen.getByText(/ETA ~5h00/)).toBeInTheDocument()
+      expect(screen.queryByText(/pause/)).not.toBeInTheDocument()
     })
   })
 
@@ -169,9 +203,16 @@ describe('StageCard', () => {
         />,
       )
 
-      // No line 3 without ETA in live mode (departureTime not shown in live)
+      // No line 3 (departure not shown in live), no line 4 ETA (only shown in planning)
       const container = screen.getByTestId('stage-item-s1')
       expect(container.children.length).toBe(2)
+    })
+
+    it('does not show line 4 ETA planning in live mode', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: 300 })} mode="live" />)
+
+      // ETA planning line only in planning mode
+      expect(screen.queryByText(/ETA ~5h00/)).not.toBeInTheDocument()
     })
   })
 })

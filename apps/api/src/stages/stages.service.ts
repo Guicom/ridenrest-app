@@ -37,12 +37,11 @@ export function computeElevationGainForRange(
   return { gain: Math.round(gain), loss: Math.round(loss) }
 }
 
-/** Compute ETA in minutes using Naismith's rule approximation.
- *  Default pace: 15 km/h flat. Elevation: +6 min per 100m D+. */
+/** Compute ETA in minutes based on distance and speed only.
+ *  Elevation gain is intentionally ignored — the user controls D+ impact via the per-stage speed. */
 export function computeEtaMinutes(distanceKm: number, elevationGainM: number | null, speedKmh = 15): number {
   const flatMinutes = (distanceKm / speedKmh) * 60
-  const climbMinutes = ((elevationGainM ?? 0) / 100) * 6
-  return Math.round(flatMinutes + climbMinutes)
+  return Math.round(flatMinutes)
 }
 
 @Injectable()
@@ -69,16 +68,23 @@ export class StagesService {
 
     const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
 
+    const stageSpeedKmh = dto.speedKmh ?? null
+    const stagePauseHours = dto.pauseHours ?? null
+    const effectiveSpeed = dto.speedKmh ?? speedKmh
+    const pauseMinutes = Math.round((stagePauseHours ?? 0) * 60)
+
     // Split detection: check if dto.endKm falls inside an existing stage
     const splitTarget = await this.stagesRepo.findContaining(adventureId, dto.endKm)
     if (splitTarget) {
       const newDistKm = dto.endKm - splitTarget.startKm
       const newElev = computeElevationGainForRange(waypoints, splitTarget.startKm, dto.endKm)
-      const newEta = computeEtaMinutes(newDistKm, newElev?.gain ?? null, speedKmh)
+      const newRidingEta = computeEtaMinutes(newDistKm, newElev?.gain ?? null, effectiveSpeed)
 
       const remDistKm = splitTarget.endKm - dto.endKm
       const remElev = computeElevationGainForRange(waypoints, dto.endKm, splitTarget.endKm)
-      const remEta = computeEtaMinutes(remDistKm, remElev?.gain ?? null, speedKmh)
+      const remSpeed = splitTarget.speedKmh ?? speedKmh
+      const remPause = Math.round((splitTarget.pauseHours ?? 0) * 60)
+      const remRidingEta = computeEtaMinutes(remDistKm, remElev?.gain ?? null, remSpeed)
 
       const newStage = await this.stagesRepo.createWithSplit({
         adventureId,
@@ -94,7 +100,10 @@ export class StagesService {
           distanceKm: newDistKm,
           elevationGainM: newElev?.gain ?? null,
           elevationLossM: newElev?.loss ?? null,
-          etaMinutes: newEta,
+          etaMinutes: newRidingEta + pauseMinutes,
+          speedKmh: stageSpeedKmh,
+          pauseHours: stagePauseHours,
+          ...(dto.departureTime ? { departureTime: new Date(dto.departureTime) } : {}),
         },
         remainderUpdate: {
           orderIndex: splitTarget.orderIndex + 1,
@@ -102,7 +111,7 @@ export class StagesService {
           distanceKm: remDistKm,
           elevationGainM: remElev?.gain ?? null,
           elevationLossM: remElev?.loss ?? null,
-          etaMinutes: remEta,
+          etaMinutes: remRidingEta + remPause,
         },
       })
 
@@ -122,7 +131,8 @@ export class StagesService {
     }
 
     const elev = computeElevationGainForRange(waypoints, startKm, dto.endKm)
-    const etaMinutes = computeEtaMinutes(distanceKm, elev?.gain ?? null, speedKmh)
+    const ridingEta = computeEtaMinutes(distanceKm, elev?.gain ?? null, effectiveSpeed)
+    const etaMinutes = ridingEta + pauseMinutes
 
     const stage = await this.stagesRepo.create({
       adventureId,
@@ -135,6 +145,9 @@ export class StagesService {
       elevationGainM: elev?.gain ?? null,
       elevationLossM: elev?.loss ?? null,
       etaMinutes,
+      speedKmh: stageSpeedKmh,
+      pauseHours: stagePauseHours,
+      ...(dto.departureTime ? { departureTime: new Date(dto.departureTime) } : {}),
     })
 
     return this.toResponse(stage)
@@ -156,6 +169,11 @@ export class StagesService {
     const departureTimeUpdate = dto.departureTime !== undefined
       ? { departureTime: dto.departureTime ? new Date(dto.departureTime) : null }
       : {}
+    const speedUpdate = dto.speedKmh !== undefined ? { speedKmh: dto.speedKmh ?? null } : {}
+    const pauseUpdate = dto.pauseHours !== undefined ? { pauseHours: dto.pauseHours ?? null } : {}
+
+    // Determine if ETA needs recalculation (speed or pause changed)
+    const needsEtaRecompute = dto.speedKmh !== undefined || dto.pauseHours !== undefined
 
     if (dto.endKm !== undefined) {
       if (dto.endKm <= stage.startKm) {
@@ -171,7 +189,10 @@ export class StagesService {
       const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
       const newDistanceKm = dto.endKm - stage.startKm
       const elev = computeElevationGainForRange(waypoints, stage.startKm, dto.endKm)
-      const etaMinutes = computeEtaMinutes(newDistanceKm, elev?.gain ?? null, speedKmh)
+      const effectiveSpeed = (dto.speedKmh !== undefined ? dto.speedKmh : stage.speedKmh) ?? speedKmh
+      const effectivePause = (dto.pauseHours !== undefined ? dto.pauseHours : stage.pauseHours) ?? 0
+      const ridingEta = computeEtaMinutes(newDistanceKm, elev?.gain ?? null, effectiveSpeed)
+      const etaMinutes = ridingEta + Math.round(effectivePause * 60)
 
       const updated = await this.stagesRepo.update(stageId, {
         endKm: dto.endKm,
@@ -182,6 +203,8 @@ export class StagesService {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
         ...departureTimeUpdate,
+        ...speedUpdate,
+        ...pauseUpdate,
       })
 
       // Cascade: update subsequent stages' startKm (endKm stays unchanged)
@@ -191,7 +214,9 @@ export class StagesService {
           const newStartKm = prevEndKm
           const cascadeDistKm = s.endKm - newStartKm
           const cascadeElev = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
-          const cascadeEta = computeEtaMinutes(cascadeDistKm, cascadeElev?.gain ?? null, speedKmh)
+          const cascadeSpeed = s.speedKmh ?? speedKmh
+          const cascadePause = Math.round((s.pauseHours ?? 0) * 60)
+          const cascadeEta = computeEtaMinutes(cascadeDistKm, cascadeElev?.gain ?? null, cascadeSpeed) + cascadePause
           prevEndKm = s.endKm
           return {
             id: s.id,
@@ -209,10 +234,32 @@ export class StagesService {
       return this.toResponse(updated)
     }
 
+    // No endKm change — but may need ETA recompute if speed/pause changed
+    if (needsEtaRecompute) {
+      const waypoints = await this.adventuresService.getAdventureWaypoints(adventureId)
+      const elev = computeElevationGainForRange(waypoints, stage.startKm, stage.endKm)
+      const effectiveSpeed = (dto.speedKmh !== undefined ? dto.speedKmh : stage.speedKmh) ?? speedKmh
+      const effectivePause = (dto.pauseHours !== undefined ? dto.pauseHours : stage.pauseHours) ?? 0
+      const ridingEta = computeEtaMinutes(stage.distanceKm, elev?.gain ?? null, effectiveSpeed)
+      const etaMinutes = ridingEta + Math.round(effectivePause * 60)
+
+      const updated = await this.stagesRepo.update(stageId, {
+        etaMinutes,
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.color !== undefined ? { color: dto.color } : {}),
+        ...departureTimeUpdate,
+        ...speedUpdate,
+        ...pauseUpdate,
+      })
+      return this.toResponse(updated)
+    }
+
     const updated = await this.stagesRepo.update(stageId, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.color !== undefined ? { color: dto.color } : {}),
       ...departureTimeUpdate,
+      ...speedUpdate,
+      ...pauseUpdate,
     })
     return this.toResponse(updated)
   }
@@ -240,7 +287,9 @@ export class StagesService {
       const newStartKm = prevEndKm
       const newDistKm = s.endKm - newStartKm
       const elev = computeElevationGainForRange(waypoints, newStartKm, s.endKm)
-      const eta = computeEtaMinutes(newDistKm, elev?.gain ?? null, speedKmh)
+      const stageSpeed = s.speedKmh ?? speedKmh
+      const stagePause = Math.round((s.pauseHours ?? 0) * 60)
+      const eta = computeEtaMinutes(newDistKm, elev?.gain ?? null, stageSpeed) + stagePause
       updates.push({ id: s.id, startKm: newStartKm, distanceKm: newDistKm, orderIndex: i, elevationGainM: elev?.gain ?? null, elevationLossM: elev?.loss ?? null, etaMinutes: eta })
       prevEndKm = s.endKm
     }
@@ -259,16 +308,26 @@ export class StagesService {
 
     // Priority: stage.departureTime (per-stage) > dto.departureTime (global from query param)
     const effectiveDepartureTime = stage.departureTime?.toISOString() ?? dto.departureTime
+    // Priority: stage.speedKmh (per-stage) > dto.speedKmh (global from query param) > 15 km/h default
+    const effectiveSpeedKmh = stage.speedKmh ?? dto.speedKmh ?? 15
+    // Compute an "effective slower speed" that integrates pause time into the ETA
+    // so the weather forecast reflects the real arrival time (riding + pauses)
+    const pauseHours = stage.pauseHours ?? 0
+    let weatherSpeedKmh = effectiveSpeedKmh
+    if (pauseHours > 0 && stage.distanceKm > 0) {
+      const ridingHours = stage.distanceKm / effectiveSpeedKmh
+      weatherSpeedKmh = stage.distanceKm / (ridingHours + pauseHours)
+    }
 
     if (stage.departureTime) {
       // When stage has its own departure time, compute ETA from stage start (not km 0)
-      // ETA = stage.departureTime + (stage.distanceKm / speedKmh) * 3600000ms
+      // ETA = stage.departureTime + (stage.distanceKm / weatherSpeedKmh) * 3600000ms
       return this.weatherService.getWeatherAtKmWithEta(
         stage.adventureId,
         stage.endKm,
         effectiveDepartureTime!,
         stage.distanceKm,
-        dto.speedKmh,
+        weatherSpeedKmh,
       )
     }
 
@@ -277,21 +336,25 @@ export class StagesService {
       stage.adventureId,
       stage.endKm,
       effectiveDepartureTime,
-      dto.speedKmh,
+      weatherSpeedKmh,
     )
   }
 
   async recomputeAllEtasForAdventure(adventureId: string, speedKmh: number): Promise<void> {
     const stages = await this.stagesRepo.findByAdventureId(adventureId)
     if (stages.length === 0) return
-    const updates = stages.map((s) => ({
-      id: s.id,
-      startKm: s.startKm,
-      distanceKm: s.distanceKm,
-      orderIndex: s.orderIndex,
-      elevationGainM: s.elevationGainM ?? null,
-      etaMinutes: computeEtaMinutes(s.distanceKm, s.elevationGainM ?? null, speedKmh),
-    }))
+    const updates = stages.map((s) => {
+      const stageSpeed = s.speedKmh ?? speedKmh
+      const stagePause = Math.round((s.pauseHours ?? 0) * 60)
+      return {
+        id: s.id,
+        startKm: s.startKm,
+        distanceKm: s.distanceKm,
+        orderIndex: s.orderIndex,
+        elevationGainM: s.elevationGainM ?? null,
+        etaMinutes: computeEtaMinutes(s.distanceKm, s.elevationGainM ?? null, stageSpeed) + stagePause,
+      }
+    })
     await this.stagesRepo.updateMany(updates)
   }
 
@@ -309,6 +372,8 @@ export class StagesService {
       elevationLossM: s.elevationLossM ?? null,
       etaMinutes: s.etaMinutes ?? null,
       departureTime: s.departureTime?.toISOString() ?? null,
+      speedKmh: s.speedKmh ?? null,
+      pauseHours: s.pauseHours ?? null,
       createdAt: s.createdAt.toISOString(),
       updatedAt: s.updatedAt.toISOString(),
     }

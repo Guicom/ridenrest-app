@@ -14,6 +14,8 @@ export const adventureStages = pgTable('adventure_stages', {
   elevationLossM: real('elevation_loss_m'),   // nullable — null when no ele data in GPX
   etaMinutes: integer('eta_minutes'),          // nullable — null until computed (should be always set)
   departureTime: timestamp('departure_time'),  // nullable — per-stage departure time (overrides global)
+  speedKmh: real('speed_kmh'),                 // nullable — NULL = use adventure.avgSpeedKmh
+  pauseHours: real('pause_hours').default(0),  // nullable — hours of pause/rest per stage
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 }, (table) => ({

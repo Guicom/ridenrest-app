@@ -75,6 +75,8 @@ const makeStage = (overrides: Partial<AdventureStageResponse> = {}): AdventureSt
   elevationLossM: null,
   etaMinutes: null,
   departureTime: null,
+  speedKmh: null,
+  pauseHours: null,
   createdAt: '',
   updatedAt: '',
   ...overrides,
@@ -203,5 +205,40 @@ describe('SidebarStagesSection', () => {
     expand()
 
     expect(screen.queryByTestId('weather-badge-s1')).toBeNull()
+  })
+
+  it('does not render StageDepartureInput inline (removed)', () => {
+    const stages = [makeStage({ id: 's1', departureTime: '2026-04-15T07:30:00.000Z' })]
+    render(<SidebarStagesSection {...defaultProps} stages={stages} />)
+    expand()
+
+    expect(screen.queryByTestId('stage-departure-input-s1')).toBeNull()
+    expect(screen.queryByTestId('stage-departure-clear-s1')).toBeNull()
+  })
+
+  it('naming dialog shows speed, pause, and departure fields', () => {
+    render(
+      <SidebarStagesSection
+        {...defaultProps}
+        showNamingDialog={true}
+        pendingEndKm={80}
+        defaultSpeedKmh={18}
+      />,
+    )
+
+    expect(screen.getByLabelText('Vitesse moyenne (km/h)')).toBeDefined()
+    expect(screen.getByLabelText('Temps de pause (heures)')).toBeDefined()
+    expect(screen.getByLabelText('Date de début')).toBeDefined()
+  })
+
+  it('edit dialog shows speed, pause, and departure fields', () => {
+    const stages = [makeStage({ speedKmh: 20, pauseHours: 1.5, departureTime: '2026-04-15T07:30:00.000Z' })]
+    render(<SidebarStagesSection {...defaultProps} stages={stages} />)
+    expand()
+    fireEvent.click(screen.getByTestId('edit-stage-s1'))
+
+    expect(screen.getByLabelText('Vitesse moyenne (km/h)')).toBeDefined()
+    expect(screen.getByLabelText('Temps de pause (heures)')).toBeDefined()
+    expect(screen.getByLabelText('Date de début')).toBeDefined()
   })
 })
