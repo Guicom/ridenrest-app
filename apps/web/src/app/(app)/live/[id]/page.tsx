@@ -185,7 +185,7 @@ export default function LivePage() {
   }, [isLiveModeActive, targetKm, allCumulativeWaypoints])
 
   // Reverse geocoding for Booking.com city-based search
-  const { city: liveCity, postcode: livePostcode, state: liveState, country: liveCountry } = useReverseCity(isLiveModeActive ? liveSearchCenter : null)
+  const { city: liveCity } = useReverseCity(isLiveModeActive ? liveSearchCenter : null)
 
   // Live context for PoiDetailSheet (D+/ETA with live mode values)
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute)
@@ -416,9 +416,6 @@ export default function LivePage() {
                 elevationLoss={elevationLoss}
                 center={liveSearchCenter}
                 city={liveCity}
-                postcode={livePostcode}
-                adminArea={liveState}
-                country={liveCountry}
                 maxAheadKm={maxAheadKm}
               />
             )}

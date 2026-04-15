@@ -28,7 +28,7 @@ vi.mock('@/stores/map.store', () => ({
 }))
 
 vi.mock('@/hooks/use-reverse-city', () => ({
-  useReverseCity: () => ({ city: null, postcode: null, isPending: false }),
+  useReverseCity: () => ({ city: null, isPending: false }),
 }))
 
 let mockDetails: { placeId: string; displayName: string | null; formattedAddress: string | null; lat: number | null; lng: number | null; rating: number | null; isOpenNow: boolean | null; phone: string | null; website: string | null; types: string[] } | null = null
@@ -38,12 +38,11 @@ vi.mock('@/hooks/use-poi-google-details', () => ({
 }))
 
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center, city, postcode, className }: { center: { lat: number; lng: number } | null; city?: string | null; postcode?: string | null; className?: string }) => (
+  SearchOnDropdown: ({ center, city, className }: { center: { lat: number; lng: number } | null; city?: string | null; className?: string }) => (
     <div
       data-testid="search-on-dropdown"
       data-has-center={String(!!center)}
       data-city={city ?? ''}
-      data-postcode={postcode ?? ''}
       className={className}
     />
   ),
@@ -381,23 +380,15 @@ describe('PoiDetailSheet', () => {
     expect(screen.queryByText('+33 4 00 00 00 00')).toBeNull()
   })
 
-  // ── Postcode resolution ──────────────────────────────────────────────────
+  // ── Story 17.10: postcode/adminArea/country no longer passed ──────────────
 
-  it('SearchOnDropdown receives postcode from OSM rawData', () => {
+  it('does not pass postcode to SearchOnDropdown (Story 17.10)', () => {
     const poi = { ...makeAccommodationPoi(), rawData: { 'addr:city': 'Pamplona', 'addr:postcode': '31001' } } as unknown as Poi
     render(
       <PoiDetailSheet poi={poi} segments={[makeSegment()]} segmentId="seg-1" />,
     )
     const el = screen.getByTestId('search-on-dropdown')
-    expect(el.getAttribute('data-postcode')).toBe('31001')
-  })
-
-  it('SearchOnDropdown receives empty postcode when no postcode available', () => {
-    render(
-      <PoiDetailSheet poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" />,
-    )
-    const el = screen.getByTestId('search-on-dropdown')
-    expect(el.getAttribute('data-postcode')).toBe('')
+    expect(el.getAttribute('data-postcode')).toBeNull()
   })
 
   it('shows "Site officiel" using OSM rawData website when Google details not available', () => {

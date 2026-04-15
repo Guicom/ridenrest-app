@@ -10,7 +10,7 @@ afterEach(cleanup)
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock('@/hooks/use-reverse-city', () => ({
-  useReverseCity: () => ({ city: null, postcode: null, isPending: false }),
+  useReverseCity: () => ({ city: null, isPending: false }),
 }))
 
 vi.mock('@/hooks/use-reverse-address', () => ({
@@ -52,14 +52,13 @@ vi.mock('@/components/ui/skeleton', () => ({
 }))
 
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center, city, postcode, className }: { center: { lat: number; lng: number } | null; city?: string | null; postcode?: string | null; className?: string }) => (
+  SearchOnDropdown: ({ center, city, className }: { center: { lat: number; lng: number } | null; city?: string | null; className?: string }) => (
     <div
       data-testid="search-on-dropdown"
       data-has-center={String(!!center)}
       data-lat={center?.lat ?? ''}
       data-lng={center?.lng ?? ''}
       data-city={city ?? ''}
-      data-postcode={postcode ?? ''}
       className={className}
     />
   ),
@@ -504,39 +503,13 @@ describe('PoiPopup', () => {
     expect(screen.queryByTestId('search-on-dropdown')).toBeNull()
   })
 
-  // ── Postcode resolution chain ──────────────────────────────────────────────
+  // ── Story 17.10: postcode/adminArea/country no longer passed ──────────────
 
-  it('extracts postalCode from Google Places details (primary source)', () => {
+  it('does not pass postcode to SearchOnDropdown (Story 17.10)', () => {
     mockDetails = makeDetailsBase({ locality: 'Saint-Jean-de-Luz', postalCode: '64500' })
     render(
       <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
     )
-    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('64500')
-  })
-
-  it('falls back to OSM addr:postcode when Google postalCode is null', () => {
-    const poi = { ...makeAccommodationPoi(), rawData: { 'addr:city': 'Pamplona', 'addr:postcode': '31001' } } as unknown as Poi
-    mockDetails = makeDetailsBase({ locality: null, postalCode: null })
-    render(
-      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
-    )
-    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('31001')
-  })
-
-  it('Google postalCode takes priority over OSM addr:postcode', () => {
-    const poi = { ...makeAccommodationPoi(), rawData: { 'addr:city': 'Pamplona', 'addr:postcode': '99999' } } as unknown as Poi
-    mockDetails = makeDetailsBase({ locality: 'Pamplona', postalCode: '31001' })
-    render(
-      <PoiPopup poi={poi} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
-    )
-    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('31001')
-  })
-
-  it('passes empty postcode when no source has postcode', () => {
-    mockDetails = makeDetailsBase({ locality: 'Toulouse', postalCode: null })
-    render(
-      <PoiPopup poi={makeAccommodationPoi()} segments={[makeSegment()]} segmentId="seg-1" map={map} onClose={onClose} />,
-    )
-    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('')
+    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBeNull()
   })
 })

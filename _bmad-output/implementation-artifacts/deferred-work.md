@@ -68,4 +68,9 @@
 
 ## Deferred from: code review of 17-9-booking-redirect-proxy-mobile-deep-link-fix (2026-04-15)
 
-- Rate limiting absent sur l'endpoint public `/api/go/booking` — pré-existant, aucun rate limiting dans toute l'app. L'endpoint ne fait pas d'I/O (pas de DB, pas de Redis), blast radius limité à CPU/bandwidth. À considérer lors d'un futur epic sécurité/hardening.
+- ~~Rate limiting absent sur l'endpoint public `/api/go/booking`~~ — **RÉSOLU** : endpoint supprimé dans story 17.10 (module `go/` entièrement supprimé).
+
+## Deferred from: code review of 17-10-booking-url-mobile-compat-city-coords (2026-04-15)
+
+- `useReverseCity` hook retourne encore `postcode`, `state`, `country` depuis l'API Geoapify mais aucun consumer ne les utilise après suppression dans story 17.10. Dead data — nettoyage futur possible pour réduire le payload API/Redis.
+- `extractCityFromOsmRawData` retourne un champ `postcode` jamais lu en production — dead field, nettoyage cosmétique.

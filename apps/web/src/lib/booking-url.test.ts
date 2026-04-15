@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { getCorridorCenter, buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl, extractCityFromOsmRawData } from './booking-url'
 import type { MapWaypoint } from '@ridenrest/shared'
 
@@ -48,8 +48,8 @@ describe('getCorridorCenter', () => {
 })
 
 describe('buildBookingSearchUrl', () => {
-  it('uses ss param with city name', () => {
-    expect(buildBookingSearchUrl('Pamplona')).toBe('https://www.booking.com/searchresults.html?ss=Pamplona')
+  it('uses ss param with city name and dest_type=city', () => {
+    expect(buildBookingSearchUrl('Pamplona')).toBe('https://www.booking.com/searchresults.html?ss=Pamplona&dest_type=city')
   })
 
   it('encodes city name with hyphen', () => {
@@ -60,9 +60,13 @@ describe('buildBookingSearchUrl', () => {
     expect(buildBookingSearchUrl('Les Houches')).toContain('ss=Les%20Houches')
   })
 
-  it('does not include lat/lng or dest_type', () => {
+  it('includes dest_type=city always', () => {
     const url = buildBookingSearchUrl('Toulouse')
-    expect(url).not.toContain('dest_type')
+    expect(url).toContain('dest_type=city')
+  })
+
+  it('does not include lat/lng when no center provided', () => {
+    const url = buildBookingSearchUrl('Toulouse')
     expect(url).not.toContain('latitude')
     expect(url).not.toContain('longitude')
   })
@@ -71,62 +75,27 @@ describe('buildBookingSearchUrl', () => {
     expect(buildBookingSearchUrl('Pamplona')).toContain('https://www.booking.com/searchresults.html')
   })
 
-  it('appends postcode to city when provided', () => {
-    const url = buildBookingSearchUrl('Saint-Jean-de-Luz', '64500')
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Saint-Jean-de-Luz%2064500')
+  it('appends latitude and longitude when center provided', () => {
+    const url = buildBookingSearchUrl('La Puerta De Segura', { lat: 38.38, lng: -2.84 })
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=La%20Puerta%20De%20Segura&dest_type=city&latitude=38.38&longitude=-2.84')
   })
 
-  it('ignores null postcode', () => {
-    expect(buildBookingSearchUrl('Toulouse', null)).toBe('https://www.booking.com/searchresults.html?ss=Toulouse')
+  it('omits coordinates when center is null', () => {
+    const url = buildBookingSearchUrl('Toulouse', null)
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Toulouse&dest_type=city')
   })
 
-  it('ignores undefined postcode', () => {
-    expect(buildBookingSearchUrl('Toulouse', undefined)).toBe('https://www.booking.com/searchresults.html?ss=Toulouse')
+  it('omits coordinates when center is undefined', () => {
+    const url = buildBookingSearchUrl('Toulouse', undefined)
+    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Toulouse&dest_type=city')
   })
 
-  it('appends adminArea and country to city + postcode', () => {
-    const url = buildBookingSearchUrl('Valencia', '46001', 'Comunidad Valenciana', 'Spain')
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001%2C%20Comunidad%20Valenciana%2C%20Spain')
-  })
-
-  it('appends adminArea without country', () => {
-    const url = buildBookingSearchUrl('Valencia', '46001', 'Comunidad Valenciana', null)
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001%2C%20Comunidad%20Valenciana')
-  })
-
-  it('appends country without adminArea', () => {
-    const url = buildBookingSearchUrl('Valencia', '46001', null, 'Spain')
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001%2C%20Spain')
-  })
-
-  it('appends adminArea and country without postcode', () => {
-    const url = buildBookingSearchUrl('Valencia', null, 'Comunidad Valenciana', 'Spain')
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2C%20Comunidad%20Valenciana%2C%20Spain')
-  })
-
-  it('ignores null adminArea and null country (no regression)', () => {
-    const url = buildBookingSearchUrl('Valencia', '46001', null, null)
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001')
-  })
-
-  it('ignores undefined adminArea and undefined country', () => {
-    const url = buildBookingSearchUrl('Valencia', '46001', undefined, undefined)
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001')
-  })
-
-  it('full chain: city + postcode + adminArea + country with accented chars', () => {
-    const url = buildBookingSearchUrl('Saint-Jean-de-Luz', '64500', 'Nouvelle-Aquitaine', 'France')
-    expect(url).toContain('ss=Saint-Jean-de-Luz%2064500%2C%20Nouvelle-Aquitaine%2C%20France')
-  })
-
-  it('ignores whitespace-only adminArea and country', () => {
-    const url = buildBookingSearchUrl('Valencia', '46001', '   ', '  ')
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2046001')
-  })
-
-  it('ignores whitespace-only postcode', () => {
-    const url = buildBookingSearchUrl('Valencia', '  ', 'Comunidad Valenciana', 'Spain')
-    expect(url).toBe('https://www.booking.com/searchresults.html?ss=Valencia%2C%20Comunidad%20Valenciana%2C%20Spain')
+  it('encodes accented characters in city name', () => {
+    const url = buildBookingSearchUrl('Almazán', { lat: 41.49, lng: -2.53 })
+    expect(url).toContain('ss=Almaz%C3%A1n')
+    expect(url).toContain('dest_type=city')
+    expect(url).toContain('latitude=41.49')
+    expect(url).toContain('longitude=-2.53')
   })
 })
 

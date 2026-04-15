@@ -54,15 +54,14 @@ vi.mock('./accommodation-sub-types', () => ({
 }))
 
 let mockReverseCityResult: string | null = null
-let mockReversePostcodeResult: string | null = null
 
 vi.mock('@/hooks/use-reverse-city', () => ({
-  useReverseCity: () => ({ city: mockReverseCityResult, postcode: mockReversePostcodeResult, isPending: false }),
+  useReverseCity: () => ({ city: mockReverseCityResult, isPending: false }),
 }))
 
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center, city, postcode }: { center: object | null; city?: string | null; postcode?: string | null }) => (
-    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} data-city={city ?? ''} data-postcode={postcode ?? ''} />
+  SearchOnDropdown: ({ center, city }: { center: object | null; city?: string | null }) => (
+    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} data-city={city ?? ''} />
   ),
 }))
 
@@ -90,7 +89,6 @@ describe('SearchRangeControl', () => {
     mockSearchCommitted = false
     mockVisibleLayers = new Set()
     mockReverseCityResult = null
-    mockReversePostcodeResult = null
   })
 
   it('renders section header with Recherche label', () => {
@@ -400,13 +398,13 @@ describe('SearchRangeControl', () => {
     expect(el.getAttribute('data-city')).toBe('')
   })
 
-  it('passes postcode from useReverseCity to SearchOnDropdown', () => {
+  it('does not pass postcode/adminArea/country to SearchOnDropdown (Story 17.10)', () => {
     mockSearchCommitted = true
     mockVisibleLayers = new Set(['accommodations'])
     mockReverseCityResult = 'Toulouse'
-    mockReversePostcodeResult = '31000'
     render(<SearchRangeControl totalDistanceKm={100} waypoints={makeWaypoints()} isPoisPending={false} />)
     const el = screen.getByTestId('search-on-dropdown')
-    expect(el.getAttribute('data-postcode')).toBe('31000')
+    expect(el.getAttribute('data-city')).toBe('Toulouse')
+    expect(el.getAttribute('data-postcode')).toBeNull()
   })
 })

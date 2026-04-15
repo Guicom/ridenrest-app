@@ -6,8 +6,8 @@ import { useLiveStore } from '@/stores/live.store'
 afterEach(cleanup)
 
 vi.mock('@/components/shared/search-on-dropdown', () => ({
-  SearchOnDropdown: ({ center, city, postcode }: { center: object | null; city?: string | null; postcode?: string | null }) => (
-    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} data-city={city ?? ''} data-postcode={postcode ?? ''} />
+  SearchOnDropdown: ({ center, city }: { center: object | null; city?: string | null }) => (
+    <div data-testid="search-on-dropdown" data-has-center={String(!!center)} data-city={city ?? ''} />
   ),
 }))
 
@@ -156,14 +156,11 @@ describe('LiveControls', () => {
     expect(screen.getByTestId('search-on-dropdown').getAttribute('data-city')).toBe('')
   })
 
-  it('passes postcode prop to SearchOnDropdown when provided', () => {
-    render(<LiveControls {...defaultProps} city="Pamplona" postcode="31001" />)
-    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('31001')
-  })
-
-  it('passes empty postcode to SearchOnDropdown when postcode not provided', () => {
-    render(<LiveControls {...defaultProps} />)
-    expect(screen.getByTestId('search-on-dropdown').getAttribute('data-postcode')).toBe('')
+  it('does not pass postcode/adminArea/country to SearchOnDropdown (Story 17.10)', () => {
+    render(<LiveControls {...defaultProps} city="Pamplona" />)
+    const el = screen.getByTestId('search-on-dropdown')
+    expect(el.getAttribute('data-city')).toBe('Pamplona')
+    expect(el.getAttribute('data-postcode')).toBeNull()
   })
 
   // ── Story 16.24: +/- buttons ──────────────────────────────────

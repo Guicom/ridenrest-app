@@ -56,18 +56,13 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
   // POI data (Google Places / Overpass) is owner-provided and inconsistent — Geoapify gives normalized results
   const isAccommodation = poi ? ACCOMMODATION_CATEGORIES.includes(poi.category) : false
   const rawData = poi ? (poi as Poi & { rawData?: Record<string, string> }).rawData : undefined
-  const { city: reverseCity, postcode: reversePostcode, state: reverseState, country: reverseCountry } = useReverseCity(
+  const { city: reverseCity } = useReverseCity(
     isAccommodation && poi ? { lat: poi.lat, lng: poi.lng } : null,
   )
   const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
   const poiCity = isAccommodation
     ? (reverseCity ?? details?.locality ?? osmData?.city ?? null)
     : null
-  const poiPostcode = isAccommodation
-    ? (reversePostcode ?? details?.postalCode ?? osmData?.postcode ?? null)
-    : null
-  const poiAdminArea = isAccommodation ? (reverseState ?? null) : null
-  const poiCountry = isAccommodation ? (reverseCountry ?? null) : null
 
   if (!poi) return null
 
@@ -218,9 +213,6 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
                 <SearchOnDropdown
                   center={{ lat: poi.lat, lng: poi.lng }}
                   city={poiCity}
-                  postcode={poiPostcode}
-                  adminArea={poiAdminArea}
-                  country={poiCountry}
                   variant="action"
                   className="w-full"
                   page={isLiveMode ? 'live' : 'map'}

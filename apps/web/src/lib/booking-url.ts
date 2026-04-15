@@ -21,11 +21,10 @@ export function getCorridorCenter(
   return { lat: closest.lat, lng: closest.lng }
 }
 
-export function buildBookingSearchUrl(city: string, postcode?: string | null, adminArea?: string | null, country?: string | null): string {
-  let ss = postcode?.trim() ? `${city} ${postcode.trim()}` : city
-  if (adminArea?.trim()) ss += `, ${adminArea.trim()}`
-  if (country?.trim()) ss += `, ${country.trim()}`
-  return `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(ss)}`
+export function buildBookingSearchUrl(city: string, center?: { lat: number; lng: number } | null): string {
+  let url = `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(city)}&dest_type=city`
+  if (center) url += `&latitude=${center.lat}&longitude=${center.lng}`
+  return url
 }
 
 /**

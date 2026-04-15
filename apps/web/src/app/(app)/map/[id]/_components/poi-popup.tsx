@@ -120,16 +120,11 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   // City + Postcode for Booking URL: Geoapify reverse geocoding from lat/lng
   // POI data (Google Places / Overpass) is owner-provided and inconsistent — Geoapify gives normalized results
   const rawData = (poi as Poi & { rawData?: Record<string, string> }).rawData
-  const { city: reverseCity, postcode: reversePostcode, state: reverseState, country: reverseCountry } = useReverseCity(isAccommodation ? { lat: poi.lat, lng: poi.lng } : null)
+  const { city: reverseCity } = useReverseCity(isAccommodation ? { lat: poi.lat, lng: poi.lng } : null)
   const osmData = isAccommodation ? extractCityFromOsmRawData(rawData) : null
   const poiCity = isAccommodation
     ? (reverseCity ?? details?.locality ?? osmData?.city ?? null)
     : null
-  const poiPostcode = isAccommodation
-    ? (reversePostcode ?? details?.postalCode ?? osmData?.postcode ?? null)
-    : null
-  const poiAdminArea = isAccommodation ? (reverseState ?? null) : null
-  const poiCountry = isAccommodation ? (reverseCountry ?? null) : null
 
   // Reverse address for Overpass POIs only when no local address is available.
   const isOverpass = poi.source === 'overpass'
@@ -435,9 +430,6 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
                 <SearchOnDropdown
                   center={{ lat: poi.lat, lng: poi.lng }}
                   city={poiCity}
-                  postcode={poiPostcode}
-                  adminArea={poiAdminArea}
-                  country={poiCountry}
                   variant="action"
                   className="w-full"
                   page={isLiveMode ? 'live' : 'map'}
