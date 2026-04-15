@@ -22,7 +22,8 @@ describe('GoController', () => {
 
       controller.redirectBooking(url, res)
 
-      const html = send.mock.calls[0][0] as string
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const html = String(send.mock.calls[0][0])
       expect(html).toContain('window.location.replace(')
       expect(html).toContain(url)
     })
@@ -43,7 +44,8 @@ describe('GoController', () => {
 
       controller.redirectBooking(url, res)
 
-      const html = send.mock.calls[0][0] as string
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const html = String(send.mock.calls[0][0])
       expect(html).toContain('<noscript>')
       expect(html).toContain('Continue to Booking.com')
     })
@@ -94,7 +96,8 @@ describe('GoController', () => {
 
       controller.redirectBooking(url, res)
 
-      const html = send.mock.calls[0][0] as string
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const html = String(send.mock.calls[0][0])
       expect(html).toContain(url)
     })
   })
