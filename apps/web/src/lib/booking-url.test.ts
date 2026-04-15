@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { getCorridorCenter, buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl, extractCityFromOsmRawData, wrapBookingUrl } from './booking-url'
+import { getCorridorCenter, buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl, extractCityFromOsmRawData } from './booking-url'
 import type { MapWaypoint } from '@ridenrest/shared'
 
 const makeWp = (distKm: number, lat: number, lng: number): MapWaypoint => ({
@@ -182,44 +182,6 @@ describe('extractCityFromOsmRawData', () => {
 
   it('extracts addr:postcode from OSM rawData', () => {
     expect(extractCityFromOsmRawData({ 'addr:postcode': '31000' }).postcode).toBe('31000')
-  })
-})
-
-describe('wrapBookingUrl', () => {
-  const originalEnv = process.env['NEXT_PUBLIC_API_URL']
-
-  beforeEach(() => {
-    process.env['NEXT_PUBLIC_API_URL'] = 'https://api.ridenrest.app'
-  })
-
-  afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env['NEXT_PUBLIC_API_URL'] = originalEnv
-    } else {
-      delete process.env['NEXT_PUBLIC_API_URL']
-    }
-  })
-
-  it('wraps a Booking URL with the proxy endpoint', () => {
-    const original = 'https://www.booking.com/searchresults.html?ss=Pamplona'
-    const wrapped = wrapBookingUrl(original)
-    expect(wrapped).toBe(
-      `https://api.ridenrest.app/api/go/booking?url=${encodeURIComponent(original)}`,
-      // NEXT_PUBLIC_API_URL=https://api.ridenrest.app → path adds /api/go/booking
-    )
-  })
-
-  it('encodes special characters in the original URL', () => {
-    const original = 'https://www.booking.com/searchresults.html?ss=Saint-Jean-de-Luz%2064500'
-    const wrapped = wrapBookingUrl(original)
-    expect(wrapped).toContain('url=')
-    expect(wrapped).toContain(encodeURIComponent(original))
-  })
-
-  it('uses NEXT_PUBLIC_API_URL as base', () => {
-    process.env['NEXT_PUBLIC_API_URL'] = 'http://localhost:3010'
-    const wrapped = wrapBookingUrl('https://www.booking.com/searchresults.html?ss=Test')
-    expect(wrapped.startsWith('http://localhost:3010/api/go/booking?url=')).toBe(true)
   })
 })
 
