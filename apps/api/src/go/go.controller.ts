@@ -14,6 +14,7 @@ export class GoController {
       throw new BadRequestException('Invalid booking URL')
     }
     res.set('Cache-Control', 'no-store')
-    res.redirect(302, url)
+    res.set('Content-Type', 'text/html; charset=utf-8')
+    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Redirecting…</title></head><body><script>window.location.replace(${JSON.stringify(url)})</script><noscript><a href="${url.replace(/"/g, '&quot;')}">Continue to Booking.com</a></noscript></body></html>`)
   }
 }
