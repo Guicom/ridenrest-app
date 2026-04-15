@@ -50,6 +50,11 @@ export function buildBookingCoordUrl(center: { lat: number; lng: number }): stri
   return `https://www.booking.com/searchresults.html?latitude=${center.lat}&longitude=${center.lng}&dest_type=latlong`
 }
 
+/** Wraps a Booking.com URL through the redirect proxy to bypass mobile Universal Links / App Links */
+export function wrapBookingUrl(url: string): string {
+  return `${process.env['NEXT_PUBLIC_API_URL']}/api/go/booking?url=${encodeURIComponent(url)}`
+}
+
 /** Bounding box ±0.2° (≈ 22 km) autour du centre — Airbnb requiert un bbox pour la recherche par coordonnées */
 export function buildAirbnbSearchUrl(center: { lat: number; lng: number }): string {
   const d = 0.2

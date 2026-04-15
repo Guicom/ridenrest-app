@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl } from '@/lib/booking-url'
+import { buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl, wrapBookingUrl } from '@/lib/booking-url'
 import { trackBookingClick } from '@/lib/analytics'
 import type { UserTier } from '@/lib/analytics'
 import { useProfile } from '@/hooks/use-profile'
@@ -47,11 +47,12 @@ export function SearchOnDropdown({ center, city, postcode, adminArea, country, v
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [open])
 
-  const bookingUrl = city
+  const rawBookingUrl = city
     ? buildBookingSearchUrl(city, postcode, adminArea, country)
     : center
       ? buildBookingCoordUrl(center)
       : null
+  const bookingUrl = rawBookingUrl ? wrapBookingUrl(rawBookingUrl) : null
   const airbnbUrl = center ? buildAirbnbSearchUrl(center) : null
 
   const triggerClass =

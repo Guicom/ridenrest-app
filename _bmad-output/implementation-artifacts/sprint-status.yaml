@@ -261,4 +261,6 @@ development_status:
   17-5-stage-cartouche-redesign-planning-live: done         # review complète — 7 patches appliqués, max-h-90 voulu
   17-6-live-filter-stage-badges: done                  # badges étapes dans drawer filtres live mode — reviewed 2026-04-09
   17-7-stage-per-stage-speed-pause-eta: done  # vitesse + pause par étape, ETA individuelle, suppression doublon date — code review 2026-04-12
+  17-8-new-poi-categories-cafe-bar-gas-station: review  # cafe_bar + gas_station sous layer restaurants (Google Places + Overpass)
+  17-9-booking-redirect-proxy-mobile-deep-link-fix: done  # redirect proxy API pour contourner interception Universal Links/App Links Booking mobile — code review 2026-04-15
   epic-17-retrospective: optional

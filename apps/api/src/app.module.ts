@@ -19,6 +19,7 @@ import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 import { GeoModule } from './geo/geo.module.js'
+import { GoModule } from './go/go.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
 import { BackfillElevationLossService } from './common/backfill-elevation-loss.service.js'
 
@@ -60,6 +61,7 @@ import { BackfillElevationLossService } from './common/backfill-elevation-loss.s
     ProfileModule,
     FeedbacksModule,
     GeoModule,
+    GoModule,
   ],
   controllers: [AppController],
   providers: [

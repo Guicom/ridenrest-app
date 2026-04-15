@@ -65,3 +65,7 @@
 
 - `recomputeAllEtasForAdventure` préserve les speedKmh per-stage sans documentation explicite dans le JSDoc — comportement intentionnel mais surprise pour un lecteur. Ajouter un commentaire de fonction expliquant le fallback par étape.
 - Égalité flottante `speed !== defaultSpeedKmh` sans epsilon dans `handleNamingConfirm` — peut créer des overrides parasites selon arrondis JS/locale. Impact UX mineur, refactor UX séparé recommandé.
+
+## Deferred from: code review of 17-9-booking-redirect-proxy-mobile-deep-link-fix (2026-04-15)
+
+- Rate limiting absent sur l'endpoint public `/api/go/booking` — pré-existant, aucun rate limiting dans toute l'app. L'endpoint ne fait pas d'I/O (pas de DB, pas de Redis), blast radius limité à CPU/bandwidth. À considérer lors d'un futur epic sécurité/hardening.

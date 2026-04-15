@@ -56,16 +56,19 @@ describe('SearchOnDropdown', () => {
     expect(screen.getByTestId('search-on-booking')).toBeDefined()
     expect(screen.getByTestId('search-on-airbnb')).toBeDefined()
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('dest_type=latlong')
+    expect(link.href).toContain('/go/booking?url=')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('dest_type=latlong')
   })
 
-  it('Booking.com link uses ?ss=city when city provided', () => {
+  it('Booking.com link uses proxy with ?ss=city when city provided', () => {
     render(<SearchOnDropdown center={center} city="Pamplona" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('ss=Pamplona')
-    expect(link.href).not.toContain('dest_type')
-    expect(link.href).not.toContain('latitude')
+    expect(link.href).toContain('/go/booking?url=')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('ss=Pamplona')
+    expect(encodedUrl).not.toContain('dest_type')
     expect(link.getAttribute('target')).toBe('_blank')
     expect(link.getAttribute('rel')).toBe('noopener noreferrer')
   })
@@ -74,40 +77,45 @@ describe('SearchOnDropdown', () => {
     render(<SearchOnDropdown center={center} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('latitude=43.5')
-    expect(link.href).toContain('longitude=1.4')
-    expect(link.href).not.toContain('ss=')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('latitude=43.5')
+    expect(encodedUrl).toContain('longitude=1.4')
+    expect(encodedUrl).not.toContain('ss=')
   })
 
   it('Booking.com link includes postcode in ss param when both city and postcode provided', () => {
     render(<SearchOnDropdown center={center} city="Saint-Jean-de-Luz" postcode="64500" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('ss=Saint-Jean-de-Luz%2064500')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('ss=Saint-Jean-de-Luz%2064500')
   })
 
   it('Booking.com link includes adminArea and country in ss param (Story 16.31)', () => {
     render(<SearchOnDropdown center={center} city="Valencia" postcode="46001" adminArea="Comunidad Valenciana" country="España" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('ss=Valencia%2046001%2C%20Comunidad%20Valenciana%2C%20Espa')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('ss=Valencia%2046001%2C%20Comunidad%20Valenciana%2C%20Espa')
   })
 
   it('Booking.com link omits null adminArea/country gracefully', () => {
     render(<SearchOnDropdown center={center} city="Toulouse" postcode="31000" adminArea={null} country={null} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('ss=Toulouse%2031000')
-    expect(link.href).not.toContain('%2C')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('ss=Toulouse%2031000')
+    expect(encodedUrl).not.toContain('%2C')
   })
 
   it('Booking.com link uses coordinates fallback when city is null but center available (AC #6)', () => {
     render(<SearchOnDropdown center={center} city={null} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     const link = screen.getByTestId('search-on-booking') as HTMLAnchorElement
-    expect(link.href).toContain('latitude=43.5')
-    expect(link.href).toContain('longitude=1.4')
-    expect(link.href).toContain('dest_type=latlong')
+    const encodedUrl = decodeURIComponent(link.href.split('url=')[1]!)
+    expect(encodedUrl).toContain('latitude=43.5')
+    expect(encodedUrl).toContain('longitude=1.4')
+    expect(encodedUrl).toContain('dest_type=latlong')
   })
 
   it('Airbnb link has correct bbox URL', () => {
