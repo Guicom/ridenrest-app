@@ -47,12 +47,10 @@ export function SearchOnDropdown({ center, city, postcode, adminArea, country, v
     return () => document.removeEventListener('mousedown', handleMouseDown)
   }, [open])
 
-  // Always prefer coordinates — city-name search fails on Booking mobile app
-  // for small/unknown villages (app falls back to last session instead)
-  const bookingUrl = center
-    ? buildBookingCoordUrl(center)
-    : city
-      ? buildBookingSearchUrl(city, postcode, adminArea, country)
+  const bookingUrl = city
+    ? buildBookingSearchUrl(city, postcode, adminArea, country)
+    : center
+      ? buildBookingCoordUrl(center)
       : null
   const airbnbUrl = center ? buildAirbnbSearchUrl(center) : null
 
