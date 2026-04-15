@@ -9,6 +9,8 @@ export const CATEGORY_PIN_FILE: Record<PoiCategory, string> = {
   guesthouse:   'guesthouse',
   hostel:       'hostel',
   restaurant:   'restaurant',
+  cafe_bar:     'cafe-bar',
+  gas_station:  'gas-station',
   supermarket:  'supplies',
   convenience:  'supplies',
   bike_shop:    'bike',

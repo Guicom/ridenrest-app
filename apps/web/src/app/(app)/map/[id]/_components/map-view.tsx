@@ -378,6 +378,7 @@ export function MapView({ adventureId }: MapViewProps) {
         waypoints={allCumulativeWaypoints.length > 0 ? allCumulativeWaypoints : null}
         isPoisPending={poisPending}
         accommodationPois={poisByLayer.accommodations}
+        restaurantPois={poisByLayer.restaurants}
         stages={stages.length > 0 ? stages : undefined}
       />
 

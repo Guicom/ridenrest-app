@@ -23,6 +23,10 @@ vi.mock('@/stores/map.store', () => ({
     setSelectedStageId: mockSetSelectedStageId,
     searchCommitted: mockSearchCommitted,
     setSearchCommitted: mockSetSearchCommitted,
+    activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
+    toggleAccommodationType: vi.fn(),
+    activeRestaurantTypes: new Set(['restaurant', 'cafe_bar', 'gas_station']),
+    toggleRestaurantType: vi.fn(),
   }),
 }))
 

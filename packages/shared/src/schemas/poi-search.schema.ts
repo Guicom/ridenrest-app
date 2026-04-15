@@ -5,7 +5,7 @@ export const poiSearchSchema = z.object({
   segmentId: z.string().uuid(),
   fromKm: z.number().min(0),
   toKm: z.number().min(0),
-  categories: z.array(z.enum(['hotel', 'hostel', 'camp_site', 'shelter', 'restaurant', 'supermarket', 'convenience', 'bike_shop', 'bike_repair'])).optional(),
+  categories: z.array(z.enum(['hotel', 'hostel', 'camp_site', 'shelter', 'restaurant', 'cafe_bar', 'gas_station', 'supermarket', 'convenience', 'bike_shop', 'bike_repair'])).optional(),
 }).refine(
   (data) => data.toKm > data.fromKm,
   { message: 'toKm must be greater than fromKm', path: ['toKm'] }

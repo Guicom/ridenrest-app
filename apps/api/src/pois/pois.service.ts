@@ -16,6 +16,8 @@ const CATEGORY_TO_OVERPASS_TAGS: Record<string, string[]> = {
   shelter:      ['shelter'],
   guesthouse:   ['guesthouse'],
   restaurant:   ['restaurant'],
+  cafe_bar:     ['cafe_bar'],
+  gas_station:  ['gas_station'],
   supermarket:  ['supermarket'],
   convenience:  ['convenience'],
   bike_shop:    ['bike_shop'],
@@ -406,6 +408,10 @@ function resolveCategory(tags: Record<string, string>): string {
   if (tags.amenity === 'hostel')                   return 'hostel'
   if (tags.amenity === 'shelter')                  return 'shelter'
   if (tags.amenity === 'restaurant')               return 'restaurant'
+  if (tags.amenity === 'cafe')                     return 'cafe_bar'
+  if (tags.amenity === 'bar')                      return 'cafe_bar'
+  if (tags.amenity === 'pub')                      return 'cafe_bar'
+  if (tags.amenity === 'fuel')                     return 'gas_station'
   if (tags.amenity === 'bicycle_repair_station')   return 'bike_repair'
   // tourism tags — hotel variants
   if (tags.tourism === 'hotel')                    return 'hotel'

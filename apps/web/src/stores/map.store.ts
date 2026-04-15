@@ -30,6 +30,9 @@ interface MapState {
   // Accommodation sub-type filter (Story 8.4)
   activeAccommodationTypes: Set<PoiCategory>
 
+  // Restaurant sub-type filter (Story 17.8)
+  activeRestaurantTypes: Set<PoiCategory>
+
   // Selected POI pin state (Story 9.3)
   selectedPoiId: string | null
 
@@ -50,6 +53,8 @@ interface MapState {
   setWeatherDimension: (dimension: WeatherDimension) => void
   toggleAccommodationType: (type: PoiCategory) => void
   resetAccommodationTypes: () => void
+  toggleRestaurantType: (type: PoiCategory) => void
+  resetRestaurantTypes: () => void
   setSelectedPoiId: (id: string | null) => void
   setSelectedStageId: (id: string | null) => void
   setTraceClickedKm: (km: number | null) => void
@@ -68,6 +73,7 @@ export const useMapStore = create<MapState>((set) => ({
   weatherActive: false,
   weatherDimension: 'temperature',
   activeAccommodationTypes: new Set(['hotel'] as PoiCategory[]),
+  activeRestaurantTypes: new Set(LAYER_CATEGORIES.restaurants),
   selectedPoiId: null,
   selectedStageId: null,
   traceClickedKm: null,
@@ -110,6 +116,20 @@ export const useMapStore = create<MapState>((set) => ({
 
   resetAccommodationTypes: () =>
     set({ activeAccommodationTypes: new Set(LAYER_CATEGORIES.accommodations) }),
+
+  toggleRestaurantType: (type) =>
+    set((state) => {
+      const next = new Set(state.activeRestaurantTypes)
+      if (next.has(type)) {
+        next.delete(type)
+      } else {
+        next.add(type)
+      }
+      return { activeRestaurantTypes: next }
+    }),
+
+  resetRestaurantTypes: () =>
+    set({ activeRestaurantTypes: new Set(LAYER_CATEGORIES.restaurants) }),
 
   setSelectedPoiId: (id) => set({ selectedPoiId: id }),
 

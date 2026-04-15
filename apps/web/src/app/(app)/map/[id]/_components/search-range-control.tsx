@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
+import { RestaurantSubTypes } from './restaurant-sub-types'
 import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 const MAX_RANGE_KM = MAX_SEARCH_RANGE_KM
@@ -21,6 +22,7 @@ interface SearchRangeControlProps {
   waypoints: MapWaypoint[] | null
   isPoisPending: boolean
   accommodationPois?: Poi[]
+  restaurantPois?: Poi[]
   stages?: AdventureStageResponse[]
 }
 
@@ -55,7 +57,7 @@ function computeLossInRange(waypoints: MapWaypoint[], fromKm: number, toKm: numb
 }
 
 export function SearchRangeControl({
-  totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages,
+  totalDistanceKm, waypoints, isPoisPending, accommodationPois, restaurantPois, stages,
 }: SearchRangeControlProps) {
   const [expanded, setExpanded] = useState(true)
   const {
@@ -276,6 +278,9 @@ export function SearchRangeControl({
 
           {/* Accommodation sub-types — visible uniquement si Hébergements actif */}
           {visibleLayers.has('accommodations') && <AccommodationSubTypes accommodationPois={accommodationPois} />}
+
+          {/* Restaurant sub-types — visible uniquement si Restauration actif */}
+          {visibleLayers.has('restaurants') && <RestaurantSubTypes restaurantPois={restaurantPois} />}
 
           {/* Range stepper + input */}
           <div className="flex items-center justify-between">

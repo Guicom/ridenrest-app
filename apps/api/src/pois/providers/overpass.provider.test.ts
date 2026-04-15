@@ -57,6 +57,34 @@ describe('OverpassProvider', () => {
     expect(body).toContain('way["amenity"="restaurant"]')
   })
 
+  it('builds correct Overpass filters for cafe_bar category', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ elements: [] }),
+    })
+
+    await provider.queryPois(bbox, ['cafe_bar'])
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
+    const body = decodeURIComponent((options.body as string).replace('data=', ''))
+    expect(body).toContain('"amenity"="cafe"')
+    expect(body).toContain('"amenity"="bar"')
+    expect(body).toContain('"amenity"="pub"')
+  })
+
+  it('builds correct Overpass filters for gas_station category', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ elements: [] }),
+    })
+
+    await provider.queryPois(bbox, ['gas_station'])
+
+    const [, options] = mockFetch.mock.calls[0] as [string, RequestInit]
+    const body = decodeURIComponent((options.body as string).replace('data=', ''))
+    expect(body).toContain('"amenity"="fuel"')
+  })
+
   it('returns elements from Overpass response', async () => {
     const mockElements = [
       { type: 'node', id: 123, lat: 43.1, lon: 1.1, tags: { name: 'Hôtel du Lac', amenity: 'hotel' } },

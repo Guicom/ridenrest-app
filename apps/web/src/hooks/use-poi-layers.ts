@@ -17,7 +17,7 @@ export function usePoiLayers(
   styleVersion: number,  // Forces re-run after theme/style change
   selectedStageColor: string | null = null,
 ) {
-  const { visibleLayers, activeAccommodationTypes, selectedPoiId } = useMapStore()
+  const { visibleLayers, activeAccommodationTypes, activeRestaurantTypes, selectedPoiId } = useMapStore()
 
   // Ref keeps selectedStageColor current for the main effect without adding it to deps
   // (avoids unnecessary setData calls on stage selection — reactive stroke effect handles updates)
@@ -57,7 +57,9 @@ export function usePoiLayers(
         const rawPois = poisByLayer[layer]
         const pois = layer === 'accommodations'
           ? rawPois.filter((poi) => activeAccommodationTypes.has(poi.category))
-          : rawPois
+          : layer === 'restaurants'
+            ? rawPois.filter((poi) => activeRestaurantTypes.has(poi.category))
+            : rawPois
         const features: GeoJSON.Feature[] = pois.map((poi) => ({
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [poi.lng, poi.lat] },
@@ -193,7 +195,7 @@ export function usePoiLayers(
       cancelled = true
       cleanupFns.forEach((fn) => fn())
     }
-  }, [mapRef, poisByLayer, visibleLayers, activeAccommodationTypes, styleVersion])
+  }, [mapRef, poisByLayer, visibleLayers, activeAccommodationTypes, activeRestaurantTypes, styleVersion])
 
   // Separate effect — updates selected pin visual state reactively without re-creating layers
   useEffect(() => {

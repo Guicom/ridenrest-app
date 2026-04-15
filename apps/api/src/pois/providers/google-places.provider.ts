@@ -10,6 +10,8 @@ export const GOOGLE_PLACE_TYPES: Record<string, string[]> = {
   camp_site:    ['campground', 'camping_cabin', 'rv_park', 'mobile_home_park'],
   shelter:      ['lodging'],
   restaurant:   ['restaurant', 'food'],
+  cafe_bar:     ['cafe', 'bar', 'pub'],
+  gas_station:  ['gas_station'],
   supermarket:  ['grocery_or_supermarket', 'supermarket'],
   convenience:  ['convenience_store'],
   bike_shop:    ['bicycle_store'],
@@ -25,7 +27,7 @@ export const LAYER_GOOGLE_TYPES: Record<string, string[]> = {
     'bed_and_breakfast', 'guest_house', 'private_guest_room', 'cottage', 'farmstay',
     'hostel',
   ],
-  restaurants:    ['restaurant'],
+  restaurants:    ['restaurant', 'cafe', 'bar', 'pub', 'gas_station'],
   supplies:       ['grocery_or_supermarket', 'convenience_store'],
   bike:           ['bicycle_store'],
 }
@@ -49,7 +51,11 @@ interface GoogleTextSearchResponse {
 
 // Map Google place types → our PoiCategory
 export function mapGoogleTypesToCategory(types: string[], layer: string): string {
-  if (layer === 'restaurants') return 'restaurant'
+  if (layer === 'restaurants') {
+    if (types.some((t) => ['cafe', 'bar', 'pub'].includes(t))) return 'cafe_bar'
+    if (types.some((t) => ['gas_station'].includes(t))) return 'gas_station'
+    return 'restaurant'
+  }
   if (layer === 'bike') return 'bike_shop'
   if (layer === 'supplies') {
     if (types.some((t) => ['grocery_or_supermarket', 'supermarket'].includes(t))) return 'supermarket'
@@ -260,20 +266,34 @@ export class GooglePlacesProvider {
 
     this.logger.debug(`Google Places searchLayer bbox: ${bbox.minLat.toFixed(4)},${bbox.minLng.toFixed(4)} → ${bbox.maxLat.toFixed(4)},${bbox.maxLng.toFixed(4)}, layer: ${layer}`)
 
-    // Use a broad textQuery per layer so includedType does the actual filtering.
-    // Using the type name as textQuery (e.g. "private guest room") causes Google
-    // to score by text relevance, missing places whose name doesn't match the type.
+    // Per-type textQuery — matches the nature of each includedType for better relevance.
+    // includedType does the real filtering; textQuery improves ranking/coverage.
+    const TYPE_TEXT_QUERY: Record<string, string> = {
+      // accommodations
+      lodging: 'accommodation', hotel: 'hotel', motel: 'motel', inn: 'inn',
+      extended_stay_hotel: 'hotel', resort_hotel: 'resort',
+      campground: 'camping', camping_cabin: 'camping', rv_park: 'camping', mobile_home_park: 'camping',
+      bed_and_breakfast: 'bed and breakfast', guest_house: 'guest house',
+      private_guest_room: 'guest room', cottage: 'cottage', farmstay: 'farmstay',
+      hostel: 'hostel',
+      // restaurants
+      restaurant: 'restaurant', cafe: 'cafe', bar: 'bar', pub: 'pub',
+      gas_station: 'gas station',
+      // supplies
+      grocery_or_supermarket: 'grocery store', convenience_store: 'convenience store',
+      // bike
+      bicycle_store: 'bicycle bike shop',
+    }
     const LAYER_TEXT_QUERY: Record<string, string> = {
       accommodations: 'accommodation',
       restaurants:    'restaurant',
       supplies:       'grocery store',
       bike:           'bicycle bike shop',
     }
-    const textQuery = LAYER_TEXT_QUERY[layer] ?? layer
 
     const results = await Promise.allSettled(
       googleTypes.map((type) =>
-        this.searchPlaceIds(bbox, type, textQuery),
+        this.searchPlaceIds(bbox, type, TYPE_TEXT_QUERY[type] ?? LAYER_TEXT_QUERY[layer] ?? layer),
       ),
     )
 

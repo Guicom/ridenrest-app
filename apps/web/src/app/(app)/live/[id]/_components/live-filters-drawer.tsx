@@ -12,6 +12,7 @@ import { useMapStore } from '@/stores/map.store'
 import { useLiveStore } from '@/stores/live.store'
 import { PoiLayerGrid } from '@/app/(app)/map/[id]/_components/poi-layer-grid'
 import { AccommodationSubTypes } from '@/app/(app)/map/[id]/_components/accommodation-sub-types'
+import { RestaurantSubTypes } from '@/app/(app)/map/[id]/_components/restaurant-sub-types'
 import { DensityCategoryDialog } from '@/app/(app)/adventures/[id]/_components/density-category-dialog'
 import { triggerDensityAnalysis } from '@/lib/api-client'
 import { useDensity } from '@/hooks/use-density'
@@ -28,6 +29,7 @@ interface LiveFiltersDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   accommodationPois?: Poi[]
+  restaurantPois?: Poi[]
   onSearch?: () => void
   defaultSpeedKmh?: number
   adventureId: string
@@ -37,7 +39,7 @@ interface LiveFiltersDrawerProps {
   liveSpeedKmh?: number
 }
 
-export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSearch, defaultSpeedKmh, adventureId, segments, stages = [], currentKmOnRoute = null, liveSpeedKmh = 0 }: LiveFiltersDrawerProps) {
+export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, restaurantPois, onSearch, defaultSpeedKmh, adventureId, segments, stages = [], currentKmOnRoute = null, liveSpeedKmh = 0 }: LiveFiltersDrawerProps) {
   const {
     visibleLayers,
     weatherActive, weatherDimension,
@@ -214,6 +216,13 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
           {visibleLayers.has('accommodations') && (
             <div className="mb-4">
               <AccommodationSubTypes accommodationPois={accommodationPois} onlyCountActive />
+            </div>
+          )}
+
+          {/* Section 2c: Sub-types restauration (conditional) */}
+          {visibleLayers.has('restaurants') && (
+            <div className="mb-4">
+              <RestaurantSubTypes restaurantPois={restaurantPois} onlyCountActive />
             </div>
           )}
 

@@ -13,6 +13,7 @@ export function useLivePoisSearch(segmentId: string | undefined) {
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
   const visibleLayers = useMapStore((s) => s.visibleLayers)
   const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes)
+  const activeRestaurantTypes = useMapStore((s) => s.activeRestaurantTypes)
   const { data: profile } = useProfile()
   const overpassEnabled = profile?.overpassEnabled ?? false
 
@@ -20,9 +21,9 @@ export function useLivePoisSearch(segmentId: string | undefined) {
   // For accommodations, only include the active sub-types (e.g. hotel only by default)
   const categories = [...visibleLayers].flatMap((layer) => {
     const cats = LAYER_CATEGORIES[layer]
-    return layer === 'accommodations'
-      ? cats.filter((c) => activeAccommodationTypes.has(c))
-      : cats
+    if (layer === 'accommodations') return cats.filter((c) => activeAccommodationTypes.has(c))
+    if (layer === 'restaurants') return cats.filter((c) => activeRestaurantTypes.has(c))
+    return cats
   })
 
   // Always computed from current GPS position — used as queryKey and returned for map target dot

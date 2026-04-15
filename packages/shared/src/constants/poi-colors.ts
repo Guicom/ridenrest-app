@@ -8,6 +8,8 @@ export const POI_CATEGORY_COLORS: Record<PoiCategory, string> = {
   guesthouse:   '#EC4899',
   hostel:       '#8B5CF6',
   restaurant:   '#EF4444',
+  cafe_bar:     '#D97706',
+  gas_station:  '#6B7280',
   supermarket:  '#A855F7',
   convenience:  '#A855F7',
   bike_shop:    '#14B8A6',

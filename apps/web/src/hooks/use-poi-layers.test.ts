@@ -12,6 +12,7 @@ vi.mock('@/stores/map.store', () => ({
     () => ({
       visibleLayers: mockVisibleLayers,
       activeAccommodationTypes: new Set(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']),
+      activeRestaurantTypes: new Set(['restaurant', 'cafe_bar', 'gas_station']),
       selectedPoiId: null,
     }),
     { getState: () => ({ setSelectedPoiId: mockSetSelectedPoiId }) },
@@ -226,6 +227,32 @@ describe('usePoiLayers', () => {
     )
     expect(mouseEnterCalls.length).toBeGreaterThan(0)
     expect(mouseLeaveCalls.length).toBeGreaterThan(0)
+  })
+
+  it('cafe_bar and gas_station POIs are rendered under restaurants layer', async () => {
+    mockVisibleLayers = new Set(['restaurants'])
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = {
+      ...emptyPoisByLayer,
+      restaurants: [
+        makePoi('restaurants', { id: 'cafe-1', externalId: 'c1', category: 'cafe_bar' }),
+        makePoi('restaurants', { id: 'gas-1', externalId: 'g1', category: 'gas_station' }),
+        makePoi('restaurants', { id: 'resto-1', externalId: 'r1', category: 'restaurant' }),
+      ],
+    }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1))
+    await flushPromises()
+
+    const addSourceCalls = (mockMap.addSource as ReturnType<typeof vi.fn>).mock.calls as Array<[string, { data: { features: Array<{ properties: Record<string, unknown> }> } }]>
+    const restaurantsSource = addSourceCalls.find(([name]) => name === 'pois-restaurants')
+    expect(restaurantsSource).toBeDefined()
+    const features = restaurantsSource![1].data.features
+    expect(features).toHaveLength(3)
+    const categories = features.map((f) => f.properties.category)
+    expect(categories).toContain('cafe_bar')
+    expect(categories).toContain('gas_station')
+    expect(categories).toContain('restaurant')
   })
 
   it('cluster layer uses POI_CLUSTER_COLOR #2D6A4A', async () => {

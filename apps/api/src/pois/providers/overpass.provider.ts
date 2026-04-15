@@ -22,6 +22,8 @@ const CATEGORY_FILTERS: Record<string, string[]> = {
   camp_site:    ['"tourism"="camp_site"', '"tourism"="caravan_site"'],
   shelter:      ['"amenity"="shelter"', '"tourism"="alpine_hut"', '"tourism"="wilderness_hut"'],
   restaurant:   ['"amenity"="restaurant"'],
+  cafe_bar:     ['"amenity"="cafe"', '"amenity"="bar"', '"amenity"="pub"'],
+  gas_station:  ['"amenity"="fuel"'],
   supermarket:  ['"shop"="supermarket"'],
   convenience:  ['"shop"="convenience"'],
   bike_shop:    ['"shop"="bicycle"'],

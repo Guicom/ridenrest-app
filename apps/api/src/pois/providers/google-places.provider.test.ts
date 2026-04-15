@@ -265,6 +265,15 @@ describe('GooglePlacesProvider', () => {
         expect(types).toContain(t)
       }
     })
+
+    it('restaurants layer includes cafe, bar, pub, gas_station', () => {
+      const types = LAYER_GOOGLE_TYPES['restaurants']
+      expect(types).toContain('restaurant')
+      expect(types).toContain('cafe')
+      expect(types).toContain('bar')
+      expect(types).toContain('pub')
+      expect(types).toContain('gas_station')
+    })
   })
 
   describe('mapGoogleTypesToCategory', () => {
@@ -303,8 +312,21 @@ describe('GooglePlacesProvider', () => {
     })
 
     // Non-accommodation layers
-    it('maps restaurant layer → restaurant', () => {
+    it('maps restaurant layer → restaurant (default)', () => {
       expect(mapGoogleTypesToCategory(['restaurant'], 'restaurants')).toBe('restaurant')
+    })
+
+    // Cafe/bar/pub → cafe_bar
+    it.each(['cafe', 'bar', 'pub'])(
+      'maps %s → cafe_bar (restaurants layer)',
+      (type) => {
+        expect(mapGoogleTypesToCategory([type], 'restaurants')).toBe('cafe_bar')
+      },
+    )
+
+    // gas_station → gas_station
+    it('maps gas_station → gas_station (restaurants layer)', () => {
+      expect(mapGoogleTypesToCategory(['gas_station'], 'restaurants')).toBe('gas_station')
     })
 
     it('maps bike layer → bike_shop', () => {

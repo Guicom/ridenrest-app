@@ -157,6 +157,12 @@ export default function LivePage() {
     [pois],
   )
 
+  // Filter restaurant pois — same pattern (Story 17.8)
+  const restaurantPois = useMemo(
+    () => pois.filter((p) => (LAYER_CATEGORIES.restaurants as readonly string[]).includes(p.category)),
+    [pois],
+  )
+
   // Detect "filter empty" for accommodations in live mode (Story 16.17, AC-4)
   // In live mode, API already filters by activeAccommodationTypes, so we can't compute exact alternative counts.
   // Detect: pois exist (other layers) but no accommodation pois, and not all acc types are selected.
@@ -517,6 +523,7 @@ export default function LivePage() {
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
         accommodationPois={accommodationPois}
+        restaurantPois={restaurantPois}
         onSearch={handleSearch}
         defaultSpeedKmh={adventure?.avgSpeedKmh}
         adventureId={adventureId}

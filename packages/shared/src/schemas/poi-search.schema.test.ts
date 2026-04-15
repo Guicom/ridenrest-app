@@ -53,4 +53,28 @@ describe('poiSearchSchema', () => {
     const result = poiSearchSchema.safeParse({ ...validBase, categories: ['invalid_category'] })
     expect(result.success).toBe(false)
   })
+
+  it('accepts cafe_bar category', () => {
+    const result = poiSearchSchema.safeParse({
+      ...validBase,
+      categories: ['cafe_bar'],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts gas_station category', () => {
+    const result = poiSearchSchema.safeParse({
+      ...validBase,
+      categories: ['gas_station'],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts cafe_bar and gas_station mixed with other categories', () => {
+    const result = poiSearchSchema.safeParse({
+      ...validBase,
+      categories: ['restaurant', 'cafe_bar', 'gas_station'],
+    })
+    expect(result.success).toBe(true)
+  })
 })
