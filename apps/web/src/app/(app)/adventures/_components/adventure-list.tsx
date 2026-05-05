@@ -57,12 +57,17 @@ export function AdventureList() {
   // Parse YYYY-MM-DD as local midnight (not UTC) to avoid off-by-one-day for UTC- users
   const parseLocalDate = (d: string) => new Date(d + 'T00:00:00')
 
+  // Reference date: endDate if set, otherwise startDate
+  // An adventure is "past" only when its reference date is strictly before today
+  const refDate = (a: { startDate?: string | null; endDate?: string | null }) =>
+    a.endDate ? parseLocalDate(a.endDate) : a.startDate ? parseLocalDate(a.startDate) : null
+
   const upcoming = adventures
-    .filter((a) =>
-      a.status === 'active' ||
-      !a.startDate ||
-      parseLocalDate(a.startDate) >= today,
-    )
+    .filter((a) => {
+      if (a.status === 'active') return true
+      const ref = refDate(a)
+      return ref === null || ref >= today
+    })
     .sort((a, b) => {
       if (a.status === 'active' && b.status !== 'active') return -1
       if (b.status === 'active' && a.status !== 'active') return 1
@@ -73,14 +78,16 @@ export function AdventureList() {
     })
 
   const past = adventures
-    .filter((a) =>
-      a.status !== 'active' &&
-      !!a.startDate &&
-      parseLocalDate(a.startDate) < today,
-    )
-    .sort((a, b) =>
-      parseLocalDate(b.startDate!).getTime() - parseLocalDate(a.startDate!).getTime(),
-    )
+    .filter((a) => {
+      if (a.status === 'active') return false
+      const ref = refDate(a)
+      return ref !== null && ref < today
+    })
+    .sort((a, b) => {
+      const ra = refDate(a)!
+      const rb = refDate(b)!
+      return rb.getTime() - ra.getTime()
+    })
 
   return (
     <div>

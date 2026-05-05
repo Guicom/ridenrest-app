@@ -246,6 +246,23 @@ describe('AdventureList', () => {
     expect(screen.getByText('Actuelle')).toBeInTheDocument()
   })
 
+  it('adventure with no startDate and past endDate goes into "Aventures passées"', () => {
+    vi.mocked(tanstackQuery.useQuery).mockReturnValue({
+      data: [
+        makeAdventure({ id: 'adv-ended', name: 'Terminée', startDate: null, endDate: '2025-01-01', status: 'planning' }),
+        makeAdventure({ id: 'adv-undated', name: 'Sans date', startDate: null, endDate: null, status: 'planning' }),
+      ],
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof tanstackQuery.useQuery>)
+
+    renderList()
+
+    expect(screen.queryByText('Terminée')).toBeNull()
+    expect(screen.getByText(/Aventures passées \(1\)/)).toBeInTheDocument()
+    expect(screen.getByText('Sans date')).toBeInTheDocument()
+  })
+
   it('clicking "Aventures passées" toggle expands and shows past adventure', () => {
     const pastDate = '2025-01-01'
     vi.mocked(tanstackQuery.useQuery).mockReturnValue({

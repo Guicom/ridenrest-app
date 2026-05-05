@@ -2,6 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStages, createStage, updateStage, deleteStage } from '@/lib/api-client'
 import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
 
+interface UseStagesOptions {
+  onAfterChange?: () => void
+}
+
 interface UseStagesResult {
   stages: AdventureStageResponse[]
   isPending: boolean
@@ -10,7 +14,8 @@ interface UseStagesResult {
   deleteStage: (stageId: string) => Promise<void>
 }
 
-export function useStages(adventureId: string): UseStagesResult {
+export function useStages(adventureId: string, options: UseStagesOptions = {}): UseStagesResult {
+  const { onAfterChange } = options
   const queryClient = useQueryClient()
   const queryKey = ['adventures', adventureId, 'stages'] as const
 
@@ -20,7 +25,10 @@ export function useStages(adventureId: string): UseStagesResult {
     enabled: !!adventureId,
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey })
+  const invalidate = async () => {
+    await queryClient.refetchQueries({ queryKey })
+    onAfterChange?.()
+  }
 
   const createMutation = useMutation({
     mutationFn: (input: CreateStageInput) => createStage(adventureId, input),

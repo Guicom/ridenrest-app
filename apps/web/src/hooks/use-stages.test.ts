@@ -4,12 +4,12 @@ import { useStages } from './use-stages'
 
 const mockUseQuery = vi.fn()
 const mockUseMutation = vi.fn()
-const mockInvalidateQueries = vi.fn()
+const mockRefetchQueries = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
   useMutation: (...args: unknown[]) => mockUseMutation(...args),
-  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+  useQueryClient: () => ({ refetchQueries: mockRefetchQueries }),
 }))
 
 vi.mock('@/lib/api-client', () => ({
@@ -25,7 +25,8 @@ describe('useStages', () => {
   beforeEach(() => {
     mockUseQuery.mockReset()
     mockUseMutation.mockReset()
-    mockInvalidateQueries.mockReset()
+    mockRefetchQueries.mockReset()
+    mockRefetchQueries.mockResolvedValue(undefined)
     mockUseMutation.mockReturnValue(defaultMutation)
   })
 
@@ -59,28 +60,41 @@ describe('useStages', () => {
     expect(queryKey).toEqual(['adventures', 'adv-42', 'stages'])
   })
 
-  it('invalidates query on create success', () => {
+  it('refetches query on create success and calls onAfterChange', async () => {
     mockUseQuery.mockReturnValue({ data: [], isPending: false })
     mockUseMutation.mockReturnValue(defaultMutation)
+    const onAfterChange = vi.fn()
 
-    renderHook(() => useStages('adv-1'))
+    renderHook(() => useStages('adv-1', { onAfterChange }))
 
-    // Extract the onSuccess callback from createStage mutation call (first call)
     const { onSuccess } = mockUseMutation.mock.calls[0][0]
-    onSuccess()
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['adventures', 'adv-1', 'stages'] })
+    await onSuccess()
+    expect(mockRefetchQueries).toHaveBeenCalledWith({ queryKey: ['adventures', 'adv-1', 'stages'] })
+    expect(onAfterChange).toHaveBeenCalled()
   })
 
-  it('invalidates query on delete success', () => {
+  it('refetches query on delete success and calls onAfterChange', async () => {
     mockUseQuery.mockReturnValue({ data: [], isPending: false })
     mockUseMutation.mockReturnValue(defaultMutation)
+    const onAfterChange = vi.fn()
 
-    renderHook(() => useStages('adv-1'))
+    renderHook(() => useStages('adv-1', { onAfterChange }))
 
     // Third useMutation call is for delete
     const { onSuccess } = mockUseMutation.mock.calls[2][0]
-    onSuccess()
-    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['adventures', 'adv-1', 'stages'] })
+    await onSuccess()
+    expect(mockRefetchQueries).toHaveBeenCalledWith({ queryKey: ['adventures', 'adv-1', 'stages'] })
+    expect(onAfterChange).toHaveBeenCalled()
+  })
+
+  it('does not call onAfterChange when not provided', async () => {
+    mockUseQuery.mockReturnValue({ data: [], isPending: false })
+    mockUseMutation.mockReturnValue(defaultMutation)
+
+    renderHook(() => useStages('adv-1'))
+
+    const { onSuccess } = mockUseMutation.mock.calls[0][0]
+    await expect(onSuccess()).resolves.not.toThrow()
   })
 
   it('query is disabled when adventureId is empty string', () => {

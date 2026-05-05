@@ -30,6 +30,8 @@ import { SidebarStagesSection } from './sidebar-stages-section'
 import { NoResultsSubTypeBanner } from './no-results-sub-type-banner'
 import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
 import { useStages } from '@/hooks/use-stages'
+import { useEndDateSync } from '@/hooks/use-end-date-sync'
+import { EndDateSyncDialog } from '@/components/shared/end-date-sync-dialog'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import { getStoredWeatherPace } from '@/lib/weather-pace'
 import { trackMapOpened, trackPoiSearchTriggered, hashAdventureId } from '@/lib/analytics'
@@ -85,6 +87,11 @@ export function MapView({ adventureId }: MapViewProps) {
     queryFn: () => getAdventure(adventureId),
     staleTime: 30_000,
   })
+
+  const { proposedDate, isPending: endDatePending, triggerCheck, confirmUpdate: confirmEndDate, dismiss: dismissEndDate } = useEndDateSync(
+    adventureId,
+    adventure?.endDate ?? null,
+  )
 
   const { data, isPending, error } = useQuery<AdventureMapResponse>({
     queryKey: ['adventures', adventureId, 'map'],
@@ -160,7 +167,7 @@ export function MapView({ adventureId }: MapViewProps) {
       })?.id ?? null
     : null
 
-  const { stages, createStage, updateStage, deleteStage } = useStages(adventureId)
+  const { stages, createStage, updateStage, deleteStage } = useStages(adventureId, { onAfterChange: triggerCheck })
 
   // Detect if any stage has a per-stage departure time → used for weather layer + controls
   const stageDeparturesJson = useMemo(() => {
@@ -206,10 +213,12 @@ export function MapView({ adventureId }: MapViewProps) {
   const [speedInput, setSpeedInput] = useState('')
   const avgSpeedMutation = useMutation({
     mutationFn: (speed: number) => updateAdventureAvgSpeedKmh(adventureId, speed),
-    onSuccess: () => {
+    onSuccess: async () => {
       void queryClient.invalidateQueries({ queryKey: ['adventures', adventureId] })
-      void queryClient.invalidateQueries({ queryKey: ['stages', adventureId] })
       void queryClient.invalidateQueries({ queryKey: ['weather'] })
+      // Refetch stages (ETAs recomputed server-side) then propose end date update
+      await queryClient.refetchQueries({ queryKey: ['adventures', adventureId, 'stages'] })
+      triggerCheck()
       setIsEditingSpeed(false)
     },
   })
@@ -653,6 +662,13 @@ export function MapView({ adventureId }: MapViewProps) {
           />
         </div>
       </div>
+
+      <EndDateSyncDialog
+        proposedDate={proposedDate}
+        onConfirm={confirmEndDate}
+        onDismiss={dismissEndDate}
+        isPending={endDatePending}
+      />
     </div>
   )
 }
