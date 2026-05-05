@@ -264,4 +264,5 @@ development_status:
   17-8-new-poi-categories-cafe-bar-gas-station: review  # cafe_bar + gas_station sous layer restaurants (Google Places + Overpass)
   17-9-booking-redirect-proxy-mobile-deep-link-fix: done  # redirect proxy API pour contourner interception Universal Links/App Links Booking mobile — code review 2026-04-15
   17-10-booking-url-mobile-compat-city-coords: done  # fix URLs Booking mobile: ss=city + dest_type=city + lat/lng (remplace CP/region/pays) + suppression module go/ — code review 2026-04-15
+  17-11-strava-feature-flag-reactivation: ready-for-dev  # flip NEXT_PUBLIC_STRAVA_ENABLED=true (suite élévation API Strava 2026-05-03) + ajout au turbo.json#env + CHANGELOG
   epic-17-retrospective: optional

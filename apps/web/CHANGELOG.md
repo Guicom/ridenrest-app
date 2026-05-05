@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 — 2026-05-05
+
+### Nouveautés
+- Réactivation de la connexion Strava : connecte ton compte Strava depuis Paramètres
+- Import direct des routes Strava comme segments GPX dans une aventure (multi-sélection, recherche par nom)
+
 ## 1.2.0 — 2026-04-12
 
 ### Nouveautés

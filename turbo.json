@@ -10,7 +10,8 @@
         "BETTER_AUTH_SECRET",
         "BETTER_AUTH_URL",
         "NEXT_PUBLIC_PLAUSIBLE_DOMAIN",
-        "NEXT_PUBLIC_APP_VERSION"
+        "NEXT_PUBLIC_APP_VERSION",
+        "NEXT_PUBLIC_STRAVA_ENABLED"
       ]
     },
     "lint": {
