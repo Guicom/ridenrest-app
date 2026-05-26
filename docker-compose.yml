@@ -106,6 +106,27 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  brouter:
+    build:
+      context: https://github.com/abrensch/brouter.git#v1.7.9
+    image: brouter:1.7.9
+    container_name: ridenrest-brouter
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:17777:17777"
+    volumes:
+      - brouter-segments:/segments4
+    command: >-
+      sh -c "java -Xmx2g -Xms256m -DmaxRunningTime=300
+      -cp /app/brouter.jar btools.server.RouteServer
+      /segments4 /profiles2 /customprofiles 17777 1"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/17777; printf \"GET /brouter HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3; read -t 2 line <&3; exec 3<&-; [[ \"$$line\" == *HTTP* ]]' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5m
+
   caddy:
     image: caddy:2-alpine
     profiles: ["production"]
@@ -126,6 +147,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  brouter-segments:
   caddy_data:
   caddy_config:
   uptime-kuma-data:
