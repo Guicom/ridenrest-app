@@ -7,6 +7,11 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BROUTER_CONTAINER="${BROUTER_CONTAINER:-ridenrest-brouter}"
 SEGMENTS_URL="https://brouter.de/brouter/segments4"
 SEGMENTS_DIR="/segments4"
+FORCE=false
+
+if [ "${1:-}" = "--force" ]; then
+  FORCE=true
+fi
 
 LONS=(-15 -10 -5 0 5 10 15 20 25 30 35 40)
 LATS=(35 40 45 50 55 60 65 70)
@@ -17,16 +22,21 @@ FAILED=0
 TOTAL_BYTES=0
 START_TIME=$(date +%s)
 
-if ! docker inspect "$BROUTER_CONTAINER" >/dev/null 2>&1; then
-  echo "ERROR: container $BROUTER_CONTAINER not found. Run: docker compose up -d brouter"
+if ! docker inspect --format='{{.State.Running}}' "$BROUTER_CONTAINER" 2>/dev/null | grep -q "true"; then
+  echo "ERROR: container $BROUTER_CONTAINER is not running. Run: docker compose up -d brouter"
   exit 1
+fi
+
+if [ "$FORCE" = "true" ]; then
+  echo "==> Force mode: removing existing segments"
+  docker exec "$BROUTER_CONTAINER" sh -c 'rm -f /segments4/*.rd5'
 fi
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "==> Downloading BRouter Europe segments into container $BROUTER_CONTAINER"
-echo "    Grid: lon ${LONS[0]}..${LONS[-1]}, lat ${LATS[0]}..${LATS[-1]}"
+echo "    Grid: lon ${LONS[0]}..${LONS[${#LONS[@]}-1]}, lat ${LATS[0]}..${LATS[${#LATS[@]}-1]}"
 echo ""
 
 for LON in "${LONS[@]}"; do
@@ -37,7 +47,7 @@ for LON in "${LONS[@]}"; do
       TILE="E${LON}_N${LAT}.rd5"
     fi
 
-    EXISTS=$(docker exec "$BROUTER_CONTAINER" sh -c "[ -f ${SEGMENTS_DIR}/${TILE} ] && echo yes || echo no")
+    EXISTS=$(docker exec "$BROUTER_CONTAINER" sh -c '[ -f "$1/$2" ] && echo yes || echo no' _ "$SEGMENTS_DIR" "$TILE")
     if [ "$EXISTS" = "yes" ]; then
       SKIPPED=$((SKIPPED + 1))
       continue
@@ -61,7 +71,7 @@ done
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 TOTAL_MB=$(echo "scale=1; $TOTAL_BYTES / 1048576" | bc 2>/dev/null || echo "?")
-EXISTING=$(docker exec "$BROUTER_CONTAINER" sh -c "ls ${SEGMENTS_DIR}/*.rd5 2>/dev/null | wc -l")
+EXISTING=$(docker exec "$BROUTER_CONTAINER" sh -c 'ls "$1"/*.rd5 2>/dev/null | wc -l' _ "$SEGMENTS_DIR")
 
 echo ""
 echo "==> Done in ${DURATION}s"

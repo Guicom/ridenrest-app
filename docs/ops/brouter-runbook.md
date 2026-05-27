@@ -36,7 +36,7 @@ BRouter ne telecharge **pas** les segments automatiquement. Le script `scripts/u
 
 ```bash
 # Verifier le nombre de segments
-docker exec ridenrest-brouter sh -c 'ls /segments4/*.rd5 | wc -l'
+docker exec ridenrest-brouter sh -c 'ls /segments4/*.rd5 2>/dev/null | wc -l'
 # Attendu : 81
 
 # Verifier la taille totale
@@ -121,11 +121,11 @@ docker compose restart brouter
 
 ```bash
 # Ajouter au crontab utilisateur sur le VPS
-# Le 1er de chaque mois a 3h du matin
-0 3 1 * * cd /home/deploy/ridenrest-app && ./scripts/update-brouter-segments.sh >> /var/log/brouter-segments-update.log 2>&1 && docker compose restart brouter
+# Le 1er de chaque mois a 3h du matin — --force supprime puis retelecharge tous les segments
+0 3 1 * * cd /home/deploy/ridenrest-app && ./scripts/update-brouter-segments.sh --force >> /var/log/brouter-segments-update.log 2>&1 && docker compose restart brouter
 ```
 
-Le script `update-brouter-segments.sh` est idempotent : il saute les fichiers deja presents. Pour forcer un telechargement complet, supprimer les fichiers existants d'abord (voir commande ci-dessus).
+Le flag `--force` supprime les segments existants avant de retelecharger, garantissant des donnees a jour. Sans `--force`, le script est idempotent (saute les fichiers presents) — utile pour le provisionnement initial ou la reprise apres echec.
 
 ---
 
@@ -170,16 +170,16 @@ L'interface Bull Board (si configuree) permet de visualiser les jobs en attente,
 
 ```bash
 # Nombre de jobs en attente
-docker exec ridenrest-redis redis-cli LLEN bull:poi-access-calculation:wait
+docker exec ridenrest-app-redis-1 redis-cli LLEN bull:poi-access-calculation:wait
 
 # Nombre de jobs echoues
-docker exec ridenrest-redis redis-cli LLEN bull:poi-access-calculation:failed
+docker exec ridenrest-app-redis-1 redis-cli LLEN bull:poi-access-calculation:failed
 
 # Purger les jobs echoues
-docker exec ridenrest-redis redis-cli DEL bull:poi-access-calculation:failed
+docker exec ridenrest-app-redis-1 redis-cli DEL bull:poi-access-calculation:failed
 
 # Purger TOUS les jobs (attention : operation destructive)
-docker exec ridenrest-redis redis-cli KEYS "bull:poi-access-calculation:*" | xargs -I {} docker exec ridenrest-redis redis-cli DEL {}
+docker exec ridenrest-app-redis-1 redis-cli --scan --pattern "bull:poi-access-calculation:*" | xargs -n 100 docker exec -i ridenrest-app-redis-1 redis-cli DEL
 ```
 
 ### Ajuster la concurrence

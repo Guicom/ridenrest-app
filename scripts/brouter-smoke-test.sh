@@ -4,8 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+for cmd in jq python3; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: $cmd is required but not installed"; exit 1; }
+done
+
 if [ -f "$ROOT_DIR/apps/api/.env" ]; then
-  BROUTER_BASE_URL=$(grep -E '^BROUTER_BASE_URL=' "$ROOT_DIR/apps/api/.env" 2>/dev/null | cut -d= -f2- || true)
+  BROUTER_BASE_URL=$(grep -E '^BROUTER_BASE_URL=' "$ROOT_DIR/apps/api/.env" 2>/dev/null | cut -d= -f2- | tr -d '"'"'" || true)
 fi
 BASE_URL="${1:-${BROUTER_BASE_URL:-http://localhost:17777}}"
 PROFILE="${PROFILE:-trekking}"
@@ -34,8 +38,9 @@ for ROUTE in "${ROUTES[@]}"; do
   TO=$(echo "$ROUTE" | cut -d'|' -f3)
 
   START=$(millis)
+  CURL_ERR=$(mktemp)
   RESPONSE=$(curl -sS --connect-timeout 5 --max-time 30 \
-    "${BASE_URL}/brouter?lonlats=${FROM}|${TO}&profile=${PROFILE}&alternativeidx=0&format=geojson" 2>&1) || true
+    "${BASE_URL}/brouter?lonlats=${FROM}|${TO}&profile=${PROFILE}&alternativeidx=0&format=geojson" 2>"$CURL_ERR") || true
   END=$(millis)
   DURATION=$((END - START))
 
@@ -47,9 +52,10 @@ for ROUTE in "${ROUTES[@]}"; do
     PASSED=$((PASSED + 1))
   else
     echo "  FAIL  ${NAME}  ${DURATION}ms"
-    echo "$RESPONSE" | head -3
+    [ -s "$CURL_ERR" ] && cat "$CURL_ERR" || echo "$RESPONSE" | head -3
     EXIT_CODE=1
   fi
+  rm -f "$CURL_ERR"
 done
 
 if [ "$PASSED" -gt 0 ]; then

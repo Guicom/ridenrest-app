@@ -1,6 +1,6 @@
 # Story POI-Access 1.2 : Valider le téléchargement des segments en local & créer le runbook ops
 
-Status: review
+Status: done
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).
@@ -303,3 +303,18 @@ Claude Opus 4.7 (1M context) via Claude Code CLI
 - [x] `scripts/update-brouter-segments.sh` (nouveau, exécutable)
 - [x] `_bmad-output/planning-artifacts/architecture-poi-access-routing.md` (modifié — 3 sections Doc Sync)
 - [x] `_bmad-output/implementation-artifacts/poi-access-1-2-validate-brouter-segments-and-runbook.md` (modifié — tasks, completion notes)
+
+### Review Findings
+
+_Code review 2026-05-27 — Blind Hunter + Edge Case Hunter + Acceptance Auditor_
+
+- [x] [Review][Decision] **F1 — Cron mensuel = no-op permanent** : ajouté flag `--force` au script + cron utilise `--force`. Résolu.
+- [x] [Review][Patch] **F2 — Crash bash 3.2 macOS** : remplacé `${arr[-1]}` par `${arr[${#arr[@]}-1]}`. Résolu.
+- [x] [Review][Patch] **F3 — Nom conteneur Redis inexistant** : corrigé en `ridenrest-app-redis-1` dans le runbook. Résolu.
+- [x] [Review][Patch] **F4 — Commande `KEYS` Redis bloquante O(n)** : remplacé par `--scan --pattern` + batch DEL. Résolu.
+- [x] [Review][Patch] **F5 — Injection shell dans `docker exec sh -c`** : utilisé args positionnels (`'...' _ "$VAR"`). Résolu.
+- [x] [Review][Patch] **F6 — Guillemets `.env` cassent l'URL smoke test** : ajouté `tr -d '"'"'"` après extraction. Résolu.
+- [x] [Review][Patch] **F7 — Dépendances `python3`/`jq`/`bc` non vérifiées** : ajouté `command -v` checks au démarrage. Résolu.
+- [x] [Review][Patch] **F8 — `docker inspect` réussit sur conteneur arrêté** : vérifie maintenant `{{.State.Running}}` = true. Résolu.
+- [x] [Review][Patch] **F9 — `curl 2>&1 || true` masque les erreurs réseau** : stderr capturé dans fichier temp séparé. Résolu.
+- [x] [Review][Patch] **F10 — Glob `ls *.rd5 | wc -l` sans `2>/dev/null` dans le runbook** : ajouté `2>/dev/null`. Résolu.
