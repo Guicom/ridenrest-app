@@ -1,18 +1,16 @@
 import { OwnerOnlyGuard } from './owner-only.guard.js'
 import { Reflector } from '@nestjs/core'
-import { ExecutionContext, ForbiddenException } from '@nestjs/common'
-import { OWNED_RESOURCE_KEY } from '../decorators/owned-resource.decorator.js'
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 
 const makeContext = (
   params: Record<string, string>,
   user?: { id: string; email: string },
-  handlerMetadata?: Record<string, unknown>,
 ): ExecutionContext =>
   ({
     switchToHttp: () => ({
       getRequest: () => ({ params, user }),
     }),
-    getHandler: () => handlerMetadata ?? {},
+    getHandler: () => ({}),
     getClass: () => ({}),
   }) as unknown as ExecutionContext
 
@@ -27,7 +25,7 @@ describe('OwnerOnlyGuard', () => {
 
   it('passes when user is the owner', async () => {
     const check = jest.fn().mockResolvedValue(true)
-    jest.spyOn(reflector, 'get').mockReturnValue(check)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(check)
 
     const ctx = makeContext({ id: 'resource-1' }, { id: 'user-1', email: 'a@b.com' })
     await expect(guard.canActivate(ctx)).resolves.toBe(true)
@@ -36,7 +34,7 @@ describe('OwnerOnlyGuard', () => {
 
   it('throws ForbiddenException when user is not the owner', async () => {
     const check = jest.fn().mockResolvedValue(false)
-    jest.spyOn(reflector, 'get').mockReturnValue(check)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(check)
 
     const ctx = makeContext({ id: 'resource-1' }, { id: 'user-2', email: 'b@b.com' })
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException)
@@ -44,17 +42,26 @@ describe('OwnerOnlyGuard', () => {
   })
 
   it('passes when no @OwnedResource decorator is set', async () => {
-    jest.spyOn(reflector, 'get').mockReturnValue(undefined)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined)
 
     const ctx = makeContext({ id: 'resource-1' }, { id: 'user-1', email: 'a@b.com' })
     await expect(guard.canActivate(ctx)).resolves.toBe(true)
   })
 
-  it('throws ForbiddenException when user is not authenticated', async () => {
+  it('throws UnauthorizedException when user is not authenticated', async () => {
     const check = jest.fn().mockResolvedValue(true)
-    jest.spyOn(reflector, 'get').mockReturnValue(check)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(check)
 
     const ctx = makeContext({ id: 'resource-1' })
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException)
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('throws ForbiddenException when resourceId is missing', async () => {
+    const check = jest.fn().mockResolvedValue(true)
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(check)
+
+    const ctx = makeContext({}, { id: 'user-1', email: 'a@b.com' })
     await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException)
     expect(check).not.toHaveBeenCalled()
   })

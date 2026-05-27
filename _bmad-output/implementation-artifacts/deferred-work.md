@@ -85,6 +85,12 @@
 - Race condition worker pending — deux workers concurrents peuvent claim les mêmes rows via l'index partiel `access_pending`. Pattern recommandé : `SELECT FOR UPDATE SKIP LOCKED`. → Story 2.x (routing worker)
 - Changement `routing_profile` sur une adventure n'invalide pas les routes d'accès déjà calculées. Les `access_geometry` restent calculées avec l'ancien profil. → Story 2.x (routing service)
 
+## Deferred from: code review of poi-access-1-4-audit-prereqs-and-resolve-gaps.md (2026-05-27)
+
+- Ordering guards : ThrottlerGuard enregistré après JwtAuthGuard — requêtes non-auth consomment du CPU JWT avant d'être throttled. Inversion de l'ordre APP_GUARD recommandée (`app.module.ts:75-77`).
+- Test manquant : `check()` qui throw une exception dans OwnerOnlyGuard — pas de try/catch, erreur DB = 500 non contrôlé (`owner-only.guard.test.ts`).
+- ThrottlerGuard bypassable derrière reverse proxy — default tracker key sur IP. Derrière un LB/CDN, tous clients partagent une IP. Configurer `getTracker` custom pour la prod (`app.module.ts:30`).
+
 ## Deferred from: code review of poi-access-1-1-provision-brouter-docker-service.md (2026-05-27)
 
 - Build reproducibility — tag Git `v1.7.9` mutable (force-push possible), pas de SHA commit pinné ni Dockerfile local. Mitigation : `image: brouter:1.7.9` empêche les rebuilds accidentels. → Story 1.5

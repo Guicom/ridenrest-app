@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 import type { Request } from 'express'
@@ -14,9 +15,9 @@ export class OwnerOnlyGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const check = this.reflector.get<OwnerCheckFn | undefined>(
+    const check = this.reflector.getAllAndOverride<OwnerCheckFn | undefined>(
       OWNED_RESOURCE_KEY,
-      context.getHandler(),
+      [context.getHandler(), context.getClass()],
     )
 
     if (!check) return true
@@ -26,7 +27,11 @@ export class OwnerOnlyGuard implements CanActivate {
     const userId = request.user?.id
 
     if (!userId) {
-      throw new ForbiddenException('Not the owner')
+      throw new UnauthorizedException()
+    }
+
+    if (!resourceId) {
+      throw new ForbiddenException('Missing resource identifier')
     }
 
     const isOwner = await check(resourceId, userId)

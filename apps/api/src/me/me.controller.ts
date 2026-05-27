@@ -5,7 +5,7 @@ export class MeController {
   @Get()
   getSettings(): never {
     throw new NotImplementedException({
-      message: 'Not implemented yet — see story poi-access-3.2',
+      message: 'Not implemented yet — implemented in poi-access-3.2',
       plannedStory: 'poi-access-3-2-me-settings-impl',
     })
   }
@@ -13,7 +13,7 @@ export class MeController {
   @Patch()
   updateSettings(): never {
     throw new NotImplementedException({
-      message: 'Not implemented yet — see story poi-access-3.2',
+      message: 'Not implemented yet — implemented in poi-access-3.2',
       plannedStory: 'poi-access-3-2-me-settings-impl',
     })
   }

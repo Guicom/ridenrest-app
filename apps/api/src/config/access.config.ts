@@ -2,13 +2,13 @@ import { registerAs } from '@nestjs/config'
 import { z } from 'zod'
 
 const schema = z.object({
-  BROUTER_BASE_URL: z.string().url(),
-  BROUTER_TIMEOUT_MS: z.coerce.number().int().positive(),
-  BROUTER_DEFAULT_PROFILE: z.string().min(1),
-  ACCESS_EAGER_THRESHOLD_M: z.coerce.number().int().positive(),
-  ACCESS_TRACE_BUFFER_M: z.coerce.number().int().nonnegative(),
-  ACCESS_CACHE_TTL_LIVE_SECONDS: z.coerce.number().int().positive(),
-  ACCESS_ENGINE_VERSION: z.string().min(1),
+  BROUTER_BASE_URL: z.string().url().default('http://localhost:17777'),
+  BROUTER_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  BROUTER_DEFAULT_PROFILE: z.string().min(1).default('trekking'),
+  ACCESS_EAGER_THRESHOLD_M: z.coerce.number().int().positive().default(1500),
+  ACCESS_TRACE_BUFFER_M: z.coerce.number().int().nonnegative().default(10),
+  ACCESS_CACHE_TTL_LIVE_SECONDS: z.coerce.number().int().positive().default(900),
+  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+trekking'),
 })
 
 const accessConfig = registerAs('access', () => {

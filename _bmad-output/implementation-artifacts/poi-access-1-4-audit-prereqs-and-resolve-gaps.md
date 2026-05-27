@@ -1,6 +1,6 @@
 # Story POI-Access 1.4 : Audit pré-requis codebase & résolution des gaps critiques
 
-Status: review
+Status: in-progress
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).
@@ -200,6 +200,18 @@ C'est un pattern **inline dans le service**, pas un guard. Notre `OwnerOnly` gua
 
 - [x] **Task 10** — Commit propre (AC: 10)
   - [x] Prêt pour commit
+
+### Review Findings
+
+- [x] [Review][Decision→Patch] **accessConfig crash-early bloque le démarrage si env vars manquantes** — Résolu : ajout de `.default()` sur chaque var dans le schéma Zod. L'API démarre même sans les vars. [`apps/api/src/config/access.config.ts`]
+- [x] [Review][Decision→Patch] **ThrottlerGuard global rate-limit health/public endpoints** — Résolu : ajout de `@SkipThrottle()` sur HealthController et AppController. [`apps/api/src/health/health.controller.ts`, `apps/api/src/app.controller.ts`]
+- [x] [Review][Patch] **`resourceId` hardcodé sur `params['id']` sans validation undefined** — Résolu : validation `resourceId` truthy + throw ForbiddenException('Missing resource identifier'). Test ajouté. [`apps/api/src/common/guards/owner-only.guard.ts:31-33`]
+- [x] [Review][Patch] **ForbiddenException (403) au lieu d'UnauthorizedException (401) quand user absent** — Résolu : throw UnauthorizedException(). Test mis à jour. [`apps/api/src/common/guards/owner-only.guard.ts:28-29`]
+- [x] [Review][Patch] **`reflector.get()` au lieu de `getAllAndOverride()` — ignore les decorators classe** — Résolu : aligné sur le pattern JwtAuthGuard existant. Tests mis à jour. [`apps/api/src/common/guards/owner-only.guard.ts:17-19`]
+- [x] [Review][Patch] **Message 501 : "see story" au lieu de "implemented in"** — Résolu : message aligné avec la spec AC 5. [`apps/api/src/me/me.controller.ts:8,16`]
+- [x] [Review][Defer] **Ordering guards : ThrottlerGuard après JwtAuthGuard** — Requêtes non-auth consomment du CPU JWT avant d'être throttled. Inversion de l'ordre APP_GUARD recommandée mais nécessite test d'intégration complet. [`apps/api/src/app.module.ts:75-77`] — deferred, optimisation perf
+- [x] [Review][Defer] **Test manquant : `check()` qui throw une exception** — Le guard n'a pas de try/catch, une erreur DB bubblerà en 500. Couverture test à améliorer. [`apps/api/src/common/guards/owner-only.guard.test.ts`] — deferred, amélioration test coverage
+- [x] [Review][Defer] **ThrottlerGuard bypassable derrière reverse proxy** — Default tracker key sur IP. Derrière un LB/CDN, tous les clients partagent une IP. Configurer `getTracker` custom en prod. [`apps/api/src/app.module.ts:30`] — deferred, config production
 
 ---
 
