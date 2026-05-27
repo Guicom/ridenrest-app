@@ -1,0 +1,1 @@
+ALTER TABLE "accommodations_cache" ADD CONSTRAINT "chk_accommodations_cache_access_data" CHECK (access_computed_at IS NULL OR access_failed = true OR (access_distance_m IS NOT NULL AND access_geometry IS NOT NULL));

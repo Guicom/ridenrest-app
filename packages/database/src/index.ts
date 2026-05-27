@@ -3,7 +3,7 @@ export * from './schema/auth'
 
 // Enums
 export { tierEnum, unitPrefEnum, currencyEnum } from './schema/profiles'
-export { adventureStatusEnum, densityStatusEnum } from './schema/adventures'
+export { adventureStatusEnum, densityStatusEnum, routingProfileEnum } from './schema/adventures'
 export { parseStatusEnum } from './schema/adventure-segments'
 export { gapSeverityEnum } from './schema/coverage-gaps'
 

@@ -1,6 +1,6 @@
 # Story POI-Access 1.3 : Migration DB pour le calcul d'itinéraire d'accès
 
-Status: review
+Status: done
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).
@@ -314,6 +314,18 @@ Claude Opus 4.7 (1M context)
 - Build complet turbo (6/6 packages) : 0 erreurs TS
 - Migration appliquée et validée en local : 8 colonnes, 1 enum, 2 indexes, 1 FK — tous vérifiés via psql
 - Idempotence migration : confirmée
+
+### Review Findings
+
+- [x] [Review][Decision] Colonnes `access_*` nullable sans CHECK de cohérence — Résolu : CHECK constraint `chk_accommodations_cache_access_data` ajouté (migration 0015)
+- [x] [Review][Patch] `routingProfileEnum` non exporté dans `index.ts` — Résolu : ajouté à `packages/database/src/index.ts:6`
+- [x] [Review][Defer] `lineString` customType sans `fromDriver`/`toDriver` — retourne du WKB hex brut [`packages/database/src/types/geometry.ts`] — deferred, pre-existing (pattern identique avant refactor)
+- [x] [Review][Defer] `access_computed_at` sans timezone (`timestamp` vs `timestamptz`) — deferred, pre-existing (convention projet : toutes les colonnes timestamp sans tz)
+- [x] [Review][Defer] Précision `real` (float4) pour distances — ~7 chiffres significatifs — deferred, pre-existing (même type sur `dist_from_trace_m`, etc.)
+- [x] [Review][Defer] FK cross-aventure sans garde-fou — `access_origin_stage_id` peut pointer vers un stage d'une autre aventure — deferred, validation applicative future (story routing service)
+- [x] [Review][Defer] `access_geometry` orpheline après suppression stage — données de route obsolètes quand `access_origin_stage_id` passe à NULL — deferred, logique d'invalidation pour story routing service
+- [x] [Review][Defer] Race condition worker pending — deux workers peuvent claim les mêmes rows via l'index partiel — deferred, `SELECT FOR UPDATE SKIP LOCKED` à implémenter dans story routing worker
+- [x] [Review][Defer] Changement `routing_profile` n'invalide pas les routes d'accès existantes — deferred, logique d'invalidation pour story routing service
 
 ### Change Log
 

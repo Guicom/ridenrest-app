@@ -75,6 +75,16 @@
 - `useReverseCity` hook retourne encore `postcode`, `state`, `country` depuis l'API Geoapify mais aucun consumer ne les utilise après suppression dans story 17.10. Dead data — nettoyage futur possible pour réduire le payload API/Redis.
 - `extractCityFromOsmRawData` retourne un champ `postcode` jamais lu en production — dead field, nettoyage cosmétique.
 
+## Deferred from: code review of poi-access-1-3-migrate-db-poi-access-schema.md (2026-05-27)
+
+- `lineString` customType sans `fromDriver`/`toDriver` — retourne du WKB hex brut au lieu de GeoJSON. Pattern pré-existant, refactor opportun quand le routing service consommera les géométries. → Story 2.1+
+- `access_computed_at` sans timezone (`timestamp` vs `timestamptz`) — convention projet actuelle, toutes les colonnes timestamp sans tz. À migrer globalement si besoin. → Refacto globale
+- Précision `real` (float4) pour `access_distance_m` et colonnes d'élévation — ~7 chiffres significatifs, suffisant pour l'usage actuel. → Monitoring
+- FK cross-aventure sans garde-fou — `access_origin_stage_id` peut pointer vers un stage d'une autre aventure. Validation applicative nécessaire dans le routing service. → Story 2.x
+- `access_geometry` orpheline après suppression stage — données de route obsolètes quand `access_origin_stage_id` passe à NULL via `ON DELETE SET NULL`. Logique d'invalidation/recalcul à implémenter. → Story 2.x
+- Race condition worker pending — deux workers concurrents peuvent claim les mêmes rows via l'index partiel `access_pending`. Pattern recommandé : `SELECT FOR UPDATE SKIP LOCKED`. → Story 2.x (routing worker)
+- Changement `routing_profile` sur une adventure n'invalide pas les routes d'accès déjà calculées. Les `access_geometry` restent calculées avec l'ancien profil. → Story 2.x (routing service)
+
 ## Deferred from: code review of poi-access-1-1-provision-brouter-docker-service.md (2026-05-27)
 
 - Build reproducibility — tag Git `v1.7.9` mutable (force-push possible), pas de SHA commit pinné ni Dockerfile local. Mitigation : `image: brouter:1.7.9` empêche les rebuilds accidentels. → Story 1.5

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, real, jsonb, index, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, real, jsonb, index, uniqueIndex, boolean, check } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { adventureSegments } from './adventure-segments'
 import { adventureStages } from './adventure-stages'
@@ -38,4 +38,5 @@ export const accommodationsCache = pgTable('accommodations_cache', {
   accessPendingIdx: index('idx_accommodations_cache_access_pending')
     .on(table.segmentId)
     .where(sql`access_computed_at IS NULL AND access_failed = false`),
+  accessDataCheck: check('chk_accommodations_cache_access_data', sql`access_computed_at IS NULL OR access_failed = true OR (access_distance_m IS NOT NULL AND access_geometry IS NOT NULL)`),
 }))
