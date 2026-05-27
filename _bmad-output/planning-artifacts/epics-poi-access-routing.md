@@ -362,12 +362,12 @@ So that subsequent backend stories can persist computed access routes and user c
 **And** `pnpm typecheck` passe sur tous les apps et packages
 **And** `pnpm db:studio` montre les nouvelles colonnes avec leurs types
 
-**Given** le pipeline CI/CD GitHub Actions existant
-**When** j'ajoute un step `pnpm db:migrate` (ou équivalent Drizzle) dans le job de deploy, AVANT le `pm2 reload api`
-**Then** chaque release lance automatiquement les migrations en attente sur la DB prod
+**Given** le pipeline CI/CD GitHub Actions existant (le step `drizzle-kit migrate` est DÉJÀ dans `deploy.sh` — cf. project-context §VPS Deployment Config)
+**When** la migration est commitée et déployée
+**Then** `drizzle-kit migrate` dans `deploy.sh` applique automatiquement la nouvelle migration sur la DB prod
 **And** le step échoue (et bloque le deploy) si la migration ne peut pas s'appliquer
 **And** le step est idempotent (re-run safe — Drizzle skip les migrations déjà appliquées)
-**And** la migration raw SQL PostGIS est appliquée via `psql` dans le même step CI (cf. `architecture-poi-access-routing.md` §CI/CD)
+**And** pas de raw SQL séparé nécessaire — tout est généré par `drizzle-kit generate` (y compris PostGIS geometry et index partiels)
 
 **Given** un dry-run staging (si environnement staging existe)
 **When** je teste le pipeline avant prod

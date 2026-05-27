@@ -12,6 +12,8 @@ export const profiles = pgTable('profiles', {
   currency: currencyEnum('currency').notNull().default('EUR'),
   stravaAthleteId: text('strava_athlete_id').unique(),
   overpassEnabled: boolean('overpass_enabled').notNull().default(false),
+  // Tri-state RGPD: NULL = never asked, true = consented, false = explicitly refused
+  liveAccessConsent: boolean('live_access_consent'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 })

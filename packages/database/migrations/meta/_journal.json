@@ -99,6 +99,13 @@
       "when": 1775921069876,
       "tag": "0013_nasty_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1779912901155,
+      "tag": "0014_silly_firestar",
+      "breakpoints": true
     }
   ]
 }

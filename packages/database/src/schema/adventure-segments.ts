@@ -1,14 +1,8 @@
-import { pgTable, text, timestamp, real, integer, jsonb, pgEnum, customType, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, real, integer, jsonb, pgEnum, index } from 'drizzle-orm/pg-core'
 import { adventures } from './adventures'
+import { lineString } from '../types/geometry'
 
 export const parseStatusEnum = pgEnum('parse_status', ['pending', 'processing', 'done', 'error'])
-
-// PostGIS LINESTRING — Drizzle doesn't support PostGIS natively; use customType
-const geometry = customType<{ data: string; driverData: string }>({
-  dataType() {
-    return 'geometry(LINESTRING, 4326)'
-  },
-})
 
 export const adventureSegments = pgTable('adventure_segments', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -22,7 +16,7 @@ export const adventureSegments = pgTable('adventure_segments', {
   storageUrl: text('storage_url'),
   source: text('source'),  // null = manual upload, 'strava' = Strava route import
   parseStatus: parseStatusEnum('parse_status').notNull().default('pending'),
-  geom: geometry('geom'),
+  geom: lineString('geom'),
   waypoints: jsonb('waypoints'),
   boundingBox: jsonb('bounding_box'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

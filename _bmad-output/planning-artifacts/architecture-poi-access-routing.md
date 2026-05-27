@@ -401,9 +401,10 @@ CREATE INDEX idx_accommodations_cache_access_pending
 
 #### Migration Approach
 
-- **Drizzle migrations classiques** pour les colonnes simples
-- **Migration SQL raw** pour `geometry(LINESTRING, 4326)` et les index partiels `WHERE`
-- Pattern existant dans le projet (cf. `adventure-segments.geom`)
+- **TOUT via `drizzle-kit generate`** — règle stricte project-context (jamais de fichier SQL séparé)
+- Le `customType<geometry>` Drizzle génère correctement le SQL `geometry(LINESTRING, 4326)` — pas besoin de raw SQL
+- Les index partiels `WHERE` sont supportés par Drizzle via `.where(sql\`...\`)` et générés automatiquement
+- Si drizzle-kit ne supporte pas un cas, **éditer le fichier `.sql` généré** (référencé dans `_journal.json`) — jamais créer un fichier SQL séparé
 - Backfill : aucun (toutes les nouvelles colonnes sont nullables ou ont un default)
 
 #### Data Validation Strategy

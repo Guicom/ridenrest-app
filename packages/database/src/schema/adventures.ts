@@ -3,6 +3,7 @@ import { user } from './auth'
 
 export const adventureStatusEnum = pgEnum('adventure_status', ['planning', 'active', 'completed'])
 export const densityStatusEnum = pgEnum('density_status', ['idle', 'pending', 'processing', 'success', 'error'])
+export const routingProfileEnum = pgEnum('routing_profile', ['road', 'gravel', 'bikepacking'])
 
 export const adventures = pgTable('adventures', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -16,6 +17,7 @@ export const adventures = pgTable('adventures', {
   densityProgress: integer('density_progress').notNull().default(0),
   densityCategories: text('density_categories').array().notNull().default([]),
   densityAnalyzedAt: timestamp('density_analyzed_at'),
+  routingProfile: routingProfileEnum('routing_profile').notNull().default('gravel'),
   avgSpeedKmh: real('avg_speed_kmh').notNull().default(15),
   startDate: date('start_date'),
   endDate: date('end_date'),
