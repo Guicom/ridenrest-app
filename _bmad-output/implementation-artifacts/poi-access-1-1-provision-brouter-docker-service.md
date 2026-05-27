@@ -1,6 +1,6 @@
 # Story POI-Access 1.1 : Provisionner le service Docker BRouter
 
-Status: review
+Status: done
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).
@@ -279,6 +279,16 @@ Claude Opus 4.7 (1M context) via Claude Code CLI
 5. **Segments non auto-downloadés** : Confirmé — BRouter Docker ne télécharge PAS les segments au démarrage. Le routing retourne 400 "datafile not found". Handoff documenté pour Story 1.2.
 
 6. **Task 4 bloquée** : `.env.example` inaccessible (permissions Claude Code). Lignes exactes communiquées à Guillaume pour ajout manuel.
+
+### Review Findings
+
+- [x] [Review][Patch] **`mem_limit: 2560m` ajouté au conteneur BRouter** — JVM heap 2 Go + 512 Mo off-heap. Docker tue le conteneur avant le OOM killer Linux. [docker-compose.yml:115]
+- [x] [Review][Defer] **Build reproducibility — git tag mutable, pas de SHA pinné** — `v1.7.9` est un tag Git mutable (force-push possible). Pas de Dockerfile local ni registry privé. → Story 1.5 (VPS prod bootstrap)
+- [x] [Review][Defer] **Healthcheck rapporte healthy malgré routing non-fonctionnel** — `/brouter` retourne 404 (pas de segments), mais le check valide juste `*HTTP*`. → Story 1.2 (segments download)
+- [x] [Review][Defer] **deploy.sh ne gère pas le build/restart BRouter** — Le script CI/CD ne fait que git pull + pnpm + pm2 reload. Aucune commande Docker pour BRouter. → Story 1.5
+- [x] [Review][Defer] **Healthcheck bash `/dev/tcp` fragile si image upstream change** — Fonctionne sur openjdk:17.0.1-jdk-slim (Debian + bash). Si upstream passe à Alpine/distroless, le healthcheck casse. → Monitoring futur
+- [x] [Review][Defer] **Flags JVM manquants vs server.sh** — Le `command` override omet `-Xmn8M` et `-DuseRFCMimeType=false` présents dans server.sh original. Impact potentiel sur Content-Type des réponses BRouter. → Story 2.1 (RoutingService validera le parsing)
+- [x] [Review][Defer] **start_period 5m potentiellement court** — NFR-PA-014 mentionne cold start jusqu'à 15 min avec chargement segments. Actuellement OK (healthy en <15s sans segments), mais à revalider après Story 1.2. → Story 1.2
 
 ### File List
 

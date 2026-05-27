@@ -112,6 +112,7 @@ services:
     image: brouter:1.7.9
     container_name: ridenrest-brouter
     restart: unless-stopped
+    mem_limit: 2560m
     ports:
       - "127.0.0.1:17777:17777"
     volumes:

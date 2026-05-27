@@ -74,3 +74,12 @@
 
 - `useReverseCity` hook retourne encore `postcode`, `state`, `country` depuis l'API Geoapify mais aucun consumer ne les utilise après suppression dans story 17.10. Dead data — nettoyage futur possible pour réduire le payload API/Redis.
 - `extractCityFromOsmRawData` retourne un champ `postcode` jamais lu en production — dead field, nettoyage cosmétique.
+
+## Deferred from: code review of poi-access-1-1-provision-brouter-docker-service.md (2026-05-27)
+
+- Build reproducibility — tag Git `v1.7.9` mutable (force-push possible), pas de SHA commit pinné ni Dockerfile local. Mitigation : `image: brouter:1.7.9` empêche les rebuilds accidentels. → Story 1.5
+- Healthcheck rapporte `healthy` malgré routing non-fonctionnel (pas de segments /segments4). Le check valide uniquement la réponse HTTP, pas le routing réel. → Story 1.2
+- deploy.sh ne gère pas `docker compose build/up brouter` — changements Docker non auto-déployés. → Story 1.5
+- Healthcheck bash `/dev/tcp` dépend de bash dans l'image `openjdk:17.0.1-jdk-slim` (Debian). Si upstream passe à Alpine/distroless, le healthcheck casse silencieusement. → Monitoring
+- Flags JVM `-Xmn8M` et `-DuseRFCMimeType=false` omis dans le `command` override vs `server.sh` original. Impact potentiel sur Content-Type réponses. → Story 2.1
+- `start_period: 5m` potentiellement insuffisant pour cold start avec chargement segments (NFR-PA-014 : jusqu'à 15 min). → Story 1.2
