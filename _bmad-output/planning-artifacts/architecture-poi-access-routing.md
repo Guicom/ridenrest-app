@@ -153,17 +153,19 @@ Projet existant, stack figé (cf. `project-context.md`). **Aucun starter génér
 | Configuration | `command` override dans docker-compose (server.sh hardcode JAVA_OPTS) |
 | Healthcheck | TCP check bash (image slim sans wget/curl) |
 
-**Volume de données** : segments BRouter Europe téléchargés au premier démarrage (~3 Go) depuis `https://brouter.de/brouter/segments4/`. Volume Docker persistant pour éviter re-téléchargement.
+**Volume de données** : segments BRouter Europe (~3 Go, 81 tiles) téléchargés manuellement via `scripts/update-brouter-segments.sh` depuis `https://brouter.de/brouter/segments4/`. Volume Docker persistant pour éviter re-téléchargement. L'image Docker ne contient ni wget ni curl — le script télécharge sur l'hôte et copie via `docker cp`.
 
 #### 2. Profils BRouter
 
-**Option retenue** : profils standards `trekking`, `fastbike`, `safety`
+**Option retenue** : profils standards `trekking`, `fastbike`, `fastbike-verylowtraffic`
 
 | Label UI | Profil BRouter | Justification |
 |---|---|---|
 | Route | `fastbike` | Route asphaltée privilégiée |
 | Gravel (default) | `trekking` | Mix route + chemins blancs |
-| Bikepacking | `safety` | Priorité trafic réduit |
+| Bikepacking | `fastbike-verylowtraffic` | Priorité trafic réduit (remplace `safety` qui n'existe pas dans BRouter v1.7.9) |
+
+> **Discovery Story 1.2** : le profil `safety` n'existe pas dans BRouter v1.7.9. Profils disponibles : `trekking`, `fastbike`, `fastbike-verylowtraffic`, `gravel`, `mtb`, `hiking-mountain`, `moped`, `car-vario`, `shortest`, `rail`, `river`, `skating`. Le candidat le plus proche de l'intention "bikepacking faible trafic" est `fastbike-verylowtraffic`. Décision finale à valider en Story 2.1 (RoutingService).
 
 Profils custom (`gravel-rider.brf`) : **non retenus en MVP**, ajoutables sans changement d'archi en phase 2.
 
@@ -1088,15 +1090,22 @@ volumes:
 
 ##### Téléchargement initial des segments
 
-Premier démarrage : ~10 min de download (~3 Go depuis `brouter.de`). Documenté dans le runbook ops :
-- Lancer `docker-compose up brouter` en avance lors du déploiement
-- Vérifier `docker logs ridenrest-brouter` pour confirmer le téléchargement
-- Healthcheck `start_period: 5m` laisse le temps au démarrage
+BRouter ne télécharge **pas** les segments automatiquement. Le script `scripts/update-brouter-segments.sh` gère le téléchargement depuis l'hôte (curl) et la copie dans le conteneur (docker cp) :
+
+```bash
+# Premier provisionnement (~2 min sur connexion 10 Mo/s, ~3 Go)
+./scripts/update-brouter-segments.sh
+
+# Vérification
+./scripts/brouter-smoke-test.sh
+```
+
+Procédure complète : voir `docs/ops/brouter-runbook.md` §(a).
 
 ##### Mise à jour des segments
 
 - Les données OSM Europe sont mises à jour par BRouter ~1×/semaine côté upstream
-- **Stratégie de refresh** : task cron mensuelle (`docker exec brouter wget -N -P /segments4 ...`)
+- **Stratégie de refresh** : cron mensuel exécutant `scripts/update-brouter-segments.sh` (voir runbook §c)
 - Pas critique pour MVP — un dataset 3-6 mois d'âge reste pertinent pour le routing cyclable
 
 #### Réseau Docker

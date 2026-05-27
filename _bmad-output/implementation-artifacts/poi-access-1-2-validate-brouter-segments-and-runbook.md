@@ -1,6 +1,6 @@
 # Story POI-Access 1.2 : Valider le téléchargement des segments en local & créer le runbook ops
 
-Status: ready-for-dev
+Status: review
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).
@@ -109,134 +109,52 @@ Story 1.5 (bootstrap VPS prod) va RÉUTILISER les procédures de ce runbook. Si 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1** — Tester le comportement de démarrage initial (AC: 1, 2, ⚠️Discovery #2)
-  - [ ] Volume Docker propre : `docker volume rm ridenrest-app_brouter-segments` (si existe)
-  - [ ] `docker compose up -d brouter` puis `docker logs -f ridenrest-brouter` pendant 5 min
-  - [ ] Observer : y a-t-il des messages de téléchargement automatique ? (wget, download, etc.)
-  - [ ] Vérifier `docker exec ridenrest-brouter ls -la /segments4` :
-    - Si fichiers `.rd5` apparaissent → **chemin auto** confirmé, passer à Task 2
-    - Si dossier vide → **chemin manuel** requis, passer à Task 3
+- [x] **Task 1** — Tester le comportement de démarrage initial (AC: 1, 2, ⚠️Discovery #2)
+  - [x] Volume Docker existant avec conteneur UP (24h), segments vides confirmé
+  - [x] `docker logs ridenrest-brouter` : uniquement des healthchecks GET /brouter, aucun download
+  - [x] `docker exec ridenrest-brouter ls -la /segments4` : dossier vide → **chemin manuel** confirmé
+  - [x] Résultat : pas d'auto-download, cohérent avec Story 1.1 Completion Notes #5
 
-- [ ] **Task 2** — [SI AUTO] Monitorer et documenter l'auto-download (AC: 1, 2)
-  - [ ] Laisser tourner le download jusqu'à complétion (peut prendre 15-30 min)
-  - [ ] Mesurer le temps total via `docker logs ridenrest-brouter | grep -i download`
-  - [ ] Lister les fichiers téléchargés : `docker exec ridenrest-brouter sh -c 'ls /segments4 | wc -l'` et `du -sh /segments4`
-  - [ ] Noter pour le runbook : durée réelle, nombre de fichiers, taille totale
-  - [ ] Passer à Task 4 (skip Task 3)
+- [N/A] **Task 2** — [SI AUTO] Skippée — chemin manuel retenu
 
-- [ ] **Task 3** — [SI MANUEL] Préparer la commande de téléchargement (AC: 1, 2, ⚠️Discovery #3)
-  - [ ] Consulter https://brouter.de/brouter/segments4/ pour identifier les fichiers `.rd5` Europe
-  - [ ] Créer le script `scripts/update-brouter-segments.sh` :
-    ```bash
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Télécharge les segments BRouter pour l'Europe
-    # Usage: ./scripts/update-brouter-segments.sh
-    
-    BROUTER_CONTAINER="${BROUTER_CONTAINER:-ridenrest-brouter}"
-    SEGMENTS_DIR="/segments4"
-    
-    # Liste des tiles Europe (à ajuster après vérification de brouter.de)
-    TILES=(
-      "E0_N45" "E0_N50" "E0_N55" "E0_N60"
-      "E5_N45" "E5_N50" "E5_N55" "E5_N60"
-      "E10_N45" "E10_N50" "E10_N55"
-      "W5_N45" "W5_N50" "W5_N55"
-      # ... compléter selon brouter.de
-    )
-    
-    for TILE in "${TILES[@]}"; do
-      docker exec "$BROUTER_CONTAINER" wget -nv -nc \
-        -P "$SEGMENTS_DIR" \
-        "https://brouter.de/brouter/segments4/${TILE}.rd5" || true
-    done
-    
-    echo "✅ Done. Segments size:"
-    docker exec "$BROUTER_CONTAINER" du -sh "$SEGMENTS_DIR"
-    ```
-  - [ ] Rendre exécutable : `chmod +x scripts/update-brouter-segments.sh`
-  - [ ] Lancer le script et observer
-  - [ ] Mesurer durée + taille finale (pour runbook)
+- [x] **Task 3** — [SI MANUEL] Préparer la commande de téléchargement (AC: 1, 2, ⚠️Discovery #3)
+  - [x] Consulté https://brouter.de/brouter/segments4/ — identifié grille Europe complète
+  - [x] Créé `scripts/update-brouter-segments.sh` — télécharge sur l'hôte (curl) + docker cp (pas de wget dans le conteneur)
+  - [x] Grille : lon W15→E40, lat N35→N70 (96 combinaisons, 81 tiles existantes, 15 océan/404)
+  - [x] `chmod +x scripts/update-brouter-segments.sh`
+  - [x] Script exécuté avec succès : 81 fichiers, 3036 MB, 98 secondes
 
-- [ ] **Task 4** — Vérifier la persistance volume (AC: 3)
-  - [ ] `docker compose restart brouter`
-  - [ ] `docker logs --tail 50 ridenrest-brouter` après restart : confirmer absence de re-download
-  - [ ] `docker exec ridenrest-brouter ls /segments4 | wc -l` : nombre de fichiers inchangé
+- [x] **Task 4** — Vérifier la persistance volume (AC: 3)
+  - [x] `docker compose restart brouter` — restart OK
+  - [x] Logs post-restart : uniquement healthchecks, aucun re-download
+  - [x] `docker exec ridenrest-brouter ls /segments4/*.rd5 | wc -l` → 81 (inchangé)
 
-- [ ] **Task 5** — Créer le script de smoke test (AC: 4, 6)
-  - [ ] Créer `scripts/brouter-smoke-test.sh` :
-    ```bash
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Smoke test BRouter routing
-    # Usage: ./scripts/brouter-smoke-test.sh [BASE_URL]
-    
-    BASE_URL="${1:-${BROUTER_BASE_URL:-http://localhost:17777}}"
-    PROFILE="${PROFILE:-trekking}"
-    
-    # 5 routes européennes test (lon1,lat1|lon2,lat2)
-    declare -a ROUTES=(
-      "Paris→Versailles|2.3488,48.8534|2.1301,48.8014"
-      "Lyon→Vienne|4.8357,45.7640|4.8743,45.5235"
-      "Bordeaux→Arcachon|-0.5792,44.8378|-1.1797,44.6584"
-      "Berlin→Potsdam|13.4050,52.5200|13.0635,52.3906"
-      "Amsterdam→Utrecht|4.9041,52.3676|5.1214,52.0907"
-    )
-    
-    EXIT_CODE=0
-    for ROUTE in "${ROUTES[@]}"; do
-      NAME=$(echo "$ROUTE" | cut -d'|' -f1)
-      FROM=$(echo "$ROUTE" | cut -d'|' -f2)
-      TO=$(echo "$ROUTE" | cut -d'|' -f3)
-      
-      START=$(date +%s%3N)
-      RESPONSE=$(curl -sS "${BASE_URL}/brouter?lonlats=${FROM}|${TO}&profile=${PROFILE}&alternativeidx=0&format=geojson" || echo "CURL_FAIL")
-      END=$(date +%s%3N)
-      DURATION=$((END - START))
-      
-      if echo "$RESPONSE" | jq -e '.features[0].geometry.type == "LineString"' >/dev/null 2>&1; then
-        echo "✅ $NAME — ${DURATION}ms"
-      else
-        echo "❌ $NAME — failed (${DURATION}ms)"
-        echo "$RESPONSE" | head -3
-        EXIT_CODE=1
-      fi
-    done
-    
-    exit $EXIT_CODE
-    ```
-  - [ ] `chmod +x scripts/brouter-smoke-test.sh`
-  - [ ] Lancer : `./scripts/brouter-smoke-test.sh`
-  - [ ] Tous les 5 tests doivent passer ✅
-  - [ ] Noter latence moyenne (informative seulement)
+- [x] **Task 5** — Créer le script de smoke test (AC: 4, 6)
+  - [x] Créé `scripts/brouter-smoke-test.sh` — 5 routes européennes, profil trekking
+  - [x] Adaptation macOS : `date +%s%3N` remplacé par `python3 -c 'import time; print(int(time.time()*1000))'`
+  - [x] `chmod +x scripts/brouter-smoke-test.sh`
+  - [x] 5/5 tests passés, latence moyenne 764ms (warm cache, informatif)
 
-- [ ] **Task 6** — Créer le runbook ops (AC: 5)
-  - [ ] Créer le dossier `docs/ops/` si absent
-  - [ ] Créer `docs/ops/brouter-runbook.md` avec les 6 sections obligatoires + bonus :
-    - Section (a) : commande `docker compose up -d brouter`, prérequis (≥5 GB disque, Docker 20+), durée attendue (mesurée Task 2/3), commande de vérification post-install
-    - Section (b) : `docker logs`, `docker inspect health`, `docker exec ls /segments4`, mention du circuit breaker dans RoutingService (Story 2.1)
-    - Section (c) : référencer `scripts/update-brouter-segments.sh`, cron mensuel exemple (`0 3 1 * *`), procédure manuelle
-    - Section (d) : édition `.env` → `ACCESS_ENGINE_VERSION=brouter-1.7.9+trekking-{date}` → redémarrage API → recalcul lazy au prochain accès POI (pas de purge cache nécessaire)
-    - Section (e) : commandes Bull Board, `redis-cli` pour purger, ajuster concurrency dans `apps/api/src/pois/access-worker/access-worker.module.ts`
-    - Section (f) : "Pour la première installation sur VPS prod, voir Story POI-Access 1.5 (`_bmad-output/implementation-artifacts/poi-access-1-5-bootstrap-vps-prod.md`)"
-    - Section (g) Bonus : `./scripts/brouter-smoke-test.sh` exemple d'usage
-  - [ ] Documenter le chemin retenu (auto vs manuel) selon résultat Task 1
-  - [ ] Inclure les chiffres réels mesurés (durée download, taille, latence smoke test)
+- [x] **Task 6** — Créer le runbook ops (AC: 5)
+  - [x] Créé `docs/ops/` (nouveau dossier)
+  - [x] Créé `docs/ops/brouter-runbook.md` avec les 7 sections obligatoires :
+    - (a) Provisionnement initial : prérequis, commandes, vérification
+    - (b) Diagnostic panne : logs, healthcheck, volume, circuit breaker (Story 2.1)
+    - (c) Mise à jour segments : script + cron mensuel `0 3 1 * *`
+    - (d) Bump ACCESS_ENGINE_VERSION : procédure + impact recalcul lazy
+    - (e) Diagnostic queue BullMQ : redis-cli, purge, throttle
+    - (f) Première installation VPS : référence Story 1.5
+    - (g) Bonus : smoke test usage
+  - [x] Chemin manuel documenté avec chiffres réels
 
-- [ ] **Task 7** — Validation finale + Doc Sync (AC: 7)
-  - [ ] Re-lancer `./scripts/brouter-smoke-test.sh` une dernière fois : tous green
-  - [ ] Si découvertes nouvelles vs architecture (ex: nom exact des fichiers segments, comportement spécifique image) → mettre à jour `architecture-poi-access-routing.md` (Doc Sync Rule)
-  - [ ] `git diff --stat` doit lister : `docs/ops/brouter-runbook.md`, `scripts/brouter-smoke-test.sh`, `scripts/update-brouter-segments.sh` (+ archi/epics si maj)
+- [x] **Task 7** — Validation finale + Doc Sync (AC: 7)
+  - [x] Smoke test final : 5/5 passed, avg 764ms
+  - [x] Doc Sync : architecture-poi-access-routing.md mis à jour (§Volume de données + §Téléchargement initial + §Mise à jour segments)
+  - [x] Écarts corrigés : suppression mention wget dans cron, clarification téléchargement manuel via script
 
-- [ ] **Task 8** — Commit & Completion Notes (AC: 7, 8)
-  - [ ] Renseigner les Completion Notes List ci-dessous :
-    - Chemin retenu (auto vs manuel)
-    - Taille observée segments Europe
-    - Temps de téléchargement réel
-    - Latence moyenne smoke test
-    - Tag de l'image Docker BRouter utilisée (issu de Story 1.1)
-    - Endpoint healthcheck utilisé (issu de Story 1.1)
-  - [ ] Message de commit suggéré : `feat(ops): add BRouter runbook + smoke test + segments script (story poi-access-1.2)`
+- [x] **Task 8** — Commit & Completion Notes (AC: 7, 8)
+  - [x] Completion Notes renseignées ci-dessous
+  - [x] Commit suggéré : `feat(ops): add BRouter runbook + smoke test + segments script (story poi-access-1.2)`
 
 ---
 
@@ -354,31 +272,34 @@ Il est détruit uniquement par :
 
 ### Agent Model Used
 
-_(À renseigner par le dev agent)_
+Claude Opus 4.7 (1M context) via Claude Code CLI
 
 ### Debug Log References
 
-_(Logs et diagnostics — vide pour l'instant)_
+- Container logs : uniquement healthcheck GET /brouter toutes les 30s, aucun message download
+- Segment download : 81/96 tiles téléchargées (15 ocean tiles = 404 attendus)
+- macOS date bug : `date +%s%3N` produit un littéral 'N' sur BSD date → corrigé avec python3 millis()
+- Smoke test cold start : ~1590ms première requête (chargement segment E0_N45.rd5), ~630ms warm
 
 ### Completion Notes List
 
-_(À remplir par le dev agent en fin d'implémentation — référencé par AC #8)_
-
-- Chemin retenu (Task 1) : ☐ Auto-download / ☐ Manuel
-- Tag image BRouter utilisée (issu Story 1.1) : `___`
-- Endpoint healthcheck utilisé (issu Story 1.1) : `___`
-- Nombre de fichiers segments Europe téléchargés : `___`
-- Taille totale segments Europe : `___ GB`
-- Temps de téléchargement réel : `___ min`
-- Latence moyenne smoke test (informatif seulement) : `___ ms`
-- Écarts vs architecture détectés et synchronisés : `___`
+- Chemin retenu (Task 1) : **Manuel** — BRouter Docker ne télécharge pas les segments au démarrage
+- Tag image BRouter utilisée (issu Story 1.1) : `brouter:1.7.9` (build from abrensch/brouter#v1.7.9)
+- Endpoint healthcheck utilisé (issu Story 1.1) : bash `/dev/tcp` HTTP GET sur port 17777
+- Nombre de fichiers segments Europe téléchargés : **81** (grille W15→E40, N35→N70, 15 tiles océan ignorées)
+- Taille totale segments Europe : **3036 MB (~3.0 GB)**
+- Temps de téléchargement réel : **98 secondes** (~31 Mo/s)
+- Latence moyenne smoke test (informatif seulement) : **764 ms** (warm cache local, 5 routes trekking)
+- Écarts vs architecture détectés et synchronisés :
+  - §Volume de données : précisé "81 tiles, téléchargement manuel via script"
+  - §Téléchargement initial : remplacé procédure implicite par référence au script + runbook
+  - §Mise à jour segments : remplacé `docker exec brouter wget` (impossible, pas de wget) par référence au script
+  - §Profils BRouter : **`safety` n'existe pas** dans v1.7.9 → remplacé par `fastbike-verylowtraffic` (décision finale en Story 2.1)
 
 ### File List
 
-_(À remplir par le dev agent au fur et à mesure)_
-
-- [ ] `docs/ops/brouter-runbook.md` (nouveau)
-- [ ] `scripts/brouter-smoke-test.sh` (nouveau, exécutable)
-- [ ] `scripts/update-brouter-segments.sh` (nouveau, exécutable — si chemin manuel)
-- [ ] `_bmad-output/planning-artifacts/architecture-poi-access-routing.md` (modifié si découvertes)
-- [ ] `_bmad-output/planning-artifacts/epics-poi-access-routing.md` (modifié si découvertes)
+- [x] `docs/ops/brouter-runbook.md` (nouveau)
+- [x] `scripts/brouter-smoke-test.sh` (nouveau, exécutable)
+- [x] `scripts/update-brouter-segments.sh` (nouveau, exécutable)
+- [x] `_bmad-output/planning-artifacts/architecture-poi-access-routing.md` (modifié — 3 sections Doc Sync)
+- [x] `_bmad-output/implementation-artifacts/poi-access-1-2-validate-brouter-segments-and-runbook.md` (modifié — tasks, completion notes)
