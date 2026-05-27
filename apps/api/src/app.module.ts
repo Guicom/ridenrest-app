@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
+import { EventEmitterModule } from '@nestjs/event-emitter'
 import { LoggerModule } from 'nestjs-pino'
 import { AppController } from './app.controller.js'
 import { AppService } from './app.service.js'
@@ -19,12 +21,16 @@ import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 import { GeoModule } from './geo/geo.module.js'
+import { MeModule } from './me/me.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
+import accessConfig from './config/access.config.js'
 import { BackfillElevationLossService } from './common/backfill-elevation-loss.service.js'
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, load: [accessConfig] }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    EventEmitterModule.forRoot(),
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
@@ -60,12 +66,14 @@ import { BackfillElevationLossService } from './common/backfill-elevation-loss.s
     ProfileModule,
     FeedbacksModule,
     GeoModule,
+    MeModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     BackfillElevationLossService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
 })

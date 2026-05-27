@@ -1990,14 +1990,14 @@ pnpm dev
 
 ### Gap Analysis Results
 
-#### 🔴 Critical Gaps (à clarifier avant implémentation)
+#### 🔴 Critical Gaps — ✅ Résolus (story poi-access-1.4, 2026-05-27)
 
-| Gap | Action |
+| Gap | Résolution |
 |---|---|
-| Existence d'un module `MeController` / `/me/settings` actuel ? | À vérifier en story 0 — créer si absent |
-| Existence d'un guard `OwnerOnly` ? | À vérifier en story 0 — créer ou utiliser check inline |
-| `@nestjs/throttler` installé ? | À vérifier en story 0 — ajouter si absent |
-| Existence d'un `EventEmitter` NestJS configuré ? | À vérifier en story 0 — pattern à standardiser avec Density |
+| Existence d'un module `MeController` / `/me/settings` actuel ? | ✅ Créé — stub 501, `me/me.module.ts` + `me/me.controller.ts` |
+| Existence d'un guard `OwnerOnly` ? | ✅ Créé — `common/guards/owner-only.guard.ts` + decorator `OwnedResource` |
+| `@nestjs/throttler` installé ? | ✅ Installé — `@nestjs/throttler@^6.5.0`, ThrottlerModule + ThrottlerGuard global |
+| Existence d'un `EventEmitter` NestJS configuré ? | ✅ Installé — `@nestjs/event-emitter`, EventEmitterModule.forRoot() |
 
 #### 🟠 Important Gaps (à affiner en stories ultérieures)
 
@@ -2007,7 +2007,7 @@ pnpm dev
 | Threshold circuit breaker (5 échecs / 30 s) | À benchmarker en story 0 (test charge BRouter local) |
 | Buffer 10 m pour `ST_Buffer` | À valider sur 5-10 cas réels (précision OSM variable) |
 | Implémentation circuit breaker (`cockatiel` vs maison) | À trancher en story backend 2 |
-| Bull Board / Bull UI dashboard | À documenter si déjà en place |
+| Bull Board / Bull UI dashboard | ✅ Absent — reporté à Story 4.3 (documenté dans audit poi-access-1.4) |
 | Fixtures BRouter pour tests CI | À créer avec story backend 3 (E2E mock) |
 
 #### 🟢 Nice-to-Have Gaps (post-MVP)
