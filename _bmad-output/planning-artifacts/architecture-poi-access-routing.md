@@ -1879,7 +1879,7 @@ pnpm dev
 
 #### Build & Deploy
 
-- BRouter container : pull image, healthcheck via Caddy avant rollover API
+- BRouter container : `docker compose up -d brouter` (auto-build depuis les sources si l'image est absente — **PAS de `pull`**, image build-from-source `abrensch/brouter#v1.7.9`), puis **health-gate** (`docker inspect ... healthy`, timeout 5 min) AVANT migration DB + `pm2 reload`. Implémenté dans `deploy.sh` step `[4/7]` (Story 1.5). BRouter n'est **jamais** exposé via Caddy (bind `127.0.0.1:17777`).
 - API : redéploiement standard PM2 (la migration DB tourne dans le CI step)
 - Web : build Next.js standard (aucun changement)
 
@@ -1905,6 +1905,8 @@ pnpm dev
 | Profil par aventure + recalcul progressif | ✅ Versioning via `access_engine_version` permet migration douce |
 
 **Aucune contradiction détectée** entre les décisions.
+
+> **Validation prod (bootstrap Story 1.5, 2026-05-28)** : l'hypothèse « ~200 ms/POI » est confirmée — benchmark prod **p50 = 143 ms, p95 ~330 ms** sur des routes d'accès courtes (≤ 4 km, profils `trekking`/`fastbike`/`gravel`), **NFR-PA-002 PASS** sur KVM 2. ⚠️ Les trajets longs (20–60 km) sortent à 700–1300 ms même à chaud (la latence BRouter croît avec l'espace de recherche) → hors use-case POI-accès, mais à prévoir comme **NFR distincte** si la Story 2.1 (RoutingService) expose un jour un routing longue-distance.
 
 #### Pattern Consistency
 

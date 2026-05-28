@@ -224,3 +224,116 @@ Le smoke test valide :
 - Reponse HTTP 200 avec GeoJSON LineString valide
 - Latence par route (informatif)
 - Exit code 0 si tout passe, >= 1 sinon (utilisable en CI)
+
+---
+
+## (h) Log du bootstrap initial prod
+
+| | |
+|---|---|
+| Date | 2026-05-28 |
+| Operateur | Guillaume (pair-programming Claude Code) |
+| VPS | Hostinger KVM 2 (72.62.189.193) |
+| Image | `brouter:1.7.9` (build from source `abrensch/brouter#v1.7.9`) |
+| Segments | 81 tuiles Europe, ~3.0 GB, download manuel en ~121 s |
+| Benchmark NFR-PA-002 | p50 ~143 ms, p95 ~305-332 ms -> PASS |
+
+Detail complet : [`brouter-prod-bootstrap-log-2026-05-28.md`](brouter-prod-bootstrap-log-2026-05-28.md).
+Resultats benchmark : [`brouter-benchmark-results.md`](brouter-benchmark-results.md).
+
+---
+
+## (i) Redeploiement BRouter sans downtime
+
+BRouter est gere par Docker (pas PM2). Le `deploy.sh` (step [4/7]) execute automatiquement :
+
+```bash
+docker compose up -d brouter
+# health-gate : bloque la suite du deploy tant que BRouter n'est pas healthy (timeout 5 min)
+```
+
+`up -d` reutilise l'image existante (no-op si deja healthy) et ne reconstruit que si l'image est
+absente ou si son tag a change. Aucune interruption tant que la definition du service est inchangee.
+
+Manuellement :
+
+```bash
+cd /home/deploy/ridenrest-app
+docker compose up -d brouter
+docker inspect --format='{{.State.Health.Status}}' ridenrest-brouter   # attendre "healthy"
+./scripts/brouter-smoke-test.sh http://127.0.0.1:17777                 # valider 5/5
+```
+
+---
+
+## (j) Rollback BRouter
+
+ATTENTION : l'image est **construite depuis les sources** (pas de tag registre a puller). Le
+rollback ne se fait donc PAS via `docker compose pull brouter:<old>`. Deux cas :
+
+**Cas 1 — regression du `deploy.sh` ou de la conf compose (le plus courant)**
+
+```bash
+cd /home/deploy/ridenrest-app
+git revert <commit-fautif>     # ou: git checkout <ref-precedente> -- docker-compose.yml deploy.sh
+git push                       # re-declenche le pipeline CI/CD -> redeploy propre
+```
+
+**Cas 2 — downgrade de version BRouter (changer de tag source)**
+
+```bash
+# Dans docker-compose.yml, repasser le build context ET l'image au tag precedent, ex. :
+#   build: { context: 'https://github.com/abrensch/brouter.git#v1.7.8' }
+#   image: brouter:1.7.8
+docker compose build brouter   # rebuild depuis l'ancien tag source
+docker compose up -d brouter
+docker inspect --format='{{.State.Health.Status}}' ridenrest-brouter   # attendre "healthy"
+```
+
+Les segments (volume `ridenrest-app_brouter-segments`) sont independants de l'image : un downgrade
+d'image ne les touche pas.
+
+---
+
+## (k) Purge du volume segments + re-download
+
+Si les segments sont corrompus ou incomplets (routing en erreur "datafile not found", ou nombre de
+tuiles < 81) :
+
+```bash
+cd /home/deploy/ridenrest-app
+docker compose down brouter
+docker volume rm ridenrest-app_brouter-segments
+docker compose up -d brouter             # recree le conteneur + un volume vide
+./scripts/update-brouter-segments.sh     # re-telecharge les 81 tuiles (~3 GB, ~2-3 min)
+docker inspect --format='{{.State.Health.Status}}' ridenrest-brouter
+./scripts/brouter-smoke-test.sh http://127.0.0.1:17777
+```
+
+Alternative non destructive (re-telecharger sans supprimer le volume) :
+
+```bash
+./scripts/update-brouter-segments.sh --force   # supprime puis re-telecharge les .rd5 in-place
+docker compose restart brouter
+```
+
+---
+
+## (l) Monitoring — Uptime Kuma
+
+Monitor `BRouter Production` (cree Story 1.5) :
+
+| Champ | Valeur |
+|---|---|
+| Type | HTTP(s) - Keyword |
+| URL | `http://brouter:17777/brouter?lonlats=2.3488,48.8534%7C2.3488,48.8624&profile=trekking&format=geojson` |
+| Keyword | `LineString` |
+| Intervalle | 30 s, 3 retries |
+| Notifications | email + Telegram |
+
+ATTENTION : l'URL utilise le **nom de service Docker `brouter`** (reseau Compose), PAS
+`host.docker.internal:17777`. BRouter est binde sur `127.0.0.1:17777` (loopback hote, securite
+NFR-PA-008) → donc injoignable via la passerelle bridge `172.17.0.1` (`host.docker.internal`) :
+un service loopback n'est pas accessible depuis le bridge Docker. Le routage container-to-container
+via le nom de service contourne le bind hote sans l'affaiblir. Le keyword `LineString` valide une
+**vraie requete de routing** (detecte aussi le cas "up mais sans segments", piege Story 1.1).

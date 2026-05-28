@@ -14,13 +14,13 @@ fi
 
 mkdir -p /data/gpx
 
-echo "==> [1/6] git pull"
+echo "==> [1/7] git pull"
 git pull origin main
 
-echo "==> [2/6] pnpm install"
+echo "==> [2/7] pnpm install"
 pnpm install --frozen-lockfile
 
-echo "==> [3/6] turbo build"
+echo "==> [3/7] turbo build"
 set -a
 # shellcheck source=.env
 source "$APP_DIR/.env" 2>/dev/null || true
@@ -30,16 +30,31 @@ if [[ -z "$NEXT_PUBLIC_API_URL" ]]; then
 fi
 pnpm turbo build
 
-echo "==> [4/6] Copy Next.js standalone static assets"
+# ─── BRouter (POI Access Routing) — start + health-gate ─────────────────────
+# Image is BUILT FROM SOURCE (abrensch/brouter#v1.7.9 in docker-compose.yml), NOT
+# pulled from a registry — there is no published nrenner/brouter:1.7.9 (story
+# poi-access-1.1). `up -d` reuses the existing image, and auto-builds from source
+# only if the image is absent or its tag changed. The health-gate blocks the rest
+# of the deploy (migrations, pm2 reload) until BRouter is healthy, so the API never
+# reloads ahead of its routing dependency.
+echo "==> [4/7] BRouter start + health-gate"
+docker compose up -d brouter
+if ! timeout 300 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ridenrest-brouter | grep -q healthy; do sleep 5; done'; then
+  echo "ERROR: BRouter failed to become healthy within 5 min" >&2
+  exit 1
+fi
+echo "    BRouter healthy"
+
+echo "==> [5/7] Copy Next.js standalone static assets"
 rm -rf apps/web/.next/standalone/apps/web/public
 rm -rf apps/web/.next/standalone/apps/web/.next/static
 cp -r apps/web/public apps/web/.next/standalone/apps/web/public
 cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
 
-echo "==> [5/6] DB migrations (drizzle-kit)"
+echo "==> [6/7] DB migrations (drizzle-kit)"
 ( cd packages/database && pnpm drizzle-kit migrate )
 
-echo "==> [6/6] PM2 reload (zero-downtime)"
+echo "==> [7/7] PM2 reload (zero-downtime)"
 pm2 reload ecosystem.config.js --update-env || pm2 start ecosystem.config.js
 
 echo "==> Deploy done. pm2 status:"
