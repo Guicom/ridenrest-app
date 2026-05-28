@@ -1,5 +1,13 @@
 # Deferred Work
 
+## Deferred from: code review of poi-access-2-1-routing-service-brouter-wrapper.md (2026-05-28)
+
+- **D3** — `onSuccess()` remet à zéro toute la fenêtre d'échecs (`routing.service.ts` ~L131) — comportement `forgive-on-success` conservé intentionnellement. BRouter flapping rare ; alternance partielle préférable au mode dégradé forcé.
+- **D2** — Half-open sans verrou de sonde unique (`routing.service.ts` ~L117) — Option 1 (sonde unique) pénaliserait les users concurrents à la recovery. Option 2 (actuel) est meilleure pour l'UX. BRouter est loopback → pas de risque de surcharge upstream.
+- **R1** — `profile` non URL-encodé dans `buildUrl` (`routing.service.ts` ~L83) — union type `BrouterProfile` = valeurs URL-safe uniquement ; pas de risque d'injection en pratique
+- **R2** — `brouterTimeoutMs` sans borne max dans le schéma Zod (`access.config.ts`) — concern config/ops, hors périmètre story
+- **R3** — Coordonnées `NaN`/`Infinity` produiraient une URL invalide (`routing.service.ts` ~L80–84) — coordonnées toujours issues du GPS, pas d'input utilisateur
+
 ## Deferred from: code review of 17-1-versioning-app-release-notes-popup.md (2026-04-09)
 
 - Règle webpack `CHANGELOG.md asset/source` non portée vers Turbopack — import cassé en mode dev Turbopack (`next.config.ts:12-18`)

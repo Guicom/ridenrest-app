@@ -22,6 +22,7 @@ import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 import { GeoModule } from './geo/geo.module.js'
 import { MeModule } from './me/me.module.js'
+import { RoutingModule } from './routing/routing.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
 import accessConfig from './config/access.config.js'
 import { BackfillElevationLossService } from './common/backfill-elevation-loss.service.js'
@@ -67,6 +68,7 @@ import { BackfillElevationLossService } from './common/backfill-elevation-loss.s
     FeedbacksModule,
     GeoModule,
     MeModule,
+    RoutingModule,
   ],
   controllers: [AppController],
   providers: [

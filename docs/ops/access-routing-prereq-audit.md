@@ -75,3 +75,41 @@ Auteur: Claude (story poi-access-1.4)
 | `.spec.ts` tests | `.test.ts` convention | Tests en `.test.ts` |
 | `.env.example` (racine) | `apps/api/.env.example` | Vars ajoutées dans `apps/api/.env.example` |
 | Config sans `registerAs` | Simple exports | Nouveau pattern `registerAs` + Zod pour access config (justifié) |
+
+---
+
+# Story 2.1 — RoutingService (décisions d'implémentation)
+
+Date: 2026-05-28
+Auteur: Claude (story poi-access-2.1)
+
+## Décision circuit breaker : MAISON (vs cockatiel) — AC #7
+
+- **Retenu** : implémentation **maison** (state machine `closed | open | half-open` + fenêtre
+  glissante d'échecs, ~60 lignes dans `routing.service.ts`).
+- **Rejeté** : `cockatiel`.
+- **Raisons** :
+  - Aucune nouvelle dépendance runtime (cockatiel ajoute la lib + ses transitives).
+  - Logique simple, entièrement testable avec `jest.useFakeTimers()` (Date.now contrôlé).
+  - Contrôle total sur les motifs typés (`BrouterFailureReason`) et le log structuré WARN.
+- **Paramètres** : seuil 5 échecs / fenêtre 60 s → ouverture 30 s → half-open (1 requête test)
+  → succès = fermeture, échec = ré-ouverture 30 s.
+- Conforme à la recommandation de la story (« maison pour réduire les deps »).
+
+## Décision client HTTP : `fetch` natif (vs @nestjs/axios) — déviation AC #1/#2/#6
+
+- **Retenu** : `fetch` natif + `AbortController` pour le timeout (`brouterTimeoutMs`).
+- **Rejeté** : `@nestjs/axios` / `HttpModule` (mentionné dans la story spec).
+- **Raisons** :
+  - Tout le projet appelle les API externes via `fetch` natif
+    (`weather`, `strava`, `geo`) — aucune trace d'`axios`/`@nestjs/axios` dans le repo.
+  - Éviter d'introduire 2 nouvelles deps runtime pour un seul service.
+  - Décision validée par Guillaume au démarrage de la story.
+- **Impacts** :
+  - `RoutingModule` n'importe pas `HttpModule` ; `access.config` est injecté via
+    `accessConfig.KEY` (déjà chargé globalement par `ConfigModule.forRoot`).
+  - Tests (`routing.service.spec.ts`) : mock de `global.fetch` (pas de `HttpService` mock).
+  - `apps/api/package.json` **inchangé** (aucune dep ajoutée).
+- Fixture de test `__fixtures__/brouter-paris-versailles.geojson.json` : construite à la main
+  selon le schéma GeoJSON réel de BRouter 1.7.9 (BRouter prod est lié à loopback sur le VPS,
+  donc non joignable depuis le dev local pour un `curl` de capture).
