@@ -1,6 +1,6 @@
 # Story POI-Access 1.5 : Bootstrap initial du VPS prod + CI/CD pipeline BRouter + benchmark NFR
 
-Status: in-progress
+Status: review
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).
@@ -230,7 +230,7 @@ Le `deploy.sh` est utilisé pour TOUS les déploiements (pas juste BRouter). Une
     - Output complet des 3 runs (p50, p95, p99 chacun)
     - Verdict final (PASS / FAIL)
 
-- [~] **Task 5** — Modifier `deploy.sh` pour intégrer BRouter (AC: 5, ⚠️Discovery #7) — fait + déployé ; step `[4/7]` no-op s'exécutera au prochain deploy (gotcha self-pull)
+- [x] **Task 5** — Modifier `deploy.sh` pour intégrer BRouter (AC: 5, ⚠️Discovery #7) — fait + déployé ; **dry-run validé** (run 26600723977 : step `[4/7] BRouter` → "BRouter healthy" no-op, deploy OK, API :3010 OK)
   - [ ] Travailler sur une branche `feat/brouter-deploy`
   - [ ] Lire le `deploy.sh` actuel : identifier où s'insère le bloc BRouter (avant `drizzle-kit migrate`, après `git pull`)
   - [ ] Insérer le bloc :
@@ -288,7 +288,7 @@ Le `deploy.sh` est utilisé pour TOUS les déploiements (pas juste BRouter). Une
   - [ ] `git diff --stat` doit correspondre au listing AC #9
   - [ ] Message de commit : `feat(ops): bootstrap BRouter on prod VPS + CI integration + NFR validation — story poi-access-1.5`
 
-- [ ] **Task 10** — Completion + handoff (AC: 10)
+- [x] **Task 10** — Completion + handoff (AC: 10) — Completion Notes remplies ; Epic 1 POI-Access complet, Epic 2 (RoutingService 2.1) peut démarrer
   - [ ] Compléter les Completion Notes ci-dessous avec valeurs réelles
   - [ ] Informer Guillaume : BRouter est en prod, Epic 1 est complet, Epic 2 peut démarrer
   - [ ] Suggérer (optionnel) : lancer `bmad-create-story` pour Story 2.1 (RoutingService) dans la foulée
@@ -412,12 +412,13 @@ appliquée, API 1.4 rechargée et **répond 200** (`api.ridenrest.app/api/health
 cours de route : Story 1.4 avait introduit `zod ^4.4.3` (api) → 2 copies Zod 4 → build web cassé
 (`@hookform/resolvers`) → corrigé via `pnpm.overrides` `zod@4: 4.3.6`.
 
-**RÉSIDUELS (mineurs / optionnels) :**
-- **Dry-run AC #5** : le nouveau `deploy.sh` (step `[4/7] BRouter`) est sur le VPS mais n'a pas tourné
-  ce deploy (gotcha self-pull → ancien script exécuté). Il s'exécutera (no-op) au **prochain** push.
-- **7 vars `.env` prod** (AC #1) : à ajouter par Guillaume (non bloquant — defaults Zod identiques).
+- **Dry-run AC #5** : ✅ validé au push `04738b3` (run 26600723977) — nouveau `deploy.sh` exécuté,
+  step `[4/7] BRouter` → "BRouter healthy" (no-op), deploy OK, `ridenrest-api :3010 OK`.
+- **7 vars `.env` prod** (AC #1) : ✅ ajoutées par Guillaume (reload + health-check 200 à confirmer).
+
+**RÉSIDUELS (optionnels, non bloquants) :**
 - **Benchmark runs 2 & 3** (AC #4) : optionnels (run 1 froid+chaud déjà stable et PASS).
-- **Task 10** : handoff PM.
+- **Task 10** : handoff PM (ci-dessous).
 
 ### File List
 

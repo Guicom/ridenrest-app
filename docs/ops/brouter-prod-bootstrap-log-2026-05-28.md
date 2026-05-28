@@ -51,11 +51,12 @@ sans elles. À ajouter quand même (AC #1) avant/avec le push de 1.4 → **PENDI
   (`https://api.ridenrest.app/api/health` → 200, pas de crash : defaults Zod). Web rechargé.
   - ⚠️ Bug bloquant rencontré : Story 1.4 avait introduit `zod ^4.4.3` (api) → 2 copies Zod 4 →
     `@hookform/resolvers` cassé en build web. Fix : `pnpm.overrides` `zod@4: 4.3.6`. CI re-verte.
-- [~] **Task 5 (deploy.sh)** : le nouveau `deploy.sh` (step `[4/7] BRouter`) est **déployé sur le VPS**
-  mais n'a pas tourné CE deploy (gotcha : `deploy.sh` qui se `git pull` lui-même → bash exécute la
-  version déjà chargée ; le log montre les anciens labels `[5/6]`/`[6/6]`). Le step BRouter (no-op
-  car healthy) s'exécutera au **prochain** deploy → dry-run AC #5 à confirmer au prochain push.
-- [ ] Ajout des 7 vars `.env` prod (optionnel — defaults Zod OK) + Task 10 handoff — **PENDING**.
+- [x] **Task 5 (deploy.sh) + dry-run AC #5** : au push suivant (`04738b3`, run 26600723977) le **nouveau**
+  `deploy.sh` a tourné — labels `[1/7]`…`[7/7]`, step `[4/7] BRouter` → "BRouter healthy" (no-op),
+  migrations no-op, `ridenrest-api :3010 OK` + `ridenrest-web :3011 OK`. (Gotcha : un changement de
+  `deploy.sh` prend effet au deploy *suivant* car bash exécute la version déjà chargée pendant le `git pull`.)
+- [x] Ajout des 7 vars `.env` prod par Guillaume (reload + health 200 à confirmer).
+- [x] **Task 10** : handoff — Epic 1 POI-Access complet, Epic 2 peut démarrer.
 
 ## Résultats (provisoire)
 
