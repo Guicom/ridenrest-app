@@ -46,7 +46,16 @@ sans elles. À ajouter quand même (AC #1) avant/avec le push de 1.4 → **PENDI
   voir découverte ci-dessous). Test stop/start OK : alertes DOWN + recovery reçues (email + Telegram).
 - [x] **Task 8 (interne)** : `ss -tlnp | grep 17777` → `LISTEN 127.0.0.1:17777` → bind loopback
   confirmé (NFR-PA-008 côté VPS). Reste le nmap externe depuis une machine tierce — **PENDING**.
-- [ ] **Task 5 dry-run** + push 1.2→1.4 + env vars + Task 9 commit + Task 10 handoff — **PENDING**.
+- [x] **Push `1.2→1.4` + 1.5 sur `main`** (commits `0badec8` story 1.5, `9b3e494` fix zod) → CI/CD verte,
+  **déploiement prod réussi** (run 26600224746). Migration `0014`/`0015` appliquée, API 1.4 rechargée
+  (`https://api.ridenrest.app/api/health` → 200, pas de crash : defaults Zod). Web rechargé.
+  - ⚠️ Bug bloquant rencontré : Story 1.4 avait introduit `zod ^4.4.3` (api) → 2 copies Zod 4 →
+    `@hookform/resolvers` cassé en build web. Fix : `pnpm.overrides` `zod@4: 4.3.6`. CI re-verte.
+- [~] **Task 5 (deploy.sh)** : le nouveau `deploy.sh` (step `[4/7] BRouter`) est **déployé sur le VPS**
+  mais n'a pas tourné CE deploy (gotcha : `deploy.sh` qui se `git pull` lui-même → bash exécute la
+  version déjà chargée ; le log montre les anciens labels `[5/6]`/`[6/6]`). Le step BRouter (no-op
+  car healthy) s'exécutera au **prochain** deploy → dry-run AC #5 à confirmer au prochain push.
+- [ ] Ajout des 7 vars `.env` prod (optionnel — defaults Zod OK) + Task 10 handoff — **PENDING**.
 
 ## Résultats (provisoire)
 

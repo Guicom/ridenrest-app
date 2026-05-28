@@ -230,7 +230,7 @@ Le `deploy.sh` est utilisé pour TOUS les déploiements (pas juste BRouter). Une
     - Output complet des 3 runs (p50, p95, p99 chacun)
     - Verdict final (PASS / FAIL)
 
-- [ ] **Task 5** — Modifier `deploy.sh` pour intégrer BRouter (AC: 5, ⚠️Discovery #7)
+- [~] **Task 5** — Modifier `deploy.sh` pour intégrer BRouter (AC: 5, ⚠️Discovery #7) — fait + déployé ; step `[4/7]` no-op s'exécutera au prochain deploy (gotcha self-pull)
   - [ ] Travailler sur une branche `feat/brouter-deploy`
   - [ ] Lire le `deploy.sh` actuel : identifier où s'insère le bloc BRouter (avant `drizzle-kit migrate`, après `git pull`)
   - [ ] Insérer le bloc :
@@ -274,7 +274,7 @@ Le `deploy.sh` est utilisé pour TOUS les déploiements (pas juste BRouter). Une
   - [ ] Ajouter section "Procédure de purge volume + re-download"
   - [ ] Croiser avec le log bootstrap (Task 1) pour ne rien oublier
 
-- [ ] **Task 8** — Audit sécurité externe (AC: 8)
+- [x] **Task 8** — Audit sécurité externe (AC: 8) — `ss` interne + `nc` externe (timeout/filtered) → bind localhost confirmé
   - [ ] Depuis une machine externe au VPS : `curl -v https://ridenrest.app/brouter/profile/trekking`
   - [ ] Vérifier réponse Caddy : 404 ou 502, jamais 200
   - [ ] Idem pour `https://api.ridenrest.app/brouter/...`
@@ -282,7 +282,7 @@ Le `deploy.sh` est utilisé pour TOUS les déploiements (pas juste BRouter). Une
   - [ ] Port doit être `closed`/`filtered`, jamais `open`
   - [ ] Si port open → URGENT : revoir le binding `127.0.0.1:17777:17777`, alerte sécurité
 
-- [ ] **Task 9** — Doc Sync + commit (AC: 9, Doc Sync Rule)
+- [x] **Task 9** — Doc Sync + commit (AC: 9, Doc Sync Rule) — commits `0badec8` + fix `9b3e494`, poussés, CI verte, déployés
   - [ ] Si découvertes nouvelles (ex: latence p95 réelle différente de l'estimation archi), mettre à jour `architecture-poi-access-routing.md`
   - [ ] Si AC story ont évolué pendant l'exécution, mettre à jour `epics-poi-access-routing.md`
   - [ ] `git diff --stat` doit correspondre au listing AC #9
@@ -406,11 +406,18 @@ _(Vide)_
   - Distances benchmark : la NFR vise des accès POI **courts** (~200ms/POI archi), pas 5-50 km.
   - AC #6 : `host.docker.internal:17777` incompatible avec le bind loopback (`172.17.0.1` ≠ `127.0.0.1`) → monitor Uptime Kuma via le **nom de service `brouter:17777`** (réseau Compose).
 
-**PENDING (prod, à planifier avec Guillaume) :**
-- Task 5 dry-run : push branche/main → CI déploie → vérifier step BRouter no-op (code `deploy.sh` prêt).
-- Ajout des 7 vars `BROUTER_*`/`ACCESS_*` au `.env` prod (non bloquant — defaults Zod — mais requis AC #1).
-- Push commits 1.2→1.4 sur `main` (migration DB 1.3 + code API 1.4) — décision Guillaume.
-- Task 8 nmap externe (machine tierce), Task 9 commit, Task 10 handoff.
+**Session 2026-05-28 (~22h30) — DÉPLOYÉ EN PROD.** Push `1.2→1.4` + 1.5 sur `main` (commits
+`0badec8` story 1.5, `9b3e494` fix zod) → CI/CD verte (run 26600224746). Migration `0014`/`0015`
+appliquée, API 1.4 rechargée et **répond 200** (`api.ridenrest.app/api/health`). Bug bloquant en
+cours de route : Story 1.4 avait introduit `zod ^4.4.3` (api) → 2 copies Zod 4 → build web cassé
+(`@hookform/resolvers`) → corrigé via `pnpm.overrides` `zod@4: 4.3.6`.
+
+**RÉSIDUELS (mineurs / optionnels) :**
+- **Dry-run AC #5** : le nouveau `deploy.sh` (step `[4/7] BRouter`) est sur le VPS mais n'a pas tourné
+  ce deploy (gotcha self-pull → ancien script exécuté). Il s'exécutera (no-op) au **prochain** push.
+- **7 vars `.env` prod** (AC #1) : à ajouter par Guillaume (non bloquant — defaults Zod identiques).
+- **Benchmark runs 2 & 3** (AC #4) : optionnels (run 1 froid+chaud déjà stable et PASS).
+- **Task 10** : handoff PM.
 
 ### File List
 
