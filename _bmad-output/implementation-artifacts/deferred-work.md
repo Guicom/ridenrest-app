@@ -1,5 +1,13 @@
 # Deferred Work
 
+## Deferred from: code review of poi-access-2-2-access-calculator-service.md (2026-05-29)
+
+- **W1** — `Number(lat/lng)` sans garde finiteness (`access-calculator.service.ts:192-193`) — `lat`/`lng` sont `NOT NULL` dans le schéma DB ; corruption de données hors périmètre de ce service.
+- **W2** — Deux requêtes DB sans transaction dans `computeDivergentSegment` (`compute-divergent-segment.ts:36,72`) — Documenté en Discovery #3 (concurrency MVP non-critique). Mitigation future : `SELECT FOR UPDATE` ou advisory lock.
+- **W3** — Coordonnées GPS `NaN`/`Infinity` non validées dans `resolveOrigin` (`resolve-origin.ts:20`) — Validation des inputs à la frontière API (Story 2.3 / controller). Mauvaise couche pour valider.
+- **W4** — Cast `as string` sur colonnes JOIN potentiellement nullables (`access-calculator.service.ts:200-202`) — `adventure_segments.adventure_id` et `adventures.routing_profile` sont `NOT NULL` dans le schéma ; cast safe.
+- **W5** — `as unknown as RoutePointRow[]` désactive les checks de type (`compute-divergent-segment.ts:97`) — SQL contrôlé ; garde `typeof row.ele === 'number'` compense. Refactor opportuniste.
+
 ## Deferred from: code review of poi-access-2-1-routing-service-brouter-wrapper.md (2026-05-28)
 
 - **D3** — `onSuccess()` remet à zéro toute la fenêtre d'échecs (`routing.service.ts` ~L131) — comportement `forgive-on-success` conservé intentionnellement. BRouter flapping rare ; alternance partielle préférable au mode dégradé forcé.

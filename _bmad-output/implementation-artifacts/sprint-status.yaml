@@ -267,3 +267,31 @@ development_status:
   17-11-strava-feature-flag-reactivation: done  # flip NEXT_PUBLIC_STRAVA_ENABLED=true (suite élévation API Strava 2026-05-03) + ajout au turbo.json#env + CHANGELOG
   17-12-auto-update-adventure-end-date-from-last-stage: review  # dialog de confirmation end date calculée depuis dernière étape (create/update/delete + vitesse globale) — ajouté 2026-05-05
   epic-17-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic POI-Access: Accès POI — Calcul d'itinéraire & Affichage
+  # (ajouté 2026-05-29)
+  # ─────────────────────────────────────────────────────────────
+  epic-poi-access: in-progress
+  # Phase 1: Infrastructure
+  poi-access-1-1-provision-brouter-docker-service: done
+  poi-access-1-2-validate-brouter-segments-and-runbook: done
+  poi-access-1-3-migrate-db-poi-access-schema: done
+  poi-access-1-4-audit-prereqs-and-resolve-gaps: done
+  poi-access-1-5-bootstrap-vps-prod: review
+  # Phase 2: Backend + UI Planning
+  poi-access-2-1-routing-service-brouter-wrapper: done
+  poi-access-2-2-access-calculator-service: done
+  poi-access-2-3-endpoint-post-pois-access-planning: ready-for-dev
+  poi-access-2-4-access-metrics-ui-planning: ready-for-dev
+  poi-access-2-5-access-map-layer: ready-for-dev
+  poi-access-2-6-routing-profile-selector-ui: ready-for-dev
+  # Phase 3: Live Mode
+  poi-access-3-1-extend-endpoint-live-mode: ready-for-dev
+  poi-access-3-2-me-controller-settings-impl: ready-for-dev
+  poi-access-3-3-consent-dialog-and-privacy-section: ready-for-dev
+  # Phase 4: Precompute & Observability
+  poi-access-4-1-bullmq-worker-eager-precompute: ready-for-dev
+  poi-access-4-2-invalidation-handlers: ready-for-dev
+  poi-access-4-3-observability-metrics-monitoring: ready-for-dev
+  epic-poi-access-retrospective: optional
