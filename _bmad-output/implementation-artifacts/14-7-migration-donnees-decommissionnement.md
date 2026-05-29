@@ -12,7 +12,7 @@ So that there is a single source of truth (VPS Hostinger), no orphaned cloud res
 
 ## Acceptance Criteria
 
-1. **Given** the VPS is serving production traffic, **When** smoke tests are run, **Then** all critical paths respond correctly: `https://ridenrest.app` (200), `https://api.ridenrest.app/health` (200 `{status:"ok"}`), `https://status.ridenrest.app` (auth prompt, then Uptime Kuma UI).
+1. **Given** the VPS is serving production traffic, **When** smoke tests are run, **Then** all critical paths respond correctly: `https://ridenrest.app` (200), `https://api.ridenrest.app/api/health` (200 `{status:"ok"}`), `https://status.ridenrest.app` (auth prompt, then Uptime Kuma UI).
 
 2. **Given** the domain `ridenrest.app` DNS records, **When** queried with `dig`, **Then** the A records for `ridenrest.app` and `api.ridenrest.app` both point to the VPS IP (`72.62.189.193`) — no CNAME to `*.vercel.app` or `*.fly.dev`.
 
@@ -33,7 +33,7 @@ So that there is a single source of truth (VPS Hostinger), no orphaned cloud res
 ### Task 1 — Pre-flight smoke tests (before any decommissioning)
 
 - [x] 1.1 Verify `https://ridenrest.app` loads the landing page (HTTP 200, no redirect to Vercel)
-- [x] 1.2 Verify `https://api.ridenrest.app/health` returns `{"status":"ok","version":"...","timestamp":"..."}` — actual path: `/api/health` (ResponseInterceptor wraps: `{"data":{"status":"ok",...}}`)
+- [x] 1.2 Verify `https://api.ridenrest.app/api/health` returns `{"status":"ok","version":"...","timestamp":"..."}` — actual path: `/api/health` (ResponseInterceptor wraps: `{"data":{"status":"ok",...}}`)
 - [x] 1.3 Verify `https://status.ridenrest.app` shows Caddy basicauth prompt → Uptime Kuma UI on login — HTTP 401 basicauth confirmed ✅
 - [x] 1.4 Verify all Uptime Kuma monitors are green (ridenrest.app, api health, PostgreSQL TCP, Redis TCP, VPS Resources)
 - [x] 1.5 Quick functional check: login → create adventure → GPX upload → map loads with trace
