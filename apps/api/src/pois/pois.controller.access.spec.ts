@@ -46,6 +46,7 @@ import { AccessCalculatorService } from './access-calculator/access-calculator.s
 import { RoutingService } from '../routing/routing.service.js'
 import accessConfig from '../config/access.config.js'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js'
+import { RedisProvider } from '../common/providers/redis.provider.js'
 import { ResponseInterceptor } from '../common/interceptors/response.interceptor.js'
 import { HttpExceptionFilter } from '../common/filters/http-exception.filter.js'
 
@@ -135,6 +136,7 @@ describe('POST /pois/:id/access (integration)', () => {
       origin: { type: 'stage', stageId: STAGE_ID },
       profileOverride: undefined,
       mode: 'planning',
+      userId: USER_ID,
     })
   })
 
@@ -295,6 +297,8 @@ describe('POST /pois/:id/access — cache hit ne touche pas BRouter (real servic
         AccessCalculatorService, // ← le VRAI service (pas un mock)
         { provide: accessConfig.KEY, useValue: mockAccessConfig },
         { provide: RoutingService, useValue: { computeRoute } }, // espion BRouter
+        // Cache hit DB (planning) → Redis non touché ; provider requis pour la DI.
+        { provide: RedisProvider, useValue: { getClient: () => ({ get: jest.fn(), setex: jest.fn() }) } },
         { provide: APP_GUARD, useClass: ThrottlerGuard },
       ],
     })

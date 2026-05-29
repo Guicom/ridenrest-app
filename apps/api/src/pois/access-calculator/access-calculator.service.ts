@@ -1,11 +1,18 @@
 /**
- * AccessCalculatorService (Story 2.2) — orchestre le calcul d'itinéraire d'accès POI :
+ * AccessCalculatorService (Story 2.2, étendu Story 3.1) — orchestre le calcul
+ * d'itinéraire d'accès POI :
  *   resolveOrigin → resolveProfile → routingService.computeRoute → computeDivergentSegment
- *   → UPDATE accommodations_cache (cache DB Planning).
+ *
+ * Deux modes de cache selon `input.mode` :
+ *  - `planning` → UPDATE `accommodations_cache` (cache DB durable, Story 2.2).
+ *  - `live`     → consent gate (`profiles.live_access_consent`) + cache Redis anonyme
+ *                 (clé `access:live:...` sans userId, TTL 15 min, Story 3.1). AUCUN
+ *                 stockage durable de la position GPS (NFR-PA-006 / RGPD).
  *
  * Contrat (AC #2) : `compute()` ne THROW JAMAIS, sauf cas dégénéré (POI inexistant /
  * étape inexistante). Les indisponibilités BRouter sont catchées et converties en
- * `{ status: 'fallback' }`.
+ * `{ status: 'fallback' }`. Mode Live sans consentement → `{ status: 'fallback',
+ * fallbackReason: 'no_consent' }` sans appel BRouter.
  *
  * ── Déviations vs story spec (Doc Sync) ────────────────────────────────────────────────
  *  - DI `db` : le projet n'a pas de token `DRIZZLE_DB` ni de `DatabaseModule`. On importe le
@@ -30,8 +37,12 @@ import accessConfig from '../../config/access.config.js'
 import { RoutingService } from '../../routing/routing.service.js'
 import { BrouterUnavailableException } from '../../routing/brouter-unavailable.exception.js'
 import type { BrouterProfile, LonLat } from '../../routing/routing.types.js'
+import { RedisProvider } from '../../common/providers/redis.provider.js'
 import { resolveOrigin } from './strategies/resolve-origin.js'
 import { computeDivergentSegment } from './strategies/compute-divergent-segment.js'
+import { buildAccessLiveKey, getCachedAccess, setCachedAccess } from './strategies/redis-cache.js'
+import type { CachedAccessMetrics } from './strategies/redis-cache.js'
+import { getLiveAccessConsent } from './profile-lookup.js'
 import type { AccessComputeInput, AccessResult, DivergentMetrics, GeoJSONGeometry } from './types/access-result.types.js'
 
 /** Profils projet (`adventures.routing_profile`) → profils bas niveau BRouter. */
@@ -69,22 +80,33 @@ export class AccessCalculatorService {
     private readonly routingService: RoutingService,
     @Inject(accessConfig.KEY)
     private readonly config: ConfigType<typeof accessConfig>,
+    private readonly redisProvider: RedisProvider,
   ) {}
 
   /**
-   * Calcule (ou récupère depuis le cache DB) l'itinéraire d'accès d'un POI.
+   * Calcule (ou récupère depuis le cache) l'itinéraire d'accès d'un POI.
+   *  - mode `planning` → cache DB (`accommodations_cache`), Story 2.2.
+   *  - mode `live`     → consent gate + cache Redis anonyme (Story 3.1).
    * @throws NotFoundException si le POI ou l'étape demandée n'existe pas (cas dégénéré).
    */
   async compute(input: AccessComputeInput): Promise<AccessResult> {
     const poi = await this.loadPoi(input.poiId)
+
+    if (input.mode === 'live') {
+      return this.computeLive(input, poi)
+    }
+    return this.computePlanning(input, poi)
+  }
+
+  /** Mode Planning (Story 2.2) : cache DB `accommodations_cache`. */
+  private async computePlanning(input: AccessComputeInput, poi: PoiContext): Promise<AccessResult> {
     const originStageId = input.origin.type === 'stage' ? input.origin.stageId : null
 
-    // ── Cache hit DB (Planning, AC #6) ────────────────────────────────────────
+    // ── Cache hit DB (AC #6) ──────────────────────────────────────────────────
     // GPS exclu du cache : les coordonnées GPS ne font pas partie de la clé → collision
     // avec adventure-start (les deux ont accessOriginStageId = null).
     const cachedGeometry = poi.accessGeometry ? this.parseGeometry(poi.accessGeometry) : null
     if (
-      input.mode === 'planning' &&
       input.origin.type !== 'gps' &&
       poi.accessComputedAt &&
       poi.accessEngineVersion === this.config.engineVersion &&
@@ -106,7 +128,78 @@ export class AccessCalculatorService {
       }
     }
 
-    // ── Calcul frais (cache miss) ─────────────────────────────────────────────
+    // ── Calcul frais (cache miss) → UPDATE cache DB ───────────────────────────
+    return this.computeFresh(input, poi, async (metrics) => {
+      try {
+        await this.updateCache(poi.id, originStageId, metrics)
+      } catch (cacheErr) {
+        this.logger.warn({ msg: 'access_cache_write_failed', poiId: poi.id, err: cacheErr })
+      }
+    })
+  }
+
+  /**
+   * Mode Live (Story 3.1, AC #2/#3/#5) : consent gate → cache Redis anonyme → calcul frais.
+   * AUCUN stockage durable de la position GPS (clé Redis anonyme, TTL court).
+   */
+  private async computeLive(input: AccessComputeInput, poi: PoiContext): Promise<AccessResult> {
+    // ── Consent gate (AC #2) — uniquement pour l'origine gps (la seule du mode Live) ──
+    if (input.origin.type === 'gps') {
+      const consent = input.userId ? await getLiveAccessConsent(db, input.userId) : null
+      if (consent !== true) {
+        // false OU null → pas de calcul, pas d'appel BRouter. Pas de log de position.
+        return {
+          status: 'fallback',
+          fallbackReason: 'no_consent',
+          fallbackDistanceM: poi.distFromTraceM,
+          source: 'computed-fresh',
+        }
+      }
+    }
+
+    const profile = this.resolveProfile(poi.routingProfile, input.profileOverride)
+    const redis = this.redisProvider.getClient()
+    const cacheKey =
+      input.origin.type === 'gps'
+        ? buildAccessLiveKey({ poiId: poi.id, profile, lat: input.origin.lat, lng: input.origin.lng })
+        : null
+
+    // ── Cache hit Redis (AC #3) ───────────────────────────────────────────────
+    if (cacheKey) {
+      let cached: CachedAccessMetrics | null = null
+      try {
+        cached = await getCachedAccess(redis, cacheKey)
+      } catch (cacheErr) {
+        this.logger.warn({ msg: 'access_redis_read_failed', poiId: poi.id, err: cacheErr })
+      }
+      // Invalidation par version moteur (parité avec le cache DB Planning) : une entrée
+      // calculée par une version BRouter obsolète est traitée comme un miss → recalcul frais.
+      if (cached && cached.engineVersion === this.config.engineVersion) {
+        return { status: 'ok', ...cached, source: 'redis-cache' }
+      }
+    }
+
+    // ── Cache miss → calcul frais → SET Redis (TTL Live) ──────────────────────
+    return this.computeFresh(input, poi, async (metrics) => {
+      if (!cacheKey) return
+      try {
+        await setCachedAccess(redis, cacheKey, this.toCachedMetrics(metrics), this.config.cacheTtlLiveSeconds)
+      } catch (cacheErr) {
+        this.logger.warn({ msg: 'access_redis_write_failed', poiId: poi.id, err: cacheErr })
+      }
+    })
+  }
+
+  /**
+   * Calcul frais partagé (Planning & Live) : resolveOrigin → BRouter → computeDivergentSegment.
+   * `persist` reçoit les métriques pour écriture cache (DB ou Redis selon le mode).
+   * BRouter down → `status: 'fallback'` (routing_failed) sans persistance (retry ultérieur).
+   */
+  private async computeFresh(
+    input: AccessComputeInput,
+    poi: PoiContext,
+    persist: (metrics: DivergentMetrics) => Promise<void>,
+  ): Promise<AccessResult> {
     try {
       const from = await resolveOrigin(db, input.origin, { adventureId: poi.adventureId })
       const profile = this.resolveProfile(poi.routingProfile, input.profileOverride)
@@ -118,14 +211,7 @@ export class AccessCalculatorService {
       const metrics = await computeDivergentSegment(db, route.geometry, poi.adventureId, this.config.traceBufferM)
 
       this.logGeometrySize(poi.id, metrics.geometry)
-      // Écriture cache Planning uniquement (Live → Redis en Story 3.1).
-      if (input.mode === 'planning') {
-        try {
-          await this.updateCache(poi.id, originStageId, metrics)
-        } catch (cacheErr) {
-          this.logger.warn({ msg: 'access_cache_write_failed', poiId: poi.id, err: cacheErr })
-        }
-      }
+      await persist(metrics)
 
       return {
         status: 'ok',
@@ -139,7 +225,7 @@ export class AccessCalculatorService {
       }
     } catch (err) {
       if (err instanceof BrouterUnavailableException) {
-        // PAS d'UPDATE cache → permet un retry ultérieur. Log INFO (volume attendu).
+        // PAS de persistance → permet un retry ultérieur. Log INFO (volume attendu).
         this.logger.log({
           msg: 'access_fallback',
           poiId: poi.id,
@@ -155,6 +241,18 @@ export class AccessCalculatorService {
       }
       // Cas dégénéré (POI/étape inexistant, etc.) → propage.
       throw err
+    }
+  }
+
+  /** Projette les métriques calculées vers le payload mis en cache Redis (mode Live). */
+  private toCachedMetrics(metrics: DivergentMetrics): CachedAccessMetrics {
+    return {
+      distanceM: metrics.distanceM,
+      elevationGainM: metrics.elevationGainM,
+      elevationLossM: metrics.elevationLossM,
+      geometry: metrics.geometry,
+      engineVersion: this.config.engineVersion,
+      computedAt: new Date().toISOString(),
     }
   }
 

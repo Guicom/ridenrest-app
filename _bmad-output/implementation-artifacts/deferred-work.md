@@ -139,3 +139,8 @@
 
 - `updateRoutingProfile` (repo) filtre par `id` seul (pas `userId`) et renvoie `row as Adventure` sans null-check — pattern partagé par toutes les méthodes `updateX` du repo `adventures`. IDOR latent mais inatteignable car `updateAdventure` appelle `verifyOwnership` en amont (`adventures.service.ts:62`). → durcissement repo global (ajouter scope `userId` aux méthodes de mutation) si une refonte sécurité du repo est entreprise.
 - PATCH multi-champs non-atomique — `name/startDate/endDate/avgSpeedKmh/routingProfile` sont des UPDATE séparés sans transaction dans `updateAdventure` (`adventures.service.ts:65-92`). Un échec sur un champ laisse une mise à jour partielle ; l'event `adventure.profile-changed` ne serait pas émis. Le client n'envoie qu'un seul champ par appel aujourd'hui. → envelopper `updateAdventure` dans une transaction Drizzle si le PATCH multi-champs devient un cas d'usage réel.
+
+## Deferred from: code review of poi-access-3-1 (2026-05-29)
+
+- Compteur de throttle partagé Planning(60)/Live(120) sur la même clé route+tracker — trafic mixte gps/stage accumule sur un seul bucket → throttling précoce du trafic légitime ; limites non indépendantes (bornées <120). [common/guards/access-throttler.guard.ts] — tradeoff option B documenté et accepté.
+- Consent gate non appliqué pour une origine `live` non-gps (garde imbriquée dans `if origin.type==='gps'`) — non atteignable aujourd'hui (couplage mode⇔origin uniquement dans le controller). [access-calculator.service.ts computeLive] — ajouter une assertion si un futur appelant introduit une origine live non-gps.

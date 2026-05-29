@@ -77,6 +77,11 @@ export interface AccessComputeInput {
   origin: AccessOrigin
   /** Force un profil BRouter bas niveau, sinon dérivé de `adventures.routing_profile`. */
   profileOverride?: BrouterProfile
-  /** `planning` → cache DB. `live` (cache Redis) ajouté en Story 3.1. */
+  /** `planning` → cache DB. `live` → cache Redis anonyme + consent gate (Story 3.1). */
   mode: 'planning' | 'live'
+  /**
+   * Requis en mode `live` : sert UNIQUEMENT au lookup `profiles.live_access_consent`.
+   * N'est JAMAIS propagé vers la clé Redis ni stocké (anonymisation, NFR-PA-006).
+   */
+  userId?: string
 }
