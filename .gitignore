@@ -31,3 +31,6 @@ apps/api/uploads/
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Agent worktrees (ephemeral, never commit)
+.claude/worktrees/
