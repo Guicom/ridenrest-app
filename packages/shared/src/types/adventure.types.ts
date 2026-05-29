@@ -1,3 +1,5 @@
+import type { RoutingProfile } from './routing-profile'
+
 export const DENSITY_ACCOMMODATION_CATEGORIES = ['hotel', 'camp_site', 'shelter', 'hostel', 'guesthouse'] as const
 export type DensityAccommodationCategory = typeof DENSITY_ACCOMMODATION_CATEGORIES[number]
 
@@ -47,6 +49,7 @@ export interface AdventureResponse {
   densityStatus: DensityStatus
   densityProgress: number  // 0–100
   avgSpeedKmh: number
+  routingProfile: RoutingProfile  // profil de routage cyclable (Story 2.6)
   hasStravaSegment: boolean
   createdAt: string  // ISO 8601
   updatedAt: string

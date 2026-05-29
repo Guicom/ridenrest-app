@@ -1,5 +1,6 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, ValidateIf, Matches, IsISO8601, IsNumber, Min, Max } from 'class-validator'
+import { IsString, IsNotEmpty, MaxLength, IsOptional, ValidateIf, Matches, IsISO8601, IsNumber, Min, Max, IsIn } from 'class-validator'
 import { Transform } from 'class-transformer'
+import { ROUTING_PROFILE_VALUES, type RoutingProfile } from '@ridenrest/shared'
 
 export class UpdateAdventureDto {
   @IsOptional()
@@ -26,4 +27,10 @@ export class UpdateAdventureDto {
   @Min(5, { message: 'avgSpeedKmh must be at least 5 km/h' })
   @Max(50, { message: 'avgSpeedKmh must be at most 50 km/h' })
   avgSpeedKmh?: number
+
+  @IsOptional()
+  @IsIn(ROUTING_PROFILE_VALUES as readonly string[], {
+    message: 'routingProfile must be one of: road, gravel, bikepacking',
+  })
+  routingProfile?: RoutingProfile
 }

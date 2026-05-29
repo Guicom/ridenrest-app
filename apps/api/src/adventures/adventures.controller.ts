@@ -45,7 +45,7 @@ export class AdventuresController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update an adventure (name and/or start date)' })
+  @ApiOperation({ summary: 'Update an adventure (name, dates, avg speed and/or routing profile)' })
   async update(
     @CurrentUser() user: CurrentUserPayload,
     @Param('id') id: string,

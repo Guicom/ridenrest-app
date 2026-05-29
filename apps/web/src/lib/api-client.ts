@@ -89,7 +89,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ── Adventures ───────────────────────────────────────────────────────────────
 
-import type { AdventureResponse, AdventureSegmentResponse, AdventureMapResponse, MapSegmentData, MapWaypoint } from '@ridenrest/shared'
+import type { AdventureResponse, AdventureSegmentResponse, AdventureMapResponse, MapSegmentData, MapWaypoint, RoutingProfile } from '@ridenrest/shared'
 
 export async function createAdventure(name: string): Promise<AdventureResponse> {
   return apiFetch<AdventureResponse>('/api/adventures', {
@@ -169,6 +169,16 @@ export async function updateAdventureAvgSpeedKmh(id: string, avgSpeedKmh: number
   return apiFetch<AdventureResponse>(`/api/adventures/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ avgSpeedKmh }),
+  })
+}
+
+export async function updateAdventureRoutingProfile(
+  id: string,
+  routingProfile: RoutingProfile,
+): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/api/adventures/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ routingProfile }),
   })
 }
 

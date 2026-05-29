@@ -83,6 +83,15 @@ export class AdventuresRepository {
     return row as Adventure
   }
 
+  async updateRoutingProfile(id: string, routingProfile: Adventure['routingProfile']): Promise<Adventure> {
+    const [row] = await db
+      .update(adventures)
+      .set({ routingProfile, updatedAt: new Date() })
+      .where(eq(adventures.id, id))
+      .returning()
+    return row as Adventure
+  }
+
   async deleteById(id: string): Promise<void> {
     await db.delete(adventures).where(eq(adventures.id, id))
   }

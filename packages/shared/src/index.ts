@@ -1,6 +1,8 @@
 // Types
 export type { AdventureResponse, AdventureSegmentResponse, AdventureStageResponse, AdventureStatus, ParseStatus, DensityStatus, DensityStatusResponse, CoverageGapSummary, MapWaypoint, MapSegmentData, AdventureMapResponse, DensityAccommodationCategory } from './types/adventure.types'
 export { DENSITY_ACCOMMODATION_CATEGORIES } from './types/adventure.types'
+export type { RoutingProfile } from './types/routing-profile'
+export { ROUTING_PROFILE_VALUES, ROUTING_PROFILE_LABELS, ROUTING_PROFILE_TOOLTIPS } from './types/routing-profile'
 export type { Poi, PoiCategory, PoiSearchResponse, MapLayer } from './types/poi.types'
 export { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from './types/poi.types'
 export type { WeatherForecast, WeatherPoint, StageWeatherPoint } from './types/weather.types'

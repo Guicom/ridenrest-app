@@ -285,7 +285,7 @@ development_status:
   poi-access-2-3-endpoint-post-pois-access-planning: done  # code review 2026-05-29 — 4 patches appliqués (335/335 API, 31/31 shared), 1 defer, 10 dismissed
   poi-access-2-4-access-metrics-ui-planning: done  # code review 2026-05-29 — passe 1 : 4 patches (text-destructive, skeleton compact, format.ts+test, doc sync), 1 defer. passe 2 : 1 patch (refetch-error ne masque plus la donnée en cache, +test), 2 defer (durcissement schéma 2.3, concerns polyline 2.5). 109/109 tests poi-access verts, ESLint/tsc clean
   poi-access-2-5-access-map-layer: done  # Story 2.5 AccessMapLayer — validation UI OK (Guillaume 2026-05-29). Code review 2026-05-29 : 8/8 AC SATISFIED, 6 écarts Doc Sync exacts ; 1 patch (ré-ajout polyline après setStyle/theme, +2 tests), 3 defer. Suite poi-access 33/33 verte, ESLint/tsc clean
-  poi-access-2-6-routing-profile-selector-ui: ready-for-dev
+  poi-access-2-6-routing-profile-selector-ui: done  # impl 2026-05-29 — type RoutingProfile partagé + PATCH backend routingProfile + event adventure.profile-changed + RoutingProfileSelector (optimistic UI/rollback) en page détail. Shared 31/31, API 344/344, Web 1044/1044. 7 écarts Doc Sync documentés. Code review 2026-05-29 : 3 alertes High/Medium = faux positifs vérifiés, 1 patch appliqué (lecture DB redondante), 2 deferred (patterns pré-existants), 9 écartés. Validation manuelle UI (AC4/AC5) en attente Guillaume
   # Phase 3: Live Mode
   poi-access-3-1-extend-endpoint-live-mode: ready-for-dev
   poi-access-3-2-me-controller-settings-impl: ready-for-dev

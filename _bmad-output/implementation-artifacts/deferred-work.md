@@ -134,3 +134,8 @@
 ## Deferred from: code review of poi-access-2-4-access-metrics-ui-planning (2026-05-29)
 
 - Seuil de couverture AC8 « ≥ 80% » non mesuré mécaniquement — `@vitest/coverage-v8` n'est pas installé (l'ajouter = nouvelle dépendance, HALT volontairement non déclenché). Couverture évaluée manuellement à ~100% sur le dossier `poi-access/` (Completion Notes). → Installer l'outillage de couverture comme décision outillage séparée si un seuil mesuré devient requis en CI.
+
+## Deferred from: code review of poi-access-2-6-routing-profile-selector-ui (2026-05-29)
+
+- `updateRoutingProfile` (repo) filtre par `id` seul (pas `userId`) et renvoie `row as Adventure` sans null-check — pattern partagé par toutes les méthodes `updateX` du repo `adventures`. IDOR latent mais inatteignable car `updateAdventure` appelle `verifyOwnership` en amont (`adventures.service.ts:62`). → durcissement repo global (ajouter scope `userId` aux méthodes de mutation) si une refonte sécurité du repo est entreprise.
+- PATCH multi-champs non-atomique — `name/startDate/endDate/avgSpeedKmh/routingProfile` sont des UPDATE séparés sans transaction dans `updateAdventure` (`adventures.service.ts:65-92`). Un échec sur un champ laisse une mise à jour partielle ; l'event `adventure.profile-changed` ne serait pas émis. Le client n'envoie qu'un seul champ par appel aujourd'hui. → envelopper `updateAdventure` dans une transaction Drizzle si le PATCH multi-champs devient un cas d'usage réel.
