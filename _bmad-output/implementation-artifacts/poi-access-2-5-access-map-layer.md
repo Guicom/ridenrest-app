@@ -4,7 +4,7 @@ baseline_commit: f71d7a8e281d17108251ef2f6edcf71a30d90efa
 
 # Story POI-Access 2.5 : `AccessMapLayer` — polyline d'itinéraire d'accès sur MapLibre
 
-Status: review
+Status: done
 
 <!-- Dépend de : 2.3 (endpoint), 2.4 (useAccess hook). -->
 
@@ -260,3 +260,16 @@ chaud → affichage quasi instantané). Aucune action requise sur la 2.5.
   composant lazy polyline d'accès (amber pointillé, beforeId pins, setData, fitBounds once, cleanup
   idempotent), intégration `map-view`, câblage `poi-popup`. Doc Sync (6 écarts). Tests 17 nouveaux,
   suite web 1035/1035, build OK. Status → review.
+
+---
+
+### Review Findings
+
+_Code review adversariale (3 couches : Blind Hunter / Edge Case Hunter / Acceptance Auditor) — 2026-05-29. Diff = commit `d91d305` vs baseline `f71d7a8`, scopé à la File List 2.5. Les 8 AC sont SATISFIED et les 6 écarts Doc Sync vérifiés exacts. 0 decision-needed, 1 patch (MED), 3 defer, ~6 dismissed._
+
+- [x] [Review][Patch] **La polyline d'accès n'était pas ré-ajoutée après un `map.setStyle()` (changement de thème) → disparaissait jusqu'à réouverture du popup.** Convergence des 3 couches. L'effet ne gérait le `styledata` qu'au premier rendu non chargé (`map.once('styledata', apply)`) ; une fois le layer ajouté, un `setStyle` ultérieur détruit tous les layers custom, mais les deps `[map, geometry]` ne changent pas → aucun ré-ajout. **Corrigé** : `map.once` remplacé par un listener `map.on('styledata', …)` persistant et idempotent (ré-applique si `!getSource(SOURCE_ID)` → no-op quasi-gratuit hors rechargement), `map.off` au cleanup (corrige aussi le listener `once` jamais déréférencé). +2 tests (« re-adds the layer after a style reload », « deregisters the styledata listener on cleanup »). Suite poi-access 33/33 verte, ESLint/tsc clean. [apps/web/src/components/poi-access/AccessMapLayer.tsx:133-149]
+- [x] [Review][Defer] `POI_POINT_LAYER_IDS` est une copie en dur des ids de `use-poi-layers.ts` → si un layer de pins est renommé/ajouté, `firstPoiPointLayerId` renvoie `undefined` et la ligne d'accès s'insère au sommet (au-dessus des pins, viole l'intention z-index). Pas un bug runtime aujourd'hui. Fix = extraire une constante partagée (touche `use-poi-layers.ts`, hors File List 2.5). [apps/web/src/components/poi-access/AccessMapLayer.tsx:34-39] — deferred, couplage hors périmètre
+- [x] [Review][Defer] Couverture AC#7 « ≥ 75% » et impact bundle (kB) non mesurés mécaniquement (`@vitest/coverage-v8` absent) — import maplibre type-only vérifié vrai, mais % et kB non reproductibles depuis le diff. Même classe d'outillage que le defer AC8 de la story 2.4. [story 2.5 / AC#7] — deferred, outillage
+- [x] [Review][Defer] `computeBounds`/`fitBounds` sans garde de bbox dégénérée (point unique / coords identiques → zoom max) ni non-finie. Non atteignable depuis le backend de routage (route origine→POI = ≥ 2 coords finies distinctes ; `Position` = `z.number()` rejette `NaN`). Garde `isFinite`/min-span = défense en profondeur optionnelle. [apps/web/src/components/poi-access/AccessMapLayer.tsx:57-73] — deferred, non atteignable
+
+_Dismissed (faux positifs / vérifiés handled) : `getMap()` passé en prop depuis une ref (le changement d'état `accessGeometry` force un re-render frais → map dispo au moment où la géométrie arrive) ; `useAccess('')` (vérifié `enabled: !!poiId` → requête désactivée) ; double effet de cleanup (fonctionne, idempotent, React Strict Mode safe) ; géométrie périmée au switch de POI / re-zoom superflu après expiration `gcTime` (bénin) ; course `beforeId` après rechargement de style (subsumée par le patch P1) ; switch d'étape popup ouvert (l'origine est gérée par le `useAccess` origin-aware de `map-view`, l'effet popup n'a volontairement pas `accessOrigin` en deps — correct) ; MultiLineString / coords vides / loading / fallback / error : tous vérifiés handled._

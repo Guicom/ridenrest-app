@@ -18,7 +18,8 @@ interface MockMap {
   removeSource: ReturnType<typeof vi.fn>
   getLayer: ReturnType<typeof vi.fn>
   fitBounds: ReturnType<typeof vi.fn>
-  once: ReturnType<typeof vi.fn>
+  on: ReturnType<typeof vi.fn>
+  off: ReturnType<typeof vi.fn>
   _source: MockSource | null
   _layerIds: Set<string>
 }
@@ -45,7 +46,8 @@ function createMockMap(options?: { styleLoaded?: boolean; existingLayers?: strin
     }),
     getLayer: vi.fn((id: string) => (layerIds.has(id) ? { id } : undefined)),
     fitBounds: vi.fn(),
-    once: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
     _source: null,
     _layerIds: layerIds,
   }
@@ -222,12 +224,43 @@ describe('AccessMapLayer', () => {
 
     // Nothing added yet — waiting for styledata
     expect(map.addSource).not.toHaveBeenCalled()
-    expect(map.once).toHaveBeenCalledWith('styledata', expect.any(Function))
+    expect(map.on).toHaveBeenCalledWith('styledata', expect.any(Function))
 
-    // Fire the deferred callback → layer is added
-    const deferred = map.once.mock.calls[0][1] as () => void
-    deferred()
+    // Fire the deferred styledata handler → layer is added
+    const onStyleData = map.on.mock.calls.find((c) => c[0] === 'styledata')![1] as () => void
+    onStyleData()
     expect(map.addSource).toHaveBeenCalledTimes(1)
     expect(map.addLayer).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-adds the layer after a style reload (map.setStyle / theme switch)', () => {
+    const map = createMockMap({ styleLoaded: true })
+    render(<AccessMapLayer map={map as unknown as maplibregl.Map} geometry={LINESTRING} />)
+
+    // Initial display
+    expect(map.addSource).toHaveBeenCalledTimes(1)
+    expect(map.addLayer).toHaveBeenCalledTimes(1)
+
+    // Simulate setStyle wiping all custom sources/layers.
+    map._source = null
+    map._layerIds.clear()
+
+    // MapLibre emits 'styledata' once the new style is applied.
+    const onStyleData = map.on.mock.calls.find((c) => c[0] === 'styledata')![1] as () => void
+    onStyleData()
+
+    // Polyline is re-inserted (source + layer added again), not left missing.
+    expect(map.addSource).toHaveBeenCalledTimes(2)
+    expect(map.addLayer).toHaveBeenCalledTimes(2)
+  })
+
+  it('deregisters the styledata listener on cleanup', () => {
+    const map = createMockMap()
+    const { unmount } = render(
+      <AccessMapLayer map={map as unknown as maplibregl.Map} geometry={LINESTRING} />,
+    )
+    const onStyleData = map.on.mock.calls.find((c) => c[0] === 'styledata')![1]
+    unmount()
+    expect(map.off).toHaveBeenCalledWith('styledata', onStyleData)
   })
 })

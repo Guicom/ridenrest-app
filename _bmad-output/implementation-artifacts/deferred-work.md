@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of poi-access-2-5-access-map-layer.md (2026-05-29)
+
+- **W1** — `POI_POINT_LAYER_IDS` (copie en dur des ids `use-poi-layers.ts`) → drift du `beforeId` z-order si un layer de pins est renommé/ajouté → ligne d'accès au sommet au lieu de sous les pins. Pas un bug runtime. Fix = constante partagée (touche `use-poi-layers.ts`, hors périmètre 2.5). `AccessMapLayer.tsx:34-39`.
+- **W2** — Couverture AC#7 « ≥ 75% » + impact bundle (kB) non mesurés mécaniquement (`@vitest/coverage-v8` absent). Import maplibre type-only confirmé. Même classe d'outillage que le defer AC8 de la 2.4. `poi-access-2-5 / AC#7`.
+- **W3** — `computeBounds`/`fitBounds` sans garde bbox dégénérée (point unique → zoom max) ni non-finie. Non atteignable (route origine→POI = ≥2 coords finies distinctes ; `z.number()` rejette `NaN`). Défense en profondeur optionnelle. `AccessMapLayer.tsx:57-73`.
+
 ## Deferred from: code review of poi-access-2-4-access-metrics-ui-planning.md (2026-05-29, passe 2)
 
 - **W1** — Durcissement optionnel `AccessResponseSchema` : champs numériques (`distanceM`, `elevationGainM`, `elevationLossM`, `fallbackDistanceM`) en `z.number()` nu → acceptent `±Infinity` et négatifs. Non atteignable (backend renvoie du fini ≥ 0 ; D- en magnitude positive via `Math.abs`, `stages.service.ts:35`). `.finite().nonnegative()` = défense en profondeur. Hors périmètre 2.4 (fichier schéma 2.3). `packages/shared/src/schemas/poi-access.ts:73-84`.

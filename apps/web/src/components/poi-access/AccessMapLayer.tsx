@@ -130,15 +130,23 @@ export function AccessMapLayer({ map, geometry }: AccessMapLayerProps) {
       }
     }
 
-    // Le style peut ne pas être chargé (changement de thème / premier rendu) → différer.
-    if (map.isStyleLoaded()) {
-      apply()
-    } else {
-      map.once('styledata', apply)
+    // Applique immédiatement si le style est prêt.
+    if (map.isStyleLoaded()) apply()
+
+    // Ré-applique à chaque (re)chargement de style : un `map.setStyle()` (changement
+    // de thème) détruit TOUS les layers/sources custom → il faut ré-insérer la polyline,
+    // comme le font les autres layers du projet via `styleVersion` (project-context
+    // §Map Interaction UX). Couvre aussi le cas « style pas encore chargé au mount ».
+    // Guard `!getSource` → no-op quasi-gratuit hors rechargement (styledata est fréquent).
+    const onStyleData = () => {
+      if (cancelled) return
+      if (!map.getSource(SOURCE_ID)) apply()
     }
+    map.on('styledata', onStyleData)
 
     return () => {
       cancelled = true
+      map.off('styledata', onStyleData)
     }
   }, [map, geometry])
 
