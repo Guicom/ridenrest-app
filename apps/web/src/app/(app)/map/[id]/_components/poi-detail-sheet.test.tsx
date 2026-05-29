@@ -31,6 +31,11 @@ vi.mock('@/hooks/use-reverse-city', () => ({
   useReverseCity: () => ({ city: null, isPending: false }),
 }))
 
+// AccessMetrics (Story 2.4) has its own tests + requires a QueryClientProvider — stub it here.
+vi.mock('@/components/poi-access/AccessMetrics', () => ({
+  AccessMetrics: () => <div data-testid="access-metrics" />,
+}))
+
 let mockDetails: { placeId: string; displayName: string | null; formattedAddress: string | null; lat: number | null; lng: number | null; rating: number | null; isOpenNow: boolean | null; phone: string | null; website: string | null; types: string[] } | null = null
 let mockDetailsPending = false
 vi.mock('@/hooks/use-poi-google-details', () => ({

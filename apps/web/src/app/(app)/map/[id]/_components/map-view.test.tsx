@@ -68,6 +68,8 @@ vi.mock('@/stores/map.store', () => ({
     setSearchCommitted: vi.fn(),
     traceClickedKm: null,
     setTraceClickedKm: vi.fn(),
+    visibleAccessPoiId: null,
+    setVisibleAccessPoiId: vi.fn(),
   }),
 }))
 

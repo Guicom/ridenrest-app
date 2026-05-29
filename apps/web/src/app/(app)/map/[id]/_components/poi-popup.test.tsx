@@ -17,6 +17,11 @@ vi.mock('@/hooks/use-reverse-address', () => ({
   useReverseAddress: () => ({ address: null, isPending: false }),
 }))
 
+// AccessMetrics (Story 2.4) has its own tests + requires a QueryClientProvider — stub it here.
+vi.mock('@/components/poi-access/AccessMetrics', () => ({
+  AccessMetrics: () => <div data-testid="access-metrics" />,
+}))
+
 let mockDetails: {
   placeId: string
   displayName: string | null

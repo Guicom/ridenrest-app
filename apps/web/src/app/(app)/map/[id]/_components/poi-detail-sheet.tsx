@@ -1,4 +1,5 @@
 'use client'
+import { useMemo } from 'react'
 import { Drawer } from 'vaul'
 import { Globe } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -10,7 +11,8 @@ import { LAYER_CATEGORIES, DEFAULT_CYCLING_SPEED_KMH } from '@ridenrest/shared'
 import { extractCityFromOsmRawData } from '@/lib/booking-url'
 import { useReverseCity } from '@/hooks/use-reverse-city'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
-import type { Poi, MapLayer } from '@ridenrest/shared'
+import { AccessMetrics } from '@/components/poi-access/AccessMetrics'
+import type { Poi, MapLayer, AccessOrigin } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 
 const LAYER_ICONS: Record<MapLayer, string> = {
@@ -43,9 +45,18 @@ interface PoiDetailSheetProps {
 
 export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDetailSheetProps) {
   const { selectedPoiId, setSelectedPoi } = useUIStore()
-  const { fromKm } = useMapStore()
+  const { fromKm, selectedStageId } = useMapStore()
   const isOpen = !!selectedPoiId && !!poi
   const isLiveMode = !!liveContext
+
+  // Origine de l'itinéraire d'accès (Story 2.4) : l'étape sélectionnée si présente,
+  // sinon le départ de l'aventure. Doc Sync : la story planifiée référençait
+  // `usePlanningModeStore.currentStageId` (store inexistant) ; la source réelle est
+  // `useMapStore.selectedStageId` (Story 11.4).
+  const accessOrigin: AccessOrigin = useMemo(
+    () => (selectedStageId ? { type: 'stage', stageId: selectedStageId } : { type: 'adventure-start' }),
+    [selectedStageId],
+  )
 
   const { details, isPending: detailsPending } = usePoiGoogleDetails(
     poi?.externalId ?? null,
@@ -166,6 +177,19 @@ export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDet
                 hint={`(à ${speed} km/h)`}
               />
             </div>
+
+            {/* ── Itinéraire d'accès cyclable réel (hébergements, planning only) ── */}
+            {!isLiveMode && isAccommodation && (
+              <div className="py-3 border-b border-zinc-100 dark:border-zinc-800">
+                <AccessMetrics
+                  variant="full"
+                  poiId={poi.id}
+                  origin={accessOrigin}
+                  category={poi.category}
+                  fallbackDistanceM={poi.distFromTraceM}
+                />
+              </div>
+            )}
 
             {/* ── Google enrichment (progressive) ── */}
             {detailsPending ? (

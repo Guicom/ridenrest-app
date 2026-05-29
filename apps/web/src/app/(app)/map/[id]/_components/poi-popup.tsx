@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { X, Globe, Phone, Navigation, Milestone, TrendingUp, TrendingDown, Clock, ChevronDown, Copy, Check } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
@@ -9,7 +9,9 @@ import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { extractCityFromOsmRawData } from '@/lib/booking-url'
 import { useReverseCity } from '@/hooks/use-reverse-city'
 import { useReverseAddress } from '@/hooks/use-reverse-address'
-import type { Poi, PoiCategory } from '@ridenrest/shared'
+import { useMapStore } from '@/stores/map.store'
+import { AccessMetrics } from '@/components/poi-access/AccessMetrics'
+import type { Poi, PoiCategory, AccessOrigin } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import { trackPoiDetailOpened } from '@/lib/analytics'
@@ -103,6 +105,27 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   const popupRef = useRef<HTMLDivElement>(null)
   const isLiveMode = !!liveContext
   const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
+
+  // Origine de l'itinéraire d'accès (Story 2.4) — voir poi-detail-sheet.tsx.
+  // Doc Sync : `useMapStore.selectedStageId` (la story planifiée citait un
+  // `usePlanningModeStore.currentStageId` inexistant).
+  const selectedStageId = useMapStore((s) => s.selectedStageId)
+  const accessOrigin: AccessOrigin = useMemo(
+    () => (selectedStageId ? { type: 'stage', stageId: selectedStageId } : { type: 'adventure-start' }),
+    [selectedStageId],
+  )
+
+  // Affiche la polyline d'itinéraire d'accès tant que ce popup est ouvert (Story 2.5).
+  // Planning mode + hébergements uniquement (cohérent avec AccessMetrics) : le live mode
+  // est GPS/RGPD-sensible et n'a pas de polyline d'accès. Cleanup au unmount → AC#5.
+  // Doc Sync : la story planifiait ce câblage dans `poi-detail-sheet.tsx`, mais l'UI POI
+  // réelle du mode planning est `PoiPopup` (le sheet est la variante live mode).
+  const setVisibleAccessPoiId = useMapStore((s) => s.setVisibleAccessPoiId)
+  useEffect(() => {
+    if (isLiveMode || !isAccommodation) return
+    setVisibleAccessPoiId(poi.id)
+    return () => setVisibleAccessPoiId(null)
+  }, [poi.id, isLiveMode, isAccommodation, setVisibleAccessPoiId])
 
   // Stable ref so map click handler never needs to re-register on onClose identity changes
   const onCloseRef = useRef(onClose)
@@ -371,6 +394,23 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
               </div>
             )}
           </div>
+
+          {/* Itinéraire d'accès cyclable réel (hébergements, planning only) — distance seule */}
+          {!isLiveMode && isAccommodation && (
+            <>
+              <div className="mx-4 h-px bg-[--border]" />
+              <div className="px-4 py-2 flex items-center justify-between gap-2">
+                <span className="text-xs text-[--text-secondary]">Accès vélo</span>
+                <AccessMetrics
+                  variant="compact"
+                  poiId={poi.id}
+                  origin={accessOrigin}
+                  category={poi.category}
+                  fallbackDistanceM={poi.distFromTraceM}
+                />
+              </div>
+            </>
+          )}
 
           {/* Skeleton pendant chargement Google */}
           {detailsPending && (

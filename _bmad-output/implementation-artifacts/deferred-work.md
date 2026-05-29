@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of poi-access-2-4-access-metrics-ui-planning.md (2026-05-29, passe 2)
+
+- **W1** — Durcissement optionnel `AccessResponseSchema` : champs numériques (`distanceM`, `elevationGainM`, `elevationLossM`, `fallbackDistanceM`) en `z.number()` nu → acceptent `±Infinity` et négatifs. Non atteignable (backend renvoie du fini ≥ 0 ; D- en magnitude positive via `Math.abs`, `stages.service.ts:35`). `.finite().nonnegative()` = défense en profondeur. Hors périmètre 2.4 (fichier schéma 2.3). `packages/shared/src/schemas/poi-access.ts:73-84`.
+- **W2** — Câblage polyline Story 2.5 dans `poi-popup.tsx` (`setVisibleAccessPoiId`) à reviewer en 2.5 : (a) deps de l'effet omettent `selectedStageId`/origin → polyline potentiellement périmée au changement d'étape popup ouvert ; (b) cleanup `setVisibleAccessPoiId(null)` sans garde d'ownership (pertinent si deux `PoiPopup` coexistent). Probablement mitigé par le re-fetch origin-aware de `map-view`. `poi-popup.tsx:124-128`.
+
 ## Deferred from: code review of poi-access-2-2-access-calculator-service.md (2026-05-29)
 
 - **W1** — `Number(lat/lng)` sans garde finiteness (`access-calculator.service.ts:192-193`) — `lat`/`lng` sont `NOT NULL` dans le schéma DB ; corruption de données hors périmètre de ce service.
@@ -119,3 +124,7 @@
 ## Deferred from: code review of poi-access-2-3-endpoint-post-pois-access-planning (2026-05-29)
 
 - Le test d'intégration `pois.controller.access.spec.ts` ne reconstitue pas l'enregistrement `APP_GUARD` global du `JwtAuthGuard` (contourné via override + mock `jose` pour cause d'ESM/ts-jest). Conséquence : l'ordre des guards tel qu'il tourne en prod (JwtAuthGuard puis ThrottlerGuard, déclarés en `APP_GUARD` dans `app.module.ts`) n'est pas exercé — une régression de type « 429 renvoyé avant 401 » ne serait pas détectée par ce test. Tradeoff documenté (Doc Sync #4). → revoir si une stratégie E2E DB-backed est mise en place (CI avec Postgres/Redis).
+
+## Deferred from: code review of poi-access-2-4-access-metrics-ui-planning (2026-05-29)
+
+- Seuil de couverture AC8 « ≥ 80% » non mesuré mécaniquement — `@vitest/coverage-v8` n'est pas installé (l'ajouter = nouvelle dépendance, HALT volontairement non déclenché). Couverture évaluée manuellement à ~100% sur le dossier `poi-access/` (Completion Notes). → Installer l'outillage de couverture comme décision outillage séparée si un seuil mesuré devient requis en CI.

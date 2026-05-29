@@ -283,8 +283,8 @@ development_status:
   poi-access-2-1-routing-service-brouter-wrapper: done
   poi-access-2-2-access-calculator-service: done
   poi-access-2-3-endpoint-post-pois-access-planning: done  # code review 2026-05-29 — 4 patches appliqués (335/335 API, 31/31 shared), 1 defer, 10 dismissed
-  poi-access-2-4-access-metrics-ui-planning: ready-for-dev
-  poi-access-2-5-access-map-layer: ready-for-dev
+  poi-access-2-4-access-metrics-ui-planning: done  # code review 2026-05-29 — passe 1 : 4 patches (text-destructive, skeleton compact, format.ts+test, doc sync), 1 defer. passe 2 : 1 patch (refetch-error ne masque plus la donnée en cache, +test), 2 defer (durcissement schéma 2.3, concerns polyline 2.5). 109/109 tests poi-access verts, ESLint/tsc clean
+  poi-access-2-5-access-map-layer: review  # Story 2.5 AccessMapLayer — 17 tests nouveaux, suite web 1035/1035, build OK, ESLint clean ; Doc Sync 6 écarts ; Task 6 (validation manuelle UI) à exécuter par Guillaume
   poi-access-2-6-routing-profile-selector-ui: ready-for-dev
   # Phase 3: Live Mode
   poi-access-3-1-extend-endpoint-live-mode: ready-for-dev
