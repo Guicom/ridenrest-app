@@ -1,6 +1,10 @@
+---
+baseline_commit: 53175273a478a3bb6fc2084ca19f7e067f912698
+---
+
 # Story POI-Access 3.2 : `MeController` — `GET /me/settings` & `PATCH /me/settings` (impl. réelle)
 
-Status: ready-for-dev
+Status: done
 
 <!-- Dépend de : 1.4 (stubs MeController 501 créés). Indépendante de 3.1, 3.3. -->
 
@@ -112,46 +116,44 @@ Si futur ajout d'autres settings : ajouter en optional, gérer chaque champ ind�
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1** — Vérifier état actuel du stub (⚠️Discovery #1)
-  - [ ] Ouvrir `apps/api/src/me/me.controller.ts`
-  - [ ] Confirmer présence des stubs 501
-  - [ ] Identifier les autres settings éventuels (Discovery #2)
+- [x] **Task 1** — Vérifier état actuel du stub (⚠️Discovery #1)
+  - [x] Ouvrir `apps/api/src/me/me.controller.ts`
+  - [x] Confirmer présence des stubs 501 — confirmés (`GET` + `PATCH` → `NotImplementedException`)
+  - [x] Identifier les autres settings éventuels (Discovery #2) — `overpassEnabled` + `tier` gérés par `ProfileModule` (`/api/profile`). Décision : inclure `overpassEnabled` dans la réponse `/me/settings` (cohérence settings de confidentialité), `tier` exclu (état d'abonnement, pas un setting togglable)
 
-- [ ] **Task 2** — Créer `MeRepository` (AC: 1, 2)
-  - [ ] `me.repository.ts` avec méthodes : `getSettings(userId)`, `setLiveAccessConsent(userId, value)`
-  - [ ] Pattern repository (cf. project-context §NestJS Architecture Rules)
+- [x] **Task 2** — Créer `MeRepository` (AC: 1, 2)
+  - [x] `me.repository.ts` avec méthodes : `getSettings(userId)`, `setLiveAccessConsent(userId, value)`
+  - [x] Pattern repository (cf. project-context §NestJS Architecture Rules) — seul à toucher Drizzle
 
-- [ ] **Task 3** — Créer `MeService` (AC: 2, 3, 6, ⚠️Discovery #3)
-  - [ ] `me.service.ts` avec :
-    - `getSettings(userId): Promise<{ liveAccessConsent: boolean | null, ... }>`
-    - `updateSettings(userId, dto: UpdateSettingsDto): Promise<{ liveAccessConsent, ... }>`
-  - [ ] Inject `MeRepository` + `EventEmitter2`
-  - [ ] Logique emit event uniquement sur transition true→false
+- [x] **Task 3** — Créer `MeService` (AC: 2, 3, 6, ⚠️Discovery #3)
+  - [x] `me.service.ts` avec `getSettings` + `updateSettings`
+  - [x] Inject `MeRepository` + `EventEmitter2`
+  - [x] Logique emit event uniquement sur transition true→false, APRÈS commit DB (atomicité)
 
-- [ ] **Task 4** — Créer DTO `UpdateSettingsDto` (AC: 5)
-  - [ ] `dto/update-settings.dto.ts` avec class-validator OU Zod (cohérent avec Story 2.3)
+- [x] **Task 4** — Créer DTO `UpdateSettingsDto` (AC: 5)
+  - [x] `dto/update-settings.dto.ts` avec class-validator (`@IsBoolean` requis — cf. Doc Sync, déviation assumée vs Discovery #5)
 
-- [ ] **Task 5** — Remplacer stubs dans `MeController` (AC: 1, 2, 4)
-  - [ ] `GET /me/settings` → `this.meService.getSettings(user.id)`
-  - [ ] `PATCH /me/settings` → `this.meService.updateSettings(user.id, dto)`
-  - [ ] `@UseGuards(JwtAuthGuard)` (vérifier déjà appliqué via Story 1.4)
-  - [ ] Header `Cache-Control: no-store` sur GET
+- [x] **Task 5** — Remplacer stubs dans `MeController` (AC: 1, 2, 4)
+  - [x] `GET /me/settings` → `this.meService.getSettings(user.id)`
+  - [x] `PATCH /me/settings` → `this.meService.updateSettings(user.id, dto)`
+  - [x] Protection JWT : assurée par le `JwtAuthGuard` GLOBAL (`APP_GUARD`) — pas de `@UseGuards` par route nécessaire (cf. Doc Sync)
+  - [x] Header `Cache-Control: no-store` sur GET (`@Header`)
 
-- [ ] **Task 6** — Tests unitaires (AC: 7)
-  - [ ] `me.service.spec.ts` : tous les cas de l'AC #7
+- [x] **Task 6** — Tests unitaires (AC: 7)
+  - [x] `me.service.spec.ts` : 11 tests (transitions consent, idempotence, atomicité, défauts, overpassEnabled)
 
-- [ ] **Task 7** — Test E2E (AC: 7)
-  - [ ] `apps/api/test/me-settings.e2e-spec.ts`
-  - [ ] Seed DB avec user (consent null/true/false selon cas)
-  - [ ] Mock EventEmitter pour vérifier émission
+- [x] **Task 7** — Test E2E (AC: 7)
+  - [x] `apps/api/test/me-settings.e2e-spec.ts` : 9 tests HTTP (intégration controller, DB mockée + faux JWT — cf. Doc Sync, aligné Story 2.3/3.1)
+  - [x] État `profiles` piloté en mémoire (consent null/true/false selon cas)
+  - [x] `EventEmitter2` mocké pour vérifier émission `profile.live-consent-revoked`
 
-- [ ] **Task 8** — Validation manuelle
-  - [ ] `turbo dev` → curl GET /api/me/settings sans token → 401
-  - [ ] curl avec token valide → 200 + JSON
-  - [ ] curl PATCH avec body valide → 200 + DB update visible
+- [x] **Task 8** — Validation manuelle — DIFFÉRÉE (cf. Doc Sync)
+  - [x] Couverte par le test d'intégration au niveau contrat HTTP (401, 200, PATCH+persistance, 400)
+  - Le smoke test `curl` réel requiert la stack live (Postgres + Better Auth JWKS) — différé comme pour Story 3.1, à faire quand l'UI consent (3.3) atterrit
 
-- [ ] **Task 9** — Doc Sync + commit (AC: 8)
-  - [ ] Commit : `feat(api): MeController real impl for /me/settings (live access consent + event emit on revoke) — story poi-access-3.2`
+- [x] **Task 9** — Doc Sync + commit (AC: 8)
+  - [x] Doc Sync consigné dans Dev Agent Record
+  - [ ] Commit : `feat(api): MeController real impl for /me/settings (live access consent + event emit on revoke) — story poi-access-3.2` _(commit manuel restant — Guillaume, comme pour 2.6/3.1)_
 
 ---
 
@@ -188,20 +190,48 @@ return { liveAccessConsent: true }
 
 ---
 
+## Review Findings
+
+_Code review adversariale (Blind Hunter + Edge Case Hunter + Acceptance Auditor) — 2026-05-29. Acceptance Auditor : les 8 AC satisfaits, 5 écarts Doc Sync tous justifiés, File List = `git status` exact._
+
+- [x] [Review][Decision→Patch] Phantom write si le profil n'existe pas — `PATCH /me/settings` répondait 200 avec les valeurs par défaut alors que rien n'était persisté (`UPDATE ... WHERE id = userId` touchant 0 ligne en silence ; la création de profil au signup est best-effort + erreur avalée dans `apps/web/src/lib/auth/auth.ts:117-124`, et `JwtAuthGuard` ne lit jamais `profiles`). **RÉSOLU (P1)** : `setLiveAccessConsent` utilise désormais un upsert `INSERT … ON CONFLICT (id) DO UPDATE` (schéma vérifié : toutes colonnes NOT NULL ont un défaut, FK `id → user.id` satisfaite par le JWT). Garantit la persistance RGPD. `updatedAt` bumpé manuellement (hors `$onUpdateFn` sur la branche conflict). Régression couverte par un test e2e dédié. [`me.repository.ts`] (blind+edge)
+- [x] [Review][Patch] `eventEmitter.emit` non protégé — un listener Story 4.2 qui throw aurait fait remonter une 500 APRÈS le commit DB, alors que le commentaire déclare une purge cache "best-effort". **RÉSOLU (P2)** : émission isolée dans un `try/catch` + `Logger.error` ; l'échec d'un listener ne fait plus échouer le PATCH ni annuler une révocation déjà committée. [`me.service.ts`] (blind)
+- [x] [Review][Defer] Read-modify-write non transactionnel — deux `PATCH {false}` concurrents lisent tous deux `previous=true` → event `profile.live-consent-revoked` émis 2× (consumer Story 4.2 = purge Redis idempotente best-effort → bénin), ou event perdu si un `PATCH {true}` s'intercale. Durcissement transactionnel transverse (déjà noté pour 3.1) — différé. [`me.service.ts:48-55`] (blind+edge) — deferred
+- [x] [Review][Defer] `ValidationPipe` global sans `forbidNonWhitelisted` — clés inconnues d'un body PATCH silencieusement strippées (ex: `{ liveAccessConsent: true, foo: "x" }` → 200). Config globale pré-existante (`main.ts:20`), non introduite par cette story. [`apps/api/src/main.ts:20`] (edge) — deferred, pre-existing
+
+**Écartés comme bruit (6) :** `overpassEnabled` lisible mais non writable ici (by design — source de vérité `ProfileModule`, Discovery #2) ; le test d'intégration ne rejoue pas la vraie chaîne de guards globaux (limite de stratégie de test assumée, Doc Sync #3) ; défaut `overpassEnabled: false` (= défaut colonne DB, vérifié) ; paramètre `updateSettings` non typé (faux positif — `@CurrentUser() user: CurrentUserPayload` bien typé) ; `moduleNameMapper` jest strippe `.js` (convention TS-ESM standard) ; double `getSettings` par PATCH (correct, micro-efficacité).
+
 ## Dev Agent Record
 
 ### Agent Model Used
-_(À renseigner)_
+claude-opus-4-8 (1M context) — bmad-dev-story
 
 ### Completion Notes List
-- Autres settings inclus dans la réponse : `___`
-- Event émis vérifié en test : ☐ Oui / ☐ Non
+- **Autres settings inclus dans la réponse** : `overpassEnabled` (Discovery #2). `tier` exclu (état d'abonnement, pas un setting togglable). Source de vérité d'écriture reste `/api/profile` ; `/me/settings` ne fait que le lire en lecture pour cohérence.
+- **Event émis vérifié en test** : ☑ Oui — `profile.live-consent-revoked` avec `{ userId }`, vérifié en unit (`me.service.spec.ts`) ET en intégration (`me-settings.e2e-spec.ts`). Émis uniquement sur transition `true → false`, APRÈS le commit DB (atomicité AC #3 — test dédié : si `setLiveAccessConsent` rejette, aucun event).
+- **Idempotence (AC #6)** : `setLiveAccessConsent` est toujours appelé (UPDATE no-op effectif), pas d'event si pas de transition true→false. Vérifié.
+- **Résultats tests** : `me.service.spec.ts` 11/11 ✓ (CI `pnpm test`) ; `me-settings.e2e-spec.ts` 9/9 ✓ (`test:e2e`). Suite API complète **387/387**, aucune régression. `tsc --noEmit` clean, ESLint clean.
+
+#### Doc Sync — Écarts documentés (project-context §Doc Sync Rule)
+
+1. **DTO `liveAccessConsent` REQUIS (`@IsBoolean` sans `@IsOptional`)** — vs snippet Discovery #5 qui suggérait `@IsOptional()`. Raison : l'AC #5 exige `null` → 400 et l'AC #7 tranche `PATCH {}` → **400** ("PATCH ne devrait jamais être un GET déguisé"). `@IsOptional()` laisserait passer `null`/absence. Le contrat REST retenu : `liveAccessConsent` obligatoire et strictement booléen.
+2. **Protection JWT par guard GLOBAL** — pas de `@UseGuards(JwtAuthGuard)` par route. Le projet enregistre `JwtAuthGuard` en `APP_GUARD` (app.module:78), donc `/me/settings` est protégé automatiquement (AC #4 satisfait sans annotation explicite, contrairement au libellé de Task 5).
+3. **Test "E2E" = test d'intégration controller** (DB `@ridenrest/database` mockée + faux `JwtAuthGuard` piloté par header `x-test-user-id` + `EventEmitter2` mocké), PAS un E2E DB-backed avec seed réel. Raison : le CI exécute `pnpm test` (Jest unitaire, `rootDir=src`, sans Postgres/Better Auth) — décision déjà actée en Story 2.3/3.1. Tous les cas de l'AC #7 sont couverts au niveau du contrat HTTP.
+4. **`apps/api/test/jest-e2e.json` modifié** (hors File List story) — ajout de `moduleNameMapper { "^(\\.{1,2}/.*)\\.js$": "$1" }` pour résoudre les imports ESM `.js` des fichiers source sous la config e2e. Changement d'infra de test minimal et nécessaire.
+5. **Task 8 (validation manuelle `curl`) différée** — requiert la stack live (Postgres + Better Auth JWKS), différée comme pour Story 3.1. Le contrat HTTP est couvert par le test d'intégration.
 
 ### File List
-- [ ] `apps/api/src/me/me.controller.ts` (modifié)
-- [ ] `apps/api/src/me/me.service.ts` (nouveau)
-- [ ] `apps/api/src/me/me.repository.ts` (nouveau)
-- [ ] `apps/api/src/me/me.service.spec.ts` (nouveau)
-- [ ] `apps/api/src/me/me.module.ts` (modifié)
-- [ ] `apps/api/src/me/dto/update-settings.dto.ts` (nouveau)
-- [ ] `apps/api/test/me-settings.e2e-spec.ts` (nouveau)
+- `apps/api/src/me/me.controller.ts` (modifié — remplace les stubs 501 par l'impl réelle)
+- `apps/api/src/me/me.service.ts` (nouveau)
+- `apps/api/src/me/me.repository.ts` (nouveau)
+- `apps/api/src/me/me.service.spec.ts` (nouveau)
+- `apps/api/src/me/me.module.ts` (modifié — ajout providers `MeService`, `MeRepository`)
+- `apps/api/src/me/dto/update-settings.dto.ts` (nouveau)
+- `apps/api/test/me-settings.e2e-spec.ts` (nouveau)
+- `apps/api/test/jest-e2e.json` (modifié — `moduleNameMapper` pour résolution `.js`, cf. Doc Sync #4)
+- `_bmad-output/implementation-artifacts/poi-access-3-2-me-controller-settings-impl.md` (modifié — story tracking)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modifié — statut story)
+
+### Change Log
+- 2026-05-29 — Implémentation réelle de `/me/settings` (Story 3.2) : `MeRepository` + `MeService` + `UpdateSettingsDto` + remplacement des stubs `MeController`. `GET` renvoie `{ liveAccessConsent, overpassEnabled }` (no-store), `PATCH` persiste `liveAccessConsent` et émet `profile.live-consent-revoked` sur révocation (true→false, post-commit). 11 tests unitaires + 9 tests d'intégration HTTP. Suite API 387/387, tsc + ESLint clean. 5 écarts Doc Sync documentés.
+- 2026-05-29 — **Code review adversariale (bmad-code-review)** : 1 decision-needed + 1 patch + 2 defer + 6 écartés. Patches appliqués : **P1** `setLiveAccessConsent` → upsert `INSERT … ON CONFLICT DO UPDATE` (corrige le phantom-write quand le profil n'existe pas — consentement RGPD désormais garanti persisté ; `me.repository.ts`) ; **P2** émission de l'event isolée dans un `try/catch` + `Logger.error` (un listener best-effort qui throw ne fait plus échouer le PATCH post-commit ; `me.service.ts`). +1 test e2e de régression (phantom-write) → intégration 10/10. Suite API 387/387, tsc + ESLint clean. 2 findings différés consignés dans `deferred-work.md` (read-modify-write non transactionnel ; `forbidNonWhitelisted` global). Statut → `done`.

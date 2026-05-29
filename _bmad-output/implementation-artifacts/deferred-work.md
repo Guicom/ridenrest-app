@@ -144,3 +144,8 @@
 
 - Compteur de throttle partagé Planning(60)/Live(120) sur la même clé route+tracker — trafic mixte gps/stage accumule sur un seul bucket → throttling précoce du trafic légitime ; limites non indépendantes (bornées <120). [common/guards/access-throttler.guard.ts] — tradeoff option B documenté et accepté.
 - Consent gate non appliqué pour une origine `live` non-gps (garde imbriquée dans `if origin.type==='gps'`) — non atteignable aujourd'hui (couplage mode⇔origin uniquement dans le controller). [access-calculator.service.ts computeLive] — ajouter une assertion si un futur appelant introduit une origine live non-gps.
+
+## Deferred from: code review of poi-access-3-2 (2026-05-29)
+
+- Read-modify-write non transactionnel dans `MeService.updateSettings` — la lecture de `previous` et l'`UPDATE` sont deux round-trips séparés sans transaction/lock. Deux `PATCH {liveAccessConsent:false}` concurrents lisent tous deux `previous=true` → event `profile.live-consent-revoked` émis deux fois (consumer Story 4.2 = purge Redis idempotente best-effort, donc bénin) ; un `PATCH {true}` qui s'intercale peut faire diverger l'état DB de l'event émis. [apps/api/src/me/me.service.ts:48-55] — durcissement transactionnel transverse (même nature que le point différé de 3.1) ; à traiter si une passe de hardening transactionnel Drizzle est entreprise.
+- `ValidationPipe` global sans `forbidNonWhitelisted` — les clés inconnues d'un body PATCH sont silencieusement strippées (`{ liveAccessConsent: true, foo: "x" }` → 200) plutôt que rejetées en 400. Config globale pré-existante non introduite par cette story. [apps/api/src/main.ts:20] — à décider comme durcissement de contrat API global (impacte tous les endpoints).
