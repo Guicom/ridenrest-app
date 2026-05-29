@@ -20,6 +20,18 @@ export type { CreateStageInput, UpdateStageInput } from './schemas/stage.schema'
 export { poiSearchSchema } from './schemas/poi-search.schema'
 export type { PoiSearchInput } from './schemas/poi-search.schema'
 
+export {
+  AccessRequestSchema,
+  AccessResponseSchema,
+  AccessOriginSchema,
+  AccessOriginGpsSchema,
+  AccessOriginStageSchema,
+  AccessOriginAdventureStartSchema,
+  AccessGeometrySchema,
+  BrouterProfileSchema,
+} from './schemas/poi-access'
+export type { AccessRequest, AccessResponse, AccessOrigin, BrouterProfile } from './schemas/poi-access'
+
 // Constants
 export * from './constants/gpx.constants'
 export * from './constants/api.constants'

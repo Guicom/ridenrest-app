@@ -115,3 +115,7 @@
 - Healthcheck bash `/dev/tcp` dépend de bash dans l'image `openjdk:17.0.1-jdk-slim` (Debian). Si upstream passe à Alpine/distroless, le healthcheck casse silencieusement. → Monitoring
 - Flags JVM `-Xmn8M` et `-DuseRFCMimeType=false` omis dans le `command` override vs `server.sh` original. Impact potentiel sur Content-Type réponses. → Story 2.1
 - `start_period: 5m` potentiellement insuffisant pour cold start avec chargement segments (NFR-PA-014 : jusqu'à 15 min). → Story 1.2
+
+## Deferred from: code review of poi-access-2-3-endpoint-post-pois-access-planning (2026-05-29)
+
+- Le test d'intégration `pois.controller.access.spec.ts` ne reconstitue pas l'enregistrement `APP_GUARD` global du `JwtAuthGuard` (contourné via override + mock `jose` pour cause d'ESM/ts-jest). Conséquence : l'ordre des guards tel qu'il tourne en prod (JwtAuthGuard puis ThrottlerGuard, déclarés en `APP_GUARD` dans `app.module.ts`) n'est pas exercé — une régression de type « 429 renvoyé avant 401 » ne serait pas détectée par ce test. Tradeoff documenté (Doc Sync #4). → revoir si une stratégie E2E DB-backed est mise en place (CI avec Postgres/Redis).

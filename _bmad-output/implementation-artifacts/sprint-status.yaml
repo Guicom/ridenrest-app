@@ -282,7 +282,7 @@ development_status:
   # Phase 2: Backend + UI Planning
   poi-access-2-1-routing-service-brouter-wrapper: done
   poi-access-2-2-access-calculator-service: done
-  poi-access-2-3-endpoint-post-pois-access-planning: ready-for-dev
+  poi-access-2-3-endpoint-post-pois-access-planning: done  # code review 2026-05-29 — 4 patches appliqués (335/335 API, 31/31 shared), 1 defer, 10 dismissed
   poi-access-2-4-access-metrics-ui-planning: ready-for-dev
   poi-access-2-5-access-map-layer: ready-for-dev
   poi-access-2-6-routing-profile-selector-ui: ready-for-dev

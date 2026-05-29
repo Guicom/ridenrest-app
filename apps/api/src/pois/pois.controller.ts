@@ -1,9 +1,16 @@
-import { Controller, Get, Query, UseGuards, Logger } from '@nestjs/common'
-import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards, Logger } from '@nestjs/common'
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
 import { PoisService } from './pois.service.js'
 import { FindPoisDto } from './dto/find-pois.dto.js'
 import { GetGoogleDetailsDto } from './dto/get-google-details.dto.js'
+import { accessRequestValidationPipe } from './dto/access-request.dto.js'
+import type { AccessRequestDto } from './dto/access-request.dto.js'
+import { AccessCalculatorService } from './access-calculator/access-calculator.service.js'
+import { checkPoiOwnership } from './access-calculator/ownership-check.js'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard.js'
+import { OwnerOnlyGuard } from '../common/guards/owner-only.guard.js'
+import { OwnedResource } from '../common/decorators/owned-resource.decorator.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import type { CurrentUserPayload } from '../common/decorators/current-user.decorator.js'
 
@@ -12,7 +19,10 @@ import type { CurrentUserPayload } from '../common/decorators/current-user.decor
 export class PoisController {
   private readonly logger = new Logger(PoisController.name)
 
-  constructor(private readonly poisService: PoisService) {}
+  constructor(
+    private readonly poisService: PoisService,
+    private readonly accessCalculator: AccessCalculatorService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get POIs for a segment corridor' })
@@ -26,5 +36,37 @@ export class PoisController {
   @ApiOperation({ summary: 'Get Google Places enrichment for a specific POI' })
   async getPoiGoogleDetails(@Query() dto: GetGoogleDetailsDto) {
     return this.poisService.getPoiGoogleDetails(dto.externalId, dto.segmentId)
+  }
+
+  /**
+   * POST /pois/:id/access — métriques d'itinéraire d'accès d'un POI (mode Planning).
+   *
+   * Guards : `JwtAuthGuard` (global, ré-explicité) + `OwnerOnlyGuard` (vérifie que le
+   * POI appartient à une aventure du user via `checkPoiOwnership`). `ThrottlerGuard`
+   * est global → on n'override que la limite Planning (60/min) via `@Throttle`, sans
+   * le ré-ajouter à `@UseGuards` (cela doublerait le comptage). Cf. Doc Sync : l'AC #2
+   * listait `ThrottlerGuard` dans `@UseGuards`, écart assumé.
+   *
+   * Le retour brut (`AccessResult`) est wrappé par le `ResponseInterceptor` global
+   * (`{ data: ... }`). BRouter down → `status: 'fallback'` en HTTP 200 (AC #8).
+   */
+  @Post(':id/access')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, OwnerOnlyGuard)
+  @OwnedResource(checkPoiOwnership)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Compute POI access route metrics (planning mode)' })
+  async computeAccess(
+    @Param('id') poiId: string,
+    @Body(accessRequestValidationPipe) dto: AccessRequestDto,
+    @CurrentUser() _user: CurrentUserPayload,
+  ) {
+    return this.accessCalculator.compute({
+      poiId,
+      origin: dto.origin,
+      profileOverride: dto.profileOverride,
+      mode: 'planning',
+    })
   }
 }
