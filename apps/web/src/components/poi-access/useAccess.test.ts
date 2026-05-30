@@ -13,7 +13,7 @@ vi.mock('@/lib/api-client', () => ({
   apiClient: { post: (...args: unknown[]) => mockPost(...args) },
 }))
 
-const ORIGIN: AccessOrigin = { type: 'adventure-start' }
+const ORIGIN: AccessOrigin = { type: 'nearest-trace' }
 
 const OK_RESPONSE: AccessResponse = {
   status: 'ok',

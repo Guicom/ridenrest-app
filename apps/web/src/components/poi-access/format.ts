@@ -21,3 +21,17 @@ export function formatAccessDistance(distanceM: number): string {
 export function formatAccessElevation(elevationM: number): string {
   return `${Math.round(elevationM)} m`
 }
+
+/**
+ * Temps estimé pour parcourir la distance d'accès à la vitesse cycliste donnée.
+ * `~XhYY` au-delà d'une heure, `~Z min` sinon, et `<1 min` pour une distance positive
+ * qui arrondirait à 0 min (POI très proche de la trace). `—` si entrées non exploitables.
+ */
+export function formatAccessEta(distanceKm: number, speedKmh: number): string {
+  if (speedKmh <= 0 || distanceKm <= 0) return '—'
+  const totalMinutes = Math.round((distanceKm / speedKmh) * 60)
+  if (totalMinutes < 1) return '<1 min' // distance positive mais < 30 s → évite un trompeur "~0 min"
+  const h = Math.floor(totalMinutes / 60)
+  const m = totalMinutes % 60
+  return h > 0 ? `~${h}h${String(m).padStart(2, '0')}` : `~${m} min`
+}

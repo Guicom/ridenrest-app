@@ -9,7 +9,7 @@ vi.mock('./useAccess', () => ({
   useAccess: (...args: unknown[]) => mockUseAccess(...args),
 }))
 
-const ORIGIN: AccessOrigin = { type: 'adventure-start' }
+const ORIGIN: AccessOrigin = { type: 'nearest-trace' }
 
 const okResponse: AccessResponse = {
   status: 'ok',
@@ -49,19 +49,33 @@ describe('AccessMetrics', () => {
     expect(screen.getByText('80 m D-')).toBeInTheDocument()
   })
 
-  it('renders compact variant with distance only (no title, no D+/D-)', () => {
+  it('renders compact variant with distance + D+ / D- (no title)', () => {
     setAccess({ data: okResponse })
     render(<AccessMetrics poiId="p1" origin={ORIGIN} category="hotel" variant="compact" />)
 
-    expect(screen.getByTestId('access-metrics-compact')).toHaveTextContent('4,2 km')
+    const compact = screen.getByTestId('access-metrics-compact')
+    expect(compact).toHaveTextContent('4,2 km')
+    expect(compact).toHaveTextContent('120 m') // D+ (icône) sur l'approche d'accès
+    expect(compact).toHaveTextContent('80 m') // D-
     expect(screen.queryByText("Itinéraire vers l'hôtel")).not.toBeInTheDocument()
-    expect(screen.queryByText(/D\+/)).not.toBeInTheDocument()
   })
 
   it('formats sub-kilometer distance in meters', () => {
     setAccess({ data: { ...okResponse, distanceM: 740 } })
     render(<AccessMetrics poiId="p1" origin={ORIGIN} category="hotel" variant="compact" />)
     expect(screen.getByTestId('access-metrics-compact')).toHaveTextContent('740 m')
+  })
+
+  it('renders stats variant with distance, D+, D- and estimated time', () => {
+    setAccess({ data: okResponse })
+    render(<AccessMetrics poiId="p1" origin={ORIGIN} category="hotel" variant="stats" speedKmh={15} />)
+
+    const stats = screen.getByTestId('access-metrics-stats')
+    expect(stats).toHaveTextContent('4,2 km')
+    expect(stats).toHaveTextContent('120 m D+')
+    expect(stats).toHaveTextContent('80 m D-')
+    // 4,2 km à 15 km/h ≈ 17 min
+    expect(stats).toHaveTextContent('~17 min')
   })
 
   it('renders the fallback when status is fallback', () => {

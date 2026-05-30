@@ -209,6 +209,25 @@ describe('AccessMapLayer', () => {
     expect(map.removeSource).toHaveBeenCalledWith('poi-access-source')
   })
 
+  it('unmount after the map was destroyed (map.remove()) → no throw', () => {
+    // Reproduit la navigation hors carte : MapLibre appelle map.remove(), le style interne
+    // disparaît, et getLayer/getSource throw « Cannot read properties of undefined ». Le
+    // cleanup d'AccessMapLayer ne doit PAS propager cette erreur (régression 2026-05-30).
+    const map = createMockMap()
+    const { unmount } = render(
+      <AccessMapLayer map={map as unknown as maplibregl.Map} geometry={LINESTRING} />,
+    )
+
+    // Simule map.remove() : tout accès au style throw désormais.
+    const destroyed = () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'getLayer')")
+    }
+    map.getLayer.mockImplementation(destroyed)
+    map.getSource.mockImplementation(destroyed)
+
+    expect(() => unmount()).not.toThrow()
+  })
+
   it('supports MultiLineString geometry — bbox spans all sub-lines (AC#2)', () => {
     const map = createMockMap()
     render(<AccessMapLayer map={map as unknown as maplibregl.Map} geometry={MULTILINESTRING} />)
@@ -262,5 +281,21 @@ describe('AccessMapLayer', () => {
     const onStyleData = map.on.mock.calls.find((c) => c[0] === 'styledata')![1]
     unmount()
     expect(map.off).toHaveBeenCalledWith('styledata', onStyleData)
+  })
+
+  it('fits bounds on show by default (Planning, AC#6)', () => {
+    const map = createMockMap()
+    render(<AccessMapLayer map={map as unknown as maplibregl.Map} geometry={LINESTRING} />)
+    expect(map.fitBounds).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT fit bounds when fitOnShow=false (Live mode, Story 3.3)', () => {
+    const map = createMockMap()
+    render(
+      <AccessMapLayer map={map as unknown as maplibregl.Map} geometry={LINESTRING} fitOnShow={false} />,
+    )
+    // Polyline still added, but no programmatic camera move (GPS follow owns the camera).
+    expect(map.addLayer).toHaveBeenCalledTimes(1)
+    expect(map.fitBounds).not.toHaveBeenCalled()
   })
 })

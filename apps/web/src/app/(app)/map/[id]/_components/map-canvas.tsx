@@ -50,7 +50,7 @@ export interface MapCanvasHandle {
   /** Re-fit map to full adventure trace with animation (Story 16.3) */
   resetZoom: () => void
   /** Fit map to search corridor range with animation (Story 16.3) */
-  fitToCorridorRange: (fromKm: number, toKm: number, segments: MapSegmentData[]) => void
+  fitToCorridorRange: (fromKm: number, toKm: number, segments: MapSegmentData[], pois?: Array<{ lat: number; lng: number }>) => void
 }
 
 interface MapCanvasProps {
@@ -416,7 +416,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
       if (!map) return
       fitToTrace(map, segmentsRef.current, true)
     },
-    fitToCorridorRange(fromKm: number, toKm: number, segments: MapSegmentData[]) {
+    fitToCorridorRange(fromKm: number, toKm: number, segments: MapSegmentData[], pois: Array<{ lat: number; lng: number }> = []) {
       const map = mapRef.current
       if (!map) return
 
@@ -434,13 +434,16 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
         inRange.push(...filtered)
       }
 
-      if (inRange.length === 0) {
+      // Inclut les POI trouvés dans le cadrage (fix 2026-05-30) : ils sont décalés de la trace
+      // (jusqu'au rayon de recherche) → sans ça, ceux loin de la trace tombaient hors écran.
+      const points = [...inRange, ...pois]
+      if (points.length === 0) {
         fitToTrace(map, segments, true)
         return
       }
 
-      const lats = inRange.map((wp) => wp.lat)
-      const lngs = inRange.map((wp) => wp.lng)
+      const lats = points.map((p) => p.lat)
+      const lngs = points.map((p) => p.lng)
       const minLat = Math.min(...lats)
       const maxLat = Math.max(...lats)
       const minLng = Math.min(...lngs)

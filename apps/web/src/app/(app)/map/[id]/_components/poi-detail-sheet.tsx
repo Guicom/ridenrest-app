@@ -45,18 +45,14 @@ interface PoiDetailSheetProps {
 
 export function PoiDetailSheet({ poi, segments, segmentId, liveContext }: PoiDetailSheetProps) {
   const { selectedPoiId, setSelectedPoi } = useUIStore()
-  const { fromKm, selectedStageId } = useMapStore()
+  const { fromKm } = useMapStore()
   const isOpen = !!selectedPoiId && !!poi
   const isLiveMode = !!liveContext
 
-  // Origine de l'itinéraire d'accès (Story 2.4) : l'étape sélectionnée si présente,
-  // sinon le départ de l'aventure. Doc Sync : la story planifiée référençait
-  // `usePlanningModeStore.currentStageId` (store inexistant) ; la source réelle est
-  // `useMapStore.selectedStageId` (Story 11.4).
-  const accessOrigin: AccessOrigin = useMemo(
-    () => (selectedStageId ? { type: 'stage', stageId: selectedStageId } : { type: 'adventure-start' }),
-    [selectedStageId],
-  )
+  // Origine de l'itinéraire d'accès = point de la trace le plus proche du POI (fix 2026-05-30).
+  // Détour court depuis l'endroit où l'on quitte la trace, au lieu du départ d'aventure/étape
+  // (qui produisaient des « accès » de ~192 km pour un POI proche de la fin du parcours).
+  const accessOrigin: AccessOrigin = useMemo(() => ({ type: 'nearest-trace' }), [])
 
   const { details, isPending: detailsPending } = usePoiGoogleDetails(
     poi?.externalId ?? null,

@@ -180,11 +180,9 @@ export function MapView({ adventureId }: MapViewProps) {
   const { stages, createStage, updateStage, deleteStage } = useStages(adventureId, { onAfterChange: triggerCheck })
 
   // ── Access route polyline (Story POI-Access 2.5) ─────────────────────────────
-  // Origine identique à PoiPopup/PoiDetailSheet : l'étape sélectionnée sinon le départ.
-  const accessOrigin: AccessOrigin = useMemo(
-    () => (selectedStageId ? { type: 'stage', stageId: selectedStageId } : { type: 'adventure-start' }),
-    [selectedStageId],
-  )
+  // Origine identique à PoiPopup/PoiDetailSheet : point de la trace le plus proche du POI
+  // (fix 2026-05-30) — détour court, plus le départ d'aventure (~192 km).
+  const accessOrigin: AccessOrigin = useMemo(() => ({ type: 'nearest-trace' }), [])
   // `useAccess` est lazy (enabled requiert un poiId) — '' désactive la requête.
   const { data: accessData } = useAccess(visibleAccessPoiId ?? '', accessOrigin)
   const accessGeometry = accessData?.status === 'ok' ? accessData.geometry : null
@@ -271,9 +269,15 @@ export function MapView({ adventureId }: MapViewProps) {
     const justResolved = searchCommitted && prevIsPendingRef.current && !poisPending
 
     if ((justCommitted && !poisPending) || justResolved) {
-      mapCanvasRef.current?.fitToCorridorRange(mapFromKmRef.current, mapToKmRef.current, readySegmentsRef.current)
-      // Track POI search completion (AC #3, Story 15.3)
+      // Inclut les POI trouvés dans le cadrage → ceux loin de la trace restent visibles.
       const allResults = Object.values(poisByLayer).flat()
+      mapCanvasRef.current?.fitToCorridorRange(
+        mapFromKmRef.current,
+        mapToKmRef.current,
+        readySegmentsRef.current,
+        allResults.map((p) => ({ lat: p.lat, lng: p.lng })),
+      )
+      // Track POI search completion (AC #3, Story 15.3)
       trackPoiSearchTriggered({
         mode: 'planning',
         poi_categories: [...visibleLayers],
@@ -566,8 +570,15 @@ export function MapView({ adventureId }: MapViewProps) {
             }}
           />
 
-          {/* Access route polyline — amber dashed line from origin to selected POI (Story 2.5) */}
-          <AccessMapLayer map={mapCanvasRef.current?.getMap() ?? null} geometry={accessGeometry} />
+          {/* Access route polyline — amber dashed line from origin to selected POI (Story 2.5).
+              fitOnShow={false} (fix 2026-05-30) : pas d'auto-zoom sur l'itinéraire d'accès, qui
+              plaçait le pin en haut et masquait le popup (rendu au-dessus du pin). On garde le
+              cadrage du clic sur le pin (easeTo offset → popup visible). */}
+          <AccessMapLayer
+            map={mapCanvasRef.current?.getMap() ?? null}
+            geometry={accessGeometry}
+            fitOnShow={false}
+          />
 
           {/* Loading overlay while POI search is pending (AC #4, Story 16.3) */}
           <MapSearchOverlay visible={searchCommitted && poisPending} />
