@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Module } from '@nestjs/common'
 import { APP_FILTER, APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
-import { ThrottlerModule } from '@nestjs/throttler'
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { EventEmitterModule } from '@nestjs/event-emitter'
 import { LoggerModule } from 'nestjs-pino'
 import { AppController } from './app.controller.js'
@@ -15,14 +15,12 @@ import { SegmentsModule } from './segments/segments.module.js'
 import { StravaModule } from './strava/strava.module.js'
 import { PoisModule } from './pois/pois.module.js'
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js'
-import { AccessThrottlerGuard } from './common/guards/access-throttler.guard.js'
 import { DensityModule } from './density/density.module.js'
 import { WeatherModule } from './weather/weather.module.js'
 import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 import { GeoModule } from './geo/geo.module.js'
-import { MeModule } from './me/me.module.js'
 import { RoutingModule } from './routing/routing.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
 import accessConfig from './config/access.config.js'
@@ -68,7 +66,6 @@ import { BackfillElevationLossService } from './common/backfill-elevation-loss.s
     ProfileModule,
     FeedbacksModule,
     GeoModule,
-    MeModule,
     RoutingModule,
   ],
   controllers: [AppController],
@@ -76,9 +73,7 @@ import { BackfillElevationLossService } from './common/backfill-elevation-loss.s
     AppService,
     BackfillElevationLossService,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    // AccessThrottlerGuard remplace ThrottlerGuard : limite Live conditionnelle (Story 3.1,
-    // AC #4). Comportement inchangé pour toute route sans `origin.type === 'gps'` au body.
-    { provide: APP_GUARD, useClass: AccessThrottlerGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: HttpExceptionFilter },
   ],
 })

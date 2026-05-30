@@ -6,43 +6,42 @@ import { z } from 'zod'
  * Source UNIQUE de vérité de la validation : côté NestJS, un `ZodValidationPipe`
  * consomme `AccessRequestSchema` (pas de DTO class-validator parallèle → zéro drift).
  *
- * Coordonnées : voir Discovery #2 — en mode Planning l'origine `gps` n'est jamais
- * utilisée (réservée à Live, Story 3.1), mais le schéma la supporte déjà.
+ * Origine : `nearest-trace` (point de trace le plus proche du POI) en Planning comme en
+ * Live. L'origine `gps` (ex-mode Live, Story 3.1) a été retirée le 2026-05-30 : plus aucune
+ * position GPS n'est transmise au serveur. L'origine `adventure-start` (km 0) a également
+ * été retirée (review poi-access-3.3, 2026-05-30) : non utilisée par le frontend et source
+ * d'une collision de cache avec `nearest-trace` (toutes deux persistent `origin_stage_id = null`).
  */
-
-/** Profils BRouter bas niveau (cf. RoutingService, Story 2.1). */
-export const BrouterProfileSchema = z.enum(['fastbike', 'trekking', 'safety'])
 
 /**
- * Coordonnée GPS DÉJÀ arrondie à 4 décimales (~11 m) côté client (Discovery #2).
- * On tolère l'imprécision flottante (488566.00000000006) via un epsilon.
+ * Profils BRouter bas niveau (cf. RoutingService, Story 2.1).
+ * DOIVENT exister dans le build BRouter (`/profiles2/*.brf`). `safety` n'est PAS fourni
+ * par le build v1.7.9 → retiré au profit de `gravel` (fix 2026-05-30, mapping projet :
+ * road→fastbike, gravel→gravel, bikepacking→trekking).
  */
-const RoundedCoord = z.number().refine(
-  (n) => Math.abs(n * 10000 - Math.round(n * 10000)) < 1e-4,
-  { message: 'Coordinate must be rounded to 4 decimals' },
-)
+export const BrouterProfileSchema = z.enum(['fastbike', 'trekking', 'gravel'])
 
 // ── Origines (union discriminée sur `type`) ──────────────────────────────────
-
-export const AccessOriginGpsSchema = z.object({
-  type: z.literal('gps'),
-  lat: RoundedCoord.min(-90).max(90),
-  lng: RoundedCoord.min(-180).max(180),
-})
 
 export const AccessOriginStageSchema = z.object({
   type: z.literal('stage'),
   stageId: z.string().uuid(),
 })
 
-export const AccessOriginAdventureStartSchema = z.object({
-  type: z.literal('adventure-start'),
+/**
+ * Origine = point de la trace le PLUS PROCHE du POI (fix 2026-05-30).
+ * C'est la sémantique correcte de « l'accès vélo depuis la trace » : un détour court
+ * (~quelques km) calculé depuis l'endroit où le cycliste quitte sa trace, et NON depuis
+ * le départ d'aventure (qui pouvait produire un « accès » de 192 km). Le serveur résout
+ * le point via `ST_ClosestPoint(trace, POI)` — aucune donnée supplémentaire côté client.
+ */
+export const AccessOriginNearestTraceSchema = z.object({
+  type: z.literal('nearest-trace'),
 })
 
 export const AccessOriginSchema = z.discriminatedUnion('type', [
-  AccessOriginGpsSchema,
   AccessOriginStageSchema,
-  AccessOriginAdventureStartSchema,
+  AccessOriginNearestTraceSchema,
 ])
 
 // ── Requête ──────────────────────────────────────────────────────────────────
@@ -76,11 +75,11 @@ export const AccessResponseSchema = z.discriminatedUnion('status', [
     geometry: AccessGeometrySchema,
     engineVersion: z.string(),
     computedAt: z.string(),
-    source: z.enum(['db-cache', 'redis-cache', 'computed-fresh']),
+    source: z.enum(['db-cache', 'computed-fresh']),
   }),
   z.object({
     status: z.literal('fallback'),
-    fallbackReason: z.enum(['routing_failed', 'no_consent', 'unreachable']),
+    fallbackReason: z.enum(['routing_failed', 'unreachable']),
     fallbackDistanceM: z.number(),
     source: z.literal('computed-fresh'),
   }),

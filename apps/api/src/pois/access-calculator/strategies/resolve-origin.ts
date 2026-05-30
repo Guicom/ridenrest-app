@@ -2,9 +2,11 @@
  * Stratégie `resolveOrigin` (Story 2.2, AC #3).
  *
  * Résout une `AccessOrigin` en coordonnées `[lon, lat]` (GeoJSON) :
- *  - `gps`             → renvoie `[lng, lat]` tel quel (aucun accès DB).
  *  - `stage`           → projette `adventure_stages.start_km` sur la trace fusionnée.
- *  - `adventure-start` → point au km 0 de la trace fusionnée.
+ *  - `nearest-trace`   → point de la trace le plus proche du POI (`ST_ClosestPoint`) —
+ *                        détour court depuis l'endroit où l'on quitte la trace (fix 2026-05-30).
+ *
+ * `adventure-start` retiré (review poi-access-3.3, 2026-05-30) : inutilisé + collision de cache.
  *
  * Fonction pure : `db` est passé en paramètre (testable sans DI NestJS).
  * PostGIS via `db.execute(sql\`...\`)` uniquement — pas de connexion `pg` parallèle
@@ -26,21 +28,17 @@ interface GeoJsonPoint {
 /**
  * @param db Instance Drizzle (ou stub `{ execute }`).
  * @param origin Union discriminée d'origine.
- * @param poi Contexte POI minimal (nécessite `adventureId` pour stage/start).
+ * @param poi Contexte POI minimal : `adventureId` (stage/nearest) + `lat`/`lng` (nearest-trace).
  * @returns `[lon, lat]` du point d'origine.
  * @throws NotFoundException si l'étape est absente ou si l'aventure n'a aucune trace.
  */
 export async function resolveOrigin(
   db: SqlExecutor,
   origin: AccessOrigin,
-  poi: { adventureId: string },
+  poi: { adventureId: string; lat: number; lng: number },
 ): Promise<ResolvedOrigin> {
-  if (origin.type === 'gps') {
-    return [origin.lng, origin.lat]
-  }
-
-  if (origin.type === 'adventure-start') {
-    return interpolateOnTrace(db, poi.adventureId, 0)
+  if (origin.type === 'nearest-trace') {
+    return closestPointOnTrace(db, poi.adventureId, poi.lat, poi.lng)
   }
 
   // origin.type === 'stage'
@@ -61,6 +59,44 @@ export async function resolveOrigin(
     throw new NotFoundException(`Stage has invalid start_km: ${origin.stageId}`)
   }
   return interpolateOnTrace(db, poi.adventureId, startKm)
+}
+
+/**
+ * Point de la trace fusionnée le plus proche du POI (`ST_ClosestPoint`).
+ * La trace peut être multi-parties (gap ferry/train) → `ST_Collect` + `ST_LineMerge`,
+ * `ST_ClosestPoint` renvoie le point le plus proche toutes parties confondues.
+ */
+async function closestPointOnTrace(
+  db: SqlExecutor,
+  adventureId: string,
+  lat: number,
+  lng: number,
+): Promise<ResolvedOrigin> {
+  const rows = (
+    await db.execute(sql`
+      WITH t AS (
+        SELECT ST_LineMerge(ST_Collect(geom ORDER BY order_index)) AS g
+        FROM adventure_segments
+        WHERE adventure_id = ${adventureId} AND geom IS NOT NULL
+      )
+      SELECT ST_AsGeoJSON(
+        ST_ClosestPoint(t.g, ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326))
+      ) AS point
+      FROM t
+      WHERE t.g IS NOT NULL
+    `)
+  ).rows
+
+  const raw = rows[0]?.point
+  if (!raw || typeof raw !== 'string') {
+    throw new NotFoundException(`Adventure has no usable trace: ${adventureId}`)
+  }
+  const point = JSON.parse(raw) as GeoJsonPoint
+  if (!Array.isArray(point?.coordinates) || point.coordinates.length < 2) {
+    throw new NotFoundException(`Adventure trace returned degenerate point: ${adventureId}`)
+  }
+  const [lon, plat] = point.coordinates
+  return [lon, plat]
 }
 
 /**

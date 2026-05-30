@@ -6,7 +6,8 @@
  * calcule :
  *  - `distanceM`        : longueur de la portion divergente (mètres géodésiques).
  *  - `elevationGainM/LossM` : D+/D- sur les seuls points divergents (hors buffer).
- *  - `geometry`         : portion divergente simplifiée (`ST_SimplifyPreserveTopology(_, 5)`).
+ *  - `geometry`         : portion divergente simplifiée (`ST_SimplifyPreserveTopology`, tolérance
+ *                         ~5 m exprimée en degrés EPSG:4326 = `5/111320`).
  *
  * Fonction pure : `db` est passé en paramètre (testable sans DI NestJS).
  * Tout PostGIS passe par `db.execute(sql\`...\`)` (Discovery #1 — pas de `pg` parallèle).
@@ -38,9 +39,12 @@ export async function computeDivergentSegment(
 ): Promise<DivergentMetrics> {
   const routeJson = JSON.stringify(route)
 
-  // ── Requête 1 : distance divergente + géométrie simplifiée ──────────────────
-  // Trace fusionnée = agrégat ordonné des segments. Si l'aventure n'a aucune trace,
-  // `trace.g` vaut NULL → ST_Difference renvoie NULL → on retombe sur la route entière.
+  // ── Requête 1 : approche finale (du POI au 1er contact avec la trace) ─────────
+  // La route va `origin (point de trace) → POI`. `ST_Difference(route, buffer_trace)`
+  // découpe la route en composantes HORS trace ; on ne garde QUE celle qui touche le POI
+  // (= ST_EndPoint de la route) → l'approche finale, en jetant les éventuels demi-tours
+  // côté trace (fix 2026-05-30). Distance d'accès = longueur de cette approche finale.
+  // Trace absente → `dg` NULL → fallback sur la route entière.
   const diffRows = (
     await db.execute(sql`
       WITH r AS (
@@ -54,21 +58,33 @@ export async function computeDivergentSegment(
       d AS (
         SELECT
           ST_Difference(r.g, ST_Buffer(t.g::geography, ${bufferM})::geometry) AS dg,
-          r.g AS rg
+          r.g AS rg,
+          ST_EndPoint(r.g) AS poi
         FROM r, t
+      ),
+      parts AS (
+        SELECT (ST_Dump(d.dg)).geom AS part, d.poi AS poi
+        FROM d
+        WHERE d.dg IS NOT NULL AND NOT ST_IsEmpty(d.dg)
+      ),
+      final_approach AS (
+        -- Composante de la différence la plus proche du POI = celle qui le touche.
+        SELECT part FROM parts ORDER BY ST_Distance(part, poi) ASC LIMIT 1
       )
       SELECT
-        CASE
-          WHEN d.dg IS NULL THEN COALESCE(ST_Length(d.rg::geography), 0)
-          ELSE COALESCE(ST_Length(d.dg::geography), 0)
-        END AS divergent_length_m,
+        COALESCE(
+          (SELECT ST_Length(part::geography) FROM final_approach),
+          (SELECT ST_Length(rg::geography) FROM d),
+          0
+        ) AS divergent_length_m,
         ST_AsGeoJSON(
           ST_SimplifyPreserveTopology(
-            CASE WHEN d.dg IS NULL OR ST_IsEmpty(d.dg) THEN d.rg ELSE d.dg END,
-            5
+            COALESCE((SELECT part FROM final_approach), (SELECT rg FROM d)),
+            -- Tolérance ~5 m EXPRIMÉE EN DEGRÉS (la géométrie est en EPSG:4326).
+            -- ⚠️ Surtout pas '5' (= 5° ≈ 550 km) qui écrasait la route en ligne droite.
+            5.0 / 111320.0
           )
         ) AS divergent_geojson
-      FROM d
     `)
   ).rows
 
@@ -103,9 +119,10 @@ export async function computeDivergentSegment(
 }
 
 /**
- * Somme les D+/D- entre points consécutifs HORS buffer de trace.
- * Entrer dans le buffer (ou un sommet sans altitude) réinitialise la référence :
- * on ne "bridge" jamais le dénivelé à travers une portion de chevauchement.
+ * D+/D- sur l'APPROCHE FINALE uniquement (fix 2026-05-30) : le dernier run contigu de
+ * points HORS buffer de trace, qui se termine au POI (dernier point de la route).
+ * On parcourt depuis la fin jusqu'au 1er point DANS le buffer (ou sans altitude), qui
+ * borne le moment où l'on rejoint la trace. Cohérent avec la géométrie « approche finale ».
  */
 export function computeDivergentElevation(rows: RoutePointRow[]): {
   elevationGainM: number
@@ -113,20 +130,19 @@ export function computeDivergentElevation(rows: RoutePointRow[]): {
 } {
   let gain = 0
   let loss = 0
-  let prev: number | null = null
+  let next: number | null = null
 
-  for (const row of rows) {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]
     const ele = typeof row.ele === 'number' ? row.ele : null
-    if (row.within_trace || ele === null) {
-      prev = null
-      continue
-    }
-    if (prev !== null) {
-      const delta = ele - prev
+    if (row.within_trace || ele === null) break // borne : entrée sur la trace → fin de l'approche
+    if (next !== null) {
+      // Sens de parcours origin→POI : delta = ele[i+1] - ele[i].
+      const delta = next - ele
       if (delta > 0) gain += delta
       else loss += -delta
     }
-    prev = ele
+    next = ele
   }
 
   return { elevationGainM: Math.round(gain), elevationLossM: Math.round(loss) }

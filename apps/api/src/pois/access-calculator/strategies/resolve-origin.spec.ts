@@ -16,18 +16,9 @@ function pointRow(lon: number, lat: number): { rows: Record<string, unknown>[] }
   return { rows: [{ point: JSON.stringify({ type: 'Point', coordinates: [lon, lat] }) }] }
 }
 
-const ADVENTURE = { adventureId: 'adv-1' }
+const ADVENTURE = { adventureId: 'adv-1', lat: 48.5, lng: 2.5 }
 
 describe('resolveOrigin', () => {
-  it('gps → renvoie [lng, lat] tel quel sans toucher la DB', async () => {
-    const { db, execute } = makeDb([])
-
-    const result = await resolveOrigin(db, { type: 'gps', lat: 48.8566, lng: 2.3522 }, ADVENTURE)
-
-    expect(result).toEqual([2.3522, 48.8566])
-    expect(execute).not.toHaveBeenCalled()
-  })
-
   it('stage → lit start_km puis interpole le point projeté sur la trace', async () => {
     const { db, execute } = makeDb([
       { rows: [{ start_km: 12.5 }] },
@@ -40,13 +31,21 @@ describe('resolveOrigin', () => {
     expect(execute).toHaveBeenCalledTimes(2)
   })
 
-  it('adventure-start → interpole au km 0 (fraction 0)', async () => {
-    const { db, execute } = makeDb([pointRow(2.0, 48.9)])
+  it('nearest-trace → renvoie le point de la trace le plus proche du POI (ST_ClosestPoint)', async () => {
+    const { db, execute } = makeDb([pointRow(2.4987, 48.5012)])
 
-    const result = await resolveOrigin(db, { type: 'adventure-start' }, ADVENTURE)
+    const result = await resolveOrigin(db, { type: 'nearest-trace' }, ADVENTURE)
 
-    expect(result).toEqual([2.0, 48.9])
+    expect(result).toEqual([2.4987, 48.5012])
     expect(execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('nearest-trace sans trace utilisable → NotFoundException', async () => {
+    const { db } = makeDb([{ rows: [] }])
+
+    await expect(resolveOrigin(db, { type: 'nearest-trace' }, ADVENTURE)).rejects.toBeInstanceOf(
+      NotFoundException,
+    )
   })
 
   it('stage inexistant → NotFoundException', async () => {
@@ -57,10 +56,10 @@ describe('resolveOrigin', () => {
     )
   })
 
-  it('aventure sans trace utilisable → NotFoundException', async () => {
+  it('nearest-trace avec point null (trace dégénérée) → NotFoundException', async () => {
     const { db } = makeDb([{ rows: [{ point: null }] }])
 
-    await expect(resolveOrigin(db, { type: 'adventure-start' }, ADVENTURE)).rejects.toBeInstanceOf(
+    await expect(resolveOrigin(db, { type: 'nearest-trace' }, ADVENTURE)).rejects.toBeInstanceOf(
       NotFoundException,
     )
   })

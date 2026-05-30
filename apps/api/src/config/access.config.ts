@@ -7,8 +7,10 @@ const schema = z.object({
   BROUTER_DEFAULT_PROFILE: z.string().min(1).default('trekking'),
   ACCESS_EAGER_THRESHOLD_M: z.coerce.number().int().positive().default(1500),
   ACCESS_TRACE_BUFFER_M: z.coerce.number().int().nonnegative().default(10),
-  ACCESS_CACHE_TTL_LIVE_SECONDS: z.coerce.number().int().positive().default(900),
-  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+trekking'),
+  // Bump 2026-05-30 : nouveau mapping de profils (road→fastbike, gravel→gravel,
+  // bikepacking→trekking). Invalide les accès en cache calculés avec l'ancien mapping
+  // (notamment gravel calculé via 'trekking') → recalcul lazy au prochain accès.
+  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+profiles-v2'),
 })
 
 const accessConfig = registerAs('access', () => {
@@ -23,7 +25,6 @@ const accessConfig = registerAs('access', () => {
     brouterDefaultProfile: parsed.data.BROUTER_DEFAULT_PROFILE,
     eagerThresholdM: parsed.data.ACCESS_EAGER_THRESHOLD_M,
     traceBufferM: parsed.data.ACCESS_TRACE_BUFFER_M,
-    cacheTtlLiveSeconds: parsed.data.ACCESS_CACHE_TTL_LIVE_SECONDS,
     engineVersion: parsed.data.ACCESS_ENGINE_VERSION,
   }
 })

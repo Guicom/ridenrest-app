@@ -17,7 +17,6 @@ const mockConfig = {
   brouterDefaultProfile: 'trekking',
   eagerThresholdM: 1500,
   traceBufferM: 10,
-  cacheTtlLiveSeconds: 900,
   engineVersion: 'brouter-1.7.9+trekking',
 }
 

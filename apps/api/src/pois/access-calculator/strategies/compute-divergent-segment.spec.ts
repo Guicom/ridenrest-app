@@ -85,7 +85,7 @@ describe('computeDivergentSegment', () => {
 })
 
 describe('computeDivergentElevation', () => {
-  it('somme D+/D- uniquement sur les points hors buffer', () => {
+  it('somme D+/D- sur l\'approche finale (run hors buffer terminant au POI)', () => {
     const result = computeDivergentElevation([
       { ele: 100, within_trace: false },
       { ele: 120, within_trace: false }, // +20
@@ -95,14 +95,27 @@ describe('computeDivergentElevation', () => {
     expect(result).toEqual({ elevationGainM: 40, elevationLossM: 10 })
   })
 
-  it('réinitialise la référence en entrant dans le buffer (pas de bridge)', () => {
+  it('s\'arrête au 1er contact trace en remontant depuis le POI (approche finale)', () => {
     const result = computeDivergentElevation([
       { ele: 100, within_trace: false },
-      { ele: 200, within_trace: true }, // dans le buffer → reset, pas de +100
+      { ele: 200, within_trace: true }, // dans le buffer → borne l'approche finale
       { ele: 50, within_trace: false }, // nouvelle référence
       { ele: 60, within_trace: false }, // +10
     ])
     expect(result).toEqual({ elevationGainM: 10, elevationLossM: 0 })
+  })
+
+  it('ne compte QUE le dernier run hors-trace, pas les runs côté origine (fix demi-tour)', () => {
+    // origin → [100,130 hors trace : +30] → [contact trace] → [50,80 hors trace : +30] → POI
+    // Ancien comportement : somme des 2 runs = +60. Nouveau : approche finale seule = +30.
+    const result = computeDivergentElevation([
+      { ele: 100, within_trace: false },
+      { ele: 130, within_trace: false }, // run côté origine (ignoré)
+      { ele: 200, within_trace: true }, // contact trace
+      { ele: 50, within_trace: false }, // approche finale
+      { ele: 80, within_trace: false }, // +30
+    ])
+    expect(result).toEqual({ elevationGainM: 30, elevationLossM: 0 })
   })
 
   it('ignore les points sans altitude (ele null)', () => {

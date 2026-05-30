@@ -5,8 +5,12 @@
  * Cf. architecture POI Access §Enforcement Guidelines règle #1.
  */
 
-/** Profils BRouter bas niveau (PAS les labels projet Route/Gravel/Bikepacking). */
-export type BrouterProfile = 'fastbike' | 'trekking' | 'safety'
+/**
+ * Profils BRouter bas niveau (PAS les labels projet Route/Gravel/Bikepacking).
+ * DOIVENT exister dans le build BRouter (`/profiles2/*.brf`). `safety` n'est PAS fourni
+ * par le build v1.7.9 → retiré (mapping projet : road→fastbike, gravel→gravel, bikepacking→trekking).
+ */
+export type BrouterProfile = 'fastbike' | 'trekking' | 'gravel'
 
 /** Une coordonnée 3D GeoJSON : [lon, lat, ele]. */
 export type LonLatEle = [number, number, number]

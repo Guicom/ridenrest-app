@@ -26,9 +26,8 @@ export {
   AccessRequestSchema,
   AccessResponseSchema,
   AccessOriginSchema,
-  AccessOriginGpsSchema,
   AccessOriginStageSchema,
-  AccessOriginAdventureStartSchema,
+  AccessOriginNearestTraceSchema,
   AccessGeometrySchema,
   BrouterProfileSchema,
 } from './schemas/poi-access'

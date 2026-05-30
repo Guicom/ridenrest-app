@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   AccessRequestSchema,
   AccessResponseSchema,
-  AccessOriginGpsSchema,
 } from './poi-access'
 
 describe('AccessRequestSchema', () => {
@@ -13,22 +12,27 @@ describe('AccessRequestSchema', () => {
     expect(r.success).toBe(true)
   })
 
-  it('accepts adventure-start origin (no payload)', () => {
-    const r = AccessRequestSchema.safeParse({ origin: { type: 'adventure-start' } })
+  it('accepts nearest-trace origin (no payload)', () => {
+    const r = AccessRequestSchema.safeParse({ origin: { type: 'nearest-trace' } })
     expect(r.success).toBe(true)
   })
 
-  it('rejects a non-BRouter profile label as profileOverride', () => {
+  it('rejects the removed adventure-start origin (review 3.3, 2026-05-30)', () => {
+    const r = AccessRequestSchema.safeParse({ origin: { type: 'adventure-start' } })
+    expect(r.success).toBe(false) // retiré : inutilisé + collision de cache avec nearest-trace
+  })
+
+  it('rejects a profile not provided by the BRouter build as profileOverride', () => {
     const r = AccessRequestSchema.safeParse({
-      origin: { type: 'adventure-start' },
-      profileOverride: 'gravel' as unknown as 'trekking',
+      origin: { type: 'nearest-trace' },
+      profileOverride: 'safety' as unknown as 'trekking',
     })
-    expect(r.success).toBe(false) // gravel is a project label, not a BRouter profile
+    expect(r.success).toBe(false) // 'safety' n'existe pas dans le build BRouter v1.7.9
   })
 
   it('accepts valid BRouter profileOverride', () => {
     const r = AccessRequestSchema.safeParse({
-      origin: { type: 'adventure-start' },
+      origin: { type: 'nearest-trace' },
       profileOverride: 'trekking',
     })
     expect(r.success).toBe(true)
@@ -46,23 +50,6 @@ describe('AccessRequestSchema', () => {
 
   it('rejects missing origin', () => {
     const r = AccessRequestSchema.safeParse({})
-    expect(r.success).toBe(false)
-  })
-})
-
-describe('AccessOriginGpsSchema (rounded coords)', () => {
-  it('accepts coordinates rounded to 4 decimals', () => {
-    const r = AccessOriginGpsSchema.safeParse({ type: 'gps', lat: 48.8566, lng: 2.3522 })
-    expect(r.success).toBe(true)
-  })
-
-  it('rejects coordinates with > 4 decimals', () => {
-    const r = AccessOriginGpsSchema.safeParse({ type: 'gps', lat: 48.85661, lng: 2.3522 })
-    expect(r.success).toBe(false)
-  })
-
-  it('rejects out-of-range latitude', () => {
-    const r = AccessOriginGpsSchema.safeParse({ type: 'gps', lat: 91, lng: 2.3522 })
     expect(r.success).toBe(false)
   })
 })

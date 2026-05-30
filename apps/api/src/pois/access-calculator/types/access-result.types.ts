@@ -33,21 +33,24 @@ export type GeoJSONGeometry = GeoJSONLineString | GeoJSONMultiLineString
 
 /**
  * Origine de l'accès — union discriminée.
- *  - `gps`             : coordonnées brutes fournies par le client.
  *  - `stage`           : point projeté au `start_km` de l'étape sur la trace.
- *  - `adventure-start` : point au km 0 de la première trace de l'aventure.
+ *  - `nearest-trace`   : point de la trace le plus proche du POI (fix 2026-05-30) —
+ *                        sémantique correcte de « l'accès depuis la trace » (détour court).
+ *                        Utilisée en Planning ET en Live (décision 2026-05-30).
+ *
+ * `adventure-start` (km 0) retiré (review poi-access-3.3, 2026-05-30) : inutilisé par le
+ * frontend et source d'une collision de cache avec `nearest-trace` (toutes deux → `origin_stage_id = null`).
  */
 export type AccessOrigin =
-  | { type: 'gps'; lat: number; lng: number }
   | { type: 'stage'; stageId: string }
-  | { type: 'adventure-start' }
+  | { type: 'nearest-trace' }
 
 /** Métriques d'accès calculées sur la portion divergente (hors chevauchement trace). */
 export interface DivergentMetrics {
   distanceM: number
   elevationGainM: number
   elevationLossM: number
-  /** Portion divergente simplifiée (ST_SimplifyPreserveTopology, tolérance 5 m). */
+  /** Portion divergente simplifiée (ST_SimplifyPreserveTopology, tolérance ~5 m = 5/111320 deg). */
   geometry: GeoJSONGeometry
 }
 
@@ -61,11 +64,11 @@ export type AccessResult =
       geometry: GeoJSONGeometry
       engineVersion: string
       computedAt: string
-      source: 'db-cache' | 'redis-cache' | 'computed-fresh'
+      source: 'db-cache' | 'computed-fresh'
     }
   | {
       status: 'fallback'
-      fallbackReason: 'routing_failed' | 'no_consent' | 'unreachable'
+      fallbackReason: 'routing_failed' | 'unreachable'
       fallbackDistanceM: number
       source: 'computed-fresh'
     }
@@ -77,11 +80,4 @@ export interface AccessComputeInput {
   origin: AccessOrigin
   /** Force un profil BRouter bas niveau, sinon dérivé de `adventures.routing_profile`. */
   profileOverride?: BrouterProfile
-  /** `planning` → cache DB. `live` → cache Redis anonyme + consent gate (Story 3.1). */
-  mode: 'planning' | 'live'
-  /**
-   * Requis en mode `live` : sert UNIQUEMENT au lookup `profiles.live_access_consent`.
-   * N'est JAMAIS propagé vers la clé Redis ni stocké (anonymisation, NFR-PA-006).
-   */
-  userId?: string
 }

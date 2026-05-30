@@ -39,23 +39,18 @@ export class PoisController {
   }
 
   /**
-   * POST /pois/:id/access — métriques d'itinéraire d'accès d'un POI (Planning OU Live).
+   * POST /pois/:id/access — métriques d'itinéraire d'accès d'un POI.
    *
-   * Mode (Story 3.1, AC #1) : dérivé du body — `origin.type === 'gps'` → mode `live`
-   * (consent gate + cache Redis anonyme) ; sinon mode `planning` (cache DB).
+   * Origine = point de la trace le plus proche du POI (`nearest-trace`), en Planning
+   * comme en Live (décision 2026-05-30) : aucune position GPS n'est transmise, le serveur
+   * résout l'origine côté DB. Cache DB durable (`accommodations_cache`).
    *
    * Guards : `JwtAuthGuard` (global, ré-explicité) + `OwnerOnlyGuard` (vérifie que le
-   * POI appartient à une aventure du user via `checkPoiOwnership`). Le throttling est
-   * porté par `AccessThrottlerGuard` (APP_GUARD global) : `@Throttle` fixe la limite
-   * Planning (60/min) ; le guard la relève à 120/min quand `origin.type === 'gps'`
-   * (AC #4, Discovery #1 option B). On ne ré-ajoute pas le guard à `@UseGuards` (cela
-   * doublerait le comptage). Réponse 429 + `Retry-After` au dépassement.
-   *
-   * `userId` n'est transmis au service QUE pour le lookup consent (mode Live) ; il
-   * n'entre JAMAIS dans la clé Redis (anonymisation, NFR-PA-006).
+   * POI appartient à une aventure du user via `checkPoiOwnership`). Throttling 60/min via
+   * `@Throttle` (`ThrottlerGuard` global). Réponse 429 + `Retry-After` au dépassement.
    *
    * Le retour brut (`AccessResult`) est wrappé par le `ResponseInterceptor` global
-   * (`{ data: ... }`). BRouter down ou no_consent → `status: 'fallback'` en HTTP 200.
+   * (`{ data: ... }`). BRouter down → `status: 'fallback'` en HTTP 200.
    */
   @Post(':id/access')
   @HttpCode(200)
@@ -63,19 +58,15 @@ export class PoisController {
   @OwnedResource(checkPoiOwnership)
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Compute POI access route metrics (planning or live mode)' })
+  @ApiOperation({ summary: 'Compute POI access route metrics' })
   async computeAccess(
     @Param('id') poiId: string,
     @Body(accessRequestValidationPipe) dto: AccessRequestDto,
-    @CurrentUser() user: CurrentUserPayload,
   ) {
-    const mode = dto.origin.type === 'gps' ? 'live' : 'planning'
     return this.accessCalculator.compute({
       poiId,
       origin: dto.origin,
       profileOverride: dto.profileOverride,
-      mode,
-      userId: user.id,
     })
   }
 }
