@@ -227,7 +227,7 @@ Si elle n'existe pas → la créer (out of scope strict mais nécessaire). Si el
 - [x] [Review][Patch] **(P7)** Task 10 annotée « N/A (superseded) » (ci-dessus).
 - [x] [Review][Patch] **(P8, ex-D1)** Type d'origine `adventure-start` supprimé (schéma Zod `AccessOriginSchema` + barrel `index.ts`, type `AccessOrigin` api, branche `resolveOrigin`, specs api/web) — collision de cache éliminée. tsc api/shared 0, suites vertes.
 - [x] [Review][Patch] **(P9, ex-D3)** Migration drizzle `0016_rapid_dracula.sql` générée (`ALTER TABLE profiles DROP COLUMN live_access_consent`) via `drizzle-kit generate` (journal auto-mis à jour) + colonne retirée du schéma. **À committer + déployer** (le `migrate` tourne dans `deploy.sh`).
-- [ ] [Review][Patch] **(P6) BLOQUÉ — nettoyage manuel Guillaume** : retirer la ligne `ACCESS_CACHE_TTL_LIVE_SECONDS=900` dans `apps/api/.env.example` — fichier dans un répertoire protégé par permissions (écriture refusée à l'agent, comme noté en 3.1).
+- [x] [Review][Patch] **(P6)** Ligne orpheline `ACCESS_CACHE_TTL_LIVE_SECONDS=900` retirée de `apps/api/.env.example` — édition faite par Guillaume (répertoire protégé), committée par l'agent (`chore(api): remove orphaned ...`).
 
 **Findings écartés après vérification code (faux positifs / négligeables) :**
 
