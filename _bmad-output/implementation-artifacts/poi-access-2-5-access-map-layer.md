@@ -260,6 +260,7 @@ chaud → affichage quasi instantané). Aucune action requise sur la 2.5.
   composant lazy polyline d'accès (amber pointillé, beforeId pins, setData, fitBounds once, cleanup
   idempotent), intégration `map-view`, câblage `poi-popup`. Doc Sync (6 écarts). Tests 17 nouveaux,
   suite web 1035/1035, build OK. Status → review.
+- 2026-05-30 — **Bugfix runtime (signalé Guillaume) : crash `Cannot read properties of undefined (reading 'getLayer')` au démontage.** Reproduction : Planning → recherche → ouvrir un hôtel (polyline d'accès affichée) → retour aux aventures. À la navigation, MapLibre appelle `map.remove()` qui détruit le style interne ; le `map` reste truthy (le guard `if (map)` du cleanup passe) mais `map.getLayer()` lit `this.style.*` désormais `undefined` → throw. **Corrigé** : `removeAccessLayer()` enveloppé dans un `try/catch` (chemin de nettoyage — si la map est détruite, il n'y a plus rien à retirer). Couvre les 2 sites d'appel (effet géométrie `null` + cleanup unmount). +1 test de régression (« unmount after the map was destroyed → no throw »). Suite web **1051/1051**, ESLint clean. ⚠️ Ce cas avait été **dismissé à tort** en review 2026-05-29 (« double effet de cleanup … idempotent, React Strict Mode safe ») : le scénario map-détruite n'avait pas été envisagé. [apps/web/src/components/poi-access/AccessMapLayer.tsx:63-78]
 
 ---
 

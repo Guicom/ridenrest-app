@@ -4,7 +4,10 @@ baseline_commit: 53175273a478a3bb6fc2084ca19f7e067f912698
 
 # Story POI-Access 3.2 : `MeController` — `GET /me/settings` & `PATCH /me/settings` (impl. réelle)
 
-Status: done
+Status: superseded
+<!-- 2026-05-30 : module `me/` SUPPRIMÉ. L'endpoint /me/settings ne servait qu'au consentement
+     Live (Story 3.3), lui-même retiré au profit de l'origine `nearest-trace`. Cf. Change Log. -->
+
 
 <!-- Dépend de : 1.4 (stubs MeController 501 créés). Indépendante de 3.1, 3.3. -->
 
@@ -207,6 +210,17 @@ _Code review adversariale (Blind Hunter + Edge Case Hunter + Acceptance Auditor)
 claude-opus-4-8 (1M context) — bmad-dev-story
 
 ### Completion Notes List
+
+> **⚠️ SUPERSEDED — 2026-05-30.** Le module `me/` (controller, service, repository, DTO, module +
+> specs + `me-settings.e2e-spec.ts`) a été **entièrement supprimé**, et `MeModule` retiré de
+> `app.module.ts`. Raison : `/me/settings` n'existait que pour porter le consentement Live
+> `liveAccessConsent` (consommé par la Story 3.3), or le flow de consentement Live a été retiré le
+> 2026-05-30 (le mode Live utilise l'origine `nearest-trace`, sans GPS ni consentement). Plus aucun
+> appelant. La colonne DB `profiles.live_access_consent` est conservée (drop migration à décider
+> séparément) ; le `moduleNameMapper` ajouté à `apps/api/test/jest-e2e.json` (Doc Sync #4) devient
+> inutilisé mais inoffensif. Validation post-suppression : API 346/346, tsc/ESLint clean.
+> La note d'implémentation d'origine est conservée ci-dessous pour l'historique.
+
 - **Autres settings inclus dans la réponse** : `overpassEnabled` (Discovery #2). `tier` exclu (état d'abonnement, pas un setting togglable). Source de vérité d'écriture reste `/api/profile` ; `/me/settings` ne fait que le lire en lecture pour cohérence.
 - **Event émis vérifié en test** : ☑ Oui — `profile.live-consent-revoked` avec `{ userId }`, vérifié en unit (`me.service.spec.ts`) ET en intégration (`me-settings.e2e-spec.ts`). Émis uniquement sur transition `true → false`, APRÈS le commit DB (atomicité AC #3 — test dédié : si `setLiveAccessConsent` rejette, aucun event).
 - **Idempotence (AC #6)** : `setLiveAccessConsent` est toujours appelé (UPDATE no-op effectif), pas d'event si pas de transition true→false. Vérifié.
@@ -234,4 +248,5 @@ claude-opus-4-8 (1M context) — bmad-dev-story
 
 ### Change Log
 - 2026-05-29 — Implémentation réelle de `/me/settings` (Story 3.2) : `MeRepository` + `MeService` + `UpdateSettingsDto` + remplacement des stubs `MeController`. `GET` renvoie `{ liveAccessConsent, overpassEnabled }` (no-store), `PATCH` persiste `liveAccessConsent` et émet `profile.live-consent-revoked` sur révocation (true→false, post-commit). 11 tests unitaires + 9 tests d'intégration HTTP. Suite API 387/387, tsc + ESLint clean. 5 écarts Doc Sync documentés.
+- 2026-05-30 — **SUPERSEDED** : module `me/` entièrement supprimé (controller/service/repository/DTO/module + `me.service.spec.ts` + `me-settings.e2e-spec.ts`), `MeModule` retiré de `app.module.ts`. L'endpoint `/me/settings` n'avait plus d'appelant après le retrait du flow de consentement Live (Story 3.3 → origine `nearest-trace`). Colonne DB `profiles.live_access_consent` conservée. Validation : API 346/346, tsc/ESLint clean.
 - 2026-05-29 — **Code review adversariale (bmad-code-review)** : 1 decision-needed + 1 patch + 2 defer + 6 écartés. Patches appliqués : **P1** `setLiveAccessConsent` → upsert `INSERT … ON CONFLICT DO UPDATE` (corrige le phantom-write quand le profil n'existe pas — consentement RGPD désormais garanti persisté ; `me.repository.ts`) ; **P2** émission de l'event isolée dans un `try/catch` + `Logger.error` (un listener best-effort qui throw ne fait plus échouer le PATCH post-commit ; `me.service.ts`). +1 test e2e de régression (phantom-write) → intégration 10/10. Suite API 387/387, tsc + ESLint clean. 2 findings différés consignés dans `deferred-work.md` (read-modify-write non transactionnel ; `forbidNonWhitelisted` global). Statut → `done`.

@@ -4,7 +4,11 @@ baseline_commit: 59abd8a8ff344204beac86a11c191e799876653f
 
 # Story POI-Access 3.1 : Extension endpoint pour mode Live (origin GPS + cache Redis anonyme)
 
-Status: done
+Status: superseded
+<!-- 2026-05-30 : implémentation RETIRÉE. Le mode Live utilise désormais l'origine `nearest-trace`
+     (comme le Planning), pas la position GPS → plus d'origin GPS, plus de consent gate, plus de
+     cache Redis anonyme, plus de rate limit conditionnel. Cf. Change Log + Completion Notes. -->
+
 
 <!-- Dépend de : 2.2 (AccessCalculator), 2.3 (endpoint Planning créé), 1.4 (throttler). Indépendante de 3.2, 3.3. -->
 
@@ -200,6 +204,28 @@ grep -rn "access:live" apps/api/src/
 claude-opus-4-8 (BMad dev-story workflow)
 
 ### Completion Notes List
+
+> **⚠️ SUPERSEDED — 2026-05-30.** Toute l'extension « mode Live GPS » décrite ci-dessous a été
+> **retirée**. Décision produit (Guillaume) : en mode Live, l'itinéraire d'accès doit utiliser la
+> même origine `nearest-trace` que le Planning (détour final depuis la trace) plutôt que la position
+> GPS du cycliste. Conséquences appliquées le 2026-05-30 :
+> - `AccessOrigin` : variante `gps` supprimée (shared `poi-access.ts` + api types) ; `RoundedCoord`/
+>   `AccessOriginGpsSchema` supprimés.
+> - `AccessCalculatorService` : `computeLive`, consent gate, cache Redis anonyme et `toCachedMetrics`
+>   supprimés ; `compute()` ne fait plus que le chemin cache DB. Injection `RedisProvider` retirée du
+>   service et `RedisModule` retiré de `AccessCalculatorModule` (`RedisProvider` reste utilisé ailleurs).
+> - `profile-lookup.ts` (+ spec) et `strategies/redis-cache.ts` (+ spec) **supprimés**.
+> - `AccessComputeInput` : `mode` + `userId` retirés ; `AccessResult.source` perd `redis-cache`,
+>   `fallbackReason` perd `no_consent`.
+> - Rate limit : `AccessThrottlerGuard` **supprimé**, retour au `ThrottlerGuard` standard (60/min).
+>   `pois.controller.live-access.spec.ts` supprimé.
+> - `ACCESS_CACHE_TTL_LIVE_SECONDS` retiré de `access.config.ts` (ligne orpheline restant à nettoyer
+>   manuellement dans `apps/api/.env.example`, écriture refusée par permissions).
+> - Validation post-retrait : API 346/346, shared 29/29, web 1050/1050 ; tsc API 0 / web 59 (baseline) ;
+>   ESLint api+shared clean.
+>
+> La note d'implémentation d'origine est conservée ci-dessous pour l'historique.
+
 - **Stratégie rate limit retenue : ☑ B** — guard custom `AccessThrottlerGuard extends ThrottlerGuard` surchargeant `handleRequest` : bump 60→120 quand `origin.type === 'gps'`. Enregistré comme APP_GUARD global EN REMPLACEMENT du `ThrottlerGuard` standard (comportement inchangé pour les routes sans `origin.type === 'gps'` au body).
 - **Pattern Redis injection** : `RedisProvider.getClient()` (ioredis singleton, `@Global RedisModule`) — même pattern que `pois.service.ts`. `AccessCalculatorModule` importe explicitement `RedisModule` (DI hygiène + testabilité isolée).
 - **Lookup consent placement** : effectué dans `AccessCalculatorService.computeLive` (pas le controller) pour cohésion/testabilité ; le controller passe `userId` + `mode`. L'AC #2 décrivait « le controller récupère le consent » — placement assumé côté service (cf. Task 4). Fonction pure `getLiveAccessConsent(db, userId)`.
@@ -230,3 +256,4 @@ claude-opus-4-8 (BMad dev-story workflow)
 | Date | Changement |
 |---|---|
 | 2026-05-29 | Story POI-Access 3.1 implémentée — extension `POST /pois/:id/access` pour le mode Live (origin GPS) : consent gate (`profiles.live_access_consent`), cache Redis anonyme (`access:live:{poiId}:{profile}:{lat}:{lng}`, TTL 15 min, sans userId/NFR-PA-006), rate limit conditionnel 120/min via `AccessThrottlerGuard`. Calcul frais partagé Planning/Live (`computeFresh`). 11 nouveaux fichiers/modifs, API 384/384 verts, tsc + ESLint clean. 1 déviation Doc Sync (tests intégration co-localisés au lieu d'E2E TestContainers). |
+| 2026-05-30 | **SUPERSEDED** — décision produit : le mode Live passe à l'origine `nearest-trace` (comme Planning), pas de GPS. Retrait complet de l'extension Live : origin `gps`, `computeLive`, consent gate, cache Redis anonyme (`profile-lookup.ts` + `redis-cache.ts` supprimés), `AccessThrottlerGuard` (retour `ThrottlerGuard` standard), `mode`/`userId` de `AccessComputeInput`, enums `redis-cache`/`no_consent`, `ACCESS_CACHE_TTL_LIVE_SECONDS`. Validation : API 346/346, shared 29/29, web 1050/1050, tsc/ESLint clean. Colonne DB `profiles.live_access_consent` conservée (drop migration à décider séparément). |

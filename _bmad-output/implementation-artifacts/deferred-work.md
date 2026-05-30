@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of poi-access-3-3 (2026-05-30)
+
+- **W1** — `fitToCorridorRange` spread d'un tableau de POI dans `Math.min(...lats)`/`Math.max(...lngs)` (`apps/web/src/app/(app)/map/[id]/_components/map-canvas.tsx:2740`). Pré-existant : le même pattern spread s'applique déjà aux waypoints de trace (potentiellement plus nombreux qu'une liste de POI). Le nombre de POI d'un corridor (≤ 30 km) reste très en deçà de la limite d'arguments du moteur JS → risque de `RangeError` négligeable. Durcissement (réduction via `reduce` au lieu de spread) optionnel, non causé par ce changement.
+
 ## Deferred from: code review of poi-access-2-5-access-map-layer.md (2026-05-29)
 
 - **W1** — `POI_POINT_LAYER_IDS` (copie en dur des ids `use-poi-layers.ts`) → drift du `beforeId` z-order si un layer de pins est renommé/ajouté → ligne d'accès au sommet au lieu de sous les pins. Pas un bug runtime. Fix = constante partagée (touche `use-poi-layers.ts`, hors périmètre 2.5). `AccessMapLayer.tsx:34-39`.

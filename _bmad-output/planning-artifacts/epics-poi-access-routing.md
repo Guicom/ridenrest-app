@@ -23,15 +23,31 @@ Ce document fournit la décomposition complète en epics et stories de la featur
 - Routage pour POI non-accommodations (water, food, bike-shop)
 - Nouveaux profils BRouter custom (phase 2)
 
+> ## ⚠️ MISE À JOUR 2026-05-30 — Supersede du mode Live GPS/consentement (Doc Sync)
+>
+> **Décision produit (Guillaume) :** le mode **Live** n'utilise plus la **position GPS** ni de **flow de consentement RGPD**. Il calcule l'itinéraire d'accès avec la **même origine `nearest-trace`** que le Planning (point de la trace le plus proche du POI, `ST_ClosestPoint`). Aucune donnée GPS ne quitte le client → plus de popin de consentement, plus de cache Redis Live, plus de throttling spécifique Live.
+>
+> **Exigences SUPERSEDED (ne plus implémenter telles quelles) :**
+> - **FR-PA-002** — calcul depuis la position GPS Live → remplacé par origine `nearest-trace` en Live.
+> - **FR-PA-003** — fallback origine `adventure-start` (km 0) → **retiré** (review poi-access-3.3, 2026-05-30 : inutilisé + collision de cache avec `nearest-trace`). Origines restantes : `stage` + `nearest-trace`.
+> - **FR-PA-010 / FR-PA-011 / FR-PA-012 / FR-PA-013** — popin consentement RGPD, toggle Paramètres > Confidentialité, arrondi GPS 4 décimales, anonymisation clé Redis → **sans objet** (aucune position GPS transmise).
+> - **NFR-PA-004** (120 req/min Live) → le throttling Live spécifique est retiré ; reste 60 req/min via `@Throttle` standard.
+> - **NFR-PA-006** (cache Redis Live 15 min) → **retiré** (plus de chemin Live GPS). Le cache DB durable (`accommodations_cache.access_*`) couvre Planning **et** Live.
+> - **FR-PA-020** — la source `'redis-cache'` n'est plus émise (`'db-cache' | 'computed-fresh'`).
+>
+> **Exigences renforcées / inchangées :** **NFR-PA-009** (GPS jamais stocké serveur) est désormais **structurellement garantie** : l'origine `gps` a été retirée du schéma Zod partagé, le serveur ne peut plus recevoir de coordonnées GPS. FR-PA-007/008/009 (polyline + auto-zoom) restent valides, étendues au Live.
+>
+> Stories impactées : **3.1** (endpoint Live GPS), **3.2** (`/me/settings` consent), **3.3** (popin + PrivacySection + `roundCoordinate`) → toutes **superseded** (cf. leurs fichiers d'implémentation + sprint-status). Voir aussi les annotations `[SUPERSEDED 2026-05-30]` inline ci-dessous.
+
 ## Requirements Inventory
 
 ### Functional Requirements
 
 FR-PA-001: L'utilisateur peut consulter, depuis la fiche détail d'un POI hébergement en mode Planning, un itinéraire d'accès cyclable réel (distance en mètres + dénivelé positif + dénivelé négatif) entre la trace de son aventure et le POI.
 
-FR-PA-002: L'utilisateur peut consulter, depuis la fiche d'un POI hébergement en mode Live, un itinéraire d'accès cyclable réel calculé depuis sa position GPS actuelle, à condition d'avoir donné son consentement explicite.
+FR-PA-002: `[SUPERSEDED 2026-05-30]` ~~L'utilisateur peut consulter, depuis la fiche d'un POI hébergement en mode Live, un itinéraire d'accès cyclable réel calculé depuis sa position GPS actuelle, à condition d'avoir donné son consentement explicite.~~ → En Live, l'accès est calculé depuis l'origine `nearest-trace` (comme Planning), sans GPS ni consentement.
 
-FR-PA-003: Lorsqu'un POI est consulté en mode Planning et qu'aucune étape (stage) n'est définie, l'itinéraire d'accès est calculé depuis le km 0 de l'aventure (fallback "adventure-start").
+FR-PA-003: `[SUPERSEDED 2026-05-30]` ~~Lorsqu'un POI est consulté en mode Planning et qu'aucune étape (stage) n'est définie, l'itinéraire d'accès est calculé depuis le km 0 de l'aventure (fallback "adventure-start").~~ → Origine `adventure-start` **retirée** (review 3.3 : inutilisée + collision de cache). Sans étape, l'accès utilise désormais `nearest-trace`.
 
 FR-PA-004: Lorsqu'un POI est consulté en mode Planning et qu'une étape est en cours, l'itinéraire d'accès est calculé depuis le point de début de l'étape sélectionnée.
 
@@ -45,13 +61,13 @@ FR-PA-008: Une seule polyline d'itinéraire d'accès est visible à la fois sur 
 
 FR-PA-009: La carte effectue un auto-zoom sur le bbox englobant l'itinéraire d'accès + portion pertinente de la trace lors de l'affichage initial de la polyline.
 
-FR-PA-010: En mode Live, avant tout envoi de la position GPS pour calcul d'itinéraire d'accès, l'application demande à l'utilisateur un consentement explicite via une popin RGPD, à la 1ère occurrence uniquement.
+FR-PA-010: `[SUPERSEDED 2026-05-30]` ~~En mode Live, avant tout envoi de la position GPS pour calcul d'itinéraire d'accès, l'application demande à l'utilisateur un consentement explicite via une popin RGPD, à la 1ère occurrence uniquement.~~ → Sans objet : aucune position GPS transmise.
 
-FR-PA-011: L'utilisateur peut, à tout moment, activer ou désactiver le consentement "Calcul d'itinéraire d'accès précis en mode Live" depuis la page Paramètres > Confidentialité.
+FR-PA-011: `[SUPERSEDED 2026-05-30]` ~~L'utilisateur peut, à tout moment, activer ou désactiver le consentement "Calcul d'itinéraire d'accès précis en mode Live" depuis la page Paramètres > Confidentialité.~~ → Sans objet : section Confidentialité retirée.
 
-FR-PA-012: La position GPS de l'utilisateur en mode Live est arrondie à 4 décimales (~11 m) côté client avant tout envoi au serveur, conformément au principe de minimisation des données.
+FR-PA-012: `[SUPERSEDED 2026-05-30]` ~~La position GPS de l'utilisateur en mode Live est arrondie à 4 décimales (~11 m) côté client avant tout envoi au serveur, conformément au principe de minimisation des données.~~ → Sans objet : `roundCoordinate` retiré, aucun envoi GPS.
 
-FR-PA-013: Aucun identifiant utilisateur (`user_id`, email, etc.) n'est inclus dans les clés du cache Redis des itinéraires d'accès Live (anonymisation).
+FR-PA-013: `[SUPERSEDED 2026-05-30]` ~~Aucun identifiant utilisateur (`user_id`, email, etc.) n'est inclus dans les clés du cache Redis des itinéraires d'accès Live (anonymisation).~~ → Sans objet : cache Redis Live retiré.
 
 FR-PA-014: L'application pré-calcule de manière asynchrone (BullMQ) les itinéraires d'accès des POI hébergement situés à moins de 1500 m vol d'oiseau de la trace, lors de la création/import d'une aventure.
 
@@ -65,7 +81,7 @@ FR-PA-018: La fiche détail POI affiche le statut de calcul (en cours / ok / fal
 
 FR-PA-019: Le label affiché pour un itinéraire d'accès est contextualisé selon la sous-catégorie d'accommodation (ex: "Itinéraire vers l'hôtel", "Itinéraire vers le camping", "Itinéraire vers le refuge"), avec un fallback générique "Itinéraire d'accès".
 
-FR-PA-020: La réponse de l'endpoint `POST /pois/:id/access` retourne toujours un objet avec un champ `status` discriminant (`'ok' | 'fallback' | 'error'`), et précise la source du résultat (`'db-cache' | 'redis-cache' | 'computed-fresh'`).
+FR-PA-020: La réponse de l'endpoint `POST /pois/:id/access` retourne toujours un objet avec un champ `status` discriminant (`'ok' | 'fallback' | 'error'`), et précise la source du résultat (`'db-cache' | 'computed-fresh'`). `[MAJ 2026-05-30 : source 'redis-cache' retirée — cache Redis Live supprimé.]`
 
 ### NonFunctional Requirements
 
@@ -75,11 +91,11 @@ NFR-PA-002: La latence cible d'un appel BRouter (route unique) est < 500 ms p95 
 
 NFR-PA-003: Le worker BullMQ `poi-access-calculation` traite au maximum **5 jobs simultanés** pour préserver les ressources de BRouter et de la DB sur le VPS KVM 2 (8 Go RAM).
 
-NFR-PA-004: Le rate limiting sur `POST /pois/:id/access` est de **60 req/min par user** en mode Planning et **120 req/min par user** en mode Live.
+NFR-PA-004: `[SUPERSEDED 2026-05-30]` ~~Le rate limiting sur `POST /pois/:id/access` est de **60 req/min par user** en mode Planning et **120 req/min par user** en mode Live.~~ → Throttling Live spécifique retiré (`AccessThrottlerGuard` supprimé) ; reste **60 req/min** via `@Throttle` standard, Planning comme Live.
 
 NFR-PA-005: Le cache DB des itinéraires d'accès (`accommodations_cache.access_*`) n'a **pas de TTL** — l'invalidation est event-driven (modification trace, profil, ou stage).
 
-NFR-PA-006: Le cache Redis des itinéraires d'accès Live a un TTL de **15 minutes** et utilise une clé strictement anonyme (`access:live:{poi_id}:{profile}:{lat_4dec}:{lon_4dec}`).
+NFR-PA-006: `[SUPERSEDED 2026-05-30]` ~~Le cache Redis des itinéraires d'accès Live a un TTL de **15 minutes** et utilise une clé strictement anonyme (`access:live:{poi_id}:{profile}:{lat_4dec}:{lon_4dec}`).~~ → Cache Redis Live **retiré** (plus de chemin GPS Live) ; le cache DB durable couvre Planning **et** Live.
 
 NFR-PA-007: La consommation mémoire totale du conteneur BRouter ne doit pas dépasser **2 Go RAM** (cap JVM `-Xmx2g`), pour laisser une marge sur le VPS.
 
@@ -170,6 +186,8 @@ _Pas de document UX dédié à cette feature. Les éléments UX critiques sont e
 UX-DR-PA-001: Wording exact des popin RGPD et de la section Settings > Confidentialité — à valider dans un workflow UX dédié avant la story Frontend 7.
 
 ### FR Coverage Map
+
+> `[MAJ 2026-05-30]` Les lignes FR-PA-002, 003, 010, 011, 012, 013 ci-dessous sont **superseded** (cf. encart en tête de doc). Conservées pour l'historique mais non implémentées telles quelles : le mode Live utilise `nearest-trace` sans GPS ni consentement, et `adventure-start` est retiré.
 
 | FR | Epic | Description courte |
 |---|---|---|
@@ -710,6 +728,9 @@ So that the access route calculations match my actual riding style and bike type
 
 ## Epic 3 : Mode Live & Confidentialité RGPD
 
+> ### ⚠️ `[SUPERSEDED 2026-05-30]` — Tout l'Epic 3 (Stories 3.1, 3.2, 3.3)
+> Le mode Live n'utilise plus la position GPS ni de consentement (cf. encart en tête de doc). Origine Live = `nearest-trace` (comme Planning). Supprimés : endpoint Live GPS + cache Redis (3.1), `/me/settings` consent (3.2), popin + PrivacySection + `roundCoordinate` (3.3). Détails dans les fichiers d'implémentation `poi-access-3-1/3-2/3-3` + `sprint-status.yaml`. La description ci-dessous est conservée pour l'historique.
+
 Permettre à l'utilisateur, depuis le mode Live (à vélo), de calculer un itinéraire d'accès précis depuis sa position GPS actuelle, avec un consentement explicite recueilli via popin RGPD à la 1ère occurrence et révocable depuis Paramètres > Confidentialité. Garantit l'anonymisation et la non-persistance des données GPS.
 
 ### Story 3.1 : Extension endpoint pour mode Live (origin GPS + cache Redis anonyme)
@@ -825,6 +846,9 @@ So that I keep control over my privacy data per RGPD principles.
 **Given** un test E2E Playwright (si configuré)
 **When** je couvre le flow : 1ère visite Live → popin → autoriser → calcul lancé / refuser → fallback immédiat / consentement déjà donné → pas de popin
 **Then** tous les scénarios passent
+
+> **Amendement de scope (2026-05-29, validé Guillaume) — tracé d'accès en mode Live :**
+> À l'implémentation, la Story 3.3 a été étendue pour **afficher la polyline d'itinéraire d'accès sur la carte Live** (et pas seulement les métriques), lorsque le consentement est accordé. Initialement, FR-PA-007/008/009 (polyline carte) étaient rattachés à **Epic 2 (Planning)** uniquement et l'architecture scopait le Live à « Dialog + Metrics ». Décision produit : afficher aussi le tracé en Live — pas de risque RGPD nouveau (le consentement couvre déjà l'envoi de la position, et le tracé n'est visible que par l'utilisateur lui-même). Implémenté via `LiveAccessPolyline` + extension `AccessMapLayer` (`fitOnShow=false` pour ne pas concurrencer le suivi GPS). **FR-PA-007/008/009 s'appliquent donc désormais à Planning ET Live.**
 
 ---
 
