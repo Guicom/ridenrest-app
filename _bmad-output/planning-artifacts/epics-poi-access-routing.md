@@ -987,6 +987,8 @@ So that my planning decisions are always based on current information.
 
 ### Story 4.3 : Observabilité — Métriques BullMQ + Uptime Kuma + Sentry
 
+> **🔄 RE-CADRAGE 2026-05-31 (décision Guillaume — scope minimal).** Story implémentée au minimum viable car beaucoup d'observabilité existait déjà (logs JSON pino, DLQ `poi-access-failures`, circuit breaker BRouter). **Livré** : endpoint `GET /api/health/access-queue` (token `HEALTH_ENDPOINT_TOKEN`, fail-closed) + monitor Kuma `POI Access Queue Health` (depth > 200) ; Bull Board (`/api/admin/queues`, gate `BULL_BOARD_ENABLED` + Basic Auth) ; enrichissement logs worker (`status`, `engineVersion`) ; section « Observabilité » du runbook (m). **Différé en follow-up (aucun code)** : AC Sentry `beforeSend` → `infra-install-sentry` (Sentry absent du projet ; spec du filtre documentée dans le runbook) ; AC métriques Prometheus → `infra-prometheus-metrics` (pas de Grafana). Note : `routing_failed` n'est pas un `reason` d'exception mais le statut de fallback d'`AccessCalculatorService` — le filtre Sentry porte sur `BrouterUnavailableException`. `userId` retiré du pipeline d'accès (pivot nearest-trace) → toujours absent côté accès.
+
 As a **DevOps engineer running the app in production**,
 I want metrics, alerts and structured logs for the access routing pipeline,
 So that I can detect BRouter outages, queue backlogs, and silent failures before users complain.
@@ -995,7 +997,11 @@ So that I can detect BRouter outages, queue backlogs, and silent failures before
 
 **Given** un dashboard Bull Board (existant ou ajouté en Story 1.4)
 **When** j'ajoute la queue `poi-access-calculation` au dashboard
-**Then** le dashboard affiche : queue depth, active jobs, failed jobs (24h), avg processing time
+**Then** le dashboard affiche : ~~queue depth, active jobs, failed jobs (24h), avg processing time~~
+> _Doc-sync 2026-05-31 (code review)._ Bull Board (UI native) affiche les **compteurs par état** de
+> chaque queue (`waiting`/`active`/`completed`/`failed`/`delayed`/`paused`) + inspection job par job,
+> **pas** de tuile calculée « avg processing time » ni « failed 24h ». Ces agrégats vivent sur
+> l'endpoint de santé (`failed24h`, `oldestPendingAgeS`) et dans les logs worker (`durationMs`/job).
 **And** une alerte Uptime Kuma se déclenche si queue depth > 200 (push notification / email)
 
 **Given** un monitor Uptime Kuma de type HTTP Keyword

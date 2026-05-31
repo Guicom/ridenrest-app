@@ -44,9 +44,9 @@ export class AccessWorkerProcessor extends WorkerHost {
   }
 
   async process(job: Job<AccessJobPayload>): Promise<void> {
-    const { poiId, adventureId } = job.data
+    const { poiId, adventureId, engineVersion } = job.data
     const startTime = Date.now()
-    this.logger.log({ msg: 'access_job_start', jobId: job.id, poiId, adventureId })
+    this.logger.log({ msg: 'access_job_start', status: 'processing', jobId: job.id, poiId, adventureId, engineVersion })
 
     // Origine `nearest-trace` imposée (MAJ 2026-05-30). Pas de `profileOverride` : le profil
     // BRouter est dérivé du `routing_profile` de l'aventure côté `compute()` → cache identique
@@ -61,10 +61,12 @@ export class AccessWorkerProcessor extends WorkerHost {
       // BRouter indispo : pas de throw → job en succès, POI non persisté (retry lazy/eager ultérieur).
       this.logger.warn({
         msg: 'access_job_fallback',
+        status: 'fallback',
         jobId: job.id,
         poiId,
         reason: result.fallbackReason,
         durationMs,
+        engineVersion,
       })
       return
     }
@@ -74,16 +76,18 @@ export class AccessWorkerProcessor extends WorkerHost {
       // → throw). Branche défensive pour exhaustivité du type : si le contrat changeait un jour,
       // on PROPAGE l'erreur (retry BullMQ → échec définitif → `access_failed` + DLQ) plutôt que
       // de marquer le job en succès silencieux (qui laisserait `access_computed_at` NULL à jamais).
-      this.logger.error({ msg: 'access_job_error_result', jobId: job.id, poiId, message: result.message, durationMs })
+      this.logger.error({ msg: 'access_job_error_result', status: 'error', jobId: job.id, poiId, message: result.message, durationMs, engineVersion })
       throw new Error(`access compute returned error status for poi ${poiId}: ${result.message}`)
     }
 
     this.logger.log({
       msg: 'access_job_success',
+      status: 'ok',
       jobId: job.id,
       poiId,
       durationMs,
       source: result.source,
+      engineVersion,
     })
   }
 
