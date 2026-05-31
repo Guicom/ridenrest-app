@@ -6,7 +6,7 @@ import { RoutingService } from '../../routing/routing.service.js'
 import { BrouterUnavailableException } from '../../routing/brouter-unavailable.exception.js'
 import { AccessCalculatorModule } from './access-calculator.module.js'
 import { AccessCalculatorService } from './access-calculator.service.js'
-import { resolveOrigin } from './strategies/resolve-origin.js'
+import { resolveOriginCandidates } from './strategies/resolve-origin.js'
 import { computeDivergentSegment } from './strategies/compute-divergent-segment.js'
 
 // Mock @ridenrest/database — var (pas const) pour survivre au hoisting de jest.mock.
@@ -18,10 +18,10 @@ jest.mock('@ridenrest/database', () => {
 })
 
 // Mock des stratégies (fonctions pures testées séparément).
-jest.mock('./strategies/resolve-origin.js', () => ({ resolveOrigin: jest.fn() }))
+jest.mock('./strategies/resolve-origin.js', () => ({ resolveOriginCandidates: jest.fn() }))
 jest.mock('./strategies/compute-divergent-segment.js', () => ({ computeDivergentSegment: jest.fn() }))
 
-const mockResolveOrigin = resolveOrigin as jest.Mock
+const mockResolveCandidates = resolveOriginCandidates as jest.Mock
 const mockComputeDivergent = computeDivergentSegment as jest.Mock
 
 const mockConfig = {
@@ -30,6 +30,8 @@ const mockConfig = {
   brouterDefaultProfile: 'trekking',
   eagerThresholdM: 1500,
   traceBufferM: 10,
+  candidateRadiusM: 10000,
+  maxCandidates: 4,
   engineVersion: 'brouter-1.7.9+trekking',
 }
 
@@ -38,6 +40,7 @@ const ROUTE = {
   distanceM: 1000,
   elevationGainM: 50,
   elevationLossM: 40,
+  timeS: 600,
 }
 const METRICS = {
   distanceM: 850,
@@ -58,6 +61,7 @@ function poiRowFresh(overrides: Record<string, unknown> = {}): Record<string, un
     access_elevation_gain_m: null,
     access_elevation_loss_m: null,
     access_geometry: null,
+    access_variants: null,
     access_engine_version: null,
     access_computed_at: null,
     adventure_id: 'adv-1',
@@ -95,7 +99,7 @@ describe('AccessCalculatorService', () => {
     mockDb.execute
       .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
       .mockResolvedValueOnce({ rows: [] }) // updateCache
-    mockResolveOrigin.mockResolvedValue([2.4, 48.4])
+    mockResolveCandidates.mockResolvedValue([[2.4, 48.4]])
     computeRoute.mockResolvedValue(ROUTE)
     mockComputeDivergent.mockResolvedValue(METRICS)
 
@@ -118,11 +122,68 @@ describe('AccessCalculatorService', () => {
     expect(mockDb.execute).toHaveBeenCalledTimes(2)
   })
 
+  it('plusieurs candidats → retient le meilleur temps réel (profil-aware), pas le plus proche à vol d\'oiseau', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh({ routing_profile: 'road' })] }) // loadPoi
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    // Candidat A = le plus proche géométriquement mais lent (pistes) ; candidat B = plus loin
+    // mais sur nationale → temps BRouter plus court en fastbike.
+    mockResolveCandidates.mockResolvedValue([
+      [2.41, 48.41], // A
+      [2.42, 48.42], // B
+    ])
+    const routeSlow = { ...ROUTE, distanceM: 4000, timeS: 4200 } // A : raccourci lent
+    const routeFast = { ...ROUTE, distanceM: 9000, timeS: 1800 } // B : nationale rapide
+    computeRoute
+      .mockImplementationOnce(() => Promise.resolve(routeSlow))
+      .mockImplementationOnce(() => Promise.resolve(routeFast))
+    mockComputeDivergent.mockResolvedValue(METRICS)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result).toMatchObject({ status: 'ok', source: 'computed-fresh' })
+    // Les deux candidats sont routés (road → fastbike)…
+    expect(computeRoute).toHaveBeenCalledTimes(2)
+    expect(computeRoute).toHaveBeenNthCalledWith(1, { from: [2.41, 48.41], to: [2.5, 48.5], profile: 'fastbike' })
+    expect(computeRoute).toHaveBeenNthCalledWith(2, { from: [2.42, 48.42], to: [2.5, 48.5], profile: 'fastbike' })
+    // … et c'est la géométrie du candidat rapide (B) qui part au calcul du segment divergent.
+    expect(mockComputeDivergent).toHaveBeenCalledWith(
+      expect.anything(),
+      routeFast.geometry,
+      'adv-1',
+      10,
+    )
+    // Les 2 variantes sont exposées, triées meilleur-d'abord : B (etaS 1800) avant A (4200).
+    if (result.status === 'ok') {
+      expect(result.variants).toHaveLength(2)
+      expect(result.variants[0]).toMatchObject({ entryPoint: [2.42, 48.42], etaS: 1800 })
+      expect(result.variants[1]).toMatchObject({ entryPoint: [2.41, 48.41], etaS: 4200 })
+      // top-level = variants[0].
+      expect(result.distanceM).toBe(result.variants[0].distanceM)
+    }
+  })
+
+  it('un candidat échoue, un autre réussit → on garde le succès (résilience BRouter)', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    mockResolveCandidates.mockResolvedValue([[2.41, 48.41], [2.42, 48.42]])
+    computeRoute
+      .mockRejectedValueOnce(new BrouterUnavailableException('http_error'))
+      .mockResolvedValueOnce(ROUTE)
+    mockComputeDivergent.mockResolvedValue(METRICS)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result).toMatchObject({ status: 'ok', source: 'computed-fresh' })
+    expect(computeRoute).toHaveBeenCalledTimes(2)
+  })
+
   it('échec d\'écriture cache → réponse ok quand même servie + log ERROR visible (régression 0017)', async () => {
     mockDb.execute
       .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
       .mockRejectedValueOnce(new Error('Geometry type (MultiLineString) does not match column type (LineString)')) // updateCache throw
-    mockResolveOrigin.mockResolvedValue([2.4, 48.4])
+    mockResolveCandidates.mockResolvedValue([[2.4, 48.4]])
     computeRoute.mockResolvedValue(ROUTE)
     mockComputeDivergent.mockResolvedValue(METRICS)
 
@@ -152,7 +213,7 @@ describe('AccessCalculatorService', () => {
       source: 'computed-fresh',
     })
     // Court-circuit : ni résolution d'origine, ni BRouter, ni UPDATE cache.
-    expect(mockResolveOrigin).not.toHaveBeenCalled()
+    expect(mockResolveCandidates).not.toHaveBeenCalled()
     expect(computeRoute).not.toHaveBeenCalled()
     expect(mockDb.execute).toHaveBeenCalledTimes(1) // loadPoi uniquement
   })
@@ -165,6 +226,16 @@ describe('AccessCalculatorService', () => {
           access_elevation_gain_m: 80,
           access_elevation_loss_m: 60,
           access_geometry: JSON.stringify({ type: 'LineString', coordinates: [[2, 48], [2.01, 48.01]] }),
+          access_variants: [
+            {
+              entryPoint: [2.4, 48.4],
+              distanceM: 1500,
+              elevationGainM: 80,
+              elevationLossM: 60,
+              etaS: 900,
+              geometry: { type: 'LineString', coordinates: [[2, 48], [2.01, 48.01]] },
+            },
+          ],
           access_engine_version: 'brouter-1.7.9+trekking',
           access_computed_at: '2026-05-01T10:00:00.000Z',
           access_origin_stage_id: null,
@@ -178,13 +249,41 @@ describe('AccessCalculatorService', () => {
     })
 
     expect(result).toMatchObject({ status: 'ok', source: 'db-cache', distanceM: 1500 })
+    // Les variantes en cache sont restituées telles quelles.
+    if (result.status === 'ok') expect(result.variants).toHaveLength(1)
     expect(computeRoute).not.toHaveBeenCalled()
     expect(mockDb.execute).toHaveBeenCalledTimes(1) // loadPoi seul, pas d'UPDATE
   })
 
+  it('cache présent mais access_variants null (ligne pré-multicand) → recalcul forcé', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({
+        rows: [
+          poiRowFresh({
+            access_distance_m: 1500,
+            access_elevation_gain_m: 80,
+            access_elevation_loss_m: 60,
+            access_geometry: JSON.stringify({ type: 'LineString', coordinates: [[2, 48], [2.01, 48.01]] }),
+            access_variants: null, // colonne pas encore peuplée
+            access_engine_version: 'brouter-1.7.9+trekking',
+            access_computed_at: '2026-05-01T10:00:00.000Z',
+          }),
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    mockResolveCandidates.mockResolvedValue([[2.4, 48.4]])
+    computeRoute.mockResolvedValue(ROUTE)
+    mockComputeDivergent.mockResolvedValue(METRICS)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result).toMatchObject({ source: 'computed-fresh' }) // pas db-cache
+    expect(computeRoute).toHaveBeenCalled()
+  })
+
   it("BRouter indisponible → status fallback, pas d'UPDATE cache", async () => {
     mockDb.execute.mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
-    mockResolveOrigin.mockResolvedValue([2.4, 48.4])
+    mockResolveCandidates.mockResolvedValue([[2.4, 48.4]])
     computeRoute.mockRejectedValue(new BrouterUnavailableException('timeout'))
 
     const result = await service.compute({
@@ -223,7 +322,7 @@ describe('AccessCalculatorService', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
-    mockResolveOrigin.mockResolvedValue([2.4, 48.4])
+    mockResolveCandidates.mockResolvedValue([[2.4, 48.4]])
     computeRoute.mockResolvedValue(ROUTE)
     mockComputeDivergent.mockResolvedValue(METRICS)
 
@@ -238,7 +337,7 @@ describe('AccessCalculatorService', () => {
 
   it('erreur non-BRouter (étape inexistante) → propagée (cas dégénéré)', async () => {
     mockDb.execute.mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
-    mockResolveOrigin.mockRejectedValue(new NotFoundException('Stage not found'))
+    mockResolveCandidates.mockRejectedValue(new NotFoundException('Stage not found'))
 
     await expect(
       service.compute({ poiId: 'poi-1', origin: { type: 'stage', stageId: 'ghost' } }),
@@ -251,7 +350,7 @@ describe('AccessCalculatorService', () => {
     mockDb.execute
       .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
       .mockResolvedValueOnce({ rows: [] }) // updateCache
-    mockResolveOrigin.mockResolvedValue([2.4, 48.4])
+    mockResolveCandidates.mockResolvedValue([[2.4, 48.4]])
     computeRoute.mockResolvedValue(ROUTE)
     mockComputeDivergent.mockResolvedValue({ ...METRICS, geometry: { type: 'LineString', coordinates: bigCoords } })
 
@@ -276,6 +375,16 @@ describe('AccessCalculatorService', () => {
             type: 'MultiLineString',
             coordinates: [[[2, 48], [2.01, 48.01]], [[2.02, 48.02]]],
           }),
+          access_variants: [
+            {
+              entryPoint: [2.4, 48.4],
+              distanceM: 1500,
+              elevationGainM: 10,
+              elevationLossM: 5,
+              etaS: 700,
+              geometry: { type: 'MultiLineString', coordinates: [[[2, 48], [2.01, 48.01]], [[2.02, 48.02]]] },
+            },
+          ],
           access_engine_version: 'brouter-1.7.9+trekking',
           access_computed_at: '2026-05-01T10:00:00.000Z',
         }),

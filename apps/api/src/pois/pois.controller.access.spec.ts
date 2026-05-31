@@ -276,6 +276,16 @@ describe('POST /pois/:id/access — cache hit ne touche pas BRouter (real servic
     access_elevation_gain_m: 80,
     access_elevation_loss_m: 60,
     access_geometry: JSON.stringify({ type: 'LineString', coordinates: [[2, 48], [2.01, 48.01]] }),
+    access_variants: [
+      {
+        entryPoint: [2.4, 48.4],
+        distanceM: 1500,
+        elevationGainM: 80,
+        elevationLossM: 60,
+        etaS: 900,
+        geometry: { type: 'LineString', coordinates: [[2, 48], [2.01, 48.01]] },
+      },
+    ],
     access_engine_version: 'brouter-1.7.9+trekking', // === mockAccessConfig.engineVersion
     access_computed_at: '2026-05-01T10:00:00.000Z',
     adventure_id: 'adv-1',

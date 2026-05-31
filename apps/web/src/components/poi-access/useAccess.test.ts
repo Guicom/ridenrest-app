@@ -15,12 +15,16 @@ vi.mock('@/lib/api-client', () => ({
 
 const ORIGIN: AccessOrigin = { type: 'nearest-trace' }
 
+const OK_GEOM = { type: 'LineString' as const, coordinates: [[2.35, 48.85], [2.36, 48.86]] }
 const OK_RESPONSE: AccessResponse = {
   status: 'ok',
   distanceM: 4200,
   elevationGainM: 120,
   elevationLossM: 80,
-  geometry: { type: 'LineString', coordinates: [[2.35, 48.85], [2.36, 48.86]] },
+  geometry: OK_GEOM,
+  variants: [
+    { entryPoint: [2.35, 48.85], distanceM: 4200, elevationGainM: 120, elevationLossM: 80, etaS: 1000, geometry: OK_GEOM },
+  ],
   engineVersion: 'brouter-1.7.5',
   computedAt: '2026-05-29T12:00:00.000Z',
   source: 'computed-fresh',

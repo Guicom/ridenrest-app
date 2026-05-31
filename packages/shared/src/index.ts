@@ -29,9 +29,10 @@ export {
   AccessOriginStageSchema,
   AccessOriginNearestTraceSchema,
   AccessGeometrySchema,
+  AccessVariantSchema,
   BrouterProfileSchema,
 } from './schemas/poi-access'
-export type { AccessRequest, AccessResponse, AccessOrigin, BrouterProfile } from './schemas/poi-access'
+export type { AccessRequest, AccessResponse, AccessVariant, AccessOrigin, BrouterProfile } from './schemas/poi-access'
 
 // Constants
 export * from './constants/gpx.constants'

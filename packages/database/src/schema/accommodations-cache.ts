@@ -22,6 +22,10 @@ export const accommodationsCache = pgTable('accommodations_cache', {
   accessElevationGainM: real('access_elevation_gain_m'),
   accessElevationLossM: real('access_elevation_loss_m'),
   accessGeometry: lineOrMultiLineString('access_geometry'),
+  // Variantes d'itinéraire d'accès (choix utilisateur, 2026-05-31) : tableau JSON des points
+  // d'entrée candidats routés (entryPoint + distance/D+/D-/etaS + geometry), trié meilleur-d'abord.
+  // `access_geometry`/`access_distance_m` ci-dessus = variants[0] (meilleur auto) pour rétro-compat.
+  accessVariants: jsonb('access_variants'),
   accessEngineVersion: text('access_engine_version'),
   accessComputedAt: timestamp('access_computed_at'),
   accessFailed: boolean('access_failed').notNull().default(false),

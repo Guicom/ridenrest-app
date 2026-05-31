@@ -17,6 +17,8 @@ const mockConfig = {
   brouterDefaultProfile: 'trekking',
   eagerThresholdM: 1500,
   traceBufferM: 10,
+  candidateRadiusM: 10000,
+  maxCandidates: 4,
   engineVersion: 'brouter-1.7.9+trekking',
 }
 
@@ -76,6 +78,7 @@ describe('RoutingService', () => {
       const route = await call('trekking')
 
       expect(route.distanceM).toBe(20471)
+      expect(route.timeS).toBe(4264) // properties['total-time'] (s), profil-aware
       expect(route.elevationGainM).toBe(139) // properties['filtered ascend']
       expect(route.elevationLossM).toBe(134) // cumulative negative delta of 3D points
       expect(route.geometry.type).toBe('LineString')

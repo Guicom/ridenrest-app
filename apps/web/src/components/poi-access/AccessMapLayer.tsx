@@ -1,34 +1,36 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import type maplibregl from 'maplibre-gl'
-import type { AccessResponse } from '@ridenrest/shared'
+import type { AccessResponse, AccessVariant } from '@ridenrest/shared'
 
 /**
- * Polyline d'itinéraire d'accès cyclable vers un POI sur MapLibre (Story POI-Access 2.5).
+ * Calque des itinéraires d'accès cyclables vers un POI sur MapLibre (Story POI-Access 2.5,
+ * étendu multi-variantes 2026-05-31).
  *
- * Affiche le tracé renvoyé par l'endpoint `/pois/:id/access` (Story 2.3) sous forme
- * d'une ligne ambre pointillée, insérée **entre la trace de l'aventure et les pins POI**
- * (cf. project-context §z-index Stack).
+ * Le serveur renvoie plusieurs variantes (points d'entrée candidats sur la trace, cf.
+ * `closestPointsOnTrace`). On dessine :
+ *  - la variante SÉLECTIONNÉE en ambre gras pointillé (au-dessus),
+ *  - les autres en « fantômes » gris, cliquables → `onSelect(index)` (pattern Google Maps).
+ * Inséré **entre la trace de l'aventure et les pins POI** (cf. project-context §z-index Stack).
  *
- * Patterns suivis :
- * - Source GeoJSON statique + `setData` à chaque changement de géométrie (Discovery #3 —
- *   bien plus rapide que removeSource/addSource).
- * - Cleanup idempotent via flag `cancelled` au unmount (Discovery #1).
- * - `fitBounds` une seule fois par géométrie distincte (AC#6) — pas à chaque re-render.
- *
- * Doc Sync : la story planifiait un prop `geometry: GeoJSONLineString` ; le contrat réel
- * (`AccessGeometrySchema`, Story 2.3) est un `LineString | MultiLineString` — typé ici
- * via `AccessGeometry`.
+ * Patterns conservés depuis la version mono-tracé :
+ * - Source GeoJSON statique + `setData` (Discovery #3, plus rapide que removeSource/addSource).
+ * - Ré-insertion sur `styledata` (un `setStyle`/thème détruit les calques custom).
+ * - Cleanup idempotent + try/catch teardown (map.remove() détruit le style → getLayer throw).
+ * - `fitBounds` une seule fois par JEU de variantes distinct (AC#6) ; désactivé en Live (GPS).
  */
 
 /** Géométrie d'accès dérivée du contrat partagé (LineString | MultiLineString). */
 export type AccessGeometry = Extract<AccessResponse, { status: 'ok' }>['geometry']
 
 const SOURCE_ID = 'poi-access-source'
-const LAYER_ID = 'poi-access-line'
+/** Calque de la variante sélectionnée (id historique conservé). */
+const SELECTED_LAYER_ID = 'poi-access-line'
+/** Calque des variantes non sélectionnées (cliquables). */
+const GHOST_LAYER_ID = 'poi-access-ghost'
 
 /**
- * Layers de pins POI candidats. La ligne d'accès est insérée AVANT le premier présent
+ * Calques de pins POI candidats. La ligne d'accès est insérée AVANT le premier présent
  * → reste sous les pins. Couvre la carte Planning (`use-poi-layers.ts` : `pois-{layer}-points`)
  * ET la carte Live (`use-live-poi-layers.ts` : `live-pois-{layer}-points`, Story 3.3).
  */
@@ -45,70 +47,124 @@ const POI_POINT_LAYER_IDS = [
 
 interface AccessMapLayerProps {
   map: maplibregl.Map | null
-  geometry: AccessGeometry | null
+  /** Variantes d'accès renvoyées par l'API. `null`/`[]` → rien dessiné. */
+  variants: AccessVariant[] | null
+  /** Index de la variante sélectionnée (gras ambre). */
+  selectedIndex: number
+  /** Clic sur une variante fantôme → sélection. */
+  onSelect?: (index: number) => void
   /**
-   * Auto-zoom (`fitBounds`) sur la géométrie au 1er affichage (AC#6 Planning).
-   * Mis à `false` en mode Live (Story 3.3) : le suivi GPS recentre la carte en
-   * permanence — un `fitBounds` programmatique serait écrasé 1-3 s plus tard et créerait
-   * un à-coup. La polyline s'affiche alors au zoom courant, sans bagarre de caméra.
+   * Auto-zoom (`fitBounds`) sur les variantes au 1er affichage (AC#6 Planning).
+   * `false` en mode Live (Story 3.3) : le suivi GPS pilote la caméra — un `fitBounds`
+   * programmatique serait écrasé et créerait un à-coup.
    */
   fitOnShow?: boolean
 }
 
-/** Premier layer de pins POI présent dans la carte, sinon `undefined` (insertion au sommet). */
+/** Premier calque de pins POI présent, sinon `undefined` (insertion au sommet). */
 function firstPoiPointLayerId(map: maplibregl.Map): string | undefined {
   return POI_POINT_LAYER_IDS.find((id) => map.getLayer(id))
 }
 
-/**
- * Retrait idempotent du layer + source d'accès (AC#5 — sûr même si absent).
- *
- * Protégé par try/catch : au démontage (navigation hors de la carte), MapLibre appelle
- * `map.remove()` qui détruit le style interne. Le `map` reste un objet truthy, mais
- * `getLayer`/`getSource` lisent `this.style.*` (désormais `undefined`) et throw. Pendant
- * ce teardown il n'y a plus rien à nettoyer → on avale l'erreur silencieusement.
- */
+/** Retrait idempotent des calques + source d'accès (sûr même si absents / map détruite). */
 function removeAccessLayer(map: maplibregl.Map): void {
   try {
-    if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID)
+    if (map.getLayer(SELECTED_LAYER_ID)) map.removeLayer(SELECTED_LAYER_ID)
+    if (map.getLayer(GHOST_LAYER_ID)) map.removeLayer(GHOST_LAYER_ID)
     if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
   } catch {
     // map déjà détruite (map.remove()) — plus de style, rien à retirer.
   }
 }
 
-/** Bbox `[minLng, minLat, maxLng, maxLat]` sur toutes les positions, ou null si vide. */
-function computeBounds(geometry: AccessGeometry): [number, number, number, number] | null {
-  const positions: number[][] =
-    geometry.type === 'LineString' ? geometry.coordinates : geometry.coordinates.flat()
-  if (positions.length === 0) return null
+/** FeatureCollection : une feature par variante, propriété `idx`. */
+function toFeatureCollection(variants: AccessVariant[]): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: variants.map((v, idx) => ({
+      type: 'Feature',
+      geometry: v.geometry as GeoJSON.Geometry,
+      properties: { idx },
+    })),
+  }
+}
 
+/** Bbox `[minLng, minLat, maxLng, maxLat]` sur toutes les variantes, ou null si vide. */
+function computeBounds(variants: AccessVariant[]): [number, number, number, number] | null {
   let minLng = Infinity
   let minLat = Infinity
   let maxLng = -Infinity
   let maxLat = -Infinity
-  for (const [lng, lat] of positions) {
-    if (lng < minLng) minLng = lng
-    if (lng > maxLng) maxLng = lng
-    if (lat < minLat) minLat = lat
-    if (lat > maxLat) maxLat = lat
+  let seen = false
+  for (const v of variants) {
+    const positions: number[][] =
+      v.geometry.type === 'LineString' ? v.geometry.coordinates : v.geometry.coordinates.flat()
+    for (const [lng, lat] of positions) {
+      seen = true
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
   }
-  return [minLng, minLat, maxLng, maxLat]
+  return seen ? [minLng, minLat, maxLng, maxLat] : null
 }
 
-export function AccessMapLayer({ map, geometry, fitOnShow = true }: AccessMapLayerProps) {
-  // Mémorise la dernière géométrie zoomée → évite un re-zoom à chaque re-render (AC#6).
-  // La référence de `geometry` est stable par entrée de cache TanStack (un POI donné),
-  // donc change uniquement au switch de POI → re-zoom pertinent sur le nouvel itinéraire.
-  const lastZoomedGeometryRef = useRef<AccessGeometry | null>(null)
+export function AccessMapLayer({
+  map,
+  variants,
+  selectedIndex,
+  onSelect,
+  fitOnShow = true,
+}: AccessMapLayerProps) {
+  // Mémorise le dernier jeu de variantes zoomé → évite un re-zoom à chaque re-render (AC#6).
+  // La référence `variants` est stable par entrée de cache TanStack (un POI donné) → change
+  // uniquement au switch de POI → re-zoom pertinent sur le nouvel ensemble d'itinéraires.
+  const lastZoomedRef = useRef<AccessVariant[] | null>(null)
+  // onSelect via ref → le handler de clic (enregistré une fois) lit toujours la dernière valeur.
+  const onSelectRef = useRef(onSelect)
+  onSelectRef.current = onSelect
 
+  // ── Enregistrement unique des handlers de clic/curseur sur les fantômes (par map) ──
   useEffect(() => {
     if (!map) return
 
-    // Pas de géométrie (loading / fallback / fermeture) → retrait propre + reset zoom.
-    if (!geometry) {
+    const handleClick = (e: maplibregl.MapLayerMouseEvent) => {
+      const idx = e.features?.[0]?.properties?.idx
+      if (typeof idx === 'number') onSelectRef.current?.(idx)
+    }
+    const handleEnter = () => {
+      map.getCanvas().style.cursor = 'pointer'
+    }
+    const handleLeave = () => {
+      map.getCanvas().style.cursor = ''
+    }
+
+    // Handlers par id de calque : MapLibre les résout à la volée, même si le calque est
+    // (re)créé plus tard ou après un reload de style.
+    map.on('click', GHOST_LAYER_ID, handleClick)
+    map.on('mouseenter', GHOST_LAYER_ID, handleEnter)
+    map.on('mouseleave', GHOST_LAYER_ID, handleLeave)
+
+    return () => {
+      try {
+        map.off('click', GHOST_LAYER_ID, handleClick)
+        map.off('mouseenter', GHOST_LAYER_ID, handleEnter)
+        map.off('mouseleave', GHOST_LAYER_ID, handleLeave)
+      } catch {
+        // map détruite — rien à détacher.
+      }
+    }
+  }, [map])
+
+  // ── Source / calques / filtres / fit ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!map) return
+
+    // Rien à dessiner (loading / fallback / fermeture) → retrait propre + reset zoom.
+    if (!variants || variants.length === 0) {
       removeAccessLayer(map)
-      lastZoomedGeometryRef.current = null
+      lastZoomedRef.current = null
       return
     }
 
@@ -116,51 +172,64 @@ export function AccessMapLayer({ map, geometry, fitOnShow = true }: AccessMapLay
 
     const apply = () => {
       if (cancelled) return
-      const data: GeoJSON.Feature = { type: 'Feature', geometry, properties: {} }
+      const data = toFeatureCollection(variants)
+      const ghostFilter = ['!=', ['get', 'idx'], selectedIndex] as unknown as maplibregl.FilterSpecification
+      const selectedFilter = ['==', ['get', 'idx'], selectedIndex] as unknown as maplibregl.FilterSpecification
 
       const existing = map.getSource(SOURCE_ID)
       if (existing) {
-        // Source déjà présente → simple mise à jour des données (Discovery #3).
         ;(existing as maplibregl.GeoJSONSource).setData(data)
+        map.setFilter(GHOST_LAYER_ID, ghostFilter)
+        map.setFilter(SELECTED_LAYER_ID, selectedFilter)
       } else {
+        const beforeId = firstPoiPointLayerId(map)
         map.addSource(SOURCE_ID, { type: 'geojson', data })
+        // Fantômes d'abord (en dessous), puis la sélectionnée (au-dessus) — même beforeId.
         map.addLayer(
           {
-            id: LAYER_ID,
+            id: GHOST_LAYER_ID,
             type: 'line',
             source: SOURCE_ID,
+            filter: ghostFilter,
+            paint: {
+              'line-color': '#9ca3af',
+              'line-width': 3,
+              'line-dasharray': [2, 2],
+              'line-opacity': 0.55,
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          },
+          beforeId,
+        )
+        map.addLayer(
+          {
+            id: SELECTED_LAYER_ID,
+            type: 'line',
+            source: SOURCE_ID,
+            filter: selectedFilter,
             paint: {
               'line-color': '#f59e0b',
               'line-width': 4,
               'line-dasharray': [2, 2],
               'line-opacity': 0.9,
             },
-            layout: {
-              'line-cap': 'round',
-              'line-join': 'round',
-            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
           },
-          // beforeId : insère sous les pins POI, au-dessus de la trace (Discovery #5).
-          firstPoiPointLayerId(map),
+          beforeId,
         )
       }
 
-      // Zoom une seule fois par géométrie distincte (AC#6) — sauf en Live (fitOnShow=false).
-      if (fitOnShow && lastZoomedGeometryRef.current !== geometry) {
-        const bounds = computeBounds(geometry)
+      // Zoom une seule fois par jeu de variantes distinct (AC#6) — sauf en Live (fitOnShow=false).
+      if (fitOnShow && lastZoomedRef.current !== variants) {
+        const bounds = computeBounds(variants)
         if (bounds) map.fitBounds(bounds, { padding: 40, duration: 500 })
-        lastZoomedGeometryRef.current = geometry
+        lastZoomedRef.current = variants
       }
     }
 
-    // Applique immédiatement si le style est prêt.
     if (map.isStyleLoaded()) apply()
 
-    // Ré-applique à chaque (re)chargement de style : un `map.setStyle()` (changement
-    // de thème) détruit TOUS les layers/sources custom → il faut ré-insérer la polyline,
-    // comme le font les autres layers du projet via `styleVersion` (project-context
-    // §Map Interaction UX). Couvre aussi le cas « style pas encore chargé au mount ».
-    // Guard `!getSource` → no-op quasi-gratuit hors rechargement (styledata est fréquent).
+    // Ré-applique à chaque (re)chargement de style (setStyle/thème détruit les calques custom).
     const onStyleData = () => {
       if (cancelled) return
       if (!map.getSource(SOURCE_ID)) apply()
@@ -171,10 +240,9 @@ export function AccessMapLayer({ map, geometry, fitOnShow = true }: AccessMapLay
       cancelled = true
       map.off('styledata', onStyleData)
     }
-  }, [map, geometry, fitOnShow])
+  }, [map, variants, selectedIndex, fitOnShow])
 
-  // Cleanup au unmount du composant (AC#5) — retrait du layer même si la géométrie
-  // était encore affichée. Idempotent : sûr en cas de double-cleanup (React Strict Mode).
+  // Cleanup au unmount — retrait des calques même si encore affichés (idempotent, Strict Mode).
   useEffect(() => {
     return () => {
       if (map) removeAccessLayer(map)

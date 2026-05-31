@@ -1,0 +1,1 @@
+ALTER TABLE "accommodations_cache" ADD COLUMN "access_variants" jsonb;

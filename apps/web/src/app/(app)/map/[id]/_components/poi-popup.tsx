@@ -51,6 +51,9 @@ interface PoiPopupProps {
    * Stats (km, D+, ETA) are computed relative to this position.
    */
   planningFromKm?: number
+  /** Variante d'accès sélectionnée (état détenu par la page, partagé avec la carte). */
+  selectedVariantIndex?: number
+  onSelectVariant?: (index: number) => void
 }
 
 interface ScreenPos {
@@ -100,7 +103,7 @@ function getNextTransition(
   }
 }
 
-export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, planningFromKm = 0 }: PoiPopupProps) {
+export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, planningFromKm = 0, selectedVariantIndex = 0, onSelectVariant }: PoiPopupProps) {
   const [pos, setPos] = useState<ScreenPos | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   const isLiveMode = !!liveContext
@@ -281,7 +284,7 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
       <div
         ref={popupRef}
-        className="pointer-events-auto absolute w-72 max-w-[calc(100vw-2rem)] [--popup-bg:#ffffff] dark:[--popup-bg:#18181b]"
+        className="pointer-events-auto absolute w-80 max-w-[calc(100vw-2rem)] [--popup-bg:#ffffff] dark:[--popup-bg:#18181b]"
         style={{
           left: pos.x,
           top: pos.y - PIN_OFFSET_PX,
@@ -410,6 +413,8 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
               category={poi.category}
               fallbackDistanceM={poi.distFromTraceM}
               speedKmh={speed}
+              selectedVariantIndex={selectedVariantIndex}
+              onSelectVariant={onSelectVariant}
             />
           )}
 

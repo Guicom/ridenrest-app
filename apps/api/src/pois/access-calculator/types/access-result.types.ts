@@ -54,6 +54,21 @@ export interface DivergentMetrics {
   geometry: GeoJSONGeometry
 }
 
+/**
+ * Une variante d'accès = un point d'entrée candidat sur la trace + son itinéraire routé.
+ * Le service en expose plusieurs (cf. `closestPointsOnTrace`) et l'utilisateur choisit.
+ */
+export interface AccessVariant {
+  /** Point d'entrée sur la trace `[lon, lat]`. */
+  entryPoint: [number, number]
+  distanceM: number
+  elevationGainM: number
+  elevationLossM: number
+  /** Temps BRouter (s), critère de tri. */
+  etaS: number
+  geometry: GeoJSONGeometry
+}
+
 /** Résultat de `AccessCalculatorService.compute()` — status discriminant. */
 export type AccessResult =
   | {
@@ -62,6 +77,8 @@ export type AccessResult =
       elevationGainM: number
       elevationLossM: number
       geometry: GeoJSONGeometry
+      /** Variantes proposées, triées meilleur-d'abord. `variants[0]` = champs top-level. */
+      variants: AccessVariant[]
       engineVersion: string
       computedAt: string
       source: 'db-cache' | 'computed-fresh'

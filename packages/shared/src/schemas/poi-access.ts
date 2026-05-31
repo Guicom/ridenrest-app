@@ -64,6 +64,25 @@ export const AccessGeometrySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('MultiLineString'), coordinates: z.array(z.array(Position).min(2)) }),
 ])
 
+// ── Variantes d'itinéraire d'accès (choix utilisateur, 2026-05-31) ────────────
+
+/**
+ * Une variante = un point d'entrée candidat sur la trace + son itinéraire d'accès calculé
+ * pour le profil. Le serveur route plusieurs points d'entrée étalés (cf. `closestPointsOnTrace`)
+ * et expose toutes les variantes ; l'utilisateur choisit celle qui lui convient (le point le
+ * plus proche à vol d'oiseau n'est pas toujours le meilleur selon le profil/le terrain).
+ */
+export const AccessVariantSchema = z.object({
+  /** Point d'entrée sur la trace [lon, lat] (origine de l'itinéraire d'accès). */
+  entryPoint: z.tuple([z.number(), z.number()]),
+  distanceM: z.number(),
+  elevationGainM: z.number(),
+  elevationLossM: z.number(),
+  /** Temps de trajet estimé par BRouter (s) — critère de tri des variantes. */
+  etaS: z.number(),
+  geometry: AccessGeometrySchema,
+})
+
 // ── Réponse (union discriminée sur `status`, miroir de Story 2.2 AccessResult) ─
 
 export const AccessResponseSchema = z.discriminatedUnion('status', [
@@ -73,6 +92,9 @@ export const AccessResponseSchema = z.discriminatedUnion('status', [
     elevationGainM: z.number(),
     elevationLossM: z.number(),
     geometry: AccessGeometrySchema,
+    // Toutes les variantes proposées, triées meilleur-d'abord. `variants[0]` correspond aux
+    // champs top-level ci-dessus (meilleur auto) → rétro-compatible. ≥ 1 garanti par le serveur.
+    variants: z.array(AccessVariantSchema).min(1),
     engineVersion: z.string(),
     computedAt: z.string(),
     source: z.enum(['db-cache', 'computed-fresh']),
@@ -93,5 +115,6 @@ export const AccessResponseSchema = z.discriminatedUnion('status', [
 
 export type AccessRequest = z.infer<typeof AccessRequestSchema>
 export type AccessResponse = z.infer<typeof AccessResponseSchema>
+export type AccessVariant = z.infer<typeof AccessVariantSchema>
 export type AccessOrigin = z.infer<typeof AccessOriginSchema>
 export type BrouterProfile = z.infer<typeof BrouterProfileSchema>

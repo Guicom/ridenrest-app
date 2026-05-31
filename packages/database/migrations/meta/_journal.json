@@ -127,6 +127,13 @@
       "when": 1780156747931,
       "tag": "0017_lazy_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1780216437594,
+      "tag": "0018_access_variants",
+      "breakpoints": true
     }
   ]
 }

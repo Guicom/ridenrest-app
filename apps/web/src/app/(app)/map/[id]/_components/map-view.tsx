@@ -185,7 +185,12 @@ export function MapView({ adventureId }: MapViewProps) {
   const accessOrigin: AccessOrigin = useMemo(() => ({ type: 'nearest-trace' }), [])
   // `useAccess` est lazy (enabled requiert un poiId) — '' désactive la requête.
   const { data: accessData } = useAccess(visibleAccessPoiId ?? '', accessOrigin)
-  const accessGeometry = accessData?.status === 'ok' ? accessData.geometry : null
+  const accessVariants = accessData?.status === 'ok' ? accessData.variants : null
+  // Variante d'accès choisie (partagée carte ↔ popup) — réinitialisée à 0 au changement de POI.
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0)
+  useEffect(() => {
+    setSelectedVariantIndex(0)
+  }, [visibleAccessPoiId])
 
   // Detect if any stage has a per-stage departure time → used for weather layer + controls
   const stageDeparturesJson = useMemo(() => {
@@ -576,7 +581,9 @@ export function MapView({ adventureId }: MapViewProps) {
               cadrage du clic sur le pin (easeTo offset → popup visible). */}
           <AccessMapLayer
             map={mapCanvasRef.current?.getMap() ?? null}
-            geometry={accessGeometry}
+            variants={accessVariants}
+            selectedIndex={selectedVariantIndex}
+            onSelect={setSelectedVariantIndex}
             fitOnShow={false}
           />
 
@@ -634,6 +641,8 @@ export function MapView({ adventureId }: MapViewProps) {
                   ? (stages.find(s => s.id === selectedStageId)?.startKm ?? 0)
                   : 0
               }
+              selectedVariantIndex={selectedVariantIndex}
+              onSelectVariant={setSelectedVariantIndex}
             />
           )}
 

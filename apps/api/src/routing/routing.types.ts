@@ -24,6 +24,13 @@ export interface BrouterRoute {
   distanceM: number
   elevationGainM: number
   elevationLossM: number
+  /**
+   * Temps de trajet estimé par BRouter (secondes), selon le profil. 0 si absent de la
+   * réponse. C'est le coût pertinent pour départager des points d'accès candidats : il
+   * intègre la vitesse propre au profil (fastbike privilégie le bitume rapide). Cf.
+   * sélection profil-aware du point d'entrée sur la trace (closestPointsOnTrace).
+   */
+  timeS: number
 }
 
 /** Paramètres d'appel de computeRoute. `from`/`to` au format [lon, lat]. */
