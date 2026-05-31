@@ -197,7 +197,7 @@ export class AccessCalculatorService {
       const metricsList = await Promise.all(
         ranked.map((c) => computeDivergentSegment(db, c.route.geometry, poi.adventureId, this.config.traceBufferM)),
       )
-      const variants: AccessVariant[] = ranked.map((c, i) => ({
+      const allVariants: AccessVariant[] = ranked.map((c, i) => ({
         entryPoint: [c.entryPoint[0], c.entryPoint[1]],
         distanceM: metricsList[i].distanceM,
         elevationGainM: metricsList[i].elevationGainM,
@@ -205,6 +205,22 @@ export class AccessCalculatorService {
         etaS: c.route.timeS,
         geometry: metricsList[i].geometry,
       }))
+      // Dédoublonnage AU NIVEAU DE LA ROUTE AFFICHÉE : des points d'entrée distincts SUR la trace
+      // produisent souvent le MÊME segment divergent (le tronçon POI→trace est identique ; seule
+      // la portion parcourue SUR la trace, invisible, diffère) → tracé dessiné + distance/D+/D-
+      // identiques, le tout indiscernable pour l'utilisateur. On déduplique donc sur les métriques
+      // AFFICHÉES (distance, D+, D-) — surtout PAS sur `etaS`, qui inclut la portion sur trace et
+      // distingue à tort deux variantes pourtant superposées. `allVariants[0]` (meilleur) conservé.
+      const variants = allVariants.filter(
+        (v, i) =>
+          !allVariants.some(
+            (k, j) =>
+              j < i &&
+              Math.abs(k.distanceM - v.distanceM) < 50 &&
+              Math.abs(k.elevationGainM - v.elevationGainM) < 5 &&
+              Math.abs(k.elevationLossM - v.elevationLossM) < 5,
+          ),
+      )
       const best = metricsList[0] // variants[0] = meilleur (top-level + colonnes legacy)
 
       this.logGeometrySize(poi.id, best.geometry)

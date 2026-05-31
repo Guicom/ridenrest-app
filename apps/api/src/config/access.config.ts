@@ -18,9 +18,13 @@ const schema = z.object({
   // plus proche à vol d'oiseau n'est plus forcément retenu — on minimise le temps réel selon
   // le profil). Invalide les accès en cache calculés avec l'ancienne logique mono-point
   // (ST_ClosestPoint) → recalcul lazy au prochain accès.
+  // Bump 2026-05-31 (b) : dédoublonnage des variantes sur les métriques AFFICHÉES (distance,
+  // D+, D-) au lieu de `etaS` → fusionne les variantes au tracé identique (entrées distinctes,
+  // même segment divergent) qui apparaissaient en double. Invalide les variantes en cache
+  // (potentiellement dupliquées) → recalcul lazy au prochain accès.
   // Bump 2026-05-30 : nouveau mapping de profils (road→fastbike, gravel→gravel,
   // bikepacking→trekking) — invalidation précédente, conservée pour historique.
-  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+profiles-v2+multicand'),
+  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+profiles-v2+multicand2'),
 })
 
 const accessConfig = registerAs('access', () => {

@@ -137,7 +137,11 @@ describe('AccessCalculatorService', () => {
     computeRoute
       .mockImplementationOnce(() => Promise.resolve(routeSlow))
       .mockImplementationOnce(() => Promise.resolve(routeFast))
-    mockComputeDivergent.mockResolvedValue(METRICS)
+    // Métriques divergentes DISTINCTES → les deux variantes survivent au dédoublonnage.
+    // Ordre de tri (timeS) : B(1800) d'abord, puis A(4200) → computeDivergent appelé [B, A].
+    mockComputeDivergent
+      .mockResolvedValueOnce({ ...METRICS, distanceM: 9000 }) // B
+      .mockResolvedValueOnce({ ...METRICS, distanceM: 4000 }) // A
 
     const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
 
@@ -161,6 +165,33 @@ describe('AccessCalculatorService', () => {
       // top-level = variants[0].
       expect(result.distanceM).toBe(result.variants[0].distanceM)
     }
+  })
+
+  it('points d\'entrée distincts → même route → dédoublonné en une seule variante (cas gravel)', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    mockResolveCandidates.mockResolvedValue([[2.41, 48.41], [2.42, 48.42], [2.43, 48.43]])
+    // A et B (entrées distinctes) refluent par le MÊME segment divergent → métriques affichées
+    // identiques mais `etaS` différents (portion sur trace différente). C est une route distincte.
+    computeRoute
+      .mockResolvedValueOnce({ ...ROUTE, timeS: 4200 }) // A
+      .mockResolvedValueOnce({ ...ROUTE, timeS: 5200 }) // B (même segment divergent, etaS différent)
+      .mockResolvedValueOnce({ ...ROUTE, timeS: 1800 }) // C (meilleur temps → tête de tri)
+    // Tri par timeS : C(1800), A(4200), B(5200). Métriques divergentes : C distinct, A≡B.
+    mockComputeDivergent
+      .mockResolvedValueOnce({ ...METRICS, distanceM: 9000, elevationGainM: 20 }) // C
+      .mockResolvedValue({ ...METRICS, distanceM: 17500, elevationGainM: 45 }) // A puis B (identiques)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result.status).toBe('ok')
+    if (result.status === 'ok') {
+      // 3 candidats routés, mais A≡B (mêmes distance/D+/D-) → 2 variantes distinctes seulement.
+      // Le dédoublonnage ignore `etaS` (5200 vs 4200) → ne sépare pas A et B à tort.
+      expect(result.variants).toHaveLength(2)
+    }
+    expect(computeRoute).toHaveBeenCalledTimes(3) // tous routés…
   })
 
   it('un candidat échoue, un autre réussit → on garde le succès (résilience BRouter)', async () => {
