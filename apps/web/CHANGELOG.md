@@ -4,6 +4,8 @@
 
 ### Nouveautés
 - Calcul de l'itinéraire entre votre trace et un hébergement
+- Choix entre plusieurs itinéraires d'accès et affichage sur la carte (tracé magenta avec liseré blanc), avec avertissement quand l'itinéraire emprunte une route nationale
+- Carte du point d'intérêt en verre dépoli pour laisser voir l'itinéraire qui passe en dessous
 
 ## 1.3.0 — 2026-05-05
 

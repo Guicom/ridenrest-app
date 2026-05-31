@@ -206,3 +206,67 @@ Claude Opus 4.8 (1M context)
 - apps/web/src/components/poi-access/AccessMetrics.tsx (+ .test), AccessMapLayer.test.tsx,
   LiveAccessPolyline.test.tsx, useAccess.test.ts
 - apps/web/src/app/(app)/adventures/[id]/_components/adventure-detail.tsx (retrait du sélecteur)
+
+---
+
+## Polish UI POI Access (2026-05-31, post-merge PR #5)
+
+> Lot **purement UI** (aucun changement de calcul/contrat) destiné à rendre l'accès POI lisible
+> sur la carte et à fiabiliser l'avertissement « route nationale ». Réparti entre le commit `a86baa3`
+> (déjà mergé via **PR #5** + déployé prod) et le dernier correctif `5f6b6dc`
+> (branche `fix/poi-access-single-variant-national-road-warning`, mono-variante). **Tout est mutualisé
+> Planning ↔ Live** (mêmes composants `PoiPopup`, `AccessMapLayer`/`LiveAccessPolyline`, `AccessMetrics`)
+> → aucune divergence entre les deux modes.
+
+### Changements
+
+1. **Carte POI « liquid glass »** (`poi-popup.tsx`, composant `PoiPopup`, partagé Planning + Live).
+   La carte du popup POI est désormais en **verre dépoli permanent** : fond translucide
+   (`--popup-glass` ≈ `rgba(255,255,255,0.28)`), `backdrop-filter: blur(8px) saturate(...) brightness(1.05)`
+   (+ préfixe `-webkit-` pour Safari/iOS), liseré spéculaire via `box-shadow`. But : laisser
+   transparaître le routing (la trace d'accès passe parfois **sous** la carte) tout en gardant le
+   contenu net par-dessus. Inspiré de [kube.io/blog/liquid-glass-css-svg](https://kube.io/blog/liquid-glass-css-svg)
+   (la vraie réfraction SVG `feDisplacementMap` y est Chrome-only → on s'en tient à `blur`+`saturate`,
+   cross-browser). **État 100 % statique, aucune transition** : plusieurs pistes d'animation (fondu
+   transitoire « peek », défilé de pointillés, pulse glow largeur+flou) ont été testées puis **retirées**
+   à la demande.
+
+2. **Trait d'itinéraire d'accès sur la carte** (`AccessMapLayer.tsx`, partagé Planning + Live via
+   `LiveAccessPolyline`).
+   - Couleur : ambre `#f59e0b` → (brièvement vert sage `#2D6A4A`) → finalement **magenta/fuchsia
+     `#e6007e`** (constante `ACCESS_ROUTE_COLOR`), qui tranche sur tous les fonds OpenFreeMap
+     (Liberty/Bright/Positron/Dark) sans collision avec le bleu de la trace, l'orange des pins POI
+     ni le vert du terrain.
+   - **Liseré blanc continu** ajouté (calque `poi-access-casing`, `#ffffff`, largeur 7, sous le trait)
+     pour « décoller » l'itinéraire de n'importe quel fond (technique Google/Komoot). Empilement
+     bas→haut : fantômes gris (variantes non sélectionnées) → liseré blanc → trait magenta pointillé.
+
+3. **Sélecteur d'itinéraires + métriques** (`AccessMetrics.tsx`).
+   - Accent de l'option sélectionnée aligné sur le magenta `#e6007e` (cohérence carte ↔ popup).
+   - Fond gris du conteneur des boutons d'options retiré (les boutons « flottent » sur le verre).
+   - **Avertissement « ⚠ Route nationale »** (icône `TriangleAlert` rouge + texte) ajouté à droite du
+     label « ITINÉRAIRES » quand la variante affichée/sélectionnée emprunte une nationale
+     (`usesMainRoad`).
+   - **Correctif mono-variante** (`5f6b6dc`) : l'avertissement s'affiche désormais **même quand il n'y
+     a qu'une seule variante**. Avant, `VariantSelector` faisait `return null` dès `variants.length <= 1`,
+     ce qui masquait aussi l'avertissement. Dissociation : le **choix d'itinéraires** (label + boutons)
+     n'apparaît qu'à partir de **2 variantes** ; l'**avertissement nationale** apparaît dès que la
+     variante affichée passe par une nationale, quel que soit le nombre de variantes.
+
+### Tests
+
+- `AccessMapLayer.test.tsx` : calque liseré (`poi-access-casing`) + couleur magenta.
+- `AccessMetrics.test.tsx` : avertissement nationale, **dont le cas mono-variante**.
+- Tous verts.
+
+### Statut livraison
+
+- Commit `a86baa3` (liquid glass + magenta + liseré + avertissement multi-variantes) **mergé via PR #5
+  + déployé prod**.
+- Correctif mono-variante (`5f6b6dc`) **en cours de merge** (nouvelle PR).
+
+### File List (polish UI)
+
+- apps/web/src/app/(app)/map/[id]/_components/poi-popup.tsx
+- apps/web/src/components/poi-access/AccessMapLayer.tsx (+ .test)
+- apps/web/src/components/poi-access/AccessMetrics.tsx (+ .test)

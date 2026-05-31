@@ -108,6 +108,19 @@ describe('AccessMetrics', () => {
     expect(screen.queryByTestId('access-variant-selector')).not.toBeInTheDocument()
   })
 
+  it('single variant on a national road → shows the warning even without the selector', () => {
+    setAccess({
+      data: {
+        ...okResponse,
+        variants: [{ ...okResponse.variants[0], usesMainRoad: true, mainRoadDistanceM: 2000 }],
+      },
+    })
+    render(<AccessMetrics poiId="p1" origin={ORIGIN} category="hotel" variant="stats" speedKmh={15} onSelectVariant={vi.fn()} />)
+    // Pas de sélecteur d'options (une seule variante) mais l'avertissement nationale est présent.
+    expect(screen.queryByTestId('access-variant-selector')).not.toBeInTheDocument()
+    expect(screen.getByTestId('access-main-road-warning')).toHaveTextContent('Route nationale')
+  })
+
   it('renders the variant selector with multiple variants (one option each)', () => {
     setAccess({ data: okWithVariants(4200, 9000, 6000) })
     render(
