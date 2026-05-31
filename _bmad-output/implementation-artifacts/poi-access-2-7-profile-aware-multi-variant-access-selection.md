@@ -123,3 +123,86 @@ Claude Opus 4.8 (1M context)
 - apps/web/src/app/(app)/map/[id]/_components/map-view.tsx
 - apps/web/src/app/(app)/map/[id]/_components/poi-popup.tsx
 - apps/web/src/app/(app)/live/[id]/page.tsx
+
+---
+
+## Itérations post-merge (2026-05-31, suite test terrain prod — PR #5)
+
+> Après mise en prod du lot initial (PR #4), les tests de Guillaume sur le **Refugio de La Dehesa**
+> (Hortigüela, profil `road`) ont révélé que la feature « fonctionnait » mais donnait de mauvais
+> résultats. Enquête approfondie (BRouter réel + base locale) → la cause n'était **ni** les
+> candidats **ni** un bug de calcul, mais le **modèle de coût du profil**. D'où une refonte de
+> l'approche, livrée en **PR #5**.
+
+### Diagnostic (preuves)
+
+- **Doublons.** Deux variantes affichées « 17,5 km · ~1h10 » identiques. Vérifié en base :
+  géométries **byte-identiques** (mêmes distance/D+/D-), seul `etaS` différait. Cause : deux
+  points d'entrée distincts SUR la trace donnent le **même segment divergent** (le tronçon POI→trace
+  est identique ; seule la portion parcourue *sur* la trace, exclue du tracé, diffère). Le
+  dédoublonnage initial comparait `etaS` (qui inclut la portion on-trace) → ne fusionnait pas.
+- **« Pas par la N-234 ».** Mesuré sur BRouter le même trajet trace→POI selon le profil :
+  `fastbike` = 17 454 m · `trekking` = 14 052 m · `gravel` = 23 621 m. Depuis le meilleur point
+  d'entrée : `fastbike` = 21 km vs `trekking` = 10,3 km. → **`fastbike` ÉVITE délibérément les
+  routes nationales** (OSM `highway=trunk`, ex. N-234) pour la sécurité cycliste, et préférait un
+  long détour par pistes. `trekking` les emprunte (comme le vélo Google Maps : 8 km pour ce POI).
+- **Limite physique.** L'accès *depuis la trace* reste ~10 km (pas 7 km) : la trace passe de l'autre
+  côté du Río Arlanza ; le point le plus proche est à 2,3 km au sud de Cascajares, rive opposée.
+
+### Décisions produit (Guillaume)
+
+- **Suppression du choix de profil de routage** (gravel/fastbike/bikepacking). L'app est indicative
+  (pas un GPS) ; pour rejoindre un hébergement on veut le **chemin le plus court, nationales
+  autorisées**. → profil d'accès UNIQUE `trekking`.
+- **Indicateur danger** : signaler les variantes qui empruntent une **nationale** (`highway=trunk`
+  uniquement) par une **icône rouge ⚠️**, laissant le cycliste choisir son risque.
+- **Multi-variantes conservé** : l'utilisateur voit p. ex. « 10 km ⚠️ » (N-234) et « 17,5 km »
+  (pistes) et choisit.
+
+### Acceptance Criteria additionnels (PR #5)
+
+8. **Profil d'accès unique.** Tout calcul d'accès utilise `ACCESS_ROUTING_PROFILE` (constante config,
+   défaut `trekking`), indépendant du `routing_profile` de l'aventure. `PROFILE_MAP` supprimé.
+9. **Détection nationale.** Chaque variante porte `usesMainRoad` (bool) + `mainRoadDistanceM`,
+   dérivés des `WayTags` BRouter (`messages`) — `highway=trunk` uniquement (pas `trunk_link`).
+10. **UI danger.** Icône rouge ⚠️ (+ `aria-label`) sur les cellules de variante empruntant une
+    nationale. Le sélecteur de profil est retiré de la page aventure.
+11. **Dédoublonnage par métriques affichées.** Les variantes sont fusionnées sur (distance ±50 m,
+    D+ ±5 m, D- ±5 m) — PAS sur `etaS` — pour collapser les tracés identiques (entrées distinctes,
+    même segment divergent).
+12. **Invalidation déterministe.** `ACCESS_ENGINE_VERSION` est une **constante de code** (plus
+    surchargeable par `.env`) → tout déploiement invalide le cache partout. Champs `usesMainRoad`/
+    `mainRoadDistanceM` **optionnels avec défaut** côté schéma partagé → pas d'échec de parse front
+    sur des variantes en cache antérieures (robustesse rollout).
+
+### Tasks (PR #5)
+
+- [x] `routing.service` : parse `WayTags` → `BrouterRoute.usesMainRoad` + `mainRoadDistanceM` (trunk)
+- [x] `access.config` : `ACCESS_ROUTING_PROFILE` (défaut trekking) ; `ACCESS_ENGINE_VERSION` figé en
+      constante (`brouter-1.7.9+access-trekking-v3`)
+- [x] `access-calculator` : `resolveProfile` → profil unique ; variantes portent `usesMainRoad` ;
+      dédoublonnage sur métriques affichées
+- [x] Shared : `AccessVariantSchema` + `usesMainRoad`/`mainRoadDistanceM` (optionnels + défaut)
+- [x] `AccessMetrics` : icône danger ⚠️ par variante ; retrait `RoutingProfileSelector` de la page aventure
+- [x] Tests (API 408/408 ; web poi-access 51 ; shared 13) + détection validée sur BRouter réel
+
+### Notes & suivi
+
+- **Limite assumée** : pas de variante « 7 km » possible pour ce POI (barrière Río Arlanza) — le
+  7 km partait de Cascajares, hors trace.
+- **Dette/cleanup différé** : la colonne `adventures.routing_profile`, l'endpoint PATCH profil, le
+  composant `routing-profile-selector.tsx` et l'event `adventure.profile-changed` deviennent
+  inutilisés (profil d'accès unique) → suppression complète à planifier (migration + handlers).
+- **Régression évitée** : avoir fait dépendre l'invalidation d'un override `.env` masquait le
+  problème (cache jamais invalidé localement, et risque identique en prod) → corrigé par la constante.
+
+### File List additionnel (PR #5)
+
+- apps/api/src/routing/routing.types.ts, routing.service.ts (+ .spec)
+- apps/api/src/config/access.config.ts
+- apps/api/src/pois/access-calculator/types/access-result.types.ts
+- apps/api/src/pois/access-calculator/access-calculator.service.ts (+ .spec)
+- packages/shared/src/schemas/poi-access.ts (+ .test)
+- apps/web/src/components/poi-access/AccessMetrics.tsx (+ .test), AccessMapLayer.test.tsx,
+  LiveAccessPolyline.test.tsx, useAccess.test.ts
+- apps/web/src/app/(app)/adventures/[id]/_components/adventure-detail.tsx (retrait du sélecteur)
