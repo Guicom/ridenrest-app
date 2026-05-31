@@ -1,8 +1,41 @@
+---
+baseline_commit: 2bc536cb42bf55e72f387d9bfba502a5d311b785
+---
+
 # Story POI-Access 4.3 : Observabilité — Métriques BullMQ + Uptime Kuma + Sentry + Logs
 
-Status: ready-for-dev
+Status: done
+
+> **ℹ️ Note 2026-05-30 (pivot `nearest-trace`).** Story quasi-non-impactée (observabilité = transverse). Deux nuances mineures :
+> - tag Sentry `origin_type` : reste valide (valeurs `stage` / `nearest-trace`) ;
+> - champ de log `userId?` : n'est plus alimenté par le pipeline d'accès (`userId` retiré de `compute()` avec le mode Live GPS) — le garder optionnel pour les autres contextes, mais il sera toujours absent côté accès.
+> Le runbook ne contient (volontairement) pas d'item « purge cache Redis live » — ce cache a été supprimé. Cf. epic.
 
 <!-- Dépend de : 4.1 (queue active), 4.2 (handlers actifs), 1.5 (Uptime Kuma BRouter monitor existant). -->
+
+---
+
+## ⚠️ RE-CADRAGE 2026-05-31 — Scope minimal (décision Guillaume)
+
+> **Cette story a été écrite avant le pivot `nearest-trace`** et porte une ambition d'observabilité « production multi-services » disproportionnée pour l'état réel du MVP. Audit du code (Task 1) : beaucoup d'observabilité existe **déjà** et n'a pas à être rebâtie :
+> - `nestjs-pino` produit déjà des **logs JSON structurés** (prod `level=info`, `reqId`, sérialisation req/res) → AC4 quasi-satisfaite.
+> - Le **circuit breaker** `RoutingService` logge chaque échec BRouter en `warn` structuré (`reason`, `profile`, `durationMs`, `engineVersion`).
+> - La **DLQ** `poi-access-failures` existe déjà, marque `access_failed`, logge en `error` → « silent failures » déjà tracées.
+> - **Sentry** n'est installé nulle part ; **Grafana/Prometheus** non plus.
+>
+> **Décision (Guillaume, 2026-05-31) — scope minimal + Bull Board gardé.** Seul vrai trou opérationnel : Kuma (déjà installé) ne sait pas que la queue d'accès gonfle. On comble ce trou, on documente l'existant, et on **diffère le code spéculatif**.
+>
+> | Item | Décision | Raison |
+> |---|---|---|
+> | Endpoint `/api/health/access-queue` + monitor Kuma (AC2) | ✅ **FAIT** | Comble le seul vrai trou (alerte backlog proactive) |
+> | Bull Board (AC1) | ✅ **FAIT** | Outil de triage manuel de la DLQ (confort solo-dev) |
+> | Section "Observabilité" runbook (AC6) | ✅ **FAIT** | Documente pino + DLQ + circuit breaker + endpoint |
+> | Logs structurés (AC4) | ✅ **VÉRIFIÉ + enrichi léger** | Déjà couvert par pino ; enrichissement mineur du worker |
+> | Smoke test (AC5/AC7) | ✅ **RÉDUIT** | E2E sur l'endpoint health + token ; vérif champs logs. Pas de mock Sentry (rien à mocker) |
+> | Sentry `beforeSend` (AC3) | ⏭️ **DIFFÉRÉ — aucun code** | Sentry absent → spec du filtre documentée dans le runbook pour la follow-up `infra-install-sentry` |
+> | Prometheus `/metrics` (AC8) | ⏭️ **DIFFÉRÉ** | Pas de Grafana → documenté post-MVP dans le runbook |
+>
+> **Auth endpoint health** : token statique `HEALTH_ENDPOINT_TOKEN` (header `x-health-token`), **fail-closed** si non configuré.
 
 ## Story
 
@@ -117,49 +150,45 @@ NestJS a un `Logger` par défaut. Si format JSON pas configuré, le faire dans c
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1** — Audit état Sentry, Bull Board, logger (⚠️Discovery #1, #2, #5)
-  - [ ] Documenter dans `docs/ops/access-routing-prereq-audit.md` (créé Story 1.4) ou nouveau fichier
-  - [ ] Décider scope effectif de cette story selon résultats
+> Set re-cadré 2026-05-31 (scope minimal + Bull Board). Tasks Sentry/Prometheus diffÉrées (documentation seulement).
 
-- [ ] **Task 2** — Créer endpoint `/api/health/access-queue` (AC: 2, ⚠️Discovery #3)
-  - [ ] Controller dans `apps/api/src/health/` (nouveau ou existant)
-  - [ ] Query Bull queue depth, failed 24h, oldest pending age
-  - [ ] Protection token via guard custom ou header check
-  - [ ] Test E2E
+- [x] **Task 1** — Audit état Sentry, Bull Board, logger (⚠️Discovery #1, #2, #5)
+  - [x] Sentry : absent (api/web/root) → recommandation B (documenter, pas de code)
+  - [x] Bull Board : absent (pré-décidé Story 1.4 → installer ici)
+  - [x] Logger : `nestjs-pino` déjà configuré (JSON structuré) → enrichir seulement
+  - [x] Health endpoint : `/api/health` existe déjà → étendre
+  - [x] Scope effectif décidé avec Guillaume (cf. § RE-CADRAGE)
 
-- [ ] **Task 3** — Configurer Bull Board (AC: 1)
-  - [ ] Si déjà installé : ajouter `poi-access-calculation` + DLQ au dashboard
-  - [ ] Si non : installer + mount sur `/admin/queues`
-  - [ ] Documenter URL d'accès dans runbook
+- [x] **Task 2** — Endpoint `GET /api/health/access-queue` (AC: 2, ⚠️Discovery #3)
+  - [x] Controller `apps/api/src/health/access-queue-health.controller.ts` (dans HealthModule)
+  - [x] Query queue `poi-access-calculation` : `depth` (waiting+delayed), `failed24h`, `oldestPendingAgeS`
+  - [x] Guard custom `HealthTokenGuard` (header `x-health-token` vs `HEALTH_ENDPOINT_TOKEN`, fail-closed) + `@Public()` + `@SkipThrottle()`
+  - [x] Tests unit (controller 5 + guard 6) + E2E 3 (`test/access-queue-health.e2e-spec.ts`)
 
-- [ ] **Task 4** — Configurer Uptime Kuma monitor (AC: 2)
-  - [ ] Monitor HTTP JSON Query sur `/api/health/access-queue` avec token header
-  - [ ] Alerte threshold `depth > 200`
-  - [ ] Test : créer fake jobs pour gonfler la queue → alerte reçue
+- [x] **Task 3** — Bull Board (AC: 1)
+  - [x] Installer `@bull-board/api` + `@bull-board/express` + `@bull-board/nestjs` (^7.1.5)
+  - [x] `apps/api/src/admin/bull-board.module.ts` — enregistre `poi-access-calculation`, `poi-access-failures`, `gpx-processing`, `density-analysis`, route `/admin/queues` (→ `/api/admin/queues` avec global prefix)
+  - [x] Gate par `BULL_BOARD_ENABLED` (default false) ; Basic Auth via `BULL_BOARD_USER`/`BULL_BOARD_PASSWORD` quand activé (4 tests middleware)
+  - [x] Documenter accès (SSH tunnel) dans runbook §(m)
 
-- [ ] **Task 5** — Configurer Sentry filter (AC: 3, ⚠️Discovery #1)
-  - [ ] Si Sentry installé : modifier `sentry.config.ts` avec `beforeSend` hook qui filter `routing_failed` + `circuit_open`
-  - [ ] Sinon : créer follow-up story
+- [x] **Task 4** — Logs structurés access (AC: 4)
+  - [x] Worker enrichi : `status` (`processing`/`ok`/`fallback`/`error`) + `engineVersion` ajoutés aux logs `access_job_*`
+  - [x] Format + limite `traceId` (jobs worker sans contexte HTTP) documentés dans runbook §(m)
 
-- [ ] **Task 6** — Configurer logger structuré (AC: 4, ⚠️Discovery #5)
-  - [ ] Identifier le pattern logger projet (Pino ? Winston ? default NestJS ?)
-  - [ ] S'assurer que les services access émettent les champs requis
-  - [ ] Documenter format dans runbook
+- [x] **Task 5** — Section "Observabilité" du runbook (AC: 6)
+  - [x] Section (m) ajoutée à `docs/ops/brouter-runbook.md` : existant (pino/DLQ/circuit breaker), endpoint health, Bull Board, interprétation métriques, debug spike fallbacks, debug queue qui grossit
+  - [x] Config monitor Kuma `POI Access Queue Health` (HTTP JSON Query `$.data.depth`, header token, alerte `depth > 200`)
+  - [x] Spec du filtre Sentry `beforeSend` (différé) + note Prometheus post-MVP
 
-- [ ] **Task 7** — Enrichir le runbook (AC: 6)
-  - [ ] Ajouter section "Observabilité" à `docs/ops/brouter-runbook.md`
-  - [ ] Inclure URLs, commandes, troubleshooting
+- [x] **Task 6** — Doc Sync + follow-ups + commit (AC: 9)
+  - [x] MAJ epic `epics-poi-access-routing.md` (note re-cadrage, AC3/AC8 différés)
+  - [x] Follow-ups `infra-install-sentry` + `infra-prometheus-metrics` notés dans deferred-work.md
+  - [ ] Commit (manuel, Guillaume) : `feat(observability): bull board + queue health endpoint + structured logs runbook — story poi-access-4.3`
 
-- [ ] **Task 8** — (OPTIONNEL — selon scope) Métriques Prometheus (AC: 8, ⚠️Discovery #4)
-  - [ ] Si retenu : install `prom-client`, expose `/metrics`, instrument 3 métriques
-  - [ ] Sinon : documenter dans runbook comme follow-up post-MVP
+### Tasks DIFFÉRÉES (documentation seulement, aucun code)
 
-- [ ] **Task 9** — Test smoke (AC: 5, 7)
-  - [ ] Provoquer artificiellement les 3 types d'erreur en local
-  - [ ] Vérifier logs structurés + Sentry filter
-
-- [ ] **Task 10** — Doc Sync + commit (AC: 9)
-  - [ ] Commit : `feat(observability): bull board + queue health endpoint + sentry filter + structured logs for access routing — story poi-access-4.3`
+- [~] **Task 7 (différée)** — Sentry `beforeSend` (AC: 3) → spec documentée dans runbook, follow-up `infra-install-sentry`
+- [~] **Task 8 (différée)** — Prometheus `/metrics` (AC: 8) → documenté post-MVP dans runbook, follow-up `infra-prometheus-metrics`
 
 ---
 
@@ -230,23 +259,72 @@ Sentry.init({
 ## Dev Agent Record
 
 ### Agent Model Used
-_(À renseigner)_
+claude-opus-4-8 (1M context) — BMad dev-story workflow
 
 ### Completion Notes List
-- Sentry installé : ☐ Oui (filter ajouté) / ☐ Non (follow-up créé)
-- Bull Board installé : ☐ Oui (extension) / ☐ Non (installé dans cette story)
-- Logger pattern : ☐ Pino / ☐ Winston / ☐ NestJS default + format
-- Métriques Prometheus : ☐ Implémentées / ☐ Reportées post-MVP
-- URL Bull Board prod : `___`
-- Uptime Kuma monitor configuré : ☐ Oui / ☐ Non
+- Sentry installé : ☑ Non → **différé** (aucun code ; spec `beforeSend` documentée dans runbook + follow-up `infra-install-sentry`)
+- Bull Board installé : ☑ Oui (installé dans cette story, gated `BULL_BOARD_ENABLED`)
+- Logger pattern : ☑ Pino (`nestjs-pino` déjà configuré) — enrichissement worker mineur
+- Métriques Prometheus : ☑ Reportées post-MVP (runbook + follow-up `infra-prometheus-metrics`)
+- URL Bull Board prod : via SSH tunnel `/admin/queues` (non exposé publiquement par Caddy)
+- Uptime Kuma monitor configuré : config documentée dans runbook (à ajouter côté UI Kuma par Guillaume)
+- Scope re-cadré 2026-05-31 (décision Guillaume) : cf. § RE-CADRAGE en tête de story
+- **Code review 2026-05-31 (4 patches appliqués)** : (1) Bull Board durci fail-closed (503 si activé sans creds) ; (2) `oldestPendingAgeS` inclut les jobs `delayed` (backlog backoff visible) ; (3) déviation AC4 assumée — `access_job_success` reste en `info` (volume borné post-pivot eager), documentée au runbook ; (4) doc-sync AC1 epics/runbook (Bull Board = compteurs par état, pas de tuiles « avg processing time »/« failed 24h » calculées). Détail : cf. § Review Findings.
 
 ### File List
-- [ ] `apps/api/src/health/access-queue-health.controller.ts` (nouveau)
-- [ ] `apps/api/src/admin/bull-board.module.ts` (nouveau ou modifié)
-- [ ] `apps/api/src/common/sentry.config.ts` (modifié si applicable)
-- [ ] `apps/api/src/common/logger.config.ts` (modifié)
-- [ ] `apps/api/test/access-queue-health.e2e-spec.ts` (nouveau)
-- [ ] `docs/ops/brouter-runbook.md` (modifié — section Observabilité)
-- [ ] (Optionnel) `apps/api/src/common/metrics.module.ts`
-- [ ] (Si Bull Board nouveau) `apps/api/package.json` + lock
-- [ ] `_bmad-output/planning-artifacts/architecture-poi-access-routing.md` (modifié si Doc Sync)
+
+**Nouveaux fichiers :**
+- `apps/api/src/health/access-queue-health.controller.ts` — endpoint `/api/health/access-queue`
+- `apps/api/src/health/access-queue-health.controller.test.ts` — 5 tests unit
+- `apps/api/src/common/guards/health-token.guard.ts` — guard token fail-closed
+- `apps/api/src/common/guards/health-token.guard.test.ts` — 6 tests unit
+- `apps/api/src/admin/bull-board.module.ts` — Bull Board + Basic Auth middleware
+- `apps/api/src/admin/bull-board.module.test.ts` — 4 tests middleware
+- `apps/api/test/access-queue-health.e2e-spec.ts` — 3 tests E2E
+
+**Fichiers modifiés :**
+- `apps/api/src/health/health.module.ts` — import QueuesModule + AccessQueueHealthController + HealthTokenGuard
+- `apps/api/src/app.module.ts` — import conditionnel AccessBullBoardModule (gate `BULL_BOARD_ENABLED`)
+- `apps/api/src/pois/access-worker/access-worker.processor.ts` — logs enrichis (`status`, `engineVersion`)
+- `apps/api/package.json` + `pnpm-lock.yaml` — deps `@bull-board/{api,express,nestjs}@^7.1.5`
+- `docs/ops/brouter-runbook.md` — section (m) Observabilité
+- `_bmad-output/planning-artifacts/epics-poi-access-routing.md` — note re-cadrage Story 4.3
+- `_bmad-output/implementation-artifacts/deferred-work.md` — follow-ups infra-install-sentry / infra-prometheus-metrics
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — statut story
+
+**À faire manuellement (Guillaume) :**
+- `apps/api/.env.example` — ajouter `HEALTH_ENDPOINT_TOKEN`, `BULL_BOARD_ENABLED`, `BULL_BOARD_USER`, `BULL_BOARD_PASSWORD` (protection `.env*` empêche l'édition auto — valeurs dans runbook §m)
+- Config monitor Kuma `POI Access Queue Health` côté UI Kuma (table dans runbook §m)
+
+### Pré-existant (hors scope, non régressé)
+- `apps/api/test/app.e2e-spec.ts` échoue (`SyntaxError: Unexpected token 'export'` sur l'import ESM `jose` dans `jwt-auth.guard.ts` non transformé par `jest-e2e.json`). Cassé depuis le commit initial (boot full AppModule) — sans rapport avec cette story.
+
+### Change Log
+- 2026-05-31 — Re-cadrage scope minimal + Bull Board (décision Guillaume). Sentry (AC3) et Prometheus (AC8) différés en documentation/follow-up ; reste = endpoint health queue + Bull Board + logs + runbook. Story passée `ready-for-dev` → `in-progress`.
+
+---
+
+## Review Findings (code review adversariale 2026-05-31)
+
+> 3 couches : Blind Hunter (diff seul) + Edge Case Hunter (diff + repo) + Acceptance Auditor (diff + spec). Aucune couche en échec. Aucun finding **Critical**. Triage : 3 decision-needed, 1 patch, 0 defer, 11 dismissed.
+
+### Decision-needed → résolues (toutes converties en patch, appliquées)
+- [x] [Review][Decision→Patch] **Bull Board fail-OPEN si activé sans credentials** [apps/api/src/admin/bull-board.module.ts] — **Décision Guillaume : durcir en fail-closed.** Si `BULL_BOARD_ENABLED=true` sans `BULL_BOARD_USER`/`BULL_BOARD_PASSWORD` (ou l'une vide) → `bullBoardBasicAuth` renvoie désormais **503** au lieu de `next()`. Aligné sur la posture fail-closed du `HealthTokenGuard`. Test mis à jour + cas « une seule cred » ajouté. Doc runbook + commentaires module synchronisés. (blind High + edge Medium)
+- [x] [Review][Decision→Patch] **`oldestPendingAgeS` ignore les jobs `delayed`** [apps/api/src/health/access-queue-health.controller.ts] — **Décision Guillaume : inclure les delayed.** `computeOldestPendingAgeS` lit maintenant le plus ancien de `getWaiting(0,0)` ET `getDelayed(0,0)` (min `timestamp` = âge max). Un backlog en backoff devient visible. 2 tests ajoutés (delayed-only + mix). Runbook mis à jour. (blind Low/Med + edge High)
+- [x] [Review][Decision→Patch] **Logs de succès en niveau `info` (AC4)** [access-worker.processor.ts] — **Décision Guillaume : garder `info` + doc-sync AC4.** Le souci de volume d'AC4 ne s'applique plus post-pivot (eager, volume borné par nb POI). Déviation documentée dans le runbook (§ Logs structurés) + Completion Notes. Aucun changement de code. (auditor Low)
+
+### Patch (appliqués)
+- [x] [Review][Patch] **Doc-sync AC1 — métriques dashboard sur-promises** [epics + runbook] — Bull Board (UI native) affiche les compteurs par état (waiting/active/completed/failed/delayed/paused) + inspection, **pas** de tile « avg processing time » ni « failed 24h ». Ces agrégats vivent sur l'endpoint health (`failed24h`) et les logs (`durationMs`). Epic AC1 corrigé (note doc-sync) + runbook § Bull Board enrichi.
+
+### Dismissed (11 — listés pour traçabilité)
+1. `failed24h` plafonné par `removeOnFail:{count:50}` alors que `getFailed(0,199)` demande 200 → intentionnel + documenté dans le commentaire du controller ; l'alerte `failed24h<=10` se déclenche quand même (50>10). (blind+edge)
+2. `failed24h` fallback `finishedOn ?? timestamp` → pour un job réellement en échec `finishedOn` est toujours posé ; le fallback ne sur-compte que marginalement, direction d'alerte sûre. (blind)
+3. Redis injoignable → endpoint 500 → Kuma DOWN : **fail-safe** (l'alerte se déclenche), seule l'attribution est ambiguë (vs panne API/Redis). (edge)
+4. `BULL_BOARD_ENABLED` lu à l'import du module → **vérifié OK** : `import 'dotenv/config'` en tête de `main.ts` peuple `process.env` avant l'éval. Régression latente seulement. (blind+edge)
+5. Auth « single-point » sur route `@Public()` → pas de défaut, couvert par le e2e. (blind)
+6. `getWaitingCount` + `getWaiting` non-atomiques → `depth>0`+`age=0` transitoire cosmétique sur heartbeat 60s. (edge)
+7. Header `x-health-token` multi-valeurs avec 1er élément vide → 401 bénin (Kuma envoie un header simple). (edge)
+8. `timingSafeEqual` court-circuit longueur → fuite la longueur (pas le contenu), pattern standard + secret haute entropie. (blind)
+9. Décodage base64 Basic Auth → géré (pas de `:` → 401, base64 invalide ignoré sans crash). (blind)
+10. Monitor Kuma `data.depth` vs `$.data.depth` (Task 5) → incohérence interne story, runbook authoritatif correct. (auditor)
+11. `access_job_start` sans `durationMs` → justifié (aucune durée écoulée au démarrage). (auditor)

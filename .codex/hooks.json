@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '/Users/guillaume/Documents/Projets/ridenrest-app/.codex/hooks/session-start-tts.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

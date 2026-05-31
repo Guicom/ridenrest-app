@@ -337,3 +337,189 @@ NFR-PA-008) → donc injoignable via la passerelle bridge `172.17.0.1` (`host.do
 un service loopback n'est pas accessible depuis le bridge Docker. Le routage container-to-container
 via le nom de service contourne le bind hote sans l'affaiblir. Le keyword `LineString` valide une
 **vraie requete de routing** (detecte aussi le cas "up mais sans segments", piege Story 1.1).
+
+---
+
+## (m) Observabilite — Pipeline d'acces POI (Story 4.3)
+
+> **Note de scope (2026-05-31).** Story 4.3 re-cadree au minimum viable : beaucoup d'observabilite
+> existait deja (logs JSON pino, DLQ, circuit breaker). Cette section documente l'existant +
+> l'endpoint de sante de queue ajoute. Sentry et Prometheus sont **differes** (cf. fin de section).
+
+### Ce qui est deja en place (pas de nouveau code)
+
+- **Logs JSON structures** : `nestjs-pino` (config `apps/api/src/app.module.ts`). En prod `level=info`,
+  format JSON (compatible Loki/Grafana). Chaque requete HTTP porte un `reqId` (= traceId).
+- **Circuit breaker BRouter** (`RoutingService`) : logge chaque echec BRouter en `warn` structure
+  (`reason`, `profile`, `durationMs`, `engineVersion`). Reasons : `timeout`, `network`, `http_error`,
+  `parse_error`, `circuit_open`. Ouvre apres 5 echecs/60s, half-open apres 30s.
+- **Dead-letter queue** `poi-access-failures` : un job d'acces en echec definitif (apres 3 retries)
+  y est depose ET le POI est marque `access_failed=true` (stop recalcul perpetuel). Log `error`
+  `access_job_failed_final`.
+- **Fallback BRouter** : une indispo BRouter n'est PAS une erreur — le job reussit, le POI reste
+  eligible (recalcul lazy/eager ulterieur). Log `warn` `access_job_fallback` (volume attendu normal).
+
+### Logs structures — champs du pipeline d'acces
+
+| Champ | Source | Note |
+|---|---|---|
+| `level`, `time` | pino | automatique |
+| `context` (service) | `Logger(Name)` | ex. `AccessWorkerProcessor`, `RoutingService` |
+| `msg` | code | ex. `access_job_success`, `access_fallback`, `access_job_failed_final` |
+| `status` | worker | `processing` / `ok` / `fallback` / `error` |
+| `poiId`, `jobId`, `durationMs`, `engineVersion` | worker | |
+| `reason` | routing/fallback | motif BRouter (`timeout`...`circuit_open`) ou `routing_failed` (fallback) |
+| `reqId` (traceId) | pino HTTP | **absent des jobs worker** (pas de contexte HTTP) — limitation acceptee |
+
+> **Niveau des logs de succes (deviation AC4 assumee).** `access_job_success` est emis en `info`
+> (pas `debug`/silencieux comme le suggerait l'AC4 d'origine). Decision 2026-05-31 : avec le pivot
+> `nearest-trace` + pre-calcul eager, le volume de calculs est borne par le nombre de POI (et non
+> par requete utilisateur) — le souci de volume qui motivait `debug` ne s'applique plus, et un log
+> `info` par calcul est utile a l'observabilite pendant le rollout MVP. A re-evaluer si le volume
+> de POI explose.
+
+Filtrer les logs d'un POI : `pm2 logs api | grep '"poiId":"<id>"'`.
+
+### Endpoint de sante de queue
+
+`GET /api/health/access-queue` (controller `apps/api/src/health/access-queue-health.controller.ts`).
+
+- **Auth** : header `x-health-token` compare a l'env `HEALTH_ENDPOINT_TOKEN` (fail-closed : refuse
+  si la variable n'est pas configuree). `@Public` (bypass JWT) + `@SkipThrottle`.
+- **Reponse** : `{ depth, failed24h, oldestPendingAgeS }`
+  - `depth` = jobs `waiting` + `delayed` (a traiter)
+  - `failed24h` = echecs definitifs des dernieres 24h (set `failed` retenu, max 50)
+  - `oldestPendingAgeS` = age du plus vieux job en attente — `waiting` ET `delayed` (backoff) — (s), 0 si vide
+
+```bash
+# Test local / prod
+curl -s -H "x-health-token: $HEALTH_ENDPOINT_TOKEN" http://localhost:3010/api/health/access-queue
+# Attendu : {"data":{"depth":0,"failed24h":0,"oldestPendingAgeS":0}}
+```
+
+### Monitor Uptime Kuma — POI Access Queue Health
+
+A creer cote UI Kuma (reutilise les channels de notif existants : email + Telegram).
+
+**Reseau** : l'API NestJS tourne en PM2 NATIF sur le host (port 3010), PAS dans Docker — donc
+le monitor ne peut PAS utiliser un nom de service Docker (contrairement au monitor BRouter, l).
+Deux options depuis le conteneur Kuma :
+- **Recommande** : URL publique via Caddy `https://api.ridenrest.app/api/health/access-queue`
+  (l'endpoint est protege par token → exposition publique acceptable).
+- Alternative interne : `http://172.17.0.1:3010/api/health/access-queue` (passerelle bridge
+  Docker → host ; NestJS bind `0.0.0.0`).
+
+| Champ | Valeur |
+|---|---|
+| Friendly Name | `POI Access Queue Health` |
+| Monitor Type | `HTTP(s) - Json Query` |
+| URL | `https://api.ridenrest.app/api/health/access-queue` |
+| Method | `GET` |
+| Headers (JSON) | `{ "x-health-token": "<HEALTH_ENDPOINT_TOKEN>" }` |
+| **Requete Json** (jsonata) | `data.depth <= 200` |
+| **Valeur attendue** | `true` |
+| Heartbeat Interval | 60 s |
+| Retries | 3 |
+| Accepted Status Codes | 200-299 |
+| Notifications | email + Telegram (channels existants) |
+
+**Logique de la condition** : la version actuelle de Kuma evalue la `Requete Json` (jsonata)
+contre le corps de reponse, convertit le resultat en chaine et le compare a la `Valeur attendue`.
+`data.depth <= 200` renvoie un booleen → `"true"` quand la queue est saine (monitor UP),
+`"false"` des que `depth > 200` (≠ `"true"` → monitor DOWN → alerte).
+
+> ⚠️ La racine jsonata est directement l'objet JSON → `data.depth` (PAS `$.data.depth`).
+> Le header `x-health-token` doit porter la MEME valeur que `HEALTH_ENDPOINT_TOKEN` du `.env` VPS,
+> sinon l'endpoint renvoie 401 (fail-closed) et le monitor reste DOWN.
+> Test : gonfler artificiellement la queue (uploader plusieurs segments d'aventure → pre-calcul
+> eager) et verifier que l'alerte se declenche au-dela du seuil. Optionnel : un 2e monitor sur
+> `data.failed24h <= 10` pour alerter sur un taux d'echec anormal.
+
+### Bull Board — dashboard de triage des queues
+
+- **URL** : `/api/admin/queues` (le global prefix `api` s'applique a la route `/admin/queues`).
+- **Gate** : monte UNIQUEMENT si `BULL_BOARD_ENABLED=true` (defaut OFF). Pas de rôle admin dans le
+  projet → en prod, **ne PAS exposer via Caddy**. Acces via tunnel SSH :
+  ```bash
+  ssh -L 3010:localhost:3010 user@72.62.189.193
+  # puis ouvrir http://localhost:3010/api/admin/queues dans le navigateur
+  ```
+- **Basic Auth (fail-closed)** : une auth HTTP Basic via `BULL_BOARD_USER` + `BULL_BOARD_PASSWORD`
+  est exigee. Si le dashboard est active (`BULL_BOARD_ENABLED=true`) SANS credentials configurees,
+  l'acces est **refuse (503)** — jamais ouvert (cf. `bull-board.module.ts`). Toujours definir les
+  deux variables avant d'activer.
+- Queues affichees : `poi-access-calculation`, `poi-access-failures` (DLQ), `gpx-processing`,
+  `density-analysis`. Permet d'inspecter/rejouer/purger les jobs en echec.
+- **Metriques affichees** : Bull Board (UI native) montre les **compteurs par etat** de chaque queue
+  (`waiting` / `active` / `completed` / `failed` / `delayed` / `paused`) + l'inspection job par job.
+  Il n'expose PAS de tuile calculee « avg processing time » ni « failed 24h » : ces indicateurs
+  agreges vivent sur l'endpoint de sante (`failed24h`) et dans les logs (`durationMs` par job).
+
+### Comment interpreter les metriques
+
+- **Queue depth normale** : ~0 au repos. Un pic transitoire apres un upload de segment (pre-calcul
+  eager de tous les POI proches) est NORMAL et se resorbe en quelques minutes (concurrence 5).
+- **Queue depth anormale** : `depth > 200` durablement, ou `oldestPendingAgeS` qui croit sans
+  redescendre → le worker ne consomme pas (voir ci-dessous).
+- **Taux failed sain** : `failed24h` proche de 0. Quelques echecs isoles = OK (POI degenere, hoquet
+  reseau). Un `failed24h` qui grimpe = probleme systemique (BRouter down prolonge, DB en erreur).
+
+### Investiguer un spike de fallbacks BRouter
+
+1. Logs : `pm2 logs api | grep access_fallback` (et `grep '"reason":"circuit_open"'`).
+2. Si beaucoup de `circuit_open` → BRouter est down/lent : voir section (b) Diagnostic d'une panne.
+3. Le monitor Kuma `BRouter Production` (section l) doit aussi alerter — correler.
+4. Les fallbacks ne corrompent pas les donnees : les POI concernes seront recalcules au prochain
+   acces lazy ou pre-calcul eager une fois BRouter retabli.
+
+### Debug une queue qui grossit
+
+1. Verifier que le worker tourne : `pm2 status` (process `api`), logs `access_job_start`/`_success`.
+2. Verifier la sante BRouter (section b) — un BRouter lent ralentit le drain.
+3. Verifier RAM/CPU du VPS : `htop` / `docker stats` (concurrence 5 + pool PG 10).
+4. Inspecter via Bull Board les jobs `active` bloques.
+5. Throttle d'urgence si retry storm (section e).
+
+### Differe — Sentry (AC3, post-MVP)
+
+Sentry n'est installe nulle part dans le projet. Quand il sera ajoute (follow-up `infra-install-sentry`),
+le hook `beforeSend` devra **filtrer les volumes attendus** pour ne pas noyer les vraies erreurs :
+
+```typescript
+// Spec du filtre a implementer lors de l'install Sentry :
+Sentry.init({
+  beforeSend(event, hint) {
+    const ex = hint.originalException
+    // BRouter indispo = volume attendu normal (timeout/reseau/HTTP/circuit) → NE PAS envoyer.
+    if (ex instanceof BrouterUnavailableException) {
+      return null
+    }
+    // Restent envoyes : parse_error BRouter, erreurs DB, exceptions inattendues.
+    return event
+  },
+})
+```
+
+> Note : `routing_failed` n'est PAS un `reason` d'exception (c'est le statut de fallback retourne par
+> `AccessCalculatorService`, jamais leve). Le filtre porte sur `BrouterUnavailableException`
+> (reasons `timeout|network|http_error|parse_error|circuit_open`). Decision produit : filtrer
+> TOUTE `BrouterUnavailableException` (y compris `parse_error` cote BRouter, deja loggee en `warn`).
+
+### Differe — Metriques Prometheus (AC8, post-MVP)
+
+Non implemente (pas de Grafana en place). A ajouter si le volume le justifie (follow-up
+`infra-prometheus-metrics`) : `prom-client` + endpoint `/metrics` protege, compteurs
+`access_compute_total{status,source}`, histogram `access_compute_duration_seconds`,
+counter `access_brouter_failures_total{reason}`.
+
+### Variables d'environnement (a ajouter au `.env` VPS + `apps/api/.env.example`)
+
+```bash
+# Endpoint de sante de queue (consomme par Uptime Kuma) — OBLIGATOIRE (fail-closed)
+HEALTH_ENDPOINT_TOKEN="<token aleatoire — openssl rand -hex 24>"
+
+# Bull Board (dashboard de triage) — OFF par defaut
+BULL_BOARD_ENABLED=false
+BULL_BOARD_USER="admin"
+BULL_BOARD_PASSWORD="<mot de passe fort>"
+```

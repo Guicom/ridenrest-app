@@ -12,8 +12,8 @@ export const profiles = pgTable('profiles', {
   currency: currencyEnum('currency').notNull().default('EUR'),
   stravaAthleteId: text('strava_athlete_id').unique(),
   overpassEnabled: boolean('overpass_enabled').notNull().default(false),
-  // Tri-state RGPD: NULL = never asked, true = consented, false = explicitly refused
-  liveAccessConsent: boolean('live_access_consent'),
+  // `live_access_consent` retiré (review poi-access-3.3, 2026-05-30) : le mode Live utilise
+  // l'origine `nearest-trace` sans GPS → plus de consentement RGPD à persister.
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow().$onUpdateFn(() => new Date()),
 })

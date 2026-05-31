@@ -35,6 +35,7 @@ import { MapSearchOverlay } from '@/app/(app)/map/[id]/_components/map-search-ov
 import { ResetZoomButton } from '@/app/(app)/map/[id]/_components/reset-zoom-button'
 import { StatusBanner } from './_components/status-banner'
 import { PoiPopup } from '../../map/[id]/_components/poi-popup'
+import { LiveAccessPolyline } from '@/components/poi-access/LiveAccessPolyline'
 import { ElevationStrip } from './_components/elevation-strip'
 import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
 import { trackPoiSearchTriggered } from '@/lib/analytics'
@@ -334,6 +335,15 @@ export default function LivePage() {
               useMapStore.getState().setSelectedPoiId(null)
             }}
             liveContext={isLiveModeActive && currentKmOnRoute !== null ? { currentKmOnRoute, speedKmh } : undefined}
+          />
+        )}
+
+        {/* Tracé d'accès du POI hébergement sélectionné — Live, origine nearest-trace (2026-05-30) */}
+        {selectedPoi && liveMapCanvasRef.current?.getMap() && (
+          <LiveAccessPolyline
+            map={liveMapCanvasRef.current.getMap()}
+            poiId={selectedPoi.id}
+            isAccommodation={(LAYER_CATEGORIES.accommodations as readonly string[]).includes(selectedPoi.category)}
           />
         )}
 

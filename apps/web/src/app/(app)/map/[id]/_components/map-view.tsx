@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useQueries, useQueryClient, useMutation } from '@tanstack/react-query'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil } from 'lucide-react'
 import { getAdventure, getAdventureMapData, getWeatherForecast, updateAdventureAvgSpeedKmh } from '@/lib/api-client'
@@ -35,6 +36,14 @@ import { EndDateSyncDialog } from '@/components/shared/end-date-sync-dialog'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import { getStoredWeatherPace } from '@/lib/weather-pace'
 import { trackMapOpened, trackPoiSearchTriggered, hashAdventureId } from '@/lib/analytics'
+import { useAccess } from '@/components/poi-access/useAccess'
+import type { AccessOrigin } from '@ridenrest/shared'
+
+// Lazy — bundle splitting (AC#2, Discovery #4). MapLibre est déjà chargé via map-canvas.
+const AccessMapLayer = dynamic(
+  () => import('@/components/poi-access/AccessMapLayer').then((m) => m.AccessMapLayer),
+  { ssr: false },
+)
 
 interface MapViewProps {
   adventureId: string
@@ -66,7 +75,7 @@ export function MapView({ adventureId }: MapViewProps) {
   const [paceParams, setPaceParams] = useState<{ departureTime: string | null }>(() => ({
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers, activeAccommodationTypes } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers, activeAccommodationTypes, visibleAccessPoiId, setVisibleAccessPoiId } = useMapStore()
 
   // Reset transient map state when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
@@ -74,8 +83,9 @@ export function MapView({ adventureId }: MapViewProps) {
       setWeatherActive(false)
       setSelectedStageId(null)
       setSearchCommitted(false)  // prevent auto-search on return navigation
+      setVisibleAccessPoiId(null)  // hide access polyline on return navigation (Story 2.5)
     }
-  }, [setWeatherActive, setSelectedStageId, setSearchCommitted])
+  }, [setWeatherActive, setSelectedStageId, setSearchCommitted, setVisibleAccessPoiId])
 
   // Auto-show stage segments when a stage is selected from the search panel
   useEffect(() => {
@@ -169,6 +179,14 @@ export function MapView({ adventureId }: MapViewProps) {
 
   const { stages, createStage, updateStage, deleteStage } = useStages(adventureId, { onAfterChange: triggerCheck })
 
+  // ── Access route polyline (Story POI-Access 2.5) ─────────────────────────────
+  // Origine identique à PoiPopup/PoiDetailSheet : point de la trace le plus proche du POI
+  // (fix 2026-05-30) — détour court, plus le départ d'aventure (~192 km).
+  const accessOrigin: AccessOrigin = useMemo(() => ({ type: 'nearest-trace' }), [])
+  // `useAccess` est lazy (enabled requiert un poiId) — '' désactive la requête.
+  const { data: accessData } = useAccess(visibleAccessPoiId ?? '', accessOrigin)
+  const accessGeometry = accessData?.status === 'ok' ? accessData.geometry : null
+
   // Detect if any stage has a per-stage departure time → used for weather layer + controls
   const stageDeparturesJson = useMemo(() => {
     const withDeparture = stages.filter(s => s.departureTime != null)
@@ -251,9 +269,15 @@ export function MapView({ adventureId }: MapViewProps) {
     const justResolved = searchCommitted && prevIsPendingRef.current && !poisPending
 
     if ((justCommitted && !poisPending) || justResolved) {
-      mapCanvasRef.current?.fitToCorridorRange(mapFromKmRef.current, mapToKmRef.current, readySegmentsRef.current)
-      // Track POI search completion (AC #3, Story 15.3)
+      // Inclut les POI trouvés dans le cadrage → ceux loin de la trace restent visibles.
       const allResults = Object.values(poisByLayer).flat()
+      mapCanvasRef.current?.fitToCorridorRange(
+        mapFromKmRef.current,
+        mapToKmRef.current,
+        readySegmentsRef.current,
+        allResults.map((p) => ({ lat: p.lat, lng: p.lng })),
+      )
+      // Track POI search completion (AC #3, Story 15.3)
       trackPoiSearchTriggered({
         mode: 'planning',
         poi_categories: [...visibleLayers],
@@ -544,6 +568,16 @@ export function MapView({ adventureId }: MapViewProps) {
               if (stageId === null || distKm === null) setDragHoverState(null)
               else setDragHoverState({ stageId, distKm })
             }}
+          />
+
+          {/* Access route polyline — amber dashed line from origin to selected POI (Story 2.5).
+              fitOnShow={false} (fix 2026-05-30) : pas d'auto-zoom sur l'itinéraire d'accès, qui
+              plaçait le pin en haut et masquait le popup (rendu au-dessus du pin). On garde le
+              cadrage du clic sur le pin (easeTo offset → popup visible). */}
+          <AccessMapLayer
+            map={mapCanvasRef.current?.getMap() ?? null}
+            geometry={accessGeometry}
+            fitOnShow={false}
           />
 
           {/* Loading overlay while POI search is pending (AC #4, Story 16.3) */}

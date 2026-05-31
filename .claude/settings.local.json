@@ -10,7 +10,9 @@
       "WebFetch(domain:www.figma.com)",
       "WebFetch(domain:skills.sh)",
       "Bash(claude skills:*)",
-      "Bash(CLAUDECODE= claude skills:*)"
+      "Bash(CLAUDECODE= claude skills:*)",
+      "Bash(python3 /Users/guillaume/Documents/Projets/ridenrest-app/.claude/skills/bmad-init/scripts/bmad_init.py load --project-root /Users/guillaume/Documents/Projets/ridenrest-app --all)",
+      "Bash(grep -E \"^#{1,3} \" /Users/guillaume/Documents/Projets/ridenrest-app/_bmad-output/planning-artifacts/epics.md)"
     ]
   },
   "enableAllProjectMcpServers": true,

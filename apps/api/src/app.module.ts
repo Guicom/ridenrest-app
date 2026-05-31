@@ -21,10 +21,16 @@ import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
 import { GeoModule } from './geo/geo.module.js'
-import { MeModule } from './me/me.module.js'
+import { RoutingModule } from './routing/routing.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
 import accessConfig from './config/access.config.js'
 import { BackfillElevationLossService } from './common/backfill-elevation-loss.service.js'
+import { AccessBullBoardModule } from './admin/bull-board.module.js'
+
+// Bull Board (Story 4.3) — dashboard de triage des queues, gated par env (défaut OFF).
+// Importé conditionnellement : non monté en prod sauf activation explicite + tunnel SSH.
+const bullBoardImports =
+  process.env['BULL_BOARD_ENABLED'] === 'true' ? [AccessBullBoardModule] : []
 
 @Module({
   imports: [
@@ -66,7 +72,8 @@ import { BackfillElevationLossService } from './common/backfill-elevation-loss.s
     ProfileModule,
     FeedbacksModule,
     GeoModule,
-    MeModule,
+    RoutingModule,
+    ...bullBoardImports,
   ],
   controllers: [AppController],
   providers: [

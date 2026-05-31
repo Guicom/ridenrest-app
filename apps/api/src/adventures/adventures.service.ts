@@ -1,16 +1,30 @@
 import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import * as fs from 'node:fs/promises'
 import { AdventuresRepository } from './adventures.repository.js'
 import { StagesService } from '../stages/stages.service.js'
-import type { AdventureResponse, AdventureMapResponse, MapWaypoint } from '@ridenrest/shared'
+import type { AdventureResponse, AdventureMapResponse, MapWaypoint, RoutingProfile } from '@ridenrest/shared'
 import type { Adventure } from '@ridenrest/database'
 import type { UpdateAdventureDto } from './dto/update-adventure.dto.js'
+
+/**
+ * Event émis lorsque le profil de routage d'une aventure change (Story 2.6).
+ * Consommé par Story 4.2 pour invalider les caches d'accès POI en cascade.
+ */
+export const ADVENTURE_PROFILE_CHANGED_EVENT = 'adventure.profile-changed' as const
+
+export interface AdventureProfileChangedPayload {
+  adventureId: string
+  newProfile: RoutingProfile
+  previousProfile: RoutingProfile
+}
 
 @Injectable()
 export class AdventuresService {
   constructor(
     private readonly adventuresRepo: AdventuresRepository,
     @Inject(forwardRef(() => StagesService)) private readonly stagesService: StagesService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createAdventure(userId: string, name: string): Promise<AdventureResponse> {
@@ -31,9 +45,10 @@ export class AdventuresService {
     return this.toResponse(adventure, stravaIds.has(id))
   }
 
-  async verifyOwnership(id: string, userId: string): Promise<void> {
+  async verifyOwnership(id: string, userId: string): Promise<Adventure> {
     const adventure = await this.adventuresRepo.findByIdAndUserId(id, userId)
     if (!adventure) throw new NotFoundException('Adventure not found')
+    return adventure
   }
 
   async getAdventureWaypoints(adventureId: string): Promise<MapWaypoint[]> {
@@ -45,7 +60,7 @@ export class AdventuresService {
   }
 
   async updateAdventure(id: string, userId: string, dto: UpdateAdventureDto): Promise<AdventureResponse> {
-    await this.verifyOwnership(id, userId)
+    const existing = await this.verifyOwnership(id, userId)
     let adventure: Adventure | undefined
 
     if (dto.name !== undefined) {
@@ -61,6 +76,19 @@ export class AdventuresService {
     if (dto.avgSpeedKmh !== undefined) {
       adventure = await this.adventuresRepo.updateAvgSpeedKmh(id, dto.avgSpeedKmh)
       await this.stagesService.recomputeAllEtasForAdventure(id, dto.avgSpeedKmh)
+    }
+
+    if (dto.routingProfile !== undefined) {
+      const previousProfile = existing.routingProfile
+      adventure = await this.adventuresRepo.updateRoutingProfile(id, dto.routingProfile)
+      if (previousProfile !== dto.routingProfile) {
+        const payload: AdventureProfileChangedPayload = {
+          adventureId: id,
+          newProfile: dto.routingProfile,
+          previousProfile,
+        }
+        this.eventEmitter.emit(ADVENTURE_PROFILE_CHANGED_EVENT, payload)
+      }
     }
 
     if (!adventure) {
@@ -99,6 +127,7 @@ export class AdventuresService {
       densityStatus: a.densityStatus,
       densityProgress: a.densityProgress,
       avgSpeedKmh: a.avgSpeedKmh,
+      routingProfile: a.routingProfile,
       hasStravaSegment,
       createdAt: a.createdAt.toISOString(),
       updatedAt: a.updatedAt.toISOString(),

@@ -2031,7 +2031,7 @@ So that I can debug issues quickly and be notified before users report them.
 
 **Given** Uptime Kuma is running on the VPS (Epic 14 done),
 **When** alerts are configured,
-**Then** monitors exist for: `https://api.ridenrest.app/health` (HTTP 200), `https://ridenrest.app` (HTTP 200), PostgreSQL TCP check (localhost:5432), Redis TCP check (localhost:6379) — with email or Telegram notification on status change to "down".
+**Then** monitors exist for: `https://api.ridenrest.app/api/health` (HTTP 200), `https://ridenrest.app` (HTTP 200), PostgreSQL TCP check (localhost:5432), Redis TCP check (localhost:6379) — with email or Telegram notification on status change to "down".
 
 ---
 
@@ -3029,7 +3029,7 @@ So that I know immediately if the app goes down or the VPS runs out of resources
 
 **Given** monitors are configured,
 **When** checking status,
-**Then** Uptime Kuma monitors: HTTPS `ridenrest.app` (web), HTTPS `api.ridenrest.app/health` (API), PostgreSQL TCP `localhost:5432`, Redis TCP `localhost:6379`.
+**Then** Uptime Kuma monitors: HTTPS `ridenrest.app` (web), HTTPS `api.ridenrest.app/api/health` (API), PostgreSQL TCP `localhost:5432`, Redis TCP `localhost:6379`.
 
 **Given** a monitored service goes down,
 **When** 2 consecutive checks fail (60s interval),

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0 — 2026-05-31
+
+### Nouveautés
+- Calcul de l'itinéraire entre votre trace et un hébergement
+
 ## 1.3.0 — 2026-05-05
 
 ### Nouveautés

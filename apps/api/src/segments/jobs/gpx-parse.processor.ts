@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq'
 import { Logger } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import type { Job } from 'bullmq'
 import * as fs from 'node:fs/promises'
 import {
@@ -12,7 +13,11 @@ import {
 } from '@ridenrest/gpx'
 import { MAX_GPX_POINTS, RDP_EPSILON } from '@ridenrest/shared'
 import { SegmentsRepository } from '../segments.repository.js'
-import { SegmentsService } from '../segments.service.js'
+import {
+  SegmentsService,
+  ADVENTURE_TRACE_UPDATED_EVENT,
+  type AdventureTraceUpdatedPayload,
+} from '../segments.service.js'
 
 interface ParseSegmentJob {
   segmentId: string
@@ -26,6 +31,7 @@ export class GpxParseProcessor extends WorkerHost {
   constructor(
     private readonly segmentsRepo: SegmentsRepository,
     private readonly segmentsService: SegmentsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super()
   }
@@ -92,6 +98,14 @@ export class GpxParseProcessor extends WorkerHost {
 
       // 9. Recompute cumulative distances now that we have real distanceKm
       await this.segmentsService.recomputeCumulativeDistances(adventureId)
+
+      // 10. La géométrie du segment vient d'être écrite → la trace fusionnée de l'aventure a changé.
+      //     Story 4.2 : invalider le cache d'accès POI au scope aventure (origine `nearest-trace`
+      //     calculée sur ST_Collect de tous les segments). Les POI du nouveau segment n'existent pas
+      //     encore (recherche POI = action ultérieure) ; ce sont les POI pré-existants qui peuvent
+      //     devenir périmés. Émis APRÈS le commit du parse pour ne pas invalider un parse échoué.
+      const tracePayload: AdventureTraceUpdatedPayload = { adventureId, segmentId, changeType: 'segment-added' }
+      this.eventEmitter.emit(ADVENTURE_TRACE_UPDATED_EVENT, tracePayload)
 
       const durationMs = Date.now() - startTime
       this.logger.log({ segmentId, durationMs, jobId: job.id }, 'GPX parse job completed')

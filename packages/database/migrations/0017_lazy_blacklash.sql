@@ -1,0 +1,1 @@
+ALTER TABLE "accommodations_cache" ALTER COLUMN "access_geometry" SET DATA TYPE geometry(GEOMETRY, 4326);

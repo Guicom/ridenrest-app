@@ -1,6 +1,6 @@
 # Story POI-Access 1.4 : Audit pré-requis codebase & résolution des gaps critiques
 
-Status: in-progress
+Status: done
 
 <!--
 Story scope-specific issue de epics-poi-access-routing.md (feature POI Access Routing).

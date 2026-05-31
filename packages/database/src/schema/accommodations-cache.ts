@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, real, jsonb, index, uniqueIndex, boolean, che
 import { sql } from 'drizzle-orm'
 import { adventureSegments } from './adventure-segments'
 import { adventureStages } from './adventure-stages'
-import { lineString } from '../types/geometry'
+import { lineOrMultiLineString } from '../types/geometry'
 
 export const accommodationsCache = pgTable('accommodations_cache', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -21,7 +21,7 @@ export const accommodationsCache = pgTable('accommodations_cache', {
   accessDistanceM: real('access_distance_m'),
   accessElevationGainM: real('access_elevation_gain_m'),
   accessElevationLossM: real('access_elevation_loss_m'),
-  accessGeometry: lineString('access_geometry'),
+  accessGeometry: lineOrMultiLineString('access_geometry'),
   accessEngineVersion: text('access_engine_version'),
   accessComputedAt: timestamp('access_computed_at'),
   accessFailed: boolean('access_failed').notNull().default(false),

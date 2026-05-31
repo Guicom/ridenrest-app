@@ -21,6 +21,7 @@ const makeAdventure = (overrides: Partial<AdventureResponse> = {}): AdventureRes
   densityStatus: 'idle',
   densityProgress: 0,
   avgSpeedKmh: 15,
+  routingProfile: 'gravel',
   hasStravaSegment: false,
   createdAt: '2026-03-15T00:00:00.000Z',
   updatedAt: '2026-03-15T00:00:00.000Z',

@@ -11,6 +11,8 @@ import type { Job } from 'bullmq'
 import { GpxParseProcessor } from './gpx-parse.processor.js'
 import type { SegmentsRepository } from '../segments.repository.js'
 import type { SegmentsService } from '../segments.service.js'
+import { ADVENTURE_TRACE_UPDATED_EVENT } from '../segments.service.js'
+import type { EventEmitter2 } from '@nestjs/event-emitter'
 
 interface ParseSegmentJobData {
   segmentId: string
@@ -26,6 +28,10 @@ const mockSegmentsRepo = {
 
 const mockSegmentsService = {
   recomputeCumulativeDistances: jest.fn(),
+}
+
+const mockEventEmitter = {
+  emit: jest.fn(),
 }
 
 const makeJob = (data: Partial<ParseSegmentJobData> = {}): Job<ParseSegmentJobData> =>
@@ -54,6 +60,7 @@ describe('GpxParseProcessor', () => {
     processor = new GpxParseProcessor(
       mockSegmentsRepo as unknown as SegmentsRepository,
       mockSegmentsService as unknown as SegmentsService,
+      mockEventEmitter as unknown as EventEmitter2,
     )
     // Spy on the logger instance created inside the processor
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
@@ -96,6 +103,16 @@ describe('GpxParseProcessor', () => {
       )
       expect(mockSegmentsService.recomputeCumulativeDistances).toHaveBeenCalledWith('adv-1')
       expect(mockSegmentsRepo.updateParseError).not.toHaveBeenCalled()
+    })
+
+    it('emits adventure.trace-updated (segment-added) so Story 4.2 invalidates the access cache', async () => {
+      await processor.process(makeJob())
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(ADVENTURE_TRACE_UPDATED_EVENT, {
+        adventureId: 'adv-1',
+        segmentId: 'seg-1',
+        changeType: 'segment-added',
+      })
     })
 
     it('stores waypoints with ele field when elevation data is present (AC #5)', async () => {
@@ -166,6 +183,8 @@ describe('GpxParseProcessor', () => {
       expect(mockSegmentsRepo.updateParseError).toHaveBeenCalledWith('seg-1')
       expect(mockSegmentsRepo.updateAfterParse).not.toHaveBeenCalled()
       expect(mockSegmentsService.recomputeCumulativeDistances).not.toHaveBeenCalled()
+      // No trace change committed → no invalidation event (Story 4.2)
+      expect(mockEventEmitter.emit).not.toHaveBeenCalled()
     })
   })
 

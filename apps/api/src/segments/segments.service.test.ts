@@ -1,7 +1,8 @@
 // Focus: recomputeCumulativeDistances, reorderSegments, deleteSegment logic
-import { SegmentsService } from './segments.service.js'
+import { SegmentsService, ADVENTURE_TRACE_UPDATED_EVENT } from './segments.service.js'
 import type { SegmentsRepository } from './segments.repository.js'
 import type { AdventuresService } from '../adventures/adventures.service.js'
+import type { EventEmitter2 } from '@nestjs/event-emitter'
 import type { Queue } from 'bullmq'
 import * as fsPromises from 'node:fs/promises'
 
@@ -31,10 +32,13 @@ const mockAdventuresService = {
 
 const mockGpxQueue = { add: jest.fn() }
 
+const mockEventEmitter = { emit: jest.fn() }
+
 const service = new SegmentsService(
   mockSegmentsRepo as unknown as SegmentsRepository,
   mockAdventuresService as unknown as AdventuresService,
   mockGpxQueue as unknown as Queue,
+  mockEventEmitter as unknown as EventEmitter2,
 )
 
 beforeEach(() => jest.clearAllMocks())
@@ -141,6 +145,19 @@ describe('deleteSegment', () => {
     expect(fsPromises.unlink).toHaveBeenCalledWith(seg.storageUrl)
     expect(mockAdventuresService.updateTotals).toHaveBeenCalledWith('adv-1', 0, null, null)
     expect(result).toEqual({ deleted: true })
+    // Story 4.2 : la trace de l'aventure a changé → invalidation event-driven du cache d'accès POI
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith(ADVENTURE_TRACE_UPDATED_EVENT, {
+      adventureId: 'adv-1',
+      segmentId: 'seg-1',
+      changeType: 'segment-removed',
+    })
+  })
+
+  it('does NOT emit adventure.trace-updated when the segment is not found', async () => {
+    mockSegmentsRepo.findByIdAndUserId.mockResolvedValue(null)
+
+    await expect(service.deleteSegment('adv-1', 'seg-1', 'user-1')).rejects.toThrow('Segment not found')
+    expect(mockEventEmitter.emit).not.toHaveBeenCalled()
   })
 
   it('throws NotFoundException when segment belongs to a different adventure', async () => {

@@ -18,12 +18,26 @@ const mockRepo = {
   updateName: jest.fn(),
   updateStartDate: jest.fn(),
   updateEndDate: jest.fn(),
+  updateAvgSpeedKmh: jest.fn(),
+  updateRoutingProfile: jest.fn(),
   deleteById: jest.fn(),
   findSegmentStorageUrlsByAdventureId: jest.fn(),
   getAdventureMapData: jest.fn(),
 }
 
-const service = new AdventuresService(mockRepo as unknown as AdventuresRepository)
+const mockStagesService = {
+  recomputeAllEtasForAdventure: jest.fn(),
+}
+
+const mockEventEmitter = {
+  emit: jest.fn(),
+}
+
+const service = new AdventuresService(
+  mockRepo as unknown as AdventuresRepository,
+  mockStagesService as never,
+  mockEventEmitter as never,
+)
 
 const makeAdventure = (overrides = {}) => ({
   id: 'adv-1',
@@ -33,6 +47,7 @@ const makeAdventure = (overrides = {}) => ({
   startDate: null as string | null,
   endDate: null as string | null,
   status: 'planning' as const,
+  routingProfile: 'gravel' as const,
   createdAt: new Date('2026-03-15T00:00:00Z'),
   updatedAt: new Date('2026-03-15T00:00:00Z'),
   ...overrides,
@@ -70,9 +85,10 @@ describe('verifyOwnership', () => {
     await expect(service.verifyOwnership('adv-1', 'other-user')).rejects.toThrow(NotFoundException)
   })
 
-  it('resolves when adventure belongs to user', async () => {
+  it('returns the adventure when it belongs to user', async () => {
     mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure())
-    await expect(service.verifyOwnership('adv-1', 'user-1')).resolves.toBeUndefined()
+    const result = await service.verifyOwnership('adv-1', 'user-1')
+    expect(result.id).toBe('adv-1')
   })
 })
 
@@ -156,6 +172,39 @@ describe('updateAdventure', () => {
     const result = await service.getAdventure('adv-1', 'user-1')
     expect(result.startDate).toBe('2026-07-01')
     expect(result.endDate).toBe('2026-07-14')
+  })
+
+  it('updates routingProfile and emits adventure.profile-changed when it changes', async () => {
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure({ routingProfile: 'gravel' }))
+    mockRepo.updateRoutingProfile.mockResolvedValue(makeAdventure({ routingProfile: 'bikepacking' }))
+
+    const dto: UpdateAdventureDto = { routingProfile: 'bikepacking' }
+    const result = await service.updateAdventure('adv-1', 'user-1', dto)
+
+    expect(mockRepo.updateRoutingProfile).toHaveBeenCalledWith('adv-1', 'bikepacking')
+    expect(result.routingProfile).toBe('bikepacking')
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith('adventure.profile-changed', {
+      adventureId: 'adv-1',
+      newProfile: 'bikepacking',
+      previousProfile: 'gravel',
+    })
+  })
+
+  it('does NOT emit adventure.profile-changed when routingProfile is unchanged', async () => {
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure({ routingProfile: 'gravel' }))
+    mockRepo.updateRoutingProfile.mockResolvedValue(makeAdventure({ routingProfile: 'gravel' }))
+
+    const dto: UpdateAdventureDto = { routingProfile: 'gravel' }
+    await service.updateAdventure('adv-1', 'user-1', dto)
+
+    expect(mockRepo.updateRoutingProfile).toHaveBeenCalledWith('adv-1', 'gravel')
+    expect(mockEventEmitter.emit).not.toHaveBeenCalled()
+  })
+
+  it('toResponse includes routingProfile field', async () => {
+    mockRepo.findByIdAndUserId.mockResolvedValue(makeAdventure({ routingProfile: 'road' }))
+    const result = await service.getAdventure('adv-1', 'user-1')
+    expect(result.routingProfile).toBe('road')
   })
 })
 

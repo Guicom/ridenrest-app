@@ -1,0 +1,7 @@
+[mcp_servers.agentvibes]
+args = [
+    "-y",
+    "--package=agentvibes",
+    "agentvibes-mcp-server",
+]
+command = "npx"

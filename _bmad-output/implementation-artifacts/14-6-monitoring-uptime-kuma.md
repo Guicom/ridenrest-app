@@ -16,7 +16,7 @@ So that I know immediately if the app goes down or the VPS runs out of resources
 
 3. **Given** monitors are configured in the Uptime Kuma UI, **When** checking monitor list, **Then** the following monitors exist:
    - HTTP(s): `https://ridenrest.app` (web app)
-   - HTTP(s): `https://api.ridenrest.app/health` (API health — `@Public()` endpoint, no auth needed)
+   - HTTP(s): `https://api.ridenrest.app/api/health` (API health — `@Public()` endpoint, no auth needed)
    - TCP: `db:5432` (PostgreSQL via Docker network)
    - TCP: `redis:6379` (Redis via Docker network)
 
@@ -153,7 +153,7 @@ So that I know immediately if the app goes down or the VPS runs out of resources
 - [ ] 5.4 On first launch, create admin account in Uptime Kuma UI
 - [ ] 5.5 Add monitors via Uptime Kuma UI (see Dev Notes section 4 for exact settings):
   - HTTP(s) — `ridenrest.app` — 60s interval
-  - HTTP(s) — `api.ridenrest.app/health` — 60s interval
+  - HTTP(s) — `api.ridenrest.app/api/health` — 60s interval
   - TCP — `db` — port `5432` — 60s interval
   - TCP — `redis` — port `6379` — 60s interval
   - Push — name "VPS Resources" — copy the generated push URL → save to `.uptime-push-url`
@@ -217,7 +217,7 @@ docker compose --profile production restart caddy
 | Monitor | Type | URL / Host | Port | Interval | Max Retries |
 |---|---|---|---|---|---|
 | ridenrest.app | HTTP(s) | `https://ridenrest.app` | — | 60s | 2 |
-| API Health | HTTP(s) | `https://api.ridenrest.app/health` | — | 60s | 2 |
+| API Health | HTTP(s) | `https://api.ridenrest.app/api/health` | — | 60s | 2 |
 | PostgreSQL | TCP Port | `db` | `5432` | 60s | 2 |
 | Redis | TCP Port | `redis` | `6379` | 60s | 2 |
 | VPS Resources | Push | (auto-generated) | — | heartbeat 10min | 1 |

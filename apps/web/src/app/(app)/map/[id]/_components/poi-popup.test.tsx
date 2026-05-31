@@ -17,6 +17,11 @@ vi.mock('@/hooks/use-reverse-address', () => ({
   useReverseAddress: () => ({ address: null, isPending: false }),
 }))
 
+// AccessMetrics (Story 2.4) has its own tests + requires a QueryClientProvider — stub it here.
+vi.mock('@/components/poi-access/AccessMetrics', () => ({
+  AccessMetrics: () => <div data-testid="access-metrics" />,
+}))
+
 let mockDetails: {
   placeId: string
   displayName: string | null
@@ -155,10 +160,12 @@ describe('PoiPopup', () => {
     expect(screen.getByText('Restauration')).toBeDefined()
   })
 
+  // Distance-à-la-trace + stats le long de la trace : non-hébergement uniquement
+  // (les hébergements affichent désormais la rangée d'itinéraire d'accès à la place).
   it('shows distance from trace in meters when < 1km', () => {
     render(
       <PoiPopup
-        poi={makeAccommodationPoi({ distFromTraceM: 250 })}
+        poi={makeRestaurantPoi({ distFromTraceM: 250 })}
         segments={[makeSegment()]}
         segmentId="seg-1"
         map={map}
@@ -171,7 +178,7 @@ describe('PoiPopup', () => {
   it('shows distance from trace in km when >= 1000m', () => {
     render(
       <PoiPopup
-        poi={makeAccommodationPoi({ distFromTraceM: 1500 })}
+        poi={makeRestaurantPoi({ distFromTraceM: 1500 })}
         segments={[makeSegment()]}
         segmentId="seg-1"
         map={map}
@@ -184,7 +191,7 @@ describe('PoiPopup', () => {
   it('shows km on-trace value', () => {
     render(
       <PoiPopup
-        poi={makeAccommodationPoi({ distAlongRouteKm: 10 })}
+        poi={makeRestaurantPoi({ distAlongRouteKm: 10 })}
         segments={[makeSegment()]}
         segmentId="seg-1"
         map={map}

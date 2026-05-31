@@ -155,6 +155,11 @@ vi.mock('../../map/[id]/_components/poi-detail-sheet', () => ({
   PoiDetailSheet: () => <div data-testid="poi-detail-sheet" />,
 }))
 
+// Mock LiveAccessPolyline (Story 3.3) — its access/consent hooks are out of scope here
+vi.mock('@/components/poi-access/LiveAccessPolyline', () => ({
+  LiveAccessPolyline: () => null,
+}))
+
 // Mock AccommodationSubTypes (reused from map route)
 vi.mock('../../map/[id]/_components/accommodation-sub-types', () => ({
   ACCOMMODATION_SUB_TYPES: [

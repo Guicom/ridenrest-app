@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { X, Globe, Phone, Navigation, Milestone, TrendingUp, TrendingDown, Clock, ChevronDown, Copy, Check } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { usePoiGoogleDetails } from '@/hooks/use-poi-google-details'
@@ -9,7 +9,9 @@ import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { extractCityFromOsmRawData } from '@/lib/booking-url'
 import { useReverseCity } from '@/hooks/use-reverse-city'
 import { useReverseAddress } from '@/hooks/use-reverse-address'
-import type { Poi, PoiCategory } from '@ridenrest/shared'
+import { useMapStore } from '@/stores/map.store'
+import { AccessMetrics } from '@/components/poi-access/AccessMetrics'
+import type { Poi, PoiCategory, AccessOrigin } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import { trackPoiDetailOpened } from '@/lib/analytics'
@@ -103,6 +105,23 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
   const popupRef = useRef<HTMLDivElement>(null)
   const isLiveMode = !!liveContext
   const isAccommodation = ACCOMMODATION_CATEGORIES.includes(poi.category)
+
+  // Origine de l'itinéraire d'accès = point de la trace le plus proche du POI (fix 2026-05-30).
+  // Sémantique correcte de « l'accès vélo depuis la trace » : un détour court, indépendant
+  // de l'étape sélectionnée ou du départ d'aventure (qui donnaient des accès de ~192 km).
+  const accessOrigin: AccessOrigin = useMemo(() => ({ type: 'nearest-trace' }), [])
+
+  // Affiche la polyline d'itinéraire d'accès tant que ce popup est ouvert (Story 2.5).
+  // Planning mode + hébergements uniquement (cohérent avec AccessMetrics) : le live mode
+  // est GPS/RGPD-sensible et n'a pas de polyline d'accès. Cleanup au unmount → AC#5.
+  // Doc Sync : la story planifiait ce câblage dans `poi-detail-sheet.tsx`, mais l'UI POI
+  // réelle du mode planning est `PoiPopup` (le sheet est la variante live mode).
+  const setVisibleAccessPoiId = useMapStore((s) => s.setVisibleAccessPoiId)
+  useEffect(() => {
+    if (isLiveMode || !isAccommodation) return
+    setVisibleAccessPoiId(poi.id)
+    return () => setVisibleAccessPoiId(null)
+  }, [poi.id, isLiveMode, isAccommodation, setVisibleAccessPoiId])
 
   // Stable ref so map click handler never needs to re-register on onClose identity changes
   const onCloseRef = useRef(onClose)
@@ -339,38 +358,60 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
               {addressCopied ? 'Adresse copiée' : ''}
             </span>
 
-            {/* Row 4 : Distance de la trace */}
-            <p className="mt-2.5 text-sm text-[--text-secondary]">{distanceLabel}</p>
+            {/* Row 4 : Distance à vol d'oiseau de la trace — non-hébergement uniquement.
+                Pour un hébergement, la rangée d'accès ci-dessous donne la vraie distance routière. */}
+            {!isAccommodation && (
+              <p className="mt-2.5 text-sm text-[--text-secondary]">{distanceLabel}</p>
+            )}
           </div>
 
           {/* Séparateur */}
           <div className="mx-4 h-px bg-[--border]" />
 
-          {/* Stats row avec icônes */}
-          <div className={`px-4 py-3 grid gap-2 text-center ${elevationGainM !== null && elevationGainM > 0 ? (elevationLossM !== null && elevationLossM > 0 ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
-            <div className="flex flex-col items-center gap-0.5">
-              <Milestone className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium text-[--text-primary]">{distanceKm.toFixed(1)} km</span>
+          {/* Rangée stats (icône au-dessus de la valeur).
+              - Hébergement → itinéraire d'accès : distance routière + D+ + D- + temps estimé.
+              - Autre POI    → position le long de la trace : distance depuis l'origine + D+/D- + ETA.
+
+              Hébergement : même origine `nearest-trace` en Planning ET en Live (décision
+              2026-05-30). Le « détour final depuis la trace » est indépendant de la position ;
+              il ne nécessite donc aucune position GPS ni consentement RGPD. `speed` reflète
+              déjà la vitesse Live (liveContext) ou la vitesse par défaut en Planning. */}
+          {!isAccommodation ? (
+            <div className={`px-4 py-3 grid gap-2 text-center ${elevationGainM !== null && elevationGainM > 0 ? (elevationLossM !== null && elevationLossM > 0 ? 'grid-cols-4' : 'grid-cols-3') : 'grid-cols-2'}`}>
+              <div className="flex flex-col items-center gap-0.5">
+                <Milestone className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium text-[--text-primary]">{distanceKm.toFixed(1)} km</span>
+              </div>
+              {elevationGainM !== null && elevationGainM > 0 && (
+                <div className="flex flex-col items-center gap-0.5">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium text-[--text-primary]">{elevationGainM} m D+</span>
+                </div>
+              )}
+              {elevationLossM !== null && elevationLossM > 0 && (
+                <div className="flex flex-col items-center gap-0.5">
+                  <TrendingDown className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium text-[--text-primary]">{elevationLossM} m D-</span>
+                </div>
+              )}
+              {distanceKm > 0 && speed > 0 && (
+                <div className="flex flex-col items-center gap-0.5">
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-medium text-[--text-primary]">{formatEta(distanceKm, speed)}</span>
+                </div>
+              )}
             </div>
-            {elevationGainM !== null && elevationGainM > 0 && (
-              <div className="flex flex-col items-center gap-0.5">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium text-[--text-primary]">{elevationGainM} m D+</span>
-              </div>
-            )}
-            {elevationLossM !== null && elevationLossM > 0 && (
-              <div className="flex flex-col items-center gap-0.5">
-                <TrendingDown className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium text-[--text-primary]">{elevationLossM} m D-</span>
-              </div>
-            )}
-            {distanceKm > 0 && speed > 0 && (
-              <div className="flex flex-col items-center gap-0.5">
-                <Clock className="h-4 w-4 text-primary" />
-                <span className="text-xs font-medium text-[--text-primary]">{formatEta(distanceKm, speed)}</span>
-              </div>
-            )}
-          </div>
+          ) : (
+            /* Hébergement (Planning & Live) : origine = point de trace le plus proche du POI. */
+            <AccessMetrics
+              variant="stats"
+              poiId={poi.id}
+              origin={accessOrigin}
+              category={poi.category}
+              fallbackDistanceM={poi.distFromTraceM}
+              speedKmh={speed}
+            />
+          )}
 
           {/* Skeleton pendant chargement Google */}
           {detailsPending && (

@@ -19,6 +19,7 @@ describe('useMapStore', () => {
       selectedPoiId: null,
       selectedStageId: null,
       traceClickedKm: null,
+      visibleAccessPoiId: null,
     })
   })
 
@@ -148,6 +149,38 @@ describe('useMapStore', () => {
     useMapStore.getState().setTraceClickedKm(42.5)
     useMapStore.getState().setTraceClickedKm(null)
     expect(useMapStore.getState().traceClickedKm).toBeNull()
+  })
+
+  // ── Access map layer slice (Story POI-Access 2.5, AC#1) ──────────────────────
+  it('visibleAccessPoiId initializes to null (AC#1)', () => {
+    expect(useMapStore.getState().visibleAccessPoiId).toBeNull()
+  })
+
+  it('setVisibleAccessPoiId sets the visible access POI id (AC#1)', () => {
+    useMapStore.getState().setVisibleAccessPoiId('poi-abc')
+    expect(useMapStore.getState().visibleAccessPoiId).toBe('poi-abc')
+  })
+
+  it('setVisibleAccessPoiId(null) clears the visible access POI id (AC#5)', () => {
+    useMapStore.getState().setVisibleAccessPoiId('poi-abc')
+    useMapStore.getState().setVisibleAccessPoiId(null)
+    expect(useMapStore.getState().visibleAccessPoiId).toBeNull()
+  })
+
+  it('setVisibleAccessPoiId switching POI replaces the previous id (AC#4)', () => {
+    useMapStore.getState().setVisibleAccessPoiId('poi-A')
+    useMapStore.getState().setVisibleAccessPoiId('poi-B')
+    expect(useMapStore.getState().visibleAccessPoiId).toBe('poi-B')
+  })
+
+  it('setVisibleAccessPoiId does not break existing actions (no breaking change, AC#1)', () => {
+    useMapStore.getState().setVisibleAccessPoiId('poi-A')
+    useMapStore.getState().setSelectedPoiId('poi-A')
+    useMapStore.getState().setTraceClickedKm(12.3)
+    const state = useMapStore.getState()
+    expect(state.visibleAccessPoiId).toBe('poi-A')
+    expect(state.selectedPoiId).toBe('poi-A')
+    expect(state.traceClickedKm).toBe(12.3)
   })
 
   it('resetAccommodationTypes restores all sub-types (Story 16.17, AC-6)', () => {

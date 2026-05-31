@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" DROP COLUMN "live_access_consent";

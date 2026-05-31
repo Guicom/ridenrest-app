@@ -39,6 +39,11 @@ interface MapState {
   // Trace click CTA (Story 16.3)
   traceClickedKm: number | null
 
+  // Access route polyline visibility (Story POI-Access 2.5)
+  // Doc Sync : la story planifiée référençait un store dédié `usePlanningModeStore`
+  // (inexistant) ; le slice est ajouté à `useMapStore`, store réel du mode planning.
+  visibleAccessPoiId: string | null
+
   // Actions
   setActiveLayer: (layer: MapLayer | null) => void
   toggleLayer: (layer: MapLayer) => void
@@ -53,6 +58,7 @@ interface MapState {
   setSelectedPoiId: (id: string | null) => void
   setSelectedStageId: (id: string | null) => void
   setTraceClickedKm: (km: number | null) => void
+  setVisibleAccessPoiId: (id: string | null) => void
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -71,6 +77,7 @@ export const useMapStore = create<MapState>((set) => ({
   selectedPoiId: null,
   selectedStageId: null,
   traceClickedKm: null,
+  visibleAccessPoiId: null,
 
   setActiveLayer: (layer) => set({ activeLayer: layer }),
 
@@ -116,4 +123,6 @@ export const useMapStore = create<MapState>((set) => ({
   setSelectedStageId: (id) => set({ selectedStageId: id }),
 
   setTraceClickedKm: (km) => set({ traceClickedKm: km }),
+
+  setVisibleAccessPoiId: (id) => set({ visibleAccessPoiId: id }),
 }))
