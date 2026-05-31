@@ -20,17 +20,25 @@ const schema = z.object({
   // évitait les nationales et produisait de longs détours par pistes. Le danger éventuel
   // (passage par une nationale) est signalé séparément via `usesMainRoad`.
   ACCESS_ROUTING_PROFILE: z.string().min(1).default('trekking'),
-  // Bump 2026-05-31 : sélection multi-candidats profil-aware du point d'accès (le point le
-  // plus proche à vol d'oiseau n'est plus forcément retenu — on minimise le temps réel selon
-  // le profil). Invalide les accès en cache calculés avec l'ancienne logique mono-point
-  // (ST_ClosestPoint) → recalcul lazy au prochain accès.
-  // Bump 2026-05-31 (c) : profil d'accès unique `trekking` (nationales autorisées) + détection
-  // nationale (`usesMainRoad`). Invalide les accès en cache calculés avec fastbike → recalcul lazy.
-  // Bump 2026-05-31 (b) : dédoublonnage des variantes sur les métriques AFFICHÉES (distance,
-  // D+, D-) au lieu de `etaS` — invalidation précédente.
-  // Bump 2026-05-30 : nouveau mapping de profils — invalidation précédente, conservée pour historique.
-  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+access-trekking-v3'),
 })
+
+/**
+ * Version du moteur de calcul d'accès — CONSTANTE DE CODE (pas une variable d'env).
+ *
+ * Sert de clé d'invalidation du cache `accommodations_cache.access_*` : toute ligne dont
+ * `access_engine_version` diffère est recalculée (lazy) au prochain accès. La rendre constante
+ * (et non surchargeable par `.env`) garantit une invalidation DÉTERMINISTE à chaque déploiement,
+ * partout — un override d'env figé avait neutralisé les bumps et servait des variantes périmées
+ * (sans `usesMainRoad`), provoquant des échecs de parse côté front (2026-05-31).
+ *
+ * Historique des bumps :
+ *  - access-trekking-v3 (2026-05-31) : profil d'accès unique `trekking` (nationales autorisées)
+ *    + détection nationale (`usesMainRoad`) + dédoublonnage par métriques affichées.
+ *  - profiles-v2+multicand2 / +multicand (2026-05-31) : multi-candidats + dédoublonnage initial.
+ *  - profiles-v2 (2026-05-30) : mapping de profils road/gravel/bikepacking.
+ *  À INCRÉMENTER à chaque changement de logique de calcul affectant le résultat servi.
+ */
+export const ACCESS_ENGINE_VERSION = 'brouter-1.7.9+access-trekking-v3'
 
 const accessConfig = registerAs('access', () => {
   const parsed = schema.safeParse(process.env)
@@ -47,7 +55,7 @@ const accessConfig = registerAs('access', () => {
     candidateRadiusM: parsed.data.ACCESS_CANDIDATE_RADIUS_M,
     maxCandidates: parsed.data.ACCESS_MAX_CANDIDATES,
     accessRoutingProfile: parsed.data.ACCESS_ROUTING_PROFILE,
-    engineVersion: parsed.data.ACCESS_ENGINE_VERSION,
+    engineVersion: ACCESS_ENGINE_VERSION,
   }
 })
 
