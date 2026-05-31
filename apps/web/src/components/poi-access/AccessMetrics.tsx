@@ -168,9 +168,31 @@ function VariantSelector({
   speedKmh?: number
   onSelect?: (index: number) => void
 }) {
-  if (variants.length <= 1 || !onSelect) return null
-  // Avertissement nationale = propriété de la variante SÉLECTIONNÉE (celle tracée sur la carte).
+  // Choix d'itinéraires : utile seulement à partir de 2 variantes ET si la sélection est câblée.
+  const showOptions = variants.length > 1 && !!onSelect
+  // Avertissement nationale = propriété de la variante AFFICHÉE (celle tracée sur la carte).
   const selectedUsesMainRoad = variants[selected]?.usesMainRoad ?? false
+
+  // Rien à montrer : pas de choix multiple et pas de nationale à signaler.
+  if (!showOptions && !selectedUsesMainRoad) return null
+
+  const warning = selectedUsesMainRoad && (
+    <span className="flex items-center gap-1 text-red-500" data-testid="access-main-road-warning">
+      <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+      Route nationale
+    </span>
+  )
+
+  // Mono-variante (ou sélection non câblée) qui passe par une nationale : on n'affiche QUE
+  // l'avertissement (ni label « Itinéraires », ni boutons de choix qui n'auraient pas de sens).
+  if (!showOptions) {
+    return (
+      <div className="px-4 pb-3 text-[11px] font-semibold uppercase tracking-wide">
+        {warning}
+      </div>
+    )
+  }
+
   return (
     <div className="px-4 pb-3" data-testid="access-variant-selector">
       <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide">
@@ -178,12 +200,7 @@ function VariantSelector({
           <Route className="h-3.5 w-3.5" aria-hidden="true" />
           Itinéraires
         </span>
-        {selectedUsesMainRoad && (
-          <span className="flex items-center gap-1 text-red-500" data-testid="access-main-road-warning">
-            <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
-            Route nationale
-          </span>
-        )}
+        {warning}
       </div>
       <div
         role="radiogroup"
