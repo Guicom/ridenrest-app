@@ -26,8 +26,15 @@ export type AccessGeometry = Extract<AccessResponse, { status: 'ok' }>['geometry
 const SOURCE_ID = 'poi-access-source'
 /** Calque de la variante sélectionnée (id historique conservé). */
 const SELECTED_LAYER_ID = 'poi-access-line'
+/** Liseré blanc continu SOUS la variante sélectionnée — la « décolle » de n'importe quel
+ *  fond (clair, vif ou sombre) et rend les pointillés colorés lisibles partout. */
+const CASING_LAYER_ID = 'poi-access-casing'
 /** Calque des variantes non sélectionnées (cliquables). */
 const GHOST_LAYER_ID = 'poi-access-ghost'
+
+/** Couleur du trait d'accès sélectionné : magenta/fuchsia — tranche sur tous les fonds OSM
+ *  sans collision avec le bleu de la trace, l'orange des pins ni le vert du terrain. */
+const ACCESS_ROUTE_COLOR = '#e6007e'
 
 /**
  * Calques de pins POI candidats. La ligne d'accès est insérée AVANT le premier présent
@@ -70,6 +77,7 @@ function firstPoiPointLayerId(map: maplibregl.Map): string | undefined {
 function removeAccessLayer(map: maplibregl.Map): void {
   try {
     if (map.getLayer(SELECTED_LAYER_ID)) map.removeLayer(SELECTED_LAYER_ID)
+    if (map.getLayer(CASING_LAYER_ID)) map.removeLayer(CASING_LAYER_ID)
     if (map.getLayer(GHOST_LAYER_ID)) map.removeLayer(GHOST_LAYER_ID)
     if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
   } catch {
@@ -180,11 +188,12 @@ export function AccessMapLayer({
       if (existing) {
         ;(existing as maplibregl.GeoJSONSource).setData(data)
         map.setFilter(GHOST_LAYER_ID, ghostFilter)
+        map.setFilter(CASING_LAYER_ID, selectedFilter)
         map.setFilter(SELECTED_LAYER_ID, selectedFilter)
       } else {
         const beforeId = firstPoiPointLayerId(map)
         map.addSource(SOURCE_ID, { type: 'geojson', data })
-        // Fantômes d'abord (en dessous), puis la sélectionnée (au-dessus) — même beforeId.
+        // Empilement bas→haut (même beforeId) : fantômes, puis liseré blanc, puis trait coloré.
         map.addLayer(
           {
             id: GHOST_LAYER_ID,
@@ -201,6 +210,23 @@ export function AccessMapLayer({
           },
           beforeId,
         )
+        // Liseré : ruban blanc CONTINU (non pointillé), plus large → halo de contraste sous le
+        // trait. Les pointillés colorés ressortent dessus quel que soit le fond de carte.
+        map.addLayer(
+          {
+            id: CASING_LAYER_ID,
+            type: 'line',
+            source: SOURCE_ID,
+            filter: selectedFilter,
+            paint: {
+              'line-color': '#ffffff',
+              'line-width': 7,
+              'line-opacity': 0.9,
+            },
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+          },
+          beforeId,
+        )
         map.addLayer(
           {
             id: SELECTED_LAYER_ID,
@@ -208,10 +234,10 @@ export function AccessMapLayer({
             source: SOURCE_ID,
             filter: selectedFilter,
             paint: {
-              'line-color': '#f59e0b',
+              'line-color': ACCESS_ROUTE_COLOR,
               'line-width': 4,
               'line-dasharray': [2, 2],
-              'line-opacity': 0.9,
+              'line-opacity': 1,
             },
             layout: { 'line-cap': 'round', 'line-join': 'round' },
           },

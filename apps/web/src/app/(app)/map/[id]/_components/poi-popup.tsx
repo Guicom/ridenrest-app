@@ -35,6 +35,23 @@ const ACCOMMODATION_CATEGORIES = LAYER_CATEGORIES.accommodations
 // Pin height in pixels — popup is anchored this far above the pin center
 const PIN_OFFSET_PX = 44
 
+// Carte POI en « liquid glass » permanent (inspiré d'Apple, cf. kube.io/blog/liquid-glass-css-svg) :
+// fond translucide + flou de fond (frost) + liseré spéculaire, le contenu (texte/boutons) restant
+// net par-dessus. État statique (aucune transition).
+//
+// NB : la vraie réfraction du verre (feDisplacementMap dans `backdrop-filter: url(#…)`) de
+// l'article est Chrome-only → on s'en tient à blur+saturate, supporté Safari/iOS (-webkit-).
+// Flou modéré : assez pour le rendu « frost », assez faible pour laisser voir la trace
+// (un routing est une ligne fine — un fort flou l'effacerait). Saturation élevée pour
+// faire ressortir sa couleur à travers le verre.
+const GLASS_FILTER = 'blur(6px) saturate(100%) brightness(1.05)'
+// Liseré spéculaire du verre : reflet haut + contour clair + lueur basse + portée profonde.
+const GLASS_SHADOW =
+  'inset 0 1px 0 0 rgba(255,255,255,0.65), ' +
+  'inset 0 0 0 1px rgba(255,255,255,0.28), ' +
+  'inset 0 -10px 18px -10px rgba(255,255,255,0.30), ' +
+  '0 16px 48px rgba(0,0,0,0.22)'
+
 interface PoiPopupProps {
   poi: Poi
   segments: MapSegmentData[]
@@ -219,6 +236,15 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
 
   if (!pos) return null
 
+  // Surface de la carte : verre dépoli statique. Fond translucide theme-aware (`--popup-glass`)
+  // + flou de fond + liseré spéculaire = rendu « liquid glass ». Contenu net par-dessus.
+  const cardStyle = {
+    background: 'var(--popup-glass)',
+    backdropFilter: GLASS_FILTER,
+    WebkitBackdropFilter: GLASS_FILTER,
+    boxShadow: GLASS_SHADOW,
+  }
+
   // ── Computations ──────────────────────────────────────────────────────────
   const poiKm = poi.distAlongRouteKm
   const fromKm = isLiveMode ? liveContext.currentKmOnRoute : planningFromKm
@@ -284,14 +310,14 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 40 }}>
       <div
         ref={popupRef}
-        className="pointer-events-auto absolute w-80 max-w-[calc(100vw-2rem)] [--popup-bg:#ffffff] dark:[--popup-bg:#18181b]"
+        className="pointer-events-auto absolute w-80 max-w-[calc(100vw-2rem)] [--popup-glass:rgba(255,255,255,0.28)] dark:[--popup-glass:rgba(24,24,27,0.32)]"
         style={{
           left: pos.x,
           top: pos.y - PIN_OFFSET_PX,
           transform: 'translateX(-50%) translateY(-100%)',
         }}
       >
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-[--border]">
+        <div className="rounded-2xl border border-[--border]" style={cardStyle}>
 
           {/* Header */}
           <div className="px-4 pt-4 pb-3">
@@ -530,7 +556,9 @@ export function PoiPopup({ poi, segments, segmentId, map, onClose, liveContext, 
           style={{
             borderLeft: '7px solid transparent',
             borderRight: '7px solid transparent',
-            borderTop: '7px solid var(--popup-bg, white)',
+            // Teinte verre (le triangle CSS ne peut pas porter de backdrop-filter) → coïncide
+            // avec la carte translucide au lieu d'un blanc plein qui ferait une couture.
+            borderTop: '7px solid var(--popup-glass, white)',
           }}
         />
       </div>
