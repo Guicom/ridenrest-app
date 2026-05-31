@@ -130,6 +130,12 @@ export default function LivePage() {
   const selectedPoiId = useUIStore((s) => s.selectedPoiId)
   const selectedPoi = pois.find((p) => p.id === selectedPoiId) ?? null
 
+  // Variante d'accès choisie (partagée carte ↔ popup), réinitialisée au changement de POI.
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0)
+  useEffect(() => {
+    setSelectedVariantIndex(0)
+  }, [selectedPoiId])
+
   // Active filter count for badge
   const mapVisibleLayers = useMapStore((s) => s.visibleLayers)
   const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes)
@@ -335,6 +341,8 @@ export default function LivePage() {
               useMapStore.getState().setSelectedPoiId(null)
             }}
             liveContext={isLiveModeActive && currentKmOnRoute !== null ? { currentKmOnRoute, speedKmh } : undefined}
+            selectedVariantIndex={selectedVariantIndex}
+            onSelectVariant={setSelectedVariantIndex}
           />
         )}
 
@@ -344,6 +352,8 @@ export default function LivePage() {
             map={liveMapCanvasRef.current.getMap()}
             poiId={selectedPoi.id}
             isAccommodation={(LAYER_CATEGORIES.accommodations as readonly string[]).includes(selectedPoi.category)}
+            selectedVariantIndex={selectedVariantIndex}
+            onSelectVariant={setSelectedVariantIndex}
           />
         )}
 

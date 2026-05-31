@@ -87,6 +87,7 @@ export class AccessWorkerRepository {
           access_elevation_gain_m = NULL,
           access_elevation_loss_m = NULL,
           access_geometry = NULL,
+          access_variants = NULL,
           access_computed_at = NULL,
           access_engine_version = NULL,
           access_failed = false

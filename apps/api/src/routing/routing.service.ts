@@ -135,11 +135,17 @@ export class RoutingService {
     const ascend = parseFloat(String(props['filtered ascend']))
     const elevationGainM = Number.isNaN(ascend) ? 0 : Math.round(ascend)
 
+    // `total-time` (s) : coût profil-aware utilisé pour départager les points d'accès
+    // candidats. Optionnel/best-effort → 0 si absent (on retombe alors sur la distance).
+    const totalTime = parseFloat(String(props['total-time']))
+    const timeS = Number.isNaN(totalTime) ? 0 : Math.round(totalTime)
+
     return {
       geometry: { type: 'LineString', coordinates: coordinates as LonLatEle[] },
       distanceM,
       elevationGainM,
       elevationLossM: this.computeElevationLoss(coordinates),
+      timeS,
     }
   }
 

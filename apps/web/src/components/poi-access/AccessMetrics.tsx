@@ -1,6 +1,6 @@
 'use client'
-import { TrendingUp, TrendingDown, Milestone, Clock } from 'lucide-react'
-import type { AccessOrigin, PoiCategory } from '@ridenrest/shared'
+import { TrendingUp, TrendingDown, Milestone, Clock, Route } from 'lucide-react'
+import type { AccessOrigin, AccessVariant, PoiCategory } from '@ridenrest/shared'
 import { getAccessLabel } from '@/lib/poi-labels'
 import { useAccess } from './useAccess'
 import { AccessMetricsSkeleton } from './AccessMetricsSkeleton'
@@ -26,6 +26,9 @@ interface AccessMetricsProps {
   variant?: 'full' | 'compact' | 'stats'
   /** Vitesse cycliste (km/h) pour l'ETA de la variante `stats`. */
   speedKmh?: number
+  /** Variante d'accès sélectionnée (état détenu par la page, partagé avec la carte). */
+  selectedVariantIndex?: number
+  onSelectVariant?: (index: number) => void
 }
 
 export function AccessMetrics({
@@ -35,6 +38,8 @@ export function AccessMetrics({
   fallbackDistanceM,
   variant = 'full',
   speedKmh,
+  selectedVariantIndex = 0,
+  onSelectVariant,
 }: AccessMetricsProps) {
   const { data, isLoading } = useAccess(poiId, origin)
 
@@ -59,8 +64,11 @@ export function AccessMetrics({
     return <AccessFallback fallbackDistanceM={usableData.fallbackDistanceM ?? fallbackDistanceM ?? 0} />
   }
 
-  // status === 'ok'
-  const distance = formatAccessDistance(usableData.distanceM)
+  // status === 'ok' — on affiche la variante SÉLECTIONNÉE (l'utilisateur peut en changer).
+  const variants = usableData.variants
+  const sel = Math.min(Math.max(selectedVariantIndex, 0), variants.length - 1)
+  const active = variants[sel]
+  const distance = formatAccessDistance(active.distanceM)
 
   if (variant === 'compact') {
     return (
@@ -68,11 +76,11 @@ export function AccessMetrics({
         <span className="font-medium text-[--text-primary]">{distance}</span>
         <span className="flex items-center gap-0.5 text-[--text-secondary]">
           <TrendingUp className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-          {formatAccessElevation(usableData.elevationGainM)}
+          {formatAccessElevation(active.elevationGainM)}
         </span>
         <span className="flex items-center gap-0.5 text-[--text-secondary]">
           <TrendingDown className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-          {formatAccessElevation(usableData.elevationLossM)}
+          {formatAccessElevation(active.elevationLossM)}
         </span>
       </div>
     )
@@ -80,28 +88,31 @@ export function AccessMetrics({
 
   if (variant === 'stats') {
     // Rangée 4 colonnes : icône au-dessus de la donnée (distance / D+ / D- / temps).
-    const eta = formatAccessEta(usableData.distanceM / 1000, speedKmh ?? 0)
+    const eta = formatAccessEta(active.distanceM / 1000, speedKmh ?? 0)
     const cell = 'flex flex-col items-center gap-0.5'
     const val = 'text-xs font-medium text-[--text-primary]'
     return (
-      <div className="px-4 py-3 grid grid-cols-4 gap-2 text-center" data-testid="access-metrics-stats">
-        <div className={cell}>
-          <Milestone className="h-4 w-4 text-primary" aria-hidden="true" />
-          <span className={val}>{distance}</span>
+      <>
+        <div className="px-4 py-3 grid grid-cols-4 gap-2 text-center" data-testid="access-metrics-stats">
+          <div className={cell}>
+            <Milestone className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span className={val}>{distance}</span>
+          </div>
+          <div className={cell}>
+            <TrendingUp className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span className={val}>{formatAccessElevation(active.elevationGainM)} D+</span>
+          </div>
+          <div className={cell}>
+            <TrendingDown className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span className={val}>{formatAccessElevation(active.elevationLossM)} D-</span>
+          </div>
+          <div className={cell}>
+            <Clock className="h-4 w-4 text-primary" aria-hidden="true" />
+            <span className={val}>{eta}</span>
+          </div>
         </div>
-        <div className={cell}>
-          <TrendingUp className="h-4 w-4 text-primary" aria-hidden="true" />
-          <span className={val}>{formatAccessElevation(usableData.elevationGainM)} D+</span>
-        </div>
-        <div className={cell}>
-          <TrendingDown className="h-4 w-4 text-primary" aria-hidden="true" />
-          <span className={val}>{formatAccessElevation(usableData.elevationLossM)} D-</span>
-        </div>
-        <div className={cell}>
-          <Clock className="h-4 w-4 text-primary" aria-hidden="true" />
-          <span className={val}>{eta}</span>
-        </div>
-      </div>
+        <VariantSelector variants={variants} selected={sel} speedKmh={speedKmh} onSelect={onSelectVariant} />
+      </>
     )
   }
 
@@ -112,12 +123,90 @@ export function AccessMetrics({
         <span className="font-medium text-[--text-primary]">{distance}</span>
         <span className="flex items-center gap-1">
           <TrendingUp className="h-4 w-4 text-primary" aria-hidden="true" />
-          {formatAccessElevation(usableData.elevationGainM)} D+
+          {formatAccessElevation(active.elevationGainM)} D+
         </span>
         <span className="flex items-center gap-1">
           <TrendingDown className="h-4 w-4 text-primary" aria-hidden="true" />
-          {formatAccessElevation(usableData.elevationLossM)} D-
+          {formatAccessElevation(active.elevationLossM)} D-
         </span>
+      </div>
+      <VariantSelector variants={variants} selected={sel} speedKmh={speedKmh} onSelect={onSelectVariant} />
+    </div>
+  )
+}
+
+/** Distance compacte pour les cellules de variante : "740 m" en deçà du km, "1,4" au-delà. */
+function compactDistance(distanceM: number): string {
+  if (Math.round(distanceM) < 1000) return `${Math.round(distanceM)} m`
+  return (distanceM / 1000).toFixed(1).replace('.', ',')
+}
+
+/** ETA compacte type "~5'" / "~1h05" (vélo, distance/vitesse — cohérent avec la rangée stats). */
+function compactEta(distanceM: number, speedKmh?: number): string {
+  const speed = speedKmh ?? 0
+  if (speed <= 0 || distanceM <= 0) return '—'
+  const min = Math.round((distanceM / 1000 / speed) * 60)
+  if (min < 1) return "<1'"
+  const h = Math.floor(min / 60)
+  const mm = min % 60
+  return h > 0 ? `~${h}h${String(mm).padStart(2, '0')}` : `~${min}'`
+}
+
+/**
+ * Sélecteur d'itinéraire d'accès : une cellule cliquable par variante (distance + ETA), la
+ * sélectionnée en carte blanche ambre. Masqué s'il n'y a qu'une variante ou si la sélection
+ * n'est pas câblée. Synchronisé avec la carte (fantômes cliquables) via le même état `selected`.
+ */
+function VariantSelector({
+  variants,
+  selected,
+  speedKmh,
+  onSelect,
+}: {
+  variants: AccessVariant[]
+  selected: number
+  speedKmh?: number
+  onSelect?: (index: number) => void
+}) {
+  if (variants.length <= 1 || !onSelect) return null
+  return (
+    <div className="px-4 pb-3" data-testid="access-variant-selector">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[--text-secondary]">
+        <Route className="h-3.5 w-3.5" aria-hidden="true" />
+        Itinéraires
+      </div>
+      <div
+        role="radiogroup"
+        aria-label="Choix de l'itinéraire d'accès"
+        className="flex gap-1.5 rounded-xl bg-muted p-1.5"
+      >
+        {variants.map((v, i) => {
+          const isActive = i === selected
+          return (
+            <button
+              key={i}
+              type="button"
+              role="radio"
+              aria-checked={isActive}
+              aria-label={`Itinéraire ${i + 1} : ${formatAccessDistance(v.distanceM)}, ${formatAccessEta(v.distanceM / 1000, speedKmh ?? 0)}`}
+              onClick={() => onSelect?.(i)}
+              // Chaque option a un fond + bordure au repos → lisiblement cliquable sans survol
+              // (mobile). La sélectionnée ressort en ambre + ombre ; `active:scale` = retour
+              // tactile au tap. Bordure sur les deux états → pas de saut de layout à la sélection.
+              className={
+                'flex flex-1 flex-col items-center rounded-lg border px-2 py-2 leading-tight transition active:scale-95 ' +
+                (isActive
+                  ? 'border-amber-500 bg-background font-semibold text-amber-600 shadow-sm'
+                  : 'border-[--border] bg-background/60 text-[--text-primary] shadow-sm hover:border-amber-300 hover:bg-background hover:text-amber-600')
+              }
+            >
+              <span className="text-xs">{compactDistance(v.distanceM)} km</span>
+              <span className={'text-xs ' + (isActive ? 'text-amber-600/80' : 'text-[--text-secondary]')}>
+                {compactEta(v.distanceM, speedKmh)}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )

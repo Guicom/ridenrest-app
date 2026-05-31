@@ -23,15 +23,32 @@ interface LiveAccessPolylineProps {
   map: maplibregl.Map | null
   poiId: string
   isAccommodation: boolean
+  /** Variante sélectionnée (état détenu par la page Live, partagé avec le popup). */
+  selectedVariantIndex: number
+  onSelectVariant?: (index: number) => void
 }
 
 const NEAREST_TRACE: AccessOrigin = { type: 'nearest-trace' }
 
-export function LiveAccessPolyline({ map, poiId, isAccommodation }: LiveAccessPolylineProps) {
+export function LiveAccessPolyline({
+  map,
+  poiId,
+  isAccommodation,
+  selectedVariantIndex,
+  onSelectVariant,
+}: LiveAccessPolylineProps) {
   const origin = useMemo<AccessOrigin>(() => NEAREST_TRACE, [])
   // `useAccess` est lazy (enabled requiert un poiId) — '' désactive la requête.
   const { data } = useAccess(isAccommodation ? poiId : '', origin)
-  const geometry = data?.status === 'ok' ? data.geometry : null
+  const variants = data?.status === 'ok' ? data.variants : null
 
-  return <AccessMapLayer map={map} geometry={geometry} fitOnShow={false} />
+  return (
+    <AccessMapLayer
+      map={map}
+      variants={variants}
+      selectedIndex={selectedVariantIndex}
+      onSelect={onSelectVariant}
+      fitOnShow={false}
+    />
+  )
 }

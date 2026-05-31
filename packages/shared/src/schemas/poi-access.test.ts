@@ -62,11 +62,36 @@ describe('AccessResponseSchema', () => {
       elevationGainM: 50,
       elevationLossM: 12,
       geometry: { type: 'LineString', coordinates: [[2.35, 48.85], [2.36, 48.86]] },
+      variants: [
+        {
+          entryPoint: [2.35, 48.85],
+          distanceM: 1234,
+          elevationGainM: 50,
+          elevationLossM: 12,
+          etaS: 900,
+          geometry: { type: 'LineString', coordinates: [[2.35, 48.85], [2.36, 48.86]] },
+        },
+      ],
       engineVersion: 'brouter-1.7.9+trekking',
       computedAt: new Date(0).toISOString(),
       source: 'computed-fresh',
     })
     expect(r.success).toBe(true)
+  })
+
+  it('rejects an ok response without variants (≥ 1 required)', () => {
+    const r = AccessResponseSchema.safeParse({
+      status: 'ok',
+      distanceM: 1234,
+      elevationGainM: 50,
+      elevationLossM: 12,
+      geometry: { type: 'LineString', coordinates: [[2.35, 48.85], [2.36, 48.86]] },
+      variants: [],
+      engineVersion: 'v',
+      computedAt: 'now',
+      source: 'computed-fresh',
+    })
+    expect(r.success).toBe(false)
   })
 
   it('validates a fallback response', () => {
@@ -86,6 +111,16 @@ describe('AccessResponseSchema', () => {
       elevationGainM: 0,
       elevationLossM: 0,
       geometry: { type: 'MultiLineString', coordinates: [[[2.35, 48.85], [2.36, 48.86]]] },
+      variants: [
+        {
+          entryPoint: [2.35, 48.85],
+          distanceM: 1,
+          elevationGainM: 0,
+          elevationLossM: 0,
+          etaS: 0,
+          geometry: { type: 'MultiLineString', coordinates: [[[2.35, 48.85], [2.36, 48.86]]] },
+        },
+      ],
       engineVersion: 'v',
       computedAt: 'now',
       source: 'db-cache',
