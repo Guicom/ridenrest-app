@@ -2,6 +2,11 @@
 
 Status: ready-for-dev
 
+> **ℹ️ Note 2026-05-30 (pivot `nearest-trace`).** Story quasi-non-impactée (observabilité = transverse). Deux nuances mineures :
+> - tag Sentry `origin_type` : reste valide (valeurs `stage` / `nearest-trace`) ;
+> - champ de log `userId?` : n'est plus alimenté par le pipeline d'accès (`userId` retiré de `compute()` avec le mode Live GPS) — le garder optionnel pour les autres contextes, mais il sera toujours absent côté accès.
+> Le runbook ne contient (volontairement) pas d'item « purge cache Redis live » — ce cache a été supprimé. Cf. epic.
+
 <!-- Dépend de : 4.1 (queue active), 4.2 (handlers actifs), 1.5 (Uptime Kuma BRouter monitor existant). -->
 
 ## Story

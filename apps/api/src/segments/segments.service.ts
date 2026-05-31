@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import type { Queue } from 'bullmq'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
@@ -16,12 +17,31 @@ import type { AdventureSegment } from '@ridenrest/database'
 
 const GPX_STORAGE_PATH = process.env.GPX_STORAGE_PATH ?? '/data/gpx'
 
+/**
+ * Event émis quand la trace d'une aventure change (segment supprimé ici, segment ajouté/parsé
+ * dans `GpxParseProcessor`). Consommé par Story 4.2 (`AccessWorkerService`) pour invalider le
+ * cache d'accès POI.
+ *
+ * ⚠️ Scope AVENTURE (pas segment) : l'origine `nearest-trace` est calculée sur la trace FUSIONNÉE
+ *   de tous les segments (`resolve-origin.ts` → `ST_Collect`). Ajouter/supprimer n'importe quel
+ *   segment peut donc déplacer le point d'accès des POI des AUTRES segments → invalidation globale.
+ */
+export const ADVENTURE_TRACE_UPDATED_EVENT = 'adventure.trace-updated' as const
+
+export interface AdventureTraceUpdatedPayload {
+  adventureId: string
+  /** Segment à l'origine du changement (observabilité). */
+  segmentId: string
+  changeType: 'segment-added' | 'segment-removed'
+}
+
 @Injectable()
 export class SegmentsService {
   constructor(
     private readonly segmentsRepo: SegmentsRepository,
     private readonly adventuresService: AdventuresService,
     @InjectQueue('gpx-processing') private readonly gpxQueue: Queue,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createSegment(
@@ -129,6 +149,13 @@ export class SegmentsService {
       await fs.unlink(segment.storageUrl).catch(() => undefined)
     }
     await this.recomputeCumulativeDistances(adventureId)
+
+    // La trace fusionnée de l'aventure a changé → les accès POI des segments restants peuvent
+    // être périmés (origine `nearest-trace` recalculée sur ST_Collect de tous les segments).
+    // Story 4.2 : invalidation event-driven au scope aventure (les POI du segment supprimé sont
+    // déjà retirés par CASCADE). Best-effort — un listener ne doit pas faire échouer le DELETE.
+    const payload: AdventureTraceUpdatedPayload = { adventureId, segmentId, changeType: 'segment-removed' }
+    this.eventEmitter.emit(ADVENTURE_TRACE_UPDATED_EVENT, payload)
 
     return { deleted: true }
   }

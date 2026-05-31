@@ -69,6 +69,7 @@ function poiRowFresh(overrides: Record<string, unknown> = {}): Record<string, un
 describe('AccessCalculatorService', () => {
   let service: AccessCalculatorService
   let warnSpy: jest.SpyInstance
+  let errorSpy: jest.SpyInstance
   const computeRoute = jest.fn()
 
   beforeEach(async () => {
@@ -85,6 +86,7 @@ describe('AccessCalculatorService', () => {
 
     service = module.get(AccessCalculatorService)
     warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined as never)
+    errorSpy = jest.spyOn(service['logger'], 'error').mockImplementation(() => undefined as never)
     jest.spyOn(service['logger'], 'debug').mockImplementation(() => undefined as never)
     jest.spyOn(service['logger'], 'log').mockImplementation(() => undefined as never)
   })
@@ -114,6 +116,24 @@ describe('AccessCalculatorService', () => {
     expect(computeRoute).toHaveBeenCalledWith({ from: [2.4, 48.4], to: [2.5, 48.5], profile: 'gravel' })
     // 2 requêtes DB : loadPoi + updateCache
     expect(mockDb.execute).toHaveBeenCalledTimes(2)
+  })
+
+  it('échec d\'écriture cache → réponse ok quand même servie + log ERROR visible (régression 0017)', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
+      .mockRejectedValueOnce(new Error('Geometry type (MultiLineString) does not match column type (LineString)')) // updateCache throw
+    mockResolveOrigin.mockResolvedValue([2.4, 48.4])
+    computeRoute.mockResolvedValue(ROUTE)
+    mockComputeDivergent.mockResolvedValue(METRICS)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    // La réponse reste servie (best-effort cache) …
+    expect(result).toMatchObject({ status: 'ok', source: 'computed-fresh' })
+    // … mais l'échec d'écriture est loggé en ERROR (plus de warn muet) avec le contexte.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: 'access_cache_write_failed', poiId: 'poi-1', geometryType: 'LineString' }),
+    )
   })
 
   it('POI sur la trace (nearest-trace, dist ≤ buffer) → accès ~0 sans appel BRouter (guard review 3.3)', async () => {

@@ -118,11 +118,19 @@ export class AccessCalculatorService {
     }
 
     // ── Calcul frais (cache miss) → UPDATE cache DB ───────────────────────────
+    // Échec d'écriture loggé en ERROR (non fatal : la réponse reste servie). Volontairement
+    // bruyant — un `warn` muet ici a masqué pendant des semaines un cache jamais persisté
+    // (col. `access_geometry` LINESTRING rejetant les MultiLineString, cf. migration 0017).
     return this.computeFresh(input, poi, async (metrics) => {
       try {
         await this.updateCache(poi.id, originStageId, metrics)
       } catch (cacheErr) {
-        this.logger.warn({ msg: 'access_cache_write_failed', poiId: poi.id, err: cacheErr })
+        this.logger.error({
+          msg: 'access_cache_write_failed',
+          poiId: poi.id,
+          geometryType: metrics.geometry.type,
+          err: cacheErr instanceof Error ? cacheErr.message : String(cacheErr),
+        })
       }
     })
   }
@@ -252,8 +260,14 @@ export class AccessCalculatorService {
 
   /**
    * UPDATE accommodations_cache avec les colonnes access_* (AC #5 step 5).
+   *
    * La géométrie est ré-simplifiée à ~5 m côté DB (AC #8) avant stockage — tolérance
    * exprimée en degrés (EPSG:4326), cf. `5/111320`. PAS '5' (= 5° ≈ 550 km → ligne droite).
+   *
+   * `ST_Force2D` : la géométrie d'accès est fréquemment une `MultiLineString` 3D (BRouter
+   * renvoie l'élévation Z, `computeDivergentSegment` fragmente via `ST_Difference`). La colonne
+   * `access_geometry` est `geometry(GEOMETRY, 4326)` 2D (migration 0017) — sans `ST_Force2D`,
+   * les coords 3D seraient rejetées. Le D+/D- est stocké séparément, la Z géométrique est inutile.
    */
   private async updateCache(
     poiId: string,
@@ -267,7 +281,7 @@ export class AccessCalculatorService {
         access_distance_m = ${metrics.distanceM},
         access_elevation_gain_m = ${metrics.elevationGainM},
         access_elevation_loss_m = ${metrics.elevationLossM},
-        access_geometry = ST_SimplifyPreserveTopology(ST_SetSRID(ST_GeomFromGeoJSON(${geomJson}), 4326), 5.0 / 111320.0),
+        access_geometry = ST_Force2D(ST_SimplifyPreserveTopology(ST_SetSRID(ST_GeomFromGeoJSON(${geomJson}), 4326), 5.0 / 111320.0)),
         access_engine_version = ${this.config.engineVersion},
         access_origin_stage_id = ${originStageId},
         access_computed_at = NOW(),

@@ -270,6 +270,7 @@ claude-opus-4-8 (1M context) — Dev Story workflow (bmad-dev-story)
 | Date | Auteur | Changement |
 |---|---|---|
 | 2026-05-29 | Amelia (Dev Agent) | Implémentation Story 2.2 : `AccessCalculatorService` + stratégies `resolve-origin`/`compute-divergent-segment` + types partagés + wiring `PoisModule`. 20 tests (96.55 % coverage module), suite API 320/320 verte. Status → review. |
+| 2026-05-30 | Dev (Claude) | **Bugfix critique — cache DB jamais persisté (`access_computed_at` NULL pour 1770/1770 POI).** Cause racine : la colonne `access_geometry` était `geometry(LINESTRING, 4326)`, or `computeDivergentSegment` produit souvent une **MultiLineString** → `UPDATE` rejeté (« Geometry type (MultiLineString) does not match column type (LineString) ») et **avalé** par un `catch → warn` muet. Fix : (1) **migration `0017_lazy_blacklash`** `ALTER COLUMN access_geometry TYPE geometry(GEOMETRY, 4326)` + nouveau type Drizzle `lineOrMultiLineString` ; (2) `updateCache` enveloppe la géométrie d'un `ST_Force2D` (colonne 2D, BRouter renvoie de la Z) ; (3) échec d'écriture désormais loggé en **ERROR** explicite (fin du `warn` muet) + test de régression. Reproduit & vérifié en DB (MultiLineString → `UPDATE 1`). API 347/347, tsc/ESLint clean. Les 1770 lignes NULL se recalculeront lazy au prochain accès. |
 
 ---
 

@@ -233,6 +233,19 @@ UX-DR-PA-001: Wording exact des popin RGPD et de la section Settings > Confident
 | NFR-PA-015 | Epic 4 | Healthcheck BRouter monitoré Uptime Kuma + alertes |
 | NFR-PA-016 | Epic 1 | Backup Postgres inclut `access_*` ; segments BRouter exclus |
 
+> **⛔ Requirements SUPERSEDED — 2026-05-30 (pivot `nearest-trace`).** Le mode Live n'envoie plus de
+> position GPS → les exigences suivantes ne sont plus applicables :
+> - **FR-PA-002** (accès Live depuis position GPS), **FR-PA-010** (popin consentement), **FR-PA-011**
+>   (toggle Settings), **FR-PA-012** (arrondi GPS 4 décimales), **FR-PA-013** (anonymisation clé Redis Live).
+> - **NFR-PA-006** (cache Redis Live TTL 15 min + clé anonyme), **NFR-PA-009** (GPS jamais stocké).
+> - **NFR-PA-004** : la partie « 120 req/min en Live » tombe ; reste la limite **60 req/min** unique
+>   (retour au `ThrottlerGuard` standard).
+> - **FR-PA-017** (invalidation sur modification de stage) **devient sans objet** : une route
+>   `nearest-trace` ne dépend QUE de (géométrie de trace, profil de routage), jamais des stages.
+>
+> Restent pleinement applicables : tout Epic 1/2, et pour Epic 4 le pré-calcul (FR-PA-014), l'invalidation
+> trace/profil (FR-PA-015/016) et l'observabilité (NFR-PA-003/012/015).
+
 ## Epic List
 
 ### Epic 1 — Foundation : BRouter & Data Model
@@ -250,7 +263,14 @@ UX-DR-PA-001: Wording exact des popin RGPD et de la section Settings > Confident
 **FRs couverts** : FR-PA-001, FR-PA-003, FR-PA-004, FR-PA-005, FR-PA-006 (UI), FR-PA-007, FR-PA-008, FR-PA-009, FR-PA-018, FR-PA-019, FR-PA-020
 **NFRs couverts** : NFR-PA-001, NFR-PA-004 (planning : 60 req/min), NFR-PA-005, NFR-PA-010, NFR-PA-011, NFR-PA-013
 
-### Epic 3 — Mode Live & Confidentialité RGPD
+### Epic 3 — Mode Live & Confidentialité RGPD  ⛔ SUPERSEDED (2026-05-30)
+
+> **⛔ SUPERSEDED — 2026-05-30.** Décision produit (Guillaume) : en mode Live, l'itinéraire d'accès
+> utilise la même origine `nearest-trace` que le Planning (détour final depuis la trace) — **aucune
+> position GPS n'est transmise**. Tout l'epic (origine GPS, popin de consentement RGPD, toggle Settings,
+> arrondi GPS, `/me/settings`, cache Redis Live anonyme) est **retiré**. Stories 3.1/3.2/3.3 marquées
+> `superseded`. Le mode Live consomme désormais directement le cache DB d'Epic 2. Plus aucun FR/NFR
+> « confidentialité GPS » n'est applicable (cf. note sous le Requirements Inventory).
 
 **Goal** : Permettre à l'utilisateur, depuis le mode Live (à vélo), de calculer un itinéraire d'accès précis depuis sa position GPS actuelle, avec un consentement explicite recueilli via popin RGPD à la 1ère occurrence et révocable à tout moment depuis Paramètres > Confidentialité. Garantit l'anonymisation et la non-persistance des données GPS. Cet epic étend les services d'Epic 2 avec la prise en charge du mode `origin: 'gps'` et du cache Redis volatile anonyme.
 
@@ -260,9 +280,11 @@ UX-DR-PA-001: Wording exact des popin RGPD et de la section Settings > Confident
 
 ### Epic 4 — Pré-calcul Async, Invalidation & Production-Readiness
 
-**Goal** : Éliminer la latence perçue par l'utilisateur via le pré-calcul asynchrone (BullMQ) des itinéraires d'accès des POI proches (< 1500 m) lors de la création d'aventure, garantir la cohérence des données via l'invalidation event-driven (trace, profil, stage), et rendre la feature observable et résiliente en production (métriques BullMQ, healthcheck BRouter, alertes Uptime Kuma, Sentry). Cet epic transforme une feature fonctionnelle en feature production-ready.
+**Goal** : Éliminer la latence perçue par l'utilisateur via le pré-calcul asynchrone (BullMQ) des itinéraires d'accès des POI proches (< 1500 m) lors de la création d'aventure, garantir la cohérence des données via l'invalidation event-driven (trace, profil ~~, stage~~ — _stage retiré 2026-05-30_), et rendre la feature observable et résiliente en production (métriques BullMQ, healthcheck BRouter, alertes Uptime Kuma, Sentry). Cet epic transforme une feature fonctionnelle en feature production-ready.
 
-**FRs couverts** : FR-PA-014, FR-PA-015, FR-PA-016, FR-PA-017
+> **🔧 Révision 2026-05-30** : pré-calcul à exécuter en `origin: 'nearest-trace'` ; invalidation stage (FR-PA-017) et purge consent Redis retirées ; pré-requis = fiabiliser la persistance du cache DB. Détails dans la bannière en tête de la section Epic 4 ci-dessous.
+
+**FRs couverts** : FR-PA-014, FR-PA-015, FR-PA-016, ~~FR-PA-017~~ _(FR-PA-017 sans objet — invalidation stage, cf. supra)_
 **NFRs couverts** : NFR-PA-003, NFR-PA-012, NFR-PA-015
 **Additional Requirements couverts** : Observability, Cross-Cutting (EventEmitter, idempotence, versioning)
 
@@ -856,6 +878,24 @@ So that I keep control over my privacy data per RGPD principles.
 
 Éliminer la latence perçue via le pré-calcul asynchrone (BullMQ) des POI proches (<1500 m) à la création d'aventure, garantir la cohérence des données via l'invalidation event-driven, et rendre la feature observable et résiliente en production.
 
+> **🔧 Révision 2026-05-30 (impact du pivot `nearest-trace`).** Epic 4 reste **pertinent dans son cœur**
+> car il opère sur le **cache DB d'Epic 2** (`accommodations_cache.access_*`), désormais consommé par
+> Planning **ET** Live. Trois ajustements à intégrer avant implémentation :
+> 1. **Story 4.1 — origine du pré-calcul** : utiliser **`nearest-trace`**. _(MAJ 2026-05-30 : `adventure-start`
+>    a été supprimée par la review — il ne reste que `stage` et `nearest-trace`, parfaitement distingués par
+>    `access_origin_stage_id` (uuid vs NULL), donc **plus de risque de collision**. Le motif est désormais :
+>    l'UI ne requête QUE `nearest-trace` ; si le worker pré-calcule en `stage`, les entrées (stageId=uuid)
+>    ne seront JAMAIS lues par l'UI (cache-hit exige stageId identique) → pré-calcul inutile. Donc 4.1 DOIT
+>    pré-calculer en `nearest-trace` pour que ses entrées soient effectivement servies.)_
+> 2. **Story 4.2 — invalidation** : retirer les ACs d'invalidation **stage** (sans objet : `nearest-trace`
+>    ne dépend pas des stages) et l'AC de **purge consent Live / Redis** (obsolète). Restent : trace + profil.
+> 3. **Story 4.3 — observabilité** : retirer du runbook l'item « purge cache Redis live ».
+>
+> **⚠️ Pré-requis bloquant** : en l'état, `access_computed_at` est **NULL pour tous les POI** — le cache DB
+> Planning n'a jamais persisté (bug constaté en session, à investiguer). Le worker 4.1 écrit dans ce même
+> cache : **fiabiliser d'abord la persistance** (l'écrit `updateCache`/`access_cache_write_failed`), sinon
+> le pré-calcul écrira sans qu'aucune lecture ne profite du cache.
+
 ### Story 4.1 : Worker BullMQ `poi-access-calculation` (pré-calcul eager)
 
 As a **end user uploading a new adventure**,
@@ -877,7 +917,7 @@ So that I never see a loading skeleton on common POIs.
 **And** le job est traité en arrière-plan sans bloquer la réponse HTTP de l'upload
 
 **Given** un job en cours
-**When** le processor appelle `accessCalculatorService.compute(...)` avec `origin: 'stage'` (premier stage) ou `'adventure-start'` (si aucun stage)
+**When** le processor appelle `accessCalculatorService.compute(...)` avec ~~`origin: 'stage'` (premier stage) ou `'adventure-start'` (si aucun stage)~~ **`origin: 'nearest-trace'`** _(CORRIGÉ 2026-05-30 : c'est l'unique origine requêtée par l'UI Planning+Live. Pré-calculer en `stage` stockerait des entrées (stageId=uuid) que l'UI ne lit jamais → cache inutile. `adventure-start` n'existe plus. Pas de collision — cf. bannière Epic 4 §1)_
 **Then** un succès met à jour `accommodations_cache.access_*` + `access_computed_at = NOW()`
 **And** un échec définitif après 3 retries met `access_failed = true` + `access_computed_at = NOW()` (évite recalcul perpétuel)
 
@@ -900,15 +940,25 @@ So that my planning decisions are always based on current information.
 
 **Acceptance Criteria :**
 
-**Given** un UPDATE sur `adventure_segments.geom` (changement de trace)
-**When** un event `'adventure.trace-updated'` est émis avec `{ adventureId, segmentId }`
-**Then** un handler SQL UPDATE `accommodations_cache SET access_distance_m=NULL, access_elevation_gain_m=NULL, access_elevation_loss_m=NULL, access_geometry=NULL, access_computed_at=NULL, access_engine_version=NULL, access_failed=false WHERE segment_id = $segmentId`
-**And** les jobs de recompute sont enqueue pour les POI éligibles (cf. story 4.1 critères eager)
+> **🔧 MAJ 2026-05-30 (impl)** — scope corrigé **segment → aventure** : l'origine `nearest-trace` est
+> calculée sur la trace FUSIONNÉE de tous les segments (`ST_Collect`), donc add/remove segment périme
+> les accès de TOUTE l'aventure. Sources réelles câblées = `deleteSegment` + `GpxParseProcessor`
+> (pas « edit-segment / re-upload » qui n'existent pas). Couvre FR-PA-015.
+
+**Given** un ajout ou une suppression de segment (la trace fusionnée de l'aventure change)
+**When** un event `'adventure.trace-updated'` est émis avec `{ adventureId, segmentId, changeType }`
+**Then** un handler reset les `accommodations_cache.access_*` de **tous les POI de l'aventure** (UPDATE join via `adventure_segments`)
+**And** les jobs de recompute sont enqueue pour les POI éligibles (jobId enrichi `:reset:<ts>` ; cf. story 4.1 critères eager)
 
 **Given** un PATCH sur `adventures.routing_profile`
 **When** un event `'adventure.profile-changed'` est émis avec `{ adventureId, newProfile }`
 **Then** tous les `accommodations_cache.access_*` des POI de l'aventure sont reset à NULL
 **And** les jobs de recompute sont enqueue avec le nouveau profil
+
+> **⛔ SUPERSEDED 2026-05-30 — invalidation stage SANS OBJET.** Avec l'origine `nearest-trace`, la route
+> d'accès ne dépend QUE de (géométrie de trace, profil) — jamais des stages. `access_origin_stage_id`
+> reste toujours NULL. Les 2 ACs ci-dessous (PATCH/DELETE stage) ne déclenchent plus aucune invalidation
+> et peuvent être supprimés de l'implémentation.
 
 **Given** un PATCH sur `adventure_stages` (changement `start_km` ou `end_km`)
 **When** un event `'stage.updated'` est émis avec `{ stageId }`
@@ -920,13 +970,17 @@ So that my planning decisions are always based on current information.
 **Then** la contrainte `ON DELETE SET NULL` met `access_origin_stage_id` à NULL pour les POI concernés
 **And** un event `'stage.deleted'` déclenche le reset des `access_*` pour ces POI
 
+> **⛔ SUPERSEDED 2026-05-30 — purge consent Live OBSOLÈTE.** Le consentement Live, l'event
+> `'profile.live-consent-revoked'` (ex-Story 3.2) et le cache Redis `access:live:*` sont supprimés.
+> Cet AC n'a plus d'objet.
+
 **Given** un user révoque le consent Live (event `'profile.live-consent-revoked'` de la story 3.2)
 **When** le handler le consomme
 **Then** une purge best-effort des clés Redis `access:live:*` est tentée via `SCAN + DEL` (limité à 1000 clés max pour éviter blocage Redis)
 **And** un log INFO consigne le nombre de clés purgées (ou "expiré naturellement" si purge non triviale)
 
 **Given** un test d'intégration
-**When** je couvre : UPDATE trace → reset + reenqueue, UPDATE profile → reset + reenqueue, UPDATE stage → reset stage-scoped uniquement, DELETE stage → SET NULL + reset
+**When** je couvre : UPDATE trace → reset + reenqueue, UPDATE profile → reset + reenqueue ~~, UPDATE stage → reset stage-scoped uniquement, DELETE stage → SET NULL + reset~~ _(cas stage retirés 2026-05-30 — sans objet avec `nearest-trace`)_
 **Then** tous les cas passent
 
 ---
@@ -962,7 +1016,7 @@ So that I can detect BRouter outages, queue backlogs, and silent failures before
 
 **Given** la documentation du runbook
 **When** je mets à jour `docs/ops/brouter-runbook.md`
-**Then** il inclut : (a) interprétation des métriques BullMQ, (b) diagnostic d'un pic de queue depth, (c) bump `ACCESS_ENGINE_VERSION` + impact recalcul progressif, (d) procédure de purge cache Redis live, (e) checklist post-incident BRouter
+**Then** il inclut : (a) interprétation des métriques BullMQ, (b) diagnostic d'un pic de queue depth, (c) bump `ACCESS_ENGINE_VERSION` + impact recalcul progressif, ~~(d) procédure de purge cache Redis live~~ _(obsolète 2026-05-30 — plus de cache Redis Live)_, (e) checklist post-incident BRouter
 
 **Given** un test smoke d'observabilité en CI
 **When** je provoque artificiellement une exception dans le worker

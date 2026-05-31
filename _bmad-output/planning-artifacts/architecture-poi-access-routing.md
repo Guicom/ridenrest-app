@@ -389,12 +389,15 @@ CREATE INDEX idx_accommodations_cache_access_pending
 
 #### Stratégie d'Invalidation
 
+> **🔧 MAJ 2026-05-30 (impl Story 4.2)** — l'origine `nearest-trace` est calculée sur la trace
+> FUSIONNÉE de tous les segments (`resolve-origin.ts` → `ST_Collect`). Toute modif de trace invalide
+> donc au **scope AVENTURE** (pas segment). Sources réelles = add/remove segment. Stage SUPERSEDED.
+
 | Événement | Action |
 |---|---|
-| Modification de la trace d'un segment (`adventure_segments.geom` UPDATE) | Tous les `access_*` des POI rattachés au segment → reset à NULL + recalcul BullMQ |
-| Changement de `adventures.routing_profile` | Idem pour tous les POI de l'aventure |
-| Modification d'un stage (`start_km`/`end_km`) | POI avec `access_origin_stage_id = stage.id` → reset accès |
-| Suppression de stage | `ON DELETE SET NULL` automatique + reset accès |
+| Ajout/suppression de segment (trace fusionnée modifiée) → event `adventure.trace-updated` | Tous les `access_*` des POI de **l'aventure** → reset à NULL + recalcul BullMQ |
+| Changement de `adventures.routing_profile` → event `adventure.profile-changed` | Idem, tous les POI de l'aventure |
+| ~~Modification/suppression d'un stage~~ | ⛔ SUPERSEDED — `nearest-trace` ne dépend pas des stages |
 | Bump de `access_engine_version` (changement de version BRouter ou patch profil) | Pas d'invalidation immédiate ; recalcul lazy au prochain accès POI |
 
 **Justification du recalcul lazy sur bump de version** : évite un pic de charge BullMQ au déploiement. Les POI non-consultés restent à l'ancienne version, ce qui est acceptable (cohérence éventuelle).
