@@ -140,13 +140,51 @@ export class RoutingService {
     const totalTime = parseFloat(String(props['total-time']))
     const timeS = Number.isNaN(totalTime) ? 0 : Math.round(totalTime)
 
+    const { usesMainRoad, mainRoadDistanceM } = this.detectMainRoad(props)
+
     return {
       geometry: { type: 'LineString', coordinates: coordinates as LonLatEle[] },
       distanceM,
       elevationGainM,
       elevationLossM: this.computeElevationLoss(coordinates),
       timeS,
+      usesMainRoad,
+      mainRoadDistanceM,
     }
+  }
+
+  /**
+   * Détecte si l'itinéraire emprunte une route nationale (`highway=trunk`) à partir des
+   * `messages` BRouter (tableau de segments, colonne `WayTags`). Sert d'indicateur danger
+   * vélo. `trunk` UNIQUEMENT (pas `primary`/`trunk_link`) — décision produit 2026-05-31.
+   * Best-effort : si `messages` absent, on renvoie « aucune nationale » sans échouer.
+   */
+  private detectMainRoad(props: Record<string, unknown>): { usesMainRoad: boolean; mainRoadDistanceM: number } {
+    const raw = props['messages']
+    if (!Array.isArray(raw) || raw.length < 2) return { usesMainRoad: false, mainRoadDistanceM: 0 }
+    const rows = raw as unknown[]
+    const header = rows[0]
+    if (!Array.isArray(header)) return { usesMainRoad: false, mainRoadDistanceM: 0 }
+    const headerCols = header as unknown[]
+    const wayTagsIdx = headerCols.indexOf('WayTags')
+    const distIdx = headerCols.indexOf('Distance')
+    if (wayTagsIdx < 0) return { usesMainRoad: false, mainRoadDistanceM: 0 }
+
+    let mainRoadDistanceM = 0
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i]
+      if (!Array.isArray(row)) continue
+      const cols = row as unknown[]
+      const tagsVal = cols[wayTagsIdx]
+      const tags = typeof tagsVal === 'string' ? tagsVal : ''
+      // `highway=trunk` exact (le `(\s|$)` exclut `trunk_link`).
+      if (/(?:^|\s)highway=trunk(?:\s|$)/.test(tags)) {
+        const distVal = distIdx >= 0 ? cols[distIdx] : undefined
+        const segDist = typeof distVal === 'string' || typeof distVal === 'number' ? parseFloat(String(distVal)) : 0
+        if (!Number.isNaN(segDist)) mainRoadDistanceM += segDist
+      }
+    }
+    return { usesMainRoad: mainRoadDistanceM > 0, mainRoadDistanceM: Math.round(mainRoadDistanceM) }
   }
 
   /** Somme des deltas négatifs d'altitude entre points consécutifs du LineString 3D. */

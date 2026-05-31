@@ -32,6 +32,7 @@ const mockConfig = {
   traceBufferM: 10,
   candidateRadiusM: 10000,
   maxCandidates: 4,
+  accessRoutingProfile: 'trekking',
   engineVersion: 'brouter-1.7.9+trekking',
 }
 
@@ -41,6 +42,8 @@ const ROUTE = {
   elevationGainM: 50,
   elevationLossM: 40,
   timeS: 600,
+  usesMainRoad: false,
+  mainRoadDistanceM: 0,
 }
 const METRICS = {
   distanceM: 850,
@@ -116,8 +119,8 @@ describe('AccessCalculatorService', () => {
       engineVersion: 'brouter-1.7.9+trekking',
       source: 'computed-fresh',
     })
-    // profil projet 'gravel' → BRouter 'gravel' ; destination = [poi.lng, poi.lat]
-    expect(computeRoute).toHaveBeenCalledWith({ from: [2.4, 48.4], to: [2.5, 48.5], profile: 'gravel' })
+    // profil d'accès UNIQUE (trekking, indépendant du profil de l'aventure) ; destination = [poi.lng, poi.lat]
+    expect(computeRoute).toHaveBeenCalledWith({ from: [2.4, 48.4], to: [2.5, 48.5], profile: 'trekking' })
     // 2 requêtes DB : loadPoi + updateCache
     expect(mockDb.execute).toHaveBeenCalledTimes(2)
   })
@@ -146,10 +149,10 @@ describe('AccessCalculatorService', () => {
     const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
 
     expect(result).toMatchObject({ status: 'ok', source: 'computed-fresh' })
-    // Les deux candidats sont routés (road → fastbike)…
+    // Les deux candidats sont routés avec le profil d'accès unique (trekking)…
     expect(computeRoute).toHaveBeenCalledTimes(2)
-    expect(computeRoute).toHaveBeenNthCalledWith(1, { from: [2.41, 48.41], to: [2.5, 48.5], profile: 'fastbike' })
-    expect(computeRoute).toHaveBeenNthCalledWith(2, { from: [2.42, 48.42], to: [2.5, 48.5], profile: 'fastbike' })
+    expect(computeRoute).toHaveBeenNthCalledWith(1, { from: [2.41, 48.41], to: [2.5, 48.5], profile: 'trekking' })
+    expect(computeRoute).toHaveBeenNthCalledWith(2, { from: [2.42, 48.42], to: [2.5, 48.5], profile: 'trekking' })
     // … et c'est la géométrie du candidat rapide (B) qui part au calcul du segment divergent.
     expect(mockComputeDivergent).toHaveBeenCalledWith(
       expect.anything(),
@@ -192,6 +195,22 @@ describe('AccessCalculatorService', () => {
       expect(result.variants).toHaveLength(2)
     }
     expect(computeRoute).toHaveBeenCalledTimes(3) // tous routés…
+  })
+
+  it('propage l\'indicateur nationale (usesMainRoad) sur chaque variante', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    mockResolveCandidates.mockResolvedValue([[2.41, 48.41]])
+    computeRoute.mockResolvedValue({ ...ROUTE, usesMainRoad: true, mainRoadDistanceM: 3200 })
+    mockComputeDivergent.mockResolvedValue(METRICS)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result.status).toBe('ok')
+    if (result.status === 'ok') {
+      expect(result.variants[0]).toMatchObject({ usesMainRoad: true, mainRoadDistanceM: 3200 })
+    }
   })
 
   it('un candidat échoue, un autre réussit → on garde le succès (résilience BRouter)', async () => {

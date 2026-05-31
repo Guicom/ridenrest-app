@@ -64,7 +64,7 @@ function variant(coords: number[][], overrides?: Partial<AccessVariant>): Access
     distanceM: 1000,
     elevationGainM: 10,
     elevationLossM: 5,
-    etaS: 600,
+    etaS: 600, usesMainRoad: false, mainRoadDistanceM: 0,
     geometry: { type: 'LineString', coordinates: coords },
     ...overrides,
   }
@@ -217,7 +217,7 @@ describe('AccessMapLayer (multi-variant)', () => {
       distanceM: 1000,
       elevationGainM: 10,
       elevationLossM: 5,
-      etaS: 600,
+      etaS: 600, usesMainRoad: false, mainRoadDistanceM: 0,
       geometry: {
         type: 'MultiLineString',
         coordinates: [

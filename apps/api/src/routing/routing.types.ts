@@ -27,10 +27,13 @@ export interface BrouterRoute {
   /**
    * Temps de trajet estimé par BRouter (secondes), selon le profil. 0 si absent de la
    * réponse. C'est le coût pertinent pour départager des points d'accès candidats : il
-   * intègre la vitesse propre au profil (fastbike privilégie le bitume rapide). Cf.
-   * sélection profil-aware du point d'entrée sur la trace (closestPointsOnTrace).
+   * intègre la vitesse propre au profil. Cf. sélection du point d'entrée (closestPointsOnTrace).
    */
   timeS: number
+  /** L'itinéraire emprunte une route nationale (OSM `highway=trunk`) → indicateur danger vélo. */
+  usesMainRoad: boolean
+  /** Distance (m) parcourue sur une nationale (`highway=trunk`). 0 si aucune. */
+  mainRoadDistanceM: number
 }
 
 /** Paramètres d'appel de computeRoute. `from`/`to` au format [lon, lat]. */

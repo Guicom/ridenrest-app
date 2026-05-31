@@ -39,22 +39,6 @@ import { resolveOriginCandidates } from './strategies/resolve-origin.js'
 import { computeDivergentSegment } from './strategies/compute-divergent-segment.js'
 import type { AccessComputeInput, AccessResult, AccessVariant, DivergentMetrics, GeoJSONGeometry } from './types/access-result.types.js'
 
-/**
- * Profils projet (`adventures.routing_profile`) → profils bas niveau BRouter.
- *
- * ⚠️ Les valeurs DOIVENT exister dans le build BRouter (`/profiles2/*.brf`). Le build
- * v1.7.9 fournit notamment `fastbike`, `gravel`, `trekking`, `mtb` — mais PAS `safety`.
- * `bikepacking → safety` (mapping initial) renvoyait HTTP 500 → fallback systématique
- * (vol d'oiseau) pour toute aventure en profil bikepacking. Corrigé 2026-05-30 :
- *   - road        → fastbike  (route rapide bitume)
- *   - gravel      → gravel    (profil gravel natif — plus précis que trekking)
- *   - bikepacking → trekking  (tourisme chargé / surfaces mixtes)
- */
-const PROFILE_MAP: Record<string, BrouterProfile> = {
-  road: 'fastbike',
-  gravel: 'gravel',
-  bikepacking: 'trekking',
-}
 
 /** Au-delà, la géométrie d'accès stockée/renvoyée est jugée trop lourde (AC #8). */
 const GEOMETRY_WARN_KB = 50
@@ -174,6 +158,8 @@ export class AccessCalculatorService {
           elevationGainM: 0,
           elevationLossM: 0,
           etaS: 0,
+          usesMainRoad: false,
+          mainRoadDistanceM: 0,
           geometry: onTrace,
         }],
         engineVersion: this.config.engineVersion,
@@ -189,7 +175,7 @@ export class AccessCalculatorService {
         { adventureId: poi.adventureId, lat: poi.lat, lng: poi.lng },
         { radiusM: this.config.candidateRadiusM, maxCandidates: this.config.maxCandidates },
       )
-      const profile = this.resolveProfile(poi.routingProfile, input.profileOverride)
+      const profile = this.resolveProfile(input.profileOverride)
       // Tous les candidats routés, triés meilleur-d'abord (coût profil-aware).
       const ranked = await this.routeAndRankCandidates(poi, candidates, profile)
 
@@ -203,6 +189,8 @@ export class AccessCalculatorService {
         elevationGainM: metricsList[i].elevationGainM,
         elevationLossM: metricsList[i].elevationLossM,
         etaS: c.route.timeS,
+        usesMainRoad: c.route.usesMainRoad,
+        mainRoadDistanceM: c.route.mainRoadDistanceM,
         geometry: metricsList[i].geometry,
       }))
       // Dédoublonnage AU NIVEAU DE LA ROUTE AFFICHÉE : des points d'entrée distincts SUR la trace
@@ -403,10 +391,13 @@ export class AccessCalculatorService {
     `)
   }
 
-  /** `adventures.routing_profile` (ou override explicite) → profil BRouter bas niveau. */
-  private resolveProfile(routingProfile: string, override?: BrouterProfile): BrouterProfile {
-    if (override) return override
-    return PROFILE_MAP[routingProfile] ?? (this.config.brouterDefaultProfile as BrouterProfile)
+  /**
+   * Profil BRouter pour l'accès : profil UNIQUE configuré (`trekking` par défaut, nationales
+   * autorisées), indépendant du style de l'aventure (suppression du choix de profil, 2026-05-31).
+   * `override` reste honoré (paramètre de requête optionnel) pour un usage futur/debug.
+   */
+  private resolveProfile(override?: BrouterProfile): BrouterProfile {
+    return override ?? (this.config.accessRoutingProfile as BrouterProfile)
   }
 
   /** Log la taille de la géométrie d'accès — WARN si > 50 kB (AC #8). */

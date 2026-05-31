@@ -57,7 +57,6 @@ import { SortableSegmentCard } from './sortable-segment-card'
 import { StravaImportModal } from './strava-import-modal'
 import { isStravaEnabled } from '@/lib/strava-config'
 import { DensityTriggerButton } from './density-trigger-button'
-import { RoutingProfileSelector } from './routing-profile-selector'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
 
 interface Props {
@@ -429,9 +428,6 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             />
           </div>
         </div>
-
-        {/* Profil de routage cyclable */}
-        <RoutingProfileSelector adventureId={adventureId} currentProfile={adventure.routingProfile} />
 
       </div>
 

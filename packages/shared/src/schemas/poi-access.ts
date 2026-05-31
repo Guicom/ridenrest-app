@@ -80,6 +80,10 @@ export const AccessVariantSchema = z.object({
   elevationLossM: z.number(),
   /** Temps de trajet estimé par BRouter (s) — critère de tri des variantes. */
   etaS: z.number(),
+  /** L'itinéraire emprunte une route nationale (OSM `highway=trunk`) → indicateur danger vélo. */
+  usesMainRoad: z.boolean(),
+  /** Distance (m) parcourue sur une nationale. 0 si aucune. */
+  mainRoadDistanceM: z.number(),
   geometry: AccessGeometrySchema,
 })
 

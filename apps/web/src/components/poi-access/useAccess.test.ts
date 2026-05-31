@@ -23,7 +23,7 @@ const OK_RESPONSE: AccessResponse = {
   elevationLossM: 80,
   geometry: OK_GEOM,
   variants: [
-    { entryPoint: [2.35, 48.85], distanceM: 4200, elevationGainM: 120, elevationLossM: 80, etaS: 1000, geometry: OK_GEOM },
+    { entryPoint: [2.35, 48.85], distanceM: 4200, elevationGainM: 120, elevationLossM: 80, etaS: 1000, usesMainRoad: false, mainRoadDistanceM: 0, geometry: OK_GEOM },
   ],
   engineVersion: 'brouter-1.7.5',
   computedAt: '2026-05-29T12:00:00.000Z',

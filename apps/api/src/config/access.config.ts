@@ -14,17 +14,22 @@ const schema = z.object({
   // passages les plus proches). Cf. closestPointsOnTrace / computeFresh.
   ACCESS_CANDIDATE_RADIUS_M: z.coerce.number().int().positive().default(10_000),
   ACCESS_MAX_CANDIDATES: z.coerce.number().int().positive().max(20).default(4),
+  // Profil BRouter utilisé pour TOUT calcul d'accès, indépendamment du style de l'aventure
+  // (décision 2026-05-31 : suppression du choix de profil). `trekking` = chemin le plus court
+  // raisonnable, nationales AUTORISÉES (comportement « vélo » de Google Maps) — `fastbike`
+  // évitait les nationales et produisait de longs détours par pistes. Le danger éventuel
+  // (passage par une nationale) est signalé séparément via `usesMainRoad`.
+  ACCESS_ROUTING_PROFILE: z.string().min(1).default('trekking'),
   // Bump 2026-05-31 : sélection multi-candidats profil-aware du point d'accès (le point le
   // plus proche à vol d'oiseau n'est plus forcément retenu — on minimise le temps réel selon
   // le profil). Invalide les accès en cache calculés avec l'ancienne logique mono-point
   // (ST_ClosestPoint) → recalcul lazy au prochain accès.
+  // Bump 2026-05-31 (c) : profil d'accès unique `trekking` (nationales autorisées) + détection
+  // nationale (`usesMainRoad`). Invalide les accès en cache calculés avec fastbike → recalcul lazy.
   // Bump 2026-05-31 (b) : dédoublonnage des variantes sur les métriques AFFICHÉES (distance,
-  // D+, D-) au lieu de `etaS` → fusionne les variantes au tracé identique (entrées distinctes,
-  // même segment divergent) qui apparaissaient en double. Invalide les variantes en cache
-  // (potentiellement dupliquées) → recalcul lazy au prochain accès.
-  // Bump 2026-05-30 : nouveau mapping de profils (road→fastbike, gravel→gravel,
-  // bikepacking→trekking) — invalidation précédente, conservée pour historique.
-  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+profiles-v2+multicand2'),
+  // D+, D-) au lieu de `etaS` — invalidation précédente.
+  // Bump 2026-05-30 : nouveau mapping de profils — invalidation précédente, conservée pour historique.
+  ACCESS_ENGINE_VERSION: z.string().min(1).default('brouter-1.7.9+access-trekking-v3'),
 })
 
 const accessConfig = registerAs('access', () => {
@@ -41,6 +46,7 @@ const accessConfig = registerAs('access', () => {
     traceBufferM: parsed.data.ACCESS_TRACE_BUFFER_M,
     candidateRadiusM: parsed.data.ACCESS_CANDIDATE_RADIUS_M,
     maxCandidates: parsed.data.ACCESS_MAX_CANDIDATES,
+    accessRoutingProfile: parsed.data.ACCESS_ROUTING_PROFILE,
     engineVersion: parsed.data.ACCESS_ENGINE_VERSION,
   }
 })

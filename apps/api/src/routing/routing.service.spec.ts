@@ -86,6 +86,41 @@ describe('RoutingService', () => {
       expect(route.geometry.coordinates[0]).toEqual([2.352139, 48.857038, 33.75])
     })
 
+    it('flags usesMainRoad from WayTags when the route uses highway=trunk', async () => {
+      const body = {
+        features: [
+          {
+            properties: {
+              'track-length': '5000',
+              'total-time': '900',
+              'filtered ascend': '10',
+              // header + segments ; colonnes Distance (idx 3) et WayTags (idx 9)
+              messages: [
+                ['Longitude', 'Latitude', 'Elevation', 'Distance', 'CostPerKm', 'ElevCost', 'TurnCost', 'NodeCost', 'InitialCost', 'WayTags', 'NodeTags'],
+                ['0', '0', '0', '1200', '', '', '', '', '', 'highway=trunk ref=N-234', ''],
+                ['0', '0', '0', '800', '', '', '', '', '', 'highway=tertiary', ''],
+                ['0', '0', '0', '500', '', '', '', '', '', 'highway=trunk_link', ''], // ignoré (link)
+              ],
+            },
+            geometry: { type: 'LineString', coordinates: [[2, 48, 10], [2.01, 48.01, 12]] },
+          },
+        ],
+      }
+      fetchMock.mockResolvedValue(okResponse(body))
+
+      const route = await call('trekking')
+
+      expect(route.usesMainRoad).toBe(true)
+      expect(route.mainRoadDistanceM).toBe(1200) // seul le segment highway=trunk (pas trunk_link)
+    })
+
+    it('usesMainRoad=false when the fixture has no trunk segment', async () => {
+      fetchMock.mockResolvedValue(okResponse(fixture))
+      const route = await call('trekking')
+      expect(route.usesMainRoad).toBe(false)
+      expect(route.mainRoadDistanceM).toBe(0)
+    })
+
     it('builds the BRouter URL with lonlats, profile, alternativeidx and geojson format', async () => {
       fetchMock.mockResolvedValue(okResponse(fixture))
 
