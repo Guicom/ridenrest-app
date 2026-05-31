@@ -21,7 +21,7 @@ const okResponse: OkResponse = {
   geometry: geom,
   // variants[0] = champs top-level (meilleur auto). C'est la variante affichée par défaut.
   variants: [
-    { entryPoint: [2.35, 48.85], distanceM: 4200, elevationGainM: 120, elevationLossM: 80, etaS: 1000, geometry: geom },
+    { entryPoint: [2.35, 48.85], distanceM: 4200, elevationGainM: 120, elevationLossM: 80, etaS: 1000, usesMainRoad: false, mainRoadDistanceM: 0, geometry: geom },
   ],
   engineVersion: 'brouter-1.7.5',
   computedAt: '2026-05-29T12:00:00.000Z',
@@ -39,6 +39,8 @@ function okWithVariants(...dists: number[]): OkResponse {
       elevationGainM: 120,
       elevationLossM: 80,
       etaS: 1000 + i * 100,
+      usesMainRoad: false,
+      mainRoadDistanceM: 0,
       geometry: geom,
     })),
   }
@@ -142,6 +144,23 @@ describe('AccessMetrics', () => {
     const options = screen.getByTestId('access-variant-selector').querySelectorAll('[role="radio"]')
     await userEvent.click(options[1])
     expect(onSelect).toHaveBeenCalledWith(1)
+  })
+
+  it('flags the variant that uses a national road (danger indicator)', () => {
+    const base = okResponse.variants[0]
+    setAccess({
+      data: {
+        ...okResponse,
+        variants: [
+          { ...base, usesMainRoad: false },
+          { ...base, distanceM: 9000, usesMainRoad: true, mainRoadDistanceM: 3000 },
+        ],
+      },
+    })
+    render(<AccessMetrics poiId="p1" origin={ORIGIN} category="hotel" variant="stats" speedKmh={15} onSelectVariant={vi.fn()} />)
+    const options = screen.getByTestId('access-variant-selector').querySelectorAll('[role="radio"]')
+    expect(options[1].getAttribute('aria-label')).toContain('nationale')
+    expect(options[0].getAttribute('aria-label')).not.toContain('nationale')
   })
 
   it('hides the selector when selection is not wired (no onSelectVariant)', () => {

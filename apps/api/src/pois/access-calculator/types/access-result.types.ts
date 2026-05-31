@@ -66,6 +66,10 @@ export interface AccessVariant {
   elevationLossM: number
   /** Temps BRouter (s), critère de tri. */
   etaS: number
+  /** L'itinéraire emprunte une route nationale (`highway=trunk`) → indicateur danger vélo. */
+  usesMainRoad: boolean
+  /** Distance (m) parcourue sur une nationale. 0 si aucune. */
+  mainRoadDistanceM: number
   geometry: GeoJSONGeometry
 }
 

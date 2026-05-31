@@ -32,6 +32,7 @@ const mockConfig = {
   traceBufferM: 10,
   candidateRadiusM: 10000,
   maxCandidates: 4,
+  accessRoutingProfile: 'trekking',
   engineVersion: 'brouter-1.7.9+trekking',
 }
 
@@ -41,6 +42,8 @@ const ROUTE = {
   elevationGainM: 50,
   elevationLossM: 40,
   timeS: 600,
+  usesMainRoad: false,
+  mainRoadDistanceM: 0,
 }
 const METRICS = {
   distanceM: 850,
@@ -116,8 +119,8 @@ describe('AccessCalculatorService', () => {
       engineVersion: 'brouter-1.7.9+trekking',
       source: 'computed-fresh',
     })
-    // profil projet 'gravel' → BRouter 'gravel' ; destination = [poi.lng, poi.lat]
-    expect(computeRoute).toHaveBeenCalledWith({ from: [2.4, 48.4], to: [2.5, 48.5], profile: 'gravel' })
+    // profil d'accès UNIQUE (trekking, indépendant du profil de l'aventure) ; destination = [poi.lng, poi.lat]
+    expect(computeRoute).toHaveBeenCalledWith({ from: [2.4, 48.4], to: [2.5, 48.5], profile: 'trekking' })
     // 2 requêtes DB : loadPoi + updateCache
     expect(mockDb.execute).toHaveBeenCalledTimes(2)
   })
@@ -137,15 +140,19 @@ describe('AccessCalculatorService', () => {
     computeRoute
       .mockImplementationOnce(() => Promise.resolve(routeSlow))
       .mockImplementationOnce(() => Promise.resolve(routeFast))
-    mockComputeDivergent.mockResolvedValue(METRICS)
+    // Métriques divergentes DISTINCTES → les deux variantes survivent au dédoublonnage.
+    // Ordre de tri (timeS) : B(1800) d'abord, puis A(4200) → computeDivergent appelé [B, A].
+    mockComputeDivergent
+      .mockResolvedValueOnce({ ...METRICS, distanceM: 9000 }) // B
+      .mockResolvedValueOnce({ ...METRICS, distanceM: 4000 }) // A
 
     const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
 
     expect(result).toMatchObject({ status: 'ok', source: 'computed-fresh' })
-    // Les deux candidats sont routés (road → fastbike)…
+    // Les deux candidats sont routés avec le profil d'accès unique (trekking)…
     expect(computeRoute).toHaveBeenCalledTimes(2)
-    expect(computeRoute).toHaveBeenNthCalledWith(1, { from: [2.41, 48.41], to: [2.5, 48.5], profile: 'fastbike' })
-    expect(computeRoute).toHaveBeenNthCalledWith(2, { from: [2.42, 48.42], to: [2.5, 48.5], profile: 'fastbike' })
+    expect(computeRoute).toHaveBeenNthCalledWith(1, { from: [2.41, 48.41], to: [2.5, 48.5], profile: 'trekking' })
+    expect(computeRoute).toHaveBeenNthCalledWith(2, { from: [2.42, 48.42], to: [2.5, 48.5], profile: 'trekking' })
     // … et c'est la géométrie du candidat rapide (B) qui part au calcul du segment divergent.
     expect(mockComputeDivergent).toHaveBeenCalledWith(
       expect.anything(),
@@ -160,6 +167,49 @@ describe('AccessCalculatorService', () => {
       expect(result.variants[1]).toMatchObject({ entryPoint: [2.41, 48.41], etaS: 4200 })
       // top-level = variants[0].
       expect(result.distanceM).toBe(result.variants[0].distanceM)
+    }
+  })
+
+  it('points d\'entrée distincts → même route → dédoublonné en une seule variante (cas gravel)', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    mockResolveCandidates.mockResolvedValue([[2.41, 48.41], [2.42, 48.42], [2.43, 48.43]])
+    // A et B (entrées distinctes) refluent par le MÊME segment divergent → métriques affichées
+    // identiques mais `etaS` différents (portion sur trace différente). C est une route distincte.
+    computeRoute
+      .mockResolvedValueOnce({ ...ROUTE, timeS: 4200 }) // A
+      .mockResolvedValueOnce({ ...ROUTE, timeS: 5200 }) // B (même segment divergent, etaS différent)
+      .mockResolvedValueOnce({ ...ROUTE, timeS: 1800 }) // C (meilleur temps → tête de tri)
+    // Tri par timeS : C(1800), A(4200), B(5200). Métriques divergentes : C distinct, A≡B.
+    mockComputeDivergent
+      .mockResolvedValueOnce({ ...METRICS, distanceM: 9000, elevationGainM: 20 }) // C
+      .mockResolvedValue({ ...METRICS, distanceM: 17500, elevationGainM: 45 }) // A puis B (identiques)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result.status).toBe('ok')
+    if (result.status === 'ok') {
+      // 3 candidats routés, mais A≡B (mêmes distance/D+/D-) → 2 variantes distinctes seulement.
+      // Le dédoublonnage ignore `etaS` (5200 vs 4200) → ne sépare pas A et B à tort.
+      expect(result.variants).toHaveLength(2)
+    }
+    expect(computeRoute).toHaveBeenCalledTimes(3) // tous routés…
+  })
+
+  it('propage l\'indicateur nationale (usesMainRoad) sur chaque variante', async () => {
+    mockDb.execute
+      .mockResolvedValueOnce({ rows: [poiRowFresh()] }) // loadPoi
+      .mockResolvedValueOnce({ rows: [] }) // updateCache
+    mockResolveCandidates.mockResolvedValue([[2.41, 48.41]])
+    computeRoute.mockResolvedValue({ ...ROUTE, usesMainRoad: true, mainRoadDistanceM: 3200 })
+    mockComputeDivergent.mockResolvedValue(METRICS)
+
+    const result = await service.compute({ poiId: 'poi-1', origin: { type: 'nearest-trace' } })
+
+    expect(result.status).toBe('ok')
+    if (result.status === 'ok') {
+      expect(result.variants[0]).toMatchObject({ usesMainRoad: true, mainRoadDistanceM: 3200 })
     }
   })
 

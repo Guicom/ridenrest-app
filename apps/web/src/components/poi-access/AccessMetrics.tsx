@@ -1,5 +1,5 @@
 'use client'
-import { TrendingUp, TrendingDown, Milestone, Clock, Route } from 'lucide-react'
+import { TrendingUp, TrendingDown, Milestone, Clock, Route, TriangleAlert } from 'lucide-react'
 import type { AccessOrigin, AccessVariant, PoiCategory } from '@ridenrest/shared'
 import { getAccessLabel } from '@/lib/poi-labels'
 import { useAccess } from './useAccess'
@@ -169,16 +169,26 @@ function VariantSelector({
   onSelect?: (index: number) => void
 }) {
   if (variants.length <= 1 || !onSelect) return null
+  // Avertissement nationale = propriété de la variante SÉLECTIONNÉE (celle tracée sur la carte).
+  const selectedUsesMainRoad = variants[selected]?.usesMainRoad ?? false
   return (
     <div className="px-4 pb-3" data-testid="access-variant-selector">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[--text-secondary]">
-        <Route className="h-3.5 w-3.5" aria-hidden="true" />
-        Itinéraires
+      <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide">
+        <span className="flex items-center gap-1.5 text-[--text-secondary]">
+          <Route className="h-3.5 w-3.5" aria-hidden="true" />
+          Itinéraires
+        </span>
+        {selectedUsesMainRoad && (
+          <span className="flex items-center gap-1 text-red-500" data-testid="access-main-road-warning">
+            <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+            Route nationale
+          </span>
+        )}
       </div>
       <div
         role="radiogroup"
         aria-label="Choix de l'itinéraire d'accès"
-        className="flex gap-1.5 rounded-xl bg-muted p-1.5"
+        className="flex gap-1.5"
       >
         {variants.map((v, i) => {
           const isActive = i === selected
@@ -188,20 +198,31 @@ function VariantSelector({
               type="button"
               role="radio"
               aria-checked={isActive}
-              aria-label={`Itinéraire ${i + 1} : ${formatAccessDistance(v.distanceM)}, ${formatAccessEta(v.distanceM / 1000, speedKmh ?? 0)}`}
+              aria-label={
+                `Itinéraire ${i + 1} : ${formatAccessDistance(v.distanceM)}, ${formatAccessEta(v.distanceM / 1000, speedKmh ?? 0)}` +
+                (v.usesMainRoad ? ' — passe par une route nationale' : '')
+              }
               onClick={() => onSelect?.(i)}
               // Chaque option a un fond + bordure au repos → lisiblement cliquable sans survol
               // (mobile). La sélectionnée ressort en ambre + ombre ; `active:scale` = retour
               // tactile au tap. Bordure sur les deux états → pas de saut de layout à la sélection.
               className={
-                'flex flex-1 flex-col items-center rounded-lg border px-2 py-2 leading-tight transition active:scale-95 ' +
+                'relative flex flex-1 flex-col items-center rounded-lg border px-2 py-2 leading-tight transition active:scale-95 ' +
+                // Accent magenta = couleur du trait sélectionné sur la carte (cohérence visuelle).
                 (isActive
-                  ? 'border-amber-500 bg-background font-semibold text-amber-600 shadow-sm'
-                  : 'border-[--border] bg-background/60 text-[--text-primary] shadow-sm hover:border-amber-300 hover:bg-background hover:text-amber-600')
+                  ? 'border-[#e6007e] bg-background font-semibold text-[#e6007e] shadow-sm'
+                  : 'border-[--border] bg-background/60 text-[--text-primary] shadow-sm hover:border-[#e6007e]/40 hover:bg-background hover:text-[#e6007e]')
               }
             >
+              {/* Indicateur danger : l'itinéraire emprunte une route nationale (highway=trunk). */}
+              {v.usesMainRoad && (
+                <TriangleAlert
+                  className="absolute right-1 top-1 h-3.5 w-3.5 text-red-500"
+                  aria-hidden="true"
+                />
+              )}
               <span className="text-xs">{compactDistance(v.distanceM)} km</span>
-              <span className={'text-xs ' + (isActive ? 'text-amber-600/80' : 'text-[--text-secondary]')}>
+              <span className={'text-xs ' + (isActive ? 'text-[#e6007e]/80' : 'text-[--text-secondary]')}>
                 {compactEta(v.distanceM, speedKmh)}
               </span>
             </button>

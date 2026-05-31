@@ -64,7 +64,7 @@ function variant(coords: number[][], overrides?: Partial<AccessVariant>): Access
     distanceM: 1000,
     elevationGainM: 10,
     elevationLossM: 5,
-    etaS: 600,
+    etaS: 600, usesMainRoad: false, mainRoadDistanceM: 0,
     geometry: { type: 'LineString', coordinates: coords },
     ...overrides,
   }
@@ -100,10 +100,14 @@ describe('AccessMapLayer (multi-variant)', () => {
       }),
     )
     const ids = map.addLayer.mock.calls.map((c) => (c[0] as { id: string }).id)
-    expect(ids).toEqual(['poi-access-ghost', 'poi-access-line'])
-    // The selected layer is amber.
+    // Empilement bas→haut : fantômes, liseré blanc, trait coloré.
+    expect(ids).toEqual(['poi-access-ghost', 'poi-access-casing', 'poi-access-line'])
+    // The selected layer uses the vivid magenta access-route color.
     const selected = map.addLayer.mock.calls.find((c) => (c[0] as { id: string }).id === 'poi-access-line')![0]
-    expect(selected).toMatchObject({ paint: { 'line-color': '#f59e0b' } })
+    expect(selected).toMatchObject({ paint: { 'line-color': '#e6007e' } })
+    // The white casing sits under it, continuous (no dasharray), wider.
+    const casing = map.addLayer.mock.calls.find((c) => (c[0] as { id: string }).id === 'poi-access-casing')![0]
+    expect(casing).toMatchObject({ paint: { 'line-color': '#ffffff' } })
   })
 
   it('builds one feature per variant, tagged with idx', () => {
@@ -137,11 +141,11 @@ describe('AccessMapLayer (multi-variant)', () => {
   it('changing only selectedIndex → updates filters, no new layers, no re-zoom', () => {
     const map = createMockMap()
     const { rerender } = render(<AccessMapLayer map={m(map)} variants={VARIANTS} selectedIndex={0} />)
-    expect(map.addLayer).toHaveBeenCalledTimes(2)
+    expect(map.addLayer).toHaveBeenCalledTimes(3)
 
     rerender(<AccessMapLayer map={m(map)} variants={VARIANTS} selectedIndex={1} />)
 
-    expect(map.addLayer).toHaveBeenCalledTimes(2) // no accumulation
+    expect(map.addLayer).toHaveBeenCalledTimes(3) // no accumulation
     expect(map.setFilter).toHaveBeenCalledWith('poi-access-line', ['==', ['get', 'idx'], 1])
     expect(map.setFilter).toHaveBeenCalledWith('poi-access-ghost', ['!=', ['get', 'idx'], 1])
     expect(map._source?.setData).toHaveBeenCalled()
@@ -153,7 +157,7 @@ describe('AccessMapLayer (multi-variant)', () => {
     const { rerender } = render(<AccessMapLayer map={m(map)} variants={VARIANTS} selectedIndex={0} />)
     rerender(<AccessMapLayer map={m(map)} variants={OTHER_VARIANTS} selectedIndex={0} />)
 
-    expect(map.addLayer).toHaveBeenCalledTimes(2) // still 2, reused via setData
+    expect(map.addLayer).toHaveBeenCalledTimes(3) // still 3, reused via setData
     expect(map._source?.setData).toHaveBeenCalled()
     expect(map.fitBounds).toHaveBeenCalledTimes(2)
   })
@@ -217,7 +221,7 @@ describe('AccessMapLayer (multi-variant)', () => {
       distanceM: 1000,
       elevationGainM: 10,
       elevationLossM: 5,
-      etaS: 600,
+      etaS: 600, usesMainRoad: false, mainRoadDistanceM: 0,
       geometry: {
         type: 'MultiLineString',
         coordinates: [
@@ -240,13 +244,13 @@ describe('AccessMapLayer (multi-variant)', () => {
     const onStyleData = map.on.mock.calls.find((c) => c[0] === 'styledata')![1] as () => void
     onStyleData()
     expect(map.addSource).toHaveBeenCalledTimes(1)
-    expect(map.addLayer).toHaveBeenCalledTimes(2)
+    expect(map.addLayer).toHaveBeenCalledTimes(3)
   })
 
   it('re-adds the layers after a style reload', () => {
     const map = createMockMap({ styleLoaded: true })
     render(<AccessMapLayer map={m(map)} variants={VARIANTS} selectedIndex={0} />)
-    expect(map.addLayer).toHaveBeenCalledTimes(2)
+    expect(map.addLayer).toHaveBeenCalledTimes(3)
 
     map._source = null
     map._layerIds.clear()
@@ -254,14 +258,14 @@ describe('AccessMapLayer (multi-variant)', () => {
     onStyleData()
 
     expect(map.addSource).toHaveBeenCalledTimes(2)
-    expect(map.addLayer).toHaveBeenCalledTimes(4)
+    expect(map.addLayer).toHaveBeenCalledTimes(6) // 3 calques × 2 (re-ajout après reload de style)
   })
 
   it('does NOT fit bounds when fitOnShow=false (Live mode)', () => {
     const map = createMockMap()
     render(<AccessMapLayer map={m(map)} variants={VARIANTS} selectedIndex={0} fitOnShow={false} />)
 
-    expect(map.addLayer).toHaveBeenCalledTimes(2)
+    expect(map.addLayer).toHaveBeenCalledTimes(3)
     expect(map.fitBounds).not.toHaveBeenCalled()
   })
 

@@ -30,7 +30,7 @@ const VARIANTS = [
     distanceM: 1000,
     elevationGainM: 10,
     elevationLossM: 5,
-    etaS: 600,
+    etaS: 600, usesMainRoad: false, mainRoadDistanceM: 0,
     geometry: { type: 'LineString', coordinates: [[2.35, 48.85], [2.36, 48.86]] },
   },
 ]
