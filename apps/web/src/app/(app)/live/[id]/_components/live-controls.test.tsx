@@ -36,6 +36,10 @@ const defaultProps = {
   elevationGain: null,
   elevationLoss: null,
   center: null,
+  profileOpen: false,
+  onProfileToggle: vi.fn(),
+  onProfileAutoOpen: vi.fn(),
+  profileContent: <div data-testid="default-profile" />,
 }
 
 describe('LiveControls', () => {
@@ -71,7 +75,14 @@ describe('LiveControls', () => {
 
   it('renders elevation gain when provided', () => {
     render(<LiveControls {...defaultProps} elevationGain={450} />)
-    expect(screen.getByTestId('elevation-gain-display').textContent).toContain('D+ 450m')
+    expect(screen.getByTestId('elevation-gain-display').textContent).toContain('↑ 450 m')
+  })
+
+  it('renders elevation gain and loss on a single line (↑/↓)', () => {
+    render(<LiveControls {...defaultProps} elevationGain={107} elevationLoss={59} />)
+    const text = screen.getByTestId('elevation-gain-display').textContent
+    expect(text).toContain('↑ 107 m')
+    expect(text).toContain('↓ 59 m')
   })
 
   it('renders — when elevationGain is null', () => {
@@ -258,6 +269,136 @@ describe('LiveControls', () => {
       useLiveStore.setState({ targetAheadKm: 30 })
       render(<LiveControls {...defaultProps} maxAheadKm={200} />)
       expect(useLiveStore.getState().targetAheadKm).toBe(30)
+    })
+  })
+
+  // ── Story live-profile.1: collapsible PROFIL section ──────────
+
+  describe('PROFIL collapsible section (Story live-profile.1)', () => {
+    it('renders the PROFIL header with a toggle button', () => {
+      render(<LiveControls {...defaultProps} />)
+      expect(screen.getByText('PROFIL')).toBeDefined()
+      expect(screen.getByTestId('btn-profile-toggle')).toBeDefined()
+    })
+
+    it('renders a separator border under the PROFIL header', () => {
+      render(<LiveControls {...defaultProps} />)
+      expect(screen.getByTestId('btn-profile-toggle').className).toContain('border-b')
+    })
+
+    it('renders the chevron inside a light-green rounded circle', () => {
+      render(<LiveControls {...defaultProps} />)
+      const circle = screen.getByTestId('btn-profile-toggle').querySelector('span:last-child')
+      expect(circle?.className).toContain('rounded-full')
+      expect(circle?.className).toContain('bg-primary/10')
+    })
+
+    it('renders the metrics line after the slider in DOM order', () => {
+      render(<LiveControls {...defaultProps} elevationGain={107} />)
+      const slider = screen.getByTestId('slider-target')
+      const metrics = screen.getByTestId('elevation-gain-display')
+      // metrics appears after the slider → DOCUMENT_POSITION_PRECEDING (2) relative to metrics
+      expect(slider.compareDocumentPosition(metrics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('is collapsed by default — section height is h-0 (AC #2)', () => {
+      render(<LiveControls {...defaultProps} profileOpen={false} />)
+      const section = screen.getByTestId('profile-section')
+      expect(section.className).toContain('h-0')
+      expect(section.className).not.toContain('h-[130px]')
+    })
+
+    it('expands the section when profileOpen is true', () => {
+      render(<LiveControls {...defaultProps} profileOpen={true} />)
+      const section = screen.getByTestId('profile-section')
+      expect(section.className).toContain('h-[130px]')
+    })
+
+    it('uses a smooth height transition (NFR-LP-004)', () => {
+      render(<LiveControls {...defaultProps} />)
+      const section = screen.getByTestId('profile-section')
+      expect(section.className).toContain('transition-all')
+      expect(section.className).toContain('duration-200')
+    })
+
+    it('renders profileContent inside the section', () => {
+      render(
+        <LiveControls
+          {...defaultProps}
+          profileContent={<div data-testid="profile-content-probe" />}
+        />,
+      )
+      expect(screen.getByTestId('profile-content-probe')).toBeDefined()
+    })
+
+    it('toggle button has an aria-label reflecting state (AC #5)', () => {
+      const { rerender } = render(<LiveControls {...defaultProps} profileOpen={false} />)
+      expect(screen.getByTestId('btn-profile-toggle').getAttribute('aria-label')).toContain('Afficher')
+      rerender(<LiveControls {...defaultProps} profileOpen={true} />)
+      expect(screen.getByTestId('btn-profile-toggle').getAttribute('aria-label')).toContain('Masquer')
+    })
+
+    it('calls onProfileToggle when the chevron is clicked (AC #5)', () => {
+      const onProfileToggle = vi.fn()
+      render(<LiveControls {...defaultProps} onProfileToggle={onProfileToggle} />)
+      fireEvent.click(screen.getByTestId('btn-profile-toggle'))
+      expect(onProfileToggle).toHaveBeenCalled()
+    })
+
+    it('calls onProfileAutoOpen when the slider changes (AC #3)', () => {
+      const onProfileAutoOpen = vi.fn()
+      render(<LiveControls {...defaultProps} onProfileAutoOpen={onProfileAutoOpen} />)
+      fireEvent.change(screen.getByTestId('slider-target'), { target: { value: '50' } })
+      expect(onProfileAutoOpen).toHaveBeenCalled()
+    })
+
+    it('calls onProfileAutoOpen when btn-plus is clicked (AC #3)', () => {
+      useLiveStore.setState({ targetAheadKm: 30 })
+      const onProfileAutoOpen = vi.fn()
+      render(<LiveControls {...defaultProps} onProfileAutoOpen={onProfileAutoOpen} />)
+      fireEvent.click(screen.getByTestId('btn-plus'))
+      expect(onProfileAutoOpen).toHaveBeenCalled()
+    })
+
+    it('calls onProfileAutoOpen when btn-minus is clicked (AC #3)', () => {
+      useLiveStore.setState({ targetAheadKm: 30 })
+      const onProfileAutoOpen = vi.fn()
+      render(<LiveControls {...defaultProps} onProfileAutoOpen={onProfileAutoOpen} />)
+      fireEvent.click(screen.getByTestId('btn-minus'))
+      expect(onProfileAutoOpen).toHaveBeenCalled()
+    })
+
+    // ── Review findings (Code Review 2026-06-01) ──────────────────
+
+    it('keeps the section collapsed and disables the toggle when there is no profileContent (Review P1)', () => {
+      render(<LiveControls {...defaultProps} profileContent={undefined} profileOpen={true} />)
+      const section = screen.getByTestId('profile-section')
+      expect(section.className).toContain('h-0')
+      expect(section.className).not.toContain('h-[130px]')
+      const toggle = screen.getByTestId('btn-profile-toggle')
+      expect(toggle.getAttribute('disabled')).not.toBeNull()
+      // no expandable region announced when there is nothing to expand
+      expect(toggle.getAttribute('aria-expanded')).toBeNull()
+    })
+
+    it('marks the collapsed section aria-hidden and reveals it when expanded (Review P2)', () => {
+      const { rerender } = render(<LiveControls {...defaultProps} profileOpen={false} />)
+      expect(screen.getByTestId('profile-section').getAttribute('aria-hidden')).toBe('true')
+      rerender(<LiveControls {...defaultProps} profileOpen={true} />)
+      expect(screen.getByTestId('profile-section').getAttribute('aria-hidden')).toBe('false')
+    })
+
+    it('does not render an orphan "·" separator when D+/D- are null but ETA exists (Review P3)', () => {
+      render(<LiveControls {...defaultProps} elevationGain={null} elevationLoss={null} />)
+      expect(screen.getByTestId('elevation-gain-display').textContent).toBe('—')
+      // eta still shown (speed 15, target 30 → ~2h00) but without a leading separator
+      expect(screen.getByTestId('eta-display').textContent).not.toContain('·')
+    })
+
+    it('exposes keyboard focus affordance on the toggle (Review P4)', () => {
+      render(<LiveControls {...defaultProps} />)
+      const circle = screen.getByTestId('btn-profile-toggle').querySelector('span:last-child')
+      expect(circle?.className).toContain('group-focus-visible:bg-primary/15')
     })
   })
 })

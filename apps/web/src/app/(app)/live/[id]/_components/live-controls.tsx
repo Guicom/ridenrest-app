@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
-import { Search, SlidersHorizontal, MountainSnow, Clock, Minus, Plus } from 'lucide-react'
+import { useEffect, type ReactNode } from 'react'
+import { Search, SlidersHorizontal, Minus, Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { useLiveStore } from '@/stores/live.store'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
@@ -25,12 +25,33 @@ interface LiveControlsProps {
   city?: string | null
   /** Max km ahead based on remaining distance. Defaults to 100 when undefined (GPS not snapped). */
   maxAheadKm?: number
+  /** Whether the collapsible "PROFIL" section is open (FR-LP-002..005). */
+  profileOpen: boolean
+  /** Manual toggle of the "PROFIL" section via the header chevron (FR-LP-005). */
+  onProfileToggle: () => void
+  /** Auto-open the "PROFIL" section on first slider / +/- interaction (FR-LP-003). */
+  onProfileAutoOpen: () => void
+  /** Content rendered inside the collapsible "PROFIL" section (elevation profile). */
+  profileContent?: ReactNode
 }
 
 const SLIDER_STEP = 5
 const DEFAULT_MAX = 100
 
-export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, elevationGain, elevationLoss, center, city, maxAheadKm }: LiveControlsProps) {
+export function LiveControls({
+  onFiltersOpen,
+  onSearch,
+  activeFilterCount,
+  elevationGain,
+  elevationLoss,
+  center,
+  city,
+  maxAheadKm,
+  profileOpen,
+  onProfileToggle,
+  onProfileAutoOpen,
+  profileContent,
+}: LiveControlsProps) {
   const { isOnline, disabledReason } = useOfflineGate()
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
   const speedKmh = useLiveStore((s) => s.speedKmh)
@@ -46,46 +67,75 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
     }
   }, [effectiveMax, targetAheadKm, setTargetAheadKm])
 
+  // Auto-open the PROFIL section on slider / +/- interaction, then apply the new value (FR-LP-003)
+  const changeTarget = (value: number) => {
+    onProfileAutoOpen()
+    setTargetAheadKm(value)
+  }
+
   const etaSummary = formatEtaSummary(targetAheadKm, speedKmh)
 
+  // PROFIL section can only expand when there is content to show (Review P1)
+  const hasProfile = profileContent != null
+  const profileExpanded = profileOpen && hasProfile
+
+  // Elevation metrics — join only present values so no orphan "·" separator (Review P3)
+  const hasElevation = elevationGain != null || elevationLoss != null
+  const elevationText = (() => {
+    const parts: string[] = []
+    if (elevationGain != null) parts.push(`↑ ${Math.round(elevationGain)} m`)
+    if (elevationLoss != null) parts.push(`↓ ${Math.round(elevationLoss)} m`)
+    return parts.length > 0 ? parts.join(' · ') : '—'
+  })()
+
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 lg:right-auto lg:w-[360px] lg:bottom-4 lg:left-4 bg-white rounded-t-2xl lg:rounded-2xl shadow-lg lg:shadow-none px-4 pt-5 pb-8" data-testid="live-controls">
-      {/* Header row */}
-      <div className="flex items-start justify-between mb-7">
+    <div className="absolute bottom-0 left-0 right-0 z-30 lg:right-auto lg:w-[360px] lg:bottom-4 lg:left-4 bg-white rounded-t-2xl lg:rounded-2xl shadow-lg lg:shadow-none px-4 pt-3 pb-8" data-testid="live-controls">
+      {/* PROFIL header — chevron toggles the collapsible section (FR-LP-005), separated from the rest */}
+      <button
+        type="button"
+        onClick={onProfileToggle}
+        disabled={!hasProfile}
+        data-testid="btn-profile-toggle"
+        aria-expanded={hasProfile ? profileOpen : undefined}
+        aria-label={profileOpen ? "Masquer le profil d'élévation" : "Afficher le profil d'élévation"}
+        className={`group flex w-full min-h-[44px] items-center justify-between border-b border-[--border] pb-2 text-[--text-secondary] ${hasProfile ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+      >
+        <span className="text-xs font-medium uppercase tracking-wide">PROFIL</span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 group-focus-visible:bg-primary/15">
+          {profileOpen ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronUp className="h-4 w-4" aria-hidden="true" />}
+        </span>
+      </button>
+
+      {/* Collapsible PROFIL section — smooth height transition (NFR-LP-004), pattern map-view.tsx.
+          aria-hidden when collapsed/empty so its content isn't announced while hidden (Review P2). */}
+      <div
+        data-testid="profile-section"
+        aria-hidden={!profileExpanded}
+        className={`overflow-hidden transition-all duration-200 ${profileExpanded ? 'h-[130px]' : 'h-0'}`}
+      >
+        {profileContent}
+      </div>
+
+      {/* MON HÔTEL DANS + filters icon */}
+      <div className="mt-4 flex items-start justify-between mb-5">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-[--text-secondary]">MON HÔTEL DANS</p>
           <p className="font-mono text-4xl font-bold text-primary leading-none">{targetAheadKm} km</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* D+/ETA info — slightly left to make room for filters icon */}
-          <div className="flex flex-col items-end gap-0.5 text-right">
-            <div className="flex items-center gap-1">
-              <span className="font-mono text-sm font-bold" data-testid="elevation-gain-display">
-                {elevationGain != null ? `D+ ${Math.round(elevationGain)}m` : '—'}
-                {elevationLoss != null ? ` · D- ${Math.round(elevationLoss)}m` : ''}
-              </span>
-              <MountainSnow className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="font-mono text-sm font-bold" data-testid="eta-display">{etaSummary}</span>
-              <Clock className="h-3.5 w-3.5 text-[--text-secondary]" aria-hidden="true" />
-            </div>
-          </div>
-          {/* Filters icon button — moved from action row to header */}
-          <button
-            onClick={onFiltersOpen}
-            data-testid="btn-filters"
-            aria-label="Ouvrir les filtres"
-            className="relative flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
-          >
-            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-primary text-[10px] font-bold border border-primary">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-        </div>
+        {/* Filters icon button */}
+        <button
+          onClick={onFiltersOpen}
+          data-testid="btn-filters"
+          aria-label="Ouvrir les filtres"
+          className="relative flex h-9 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground cursor-pointer transition-all duration-75 hover:brightness-90 active:scale-[0.97]"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          {activeFilterCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-primary text-[10px] font-bold border border-primary">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Distance cible slider with +/- buttons */}
@@ -93,9 +143,9 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
         const atMin = targetAheadKm <= SLIDER_STEP
         const atMax = targetAheadKm >= effectiveMax
         return (
-          <div className="flex items-center gap-2 mb-8">
+          <div className="flex items-center gap-2 mb-3">
             <button
-              onClick={() => !atMin && setTargetAheadKm(Math.max(SLIDER_STEP, targetAheadKm - SLIDER_STEP))}
+              onClick={() => !atMin && changeTarget(Math.max(SLIDER_STEP, targetAheadKm - SLIDER_STEP))}
               disabled={atMin}
               data-testid="btn-minus"
               aria-label="Diminuer de 5 km"
@@ -107,7 +157,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
               value={[Math.min(targetAheadKm, effectiveMax)]}
               onValueChange={(v: number | readonly number[]) => {
                 const val = typeof v === 'number' ? v : v[0]
-                setTargetAheadKm(val)
+                changeTarget(val)
               }}
               min={SLIDER_STEP}
               max={effectiveMax}
@@ -117,7 +167,7 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
               thumbClassName="size-6 border-2 after:-inset-1"
             />
             <button
-              onClick={() => !atMax && setTargetAheadKm(Math.min(effectiveMax, targetAheadKm + SLIDER_STEP))}
+              onClick={() => !atMax && changeTarget(Math.min(effectiveMax, targetAheadKm + SLIDER_STEP))}
               disabled={atMax}
               data-testid="btn-plus"
               aria-label="Augmenter de 5 km"
@@ -128,6 +178,14 @@ export function LiveControls({ onFiltersOpen, onSearch, activeFilterCount, eleva
           </div>
         )
       })()}
+
+      {/* Metrics — single hierarchized line ↑ D+ · ↓ D- · ~ ETA, under the slider (FR-LP-001) */}
+      <div className="mb-4 flex items-center gap-2 font-mono text-sm font-bold text-[--text-primary]">
+        <span data-testid="elevation-gain-display">{elevationText}</span>
+        {etaSummary && (
+          <span data-testid="eta-display">{hasElevation ? `· ${etaSummary}` : etaSummary}</span>
+        )}
+      </div>
 
       {/* Action buttons */}
       <div className="flex gap-3">

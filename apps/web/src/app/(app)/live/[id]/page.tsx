@@ -57,6 +57,8 @@ export default function LivePage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTrigger, setSearchTrigger] = useState(0)
   const [elevationCollapsed, setElevationCollapsed] = useState(false)
+  // Collapsible "PROFIL" section in LiveControls — collapsed by default (FR-LP-002)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [stageLongPressStageId, setStageLongPressStageId] = useState<string | null>(null)
 
   const handleQuitRequest = () => {
@@ -105,6 +107,7 @@ export default function LivePage() {
 
   // Stable search handler — deferred to ensure React has re-rendered with latest store state
   const handleSearch = useCallback(() => {
+    setProfileOpen(false) // Collapse the PROFIL section on search (FR-LP-004)
     setSearchTrigger((v) => v + 1)
     setTimeout(() => {
       if (!canSearchRef.current) return
@@ -416,17 +419,6 @@ export default function LivePage() {
         {/* Bottom overlay — z-30 (only render after mount to avoid hydration mismatch) */}
         {mounted && (
           <>
-            {isLiveModeActive && allCumulativeWaypoints.length > 0 && (
-              <div className="lg:hidden absolute bottom-[88px] left-0 right-0 z-20 h-[60px] bg-background/80 backdrop-blur-sm border-t border-[--border]">
-                <ElevationStrip
-                  waypoints={allCumulativeWaypoints}
-                  segments={readySegments}
-                  currentDistKm={elevationCurrentDistKm}
-                  targetDistKm={elevationTargetDistKm}
-                />
-              </div>
-            )}
-
             {isLiveModeActive && (
               <LiveControls
                 onFiltersOpen={() => setFiltersOpen(true)}
@@ -437,6 +429,19 @@ export default function LivePage() {
                 center={liveSearchCenter}
                 city={liveCity}
                 maxAheadKm={maxAheadKm}
+                profileOpen={profileOpen}
+                onProfileToggle={() => setProfileOpen((v) => !v)}
+                onProfileAutoOpen={() => setProfileOpen(true)}
+                profileContent={
+                  allCumulativeWaypoints.length > 0 ? (
+                    <ElevationStrip
+                      waypoints={allCumulativeWaypoints}
+                      segments={readySegments}
+                      currentDistKm={elevationCurrentDistKm}
+                      targetDistKm={elevationTargetDistKm}
+                    />
+                  ) : undefined
+                }
               />
             )}
 
