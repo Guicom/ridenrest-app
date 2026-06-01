@@ -36,7 +36,7 @@ import { ResetZoomButton } from '@/app/(app)/map/[id]/_components/reset-zoom-but
 import { StatusBanner } from './_components/status-banner'
 import { PoiPopup } from '../../map/[id]/_components/poi-popup'
 import { LiveAccessPolyline } from '@/components/poi-access/LiveAccessPolyline'
-import { ElevationStrip } from './_components/elevation-strip'
+import { LiveElevationProfile } from './_components/live-elevation-profile'
 import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
 import { trackPoiSearchTriggered } from '@/lib/analytics'
 
@@ -202,9 +202,6 @@ export default function LivePage() {
   const speedKmh = useLiveStore((s) => s.speedKmh)
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm)
 
-  // Elevation strip positions
-  const elevationCurrentDistKm = currentKmOnRoute
-  const elevationTargetDistKm = currentKmOnRoute !== null ? currentKmOnRoute + targetAheadKm : null
   // Dynamic slider max — remaining distance on trace (Story 16.20)
   const maxAheadKm = useMemo(() => {
     if (currentKmOnRoute === null || allCumulativeWaypoints.length === 0) return undefined
@@ -434,11 +431,12 @@ export default function LivePage() {
                 onProfileAutoOpen={() => setProfileOpen(true)}
                 profileContent={
                   allCumulativeWaypoints.length > 0 ? (
-                    <ElevationStrip
+                    <LiveElevationProfile
                       waypoints={allCumulativeWaypoints}
                       segments={readySegments}
-                      currentDistKm={elevationCurrentDistKm}
-                      targetDistKm={elevationTargetDistKm}
+                      currentKmOnRoute={currentKmOnRoute}
+                      targetAheadKm={targetAheadKm}
+                      searchRadiusKm={liveSearchRadiusKm}
                     />
                   ) : undefined
                 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0 — 2026-06-01
+
+### Nouveautés
+- Profil d'élévation interactif en mode Live : démarre à ta position, surligne la zone recherchée et zoome selon la distance visée.
+
 ## 1.4.0 — 2026-05-31
 
 ### Nouveautés

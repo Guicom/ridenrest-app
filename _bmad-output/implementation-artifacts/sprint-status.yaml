@@ -303,5 +303,5 @@ development_status:
   # ─────────────────────────────────────────────────────────────
   epic-live-profile: in-progress
   live-profile-1-search-panel-redesign-collapsible-profile: done  # coquille : refonte layout (maquettes) + conteneur PROFIL repliable + comportement (replié défaut / ouverture slider / fermeture Rechercher / chevron) — code review 2026-06-01 (8/8 AC, 4 patchs appliqués, 2 items différés Story 2, 1081 tests verts)
-  live-profile-2-interactive-elevation-profile: ready-for-dev  # contenu : profil interactif début=position GPS + surlignage zone recherchée + fin ~100km + zoom piloté slider + dégradation gracieuse
+  live-profile-2-interactive-elevation-profile: done  # contenu : profil interactif début=position GPS + surlignage zone recherchée + fin ~100km + zoom piloté slider + dégradation gracieuse — impl 2026-06-01 (8/8 AC, ElevationProfile étendu rétro-compat + wrapper LiveElevationProfile, ElevationStrip orphelin supprimé). Code review 2026-06-01 : 8/8 AC OK, patch P1 garde anti-inversion domaine X (v1.7), 1098/1098 verts, ESLint clean ; P2 doc + 3 reports (voir Review Findings)
   epic-live-profile-retrospective: optional

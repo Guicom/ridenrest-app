@@ -19,7 +19,14 @@ vi.mock('recharts', () => ({
     </div>
   ),
   Area: () => null,
-  XAxis: () => null,
+  XAxis: ({ domain, allowDataOverflow, height }: { domain?: Array<number | string>; allowDataOverflow?: boolean; height?: number }) => (
+    <div
+      data-testid="x-axis"
+      data-domain={Array.isArray(domain) ? domain.join(',') : String(domain)}
+      data-allow-overflow={String(!!allowDataOverflow)}
+      data-height={String(height)}
+    />
+  ),
   YAxis: () => null,
   // Tooltip passes props through to content — simulate active tooltip
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -269,5 +276,61 @@ describe('ElevationProfile — search range overlay', () => {
     expect(screen.getByTestId('reference-area')).toBeInTheDocument()
     expect(screen.getByTestId('ref-line-10')).toBeInTheDocument()
     expect(screen.getByText('Étape 1')).toBeInTheDocument()
+  })
+})
+
+describe('ElevationProfile — Live windowing (domain + position marker)', () => {
+  const validWaypoints: MapWaypoint[] = [
+    makeWaypoint(0, 100),
+    makeWaypoint(50, 200),
+    makeWaypoint(150, 150),
+  ]
+
+  it('keeps the full-trace domain (non-regression) when no window props are given', () => {
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} />)
+    const xAxis = screen.getByTestId('x-axis')
+    expect(xAxis.getAttribute('data-domain')).toBe('dataMin,dataMax')
+    expect(xAxis.getAttribute('data-allow-overflow')).toBe('false')
+  })
+
+  it('clamps the X axis to [domainFromKm, domainToKm] with allowDataOverflow when window props are set', () => {
+    render(
+      <ElevationProfile
+        waypoints={validWaypoints}
+        segments={[]}
+        domainFromKm={20}
+        domainToKm={130}
+      />,
+    )
+    const xAxis = screen.getByTestId('x-axis')
+    expect(xAxis.getAttribute('data-domain')).toBe('20,130')
+    expect(xAxis.getAttribute('data-allow-overflow')).toBe('true')
+  })
+
+  it('keeps the default domain when only one window bound is provided', () => {
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} domainFromKm={20} />)
+    expect(screen.getByTestId('x-axis').getAttribute('data-domain')).toBe('dataMin,dataMax')
+  })
+
+  it('renders a green position marker ReferenceLine when currentKm is set', () => {
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} currentKm={25} />)
+    const marker = screen.getByTestId('ref-line-25')
+    expect(marker).toBeInTheDocument()
+    expect(marker.getAttribute('data-stroke')).toBe('#16a34a')
+  })
+
+  it('does not render a position marker when currentKm is null', () => {
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} currentKm={null} />)
+    expect(screen.queryByTestId(/^ref-line-/)).not.toBeInTheDocument()
+  })
+
+  it('uses the default X-axis band (non-regression) when compact is off', () => {
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} />)
+    expect(screen.getByTestId('x-axis').getAttribute('data-height')).toBe('undefined')
+  })
+
+  it('tightens the X-axis band (removes the space below the distance axis) when compact', () => {
+    render(<ElevationProfile waypoints={validWaypoints} segments={[]} compact />)
+    expect(screen.getByTestId('x-axis').getAttribute('data-height')).toBe('16')
   })
 })

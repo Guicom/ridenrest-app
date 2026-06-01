@@ -16,6 +16,19 @@ import type maplibregl from 'maplibre-gl'
 
 const TRACE_COLOR = '#2D6A4A'
 
+// Bottom padding for fitBounds so the search-radius circle is never hidden behind the
+// LiveControls panel. The panel height varies (PROFIL section open/collapsed, layout tweaks),
+// so we read it live instead of hardcoding — keeping the circle framed above it whatever its
+// height. Falls back to 240 when the panel isn't mounted (e.g. unit tests, pre-mount).
+const SEARCH_ZONE_BOTTOM_FALLBACK = 240
+const SEARCH_ZONE_BOTTOM_GAP = 16
+export function searchZoneBottomPadding(): number {
+  const panel = typeof document !== 'undefined' ? document.querySelector('[data-testid="live-controls"]') : null
+  return panel instanceof HTMLElement && panel.offsetHeight > 0
+    ? panel.offsetHeight + SEARCH_ZONE_BOTTOM_GAP
+    : SEARCH_ZONE_BOTTOM_FALLBACK
+}
+
 // Module-level Marker class — cached after first dynamic import so refs are never stale
 let _cachedMarker: typeof maplibregl.Marker | null = null
 
@@ -316,7 +329,7 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
           [minLng - expandLng, minLat - expandLat],
           [maxLng + expandLng, maxLat + expandLat],
         ],
-        { padding: { top: 60, right: 60, bottom: 240, left: 60 }, maxZoom: 16, animate: true, duration: 400 },
+        { padding: { top: 60, right: 60, bottom: searchZoneBottomPadding(), left: 60 }, maxZoom: 16, animate: true, duration: 400 },
       )
 
       // Pause GPS auto-follow after fitBounds — prevents the next GPS update (1-3s later)
@@ -324,7 +337,8 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
       // User must tap "Recentrer GPS" to resume tracking (same as manual pan/pinch).
       userInteractedRef.current = true
       useLiveStore.getState().setGpsTrackingActive(false)
-    }, 150) // Debounce 150ms
+    }, 220) // Debounce — also lets the PROFIL section finish expanding (200ms) before we
+            // measure the panel height for the bottom padding (so the circle frames above it)
 
     return () => clearTimeout(timer)
   }, [targetKm, searchRadiusKm, mapReady])
@@ -419,8 +433,8 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
 
     map.fitBounds(
       [[minLng - expandLng, minLat - expandLat], [maxLng + expandLng, maxLat + expandLat]],
-      // Bottom padding ~240px accounts for LiveControls panel overlay
-      { padding: { top: 60, right: 60, bottom: 240, left: 60 }, maxZoom: 16, animate: true, duration: 600 },
+      // Bottom padding = live panel height (read live) so the zone frames above the overlay
+      { padding: { top: 60, right: 60, bottom: searchZoneBottomPadding(), left: 60 }, maxZoom: 16, animate: true, duration: 600 },
     )
   }, [])
 

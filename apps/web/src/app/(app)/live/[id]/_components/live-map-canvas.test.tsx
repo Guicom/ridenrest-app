@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor, act } from '@testing-library/react'
 import React from 'react'
-import { LiveMapCanvas, createCirclePolygon } from './live-map-canvas'
+import { LiveMapCanvas, createCirclePolygon, searchZoneBottomPadding } from './live-map-canvas'
 import { useLiveStore } from '@/stores/live.store'
 import type { MapSegmentData, AdventureStageResponse } from '@ridenrest/shared'
 
@@ -548,5 +548,32 @@ describe('createCirclePolygon', () => {
     expect(feature.geometry.type).toBe('Polygon')
     expect(feature.geometry.coordinates).toHaveLength(1)
     expect(feature.properties).toEqual({})
+  })
+})
+
+describe('searchZoneBottomPadding', () => {
+  afterEach(() => {
+    document.querySelectorAll('[data-testid="live-controls"]').forEach((el) => el.remove())
+  })
+
+  it('falls back to 240 when the LiveControls panel is not mounted', () => {
+    expect(searchZoneBottomPadding()).toBe(240)
+  })
+
+  it('uses the live panel height + 16px gap so the search circle frames above it', () => {
+    const panel = document.createElement('div')
+    panel.setAttribute('data-testid', 'live-controls')
+    // jsdom reports offsetHeight as 0 — stub it to a realistic open-panel height
+    Object.defineProperty(panel, 'offsetHeight', { configurable: true, value: 342 })
+    document.body.appendChild(panel)
+    expect(searchZoneBottomPadding()).toBe(342 + 16)
+  })
+
+  it('falls back to 240 when the panel reports a zero height', () => {
+    const panel = document.createElement('div')
+    panel.setAttribute('data-testid', 'live-controls')
+    Object.defineProperty(panel, 'offsetHeight', { configurable: true, value: 0 })
+    document.body.appendChild(panel)
+    expect(searchZoneBottomPadding()).toBe(240)
   })
 })

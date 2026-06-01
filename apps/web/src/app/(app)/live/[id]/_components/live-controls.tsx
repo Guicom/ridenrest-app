@@ -89,7 +89,7 @@ export function LiveControls({
   })()
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 lg:right-auto lg:w-[360px] lg:bottom-4 lg:left-4 bg-white rounded-t-2xl lg:rounded-2xl shadow-lg lg:shadow-none px-4 pt-3 pb-8" data-testid="live-controls">
+    <div className="absolute bottom-0 left-0 right-0 z-30 lg:right-auto lg:w-[360px] lg:bottom-4 lg:left-4 bg-white rounded-t-2xl lg:rounded-2xl shadow-lg lg:shadow-none px-4 pt-2 pb-6" data-testid="live-controls">
       {/* PROFIL header — chevron toggles the collapsible section (FR-LP-005), separated from the rest */}
       <button
         type="button"
@@ -98,11 +98,11 @@ export function LiveControls({
         data-testid="btn-profile-toggle"
         aria-expanded={hasProfile ? profileOpen : undefined}
         aria-label={profileOpen ? "Masquer le profil d'élévation" : "Afficher le profil d'élévation"}
-        className={`group flex w-full min-h-[44px] items-center justify-between border-b border-[--border] pb-2 text-[--text-secondary] ${hasProfile ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+        className={`group flex w-full min-h-[36px] items-center justify-between py-1 text-[--text-secondary] ${hasProfile ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
       >
         <span className="text-xs font-medium uppercase tracking-wide">PROFIL</span>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 group-focus-visible:bg-primary/15">
-          {profileOpen ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronUp className="h-4 w-4" aria-hidden="true" />}
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/15 group-focus-visible:bg-primary/15">
+          {profileOpen ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />}
         </span>
       </button>
 
@@ -111,13 +111,13 @@ export function LiveControls({
       <div
         data-testid="profile-section"
         aria-hidden={!profileExpanded}
-        className={`overflow-hidden transition-all duration-200 ${profileExpanded ? 'h-[130px]' : 'h-0'}`}
+        className={`overflow-hidden transition-all duration-200 ${profileExpanded ? 'h-[80px] mb-[5px]' : 'h-0'}`}
       >
         {profileContent}
       </div>
 
-      {/* MON HÔTEL DANS + filters icon */}
-      <div className="mt-4 flex items-start justify-between mb-5">
+      {/* MON HÔTEL DANS + filters icon — separator sits between the profile and the rest */}
+      <div data-testid="profile-separator" className="m-0 flex items-start justify-between border-t border-[--border] pt-2">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-[--text-secondary]">MON HÔTEL DANS</p>
           <p className="font-mono text-4xl font-bold text-primary leading-none">{targetAheadKm} km</p>

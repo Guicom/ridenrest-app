@@ -1,6 +1,10 @@
+---
+baseline_commit: ebb5dd0473fdc366c57dd2a0ccbe3fa0203d37e8
+---
+
 # Story live-profile.2: Profil d'élévation interactif contextualisé (position → zone → horizon 100 km, zoom piloté slider)
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,28 +27,40 @@ so that I can instantly read the terrain between me and my next stop and judge t
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Étendre `ElevationProfile` (fenêtre X + marqueur position), rétro-compatible (AC: 1, 2, 4, 8)**
-  - [ ] Ajouter props optionnelles : `domainFromKm?: number`, `domainToKm?: number`, `currentKm?: number | null`.
-  - [ ] XAxis : si `domainFromKm`/`domainToKm` fournis → `domain={[domainFromKm, domainToKm]}` (sinon conserver `['dataMin','dataMax']` → planning inchangé). `allowDataOverflow` à activer si nécessaire pour clipper proprement hors fenêtre.
-  - [ ] Ajouter une `ReferenceLine x={currentKm}` (vert `#16a34a`, `strokeWidth={2}`) rendue seulement si `currentKm != null`.
-  - [ ] Vérifier que `ReferenceArea` (search zone) fonctionne déjà via `searchFromKm`/`searchToKm`/`searchRangeActive` (existant `:136-144`) — réutiliser tel quel.
-  - [ ] Ne PAS toucher au comportement `onHoverKm` / `onClickKm` / `boundaries` / `stages` existant.
-- [ ] **Task 2 — Wrapper Live `live-elevation-profile.tsx` (AC: 2, 3, 4, 5, 6)**
-  - [ ] Créer `apps/web/src/app/(app)/live/[id]/_components/live-elevation-profile.tsx`.
-  - [ ] Props : `{ waypoints, segments, currentKmOnRoute, targetAheadKm, searchRadiusKm, totalDistKm }` (ou dériver `totalDistKm` des waypoints).
-  - [ ] Calculer la fenêtre : `domainFromKm = max(0, currentKmOnRoute ?? 0)` ; `domainToKm = min(totalDistKm, (currentKmOnRoute ?? 0) + targetAheadKm + 100)`.
-  - [ ] Calculer la zone : `target = (currentKmOnRoute ?? 0) + targetAheadKm` ; `searchFromKm = max(domainFromKm, target − searchRadiusKm)` ; `searchToKm = min(domainToKm, target + searchRadiusKm)` ; `searchRangeActive = true`.
-  - [ ] Passer `currentKm={currentKmOnRoute}` pour le marqueur.
-  - [ ] Déléguer le rendu à `ElevationProfile` avec une `className` de hauteur (le conteneur repliable de Story 1 fixe la hauteur — le wrapper occupe `h-full w-full`).
-  - [ ] Gérer `currentKmOnRoute === null` (GPS pas encore snappé) : afficher tout de même la trace (domain par défaut) ou un état neutre — ne pas crasher.
-- [ ] **Task 3 — Brancher dans le panneau Live (AC: 1, 6)**
-  - [ ] Dans le conteneur « PROFIL » posé en Story 1 (`live-controls.tsx` / `page.tsx`), remplacer le profil provisoire de Story 1 par `LiveElevationProfile`.
-  - [ ] Lui passer `allCumulativeWaypoints`, `readySegments`, `currentKmOnRoute`, `targetAheadKm`, `searchRadiusKm` (tous déjà disponibles dans `page.tsx`).
-  - [ ] `searchRadiusKm` vient du store (`useLiveStore((s) => s.searchRadiusKm)`).
-- [ ] **Task 4 — Tests (AC: 5, 6, 8)**
-  - [ ] `live-elevation-profile.test.tsx` : fenêtre `[currentKm, currentKm+target+100]` bornée à `totalDistKm` ; zone `[target−r, target+r]` ; recadrage quand `targetAheadKm` change ; `hasElevationData=false` → message ; `currentKmOnRoute=null` → pas de crash.
-  - [ ] `elevation-profile.test.tsx` : props sans `domain*`/`currentKm` → rendu planning inchangé (non-régression) ; avec `domain*` → axe X borné ; `currentKm` → marqueur présent.
-  - [ ] `pnpm --filter web test` + `turbo lint` + `tsc` verts.
+- [x] **Task 1 — Étendre `ElevationProfile` (fenêtre X + marqueur position), rétro-compatible (AC: 1, 2, 4, 8)**
+  - [x] Ajouter props optionnelles : `domainFromKm?: number`, `domainToKm?: number`, `currentKm?: number | null`.
+  - [x] XAxis : si `domainFromKm`/`domainToKm` fournis → `domain={[domainFromKm, domainToKm]}` (sinon conserver `['dataMin','dataMax']` → planning inchangé). `allowDataOverflow` activé uniquement quand la fenêtre est définie (`hasWindow`).
+  - [x] Ajouter une `ReferenceLine x={currentKm}` (vert `#16a34a`, `strokeWidth={2}`) rendue seulement si `currentKm != null`.
+  - [x] Vérifier que `ReferenceArea` (search zone) fonctionne déjà via `searchFromKm`/`searchToKm`/`searchRangeActive` (existant) — réutilisé tel quel.
+  - [x] Ne PAS toucher au comportement `onHoverKm` / `onClickKm` / `boundaries` / `stages` existant.
+- [x] **Task 2 — Wrapper Live `live-elevation-profile.tsx` (AC: 2, 3, 4, 5, 6)**
+  - [x] Créer `apps/web/src/app/(app)/live/[id]/_components/live-elevation-profile.tsx`.
+  - [x] Props : `{ waypoints, segments, currentKmOnRoute, targetAheadKm, searchRadiusKm, totalDistKm? }` (`totalDistKm` dérivé des waypoints si absent).
+  - [x] Calculer la fenêtre : `domainFromKm = max(0, currentKmOnRoute)` ; `domainToKm = min(totalDistKm, currentKmOnRoute + targetAheadKm + 100)` (constante `PROFILE_LOOKAHEAD_KM`).
+  - [x] Calculer la zone : `target = currentKmOnRoute + targetAheadKm` ; zone clampée dans la fenêtre via `clamp(target ± searchRadiusKm, domainFromKm, domainToKm)` ; `searchRangeActive = true`.
+  - [x] Passer `currentKm={currentKmOnRoute}` pour le marqueur.
+  - [x] Déléguer le rendu à `ElevationProfile` avec `className="h-full w-full"` (le conteneur repliable de Story 1 fixe la hauteur `h-[130px]`).
+  - [x] Gérer `currentKmOnRoute === null` (GPS pas encore snappé) : rend la trace complète (domain par défaut), sans marqueur ni zone — pas de crash.
+- [x] **Task 3 — Brancher dans le panneau Live (AC: 1, 6)**
+  - [x] Dans le conteneur « PROFIL » posé en Story 1 (`page.tsx`), remplacé le profil provisoire (`ElevationStrip`) par `LiveElevationProfile`.
+  - [x] Passé `allCumulativeWaypoints`, `readySegments`, `currentKmOnRoute`, `targetAheadKm`, `liveSearchRadiusKm`. `ElevationStrip` (devenu orphelin) + son test supprimés.
+  - [x] `searchRadiusKm` vient du store (`useLiveStore((s) => s.searchRadiusKm)`, déjà lu en `liveSearchRadiusKm`).
+- [x] **Task 4 — Tests (AC: 5, 6, 8)**
+  - [x] `live-elevation-profile.test.tsx` : fenêtre `[currentKm, currentKm+target+100]` bornée à `totalDistKm` ; zone `[target−r, target+r]` clampée ; recadrage quand `targetAheadKm` change ; `hasElevationData=false` → message ; `currentKmOnRoute=null` → pas de crash ; dérivation/override `totalDistKm`.
+  - [x] `elevation-profile.test.tsx` : props sans `domain*`/`currentKm` → rendu planning inchangé (non-régression) ; avec `domain*` → axe X borné + `allowDataOverflow` ; `currentKm` → marqueur vert présent.
+  - [x] `pnpm --filter web test` (1091/1091) + ESLint (0 erreur) verts. `tsc` app-code propre (erreurs résiduelles uniquement dans des fixtures de tests pré-existantes, ignorées par `next build`).
+
+## Review Findings
+
+_Code review 2026-06-01 (3 couches adversariales : Blind Hunter, Edge Case Hunter, Acceptance Auditor). Verdict : 8/8 AC satisfaits. Aucune anomalie Critical/High réelle ; 2 patchs défensifs, 3 reports._
+
+- [x] [Review][Patch] Garde anti-inversion du domaine X — `domainToKm` n'est jamais borné `≥ domainFromKm`. Si `currentKmOnRoute > total` (overshoot flottant en fin de trace) ou `total` retombe à `0` (dernier waypoint sans `distKm`), le domaine `[from, to]` devient inversé/vide → graphe mirroré/blanc. Correctif sûr et additif : `domainToKm = Math.max(domainFromKm, Math.min(total, …))`. Flaggé indépendamment par Blind + Edge. **Corrigé (v1.7)** + test fin-de-trace (`currentKmOnRoute=305 > total 300` → domaine `[305,305]` non inversé). [live-elevation-profile.tsx:54]
+- [ ] [Review][Patch] Doc-sync — la Task 2 indique encore que le conteneur « fixe la hauteur `h-[130px]` » alors que v1.5 + le code utilisent `h-[80px] mb-[5px]`. Note obsolète dans le corps de la story (le code et les tests sont cohérents). [live-profile-2-…md:42]
+- [x] [Review][Defer] `searchZoneBottomPadding()` peut dépasser la hauteur de la carte sur petit viewport paysage — `top(60) + bottom(~356)` peut excéder un conteneur court → `fitBounds` MapLibre ignoré/averti, cercle non recadré. Padding désormais ~356 px (vs 240 fixe avant) ; risque accru par ce changement mais marginal (mobile portrait/desktop OK). Clamp robuste nécessite la hauteur carte au call-site (seuil ambigu). [live-map-canvas.tsx:25]
+- [x] [Review][Defer] Heuristique de timing du `fitBounds` — debounce 220 ms ≈ animation 200 ms (best-effort, pas de `transitionend`/ResizeObserver) ; le 2ᵉ call-site mesure au montage panneau replié. Transitoire visuel mineur ; fix robuste hors périmètre. [live-map-canvas.tsx]
+- [x] [Review][Defer] `distKm` non monotone / dupliqué (chevauchement de segments) → remplissage d'aire en zig-zag, exposé par le domaine numérique explicite mais **pré-existant** dans `use-elevation-profile.ts` (pas introduit par cette story). [use-elevation-profile.ts]
+
+_Écartés comme bruit (6) : NaN `currentKmOnRoute` (snapToTrace ne le produit pas) ; identité du tableau `xDomain` à chaque render (primitives, sans impact, le NFR-LP-002 ne concerne que `points[]`) ; copie « Données d'élévation non disponibles » (intentionnel, cohérence planning↔live, AC6) ; suppression de la `ReferenceLine` cible blanche (intentionnel, la cible est le centre de la `ReferenceArea`, AC3) ; calcul fenêtre ignoré quand `hasElevationData=false` (early-return enfant, négligeable) ; prop `totalDistKm` morte au call-site prod (dérivation autorisée par la spec)._
 
 ## Dev Notes
 
@@ -118,8 +134,59 @@ Si l'implémentation dévie de cette story / `epics-live-profile.md` (ex. fenêt
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (Amelia — bmad-dev-story)
+
 ### Debug Log References
+
+- Import relatif initial faux (`../../map/...` depuis `_components/`, un niveau trop haut) → corrigé en `../../../map/[id]/_components/elevation-profile`. Détecté par Vitest (résolution d'import) avant toute autre erreur.
+- `tsc --noEmit` global remonte des erreurs **pré-existantes** dans des fixtures de tests (`search-range-control.test.tsx`, `sidebar-density-section.test.tsx`, `weather-layer.test.tsx`, `app-header.test.tsx`, `use-elevation-profile.test.ts`, `use-pois.test.ts` : `speedKmh`/`pauseHours`/`source`/`hasStravaSegment` manquants). Aucun fichier de cette story n'apparaît dans la sortie. Le gate réel du repo est ESLint + Vitest + `next build` (qui exclut les `.test.tsx`) ; pas de script `typecheck` dans `turbo.json`.
 
 ### Completion Notes List
 
+**Approche** — Zoom = changement de `domain` XAxis, **pas** de re-slice des données (NFR-LP-002). `useElevationProfile(waypoints, segments)` reste mémoïsé ; seuls le `domain`, `allowDataOverflow` et les positions des références (`ReferenceLine` marqueur + `ReferenceArea` zone) changent au mouvement du slider. Aucune duplication du `AreaChart` : le wrapper Live délègue à `ElevationProfile` (FR-LP-006).
+
+**Décisions**
+- `ElevationProfile` étendu de façon **purement additive** : 3 props optionnelles (`domainFromKm`, `domainToKm`, `currentKm`). Sans elles, `domain={['dataMin','dataMax']}` et `allowDataOverflow=false` → planning **strictement inchangé** (AC8, test de non-régression ajouté). `allowDataOverflow` activé seulement quand la fenêtre est définie, pour clipper proprement hors fenêtre.
+- Marqueur position = `ReferenceLine` verte `#16a34a` `strokeWidth={2}` (cohérent avec l'ancien `ElevationStrip`).
+- Zone de recherche **clampée** dans la fenêtre via `clamp(target ± searchRadiusKm, domainFromKm, domainToKm)` pour éviter tout débordement hors axe (et garantir `x1 ≤ x2`).
+- Constante nommée `PROFILE_LOOKAHEAD_KM = 100` (pas de magic number).
+- `currentKmOnRoute === null` (GPS pas snappé) → trace complète, sans marqueur ni zone (dégradation gracieuse, pas de crash).
+- **Cleanup** : `ElevationStrip` n'était plus utilisé que comme contenu provisoire du conteneur PROFIL (posé en Story 1). Remplacé par `LiveElevationProfile` ; `elevation-strip.tsx` + `elevation-strip.test.tsx` (orphelins, aucune autre référence) supprimés. Variables mortes `elevationCurrentDistKm`/`elevationTargetDistKm` retirées de `page.tsx`.
+
+**Couverture AC** — AC1 (réutilisation `ElevationProfile`, pas de duplication) ✓ ; AC2 (bord gauche = `currentKmOnRoute` + marqueur vert) ✓ ; AC3 (`ReferenceArea` `#3498db`/0.2 centrée cible ±radius) ✓ ; AC4 (bord droit = cible+100 borné `totalDistKm`, gauche ≥0) ✓ ; AC5 (recadrage temps réel sans recalcul des `points[]`) ✓ ; AC6 (dégradation gracieuse, message « non disponibles ») ✓ ; AC7 (RGPD : aucun appel réseau ajouté, `currentKmOnRoute` client-side) ✓ ; AC8 (non-régression planning : props additives `domain*`/`currentKm`/`compact` + tests) ✓.
+
+**Itérations post-implémentation (retours Guillaume, même session)** — voir Change Log v1.1→1.6 pour le détail :
+- *UI panneau* (`live-controls.tsx`) : séparateur déplacé sous le graphique (au-dessus de « MON HÔTEL DANS », `m-0`) ; marges resserrées (`pt-2 pb-6`, en-tête `min-h-[36px] py-1`) ; chevron réduit (`h-6 w-6`) avec en-tête entièrement cliquable ; hauteur du conteneur profil `h-[130px]` → `h-[80px]` + `mb-[5px]`.
+- *Espace sous l'axe de distance* (`elevation-profile.tsx`) : prop additive **`compact`** → `XAxis height={16}` + `margin.bottom: 2` (la bande X par défaut de Recharts, 30 px, était trop haute pour un libellé de 10 px). Planning inchangé. `LiveElevationProfile` passe `compact`.
+- *Fausse piste assumée puis annulée* : un fenêtrage de l'axe **Y** (v1.3) avait été tenté pour « remplir » le graphique, mais Guillaume veut **garder le point le plus haut de la trace** comme échelle d'altitude (meilleure lecture du dénivelé) → entièrement **revert** (v1.4).
+- *Fix carte* (`live-map-canvas.tsx`) : le cercle `searchRadiusKm` passait **sous le panneau** car le padding bas du `fitBounds` était codé en dur à 240 px alors que le panneau ouvert fait ~340 px (depuis l'ajout de la section PROFIL). Remplacé par `searchZoneBottomPadding()` qui **lit la hauteur réelle du panneau** (`[data-testid="live-controls"]` + 16 px ; fallback 240 px) → robuste aux futures retouches de hauteur. Appliqué à l'auto-zoom slider **et** à `fitToSearchZone` ; debounce slider 150→220 ms.
+
+**Validations (état final)** — `pnpm --filter web test` : **1097/1097** verts (90 fichiers ; +16 tests nets vs baseline 1081 : fenêtrage Live, marqueur, `compact`, wrapper, `searchZoneBottomPadding`, ajustements `live-controls` ; −5 des tests `elevation-strip` supprimés). ESLint sur fichiers modifiés : **0 erreur** (2 warnings pré-existants dans `page.tsx` : `@next/next/no-img-element` sur le logo Strava, `react-hooks/exhaustive-deps` sur l'auto-zoom — non touchés). App-code `tsc` propre (erreurs résiduelles uniquement dans des fixtures de tests pré-existantes, ignorées par `next build`).
+
 ### File List
+
+- `apps/web/src/app/(app)/map/[id]/_components/elevation-profile.tsx` (modifié — props `domainFromKm`/`domainToKm`/`currentKm`, XAxis domain paramétrable + `allowDataOverflow`, marqueur position vert)
+- `apps/web/src/app/(app)/map/[id]/_components/elevation-profile.test.tsx` (modifié — mock XAxis expose le domain ; tests fenêtrage Live + non-régression + marqueur)
+- `apps/web/src/app/(app)/live/[id]/_components/live-elevation-profile.tsx` (nouveau — wrapper Live : calcul fenêtre/zone/marqueur, délègue à `ElevationProfile`)
+- `apps/web/src/app/(app)/live/[id]/_components/live-elevation-profile.test.tsx` (nouveau — fenêtre/zone/recadrage/null/no-elevation/dérivation totalDistKm)
+- `apps/web/src/app/(app)/live/[id]/page.tsx` (modifié — `ElevationStrip` → `LiveElevationProfile` dans le conteneur PROFIL ; import + variables mortes retirés)
+- `apps/web/src/app/(app)/live/[id]/_components/elevation-strip.tsx` (supprimé — orphelin)
+- `apps/web/src/app/(app)/live/[id]/_components/elevation-strip.test.tsx` (supprimé — orphelin)
+- `apps/web/src/app/(app)/live/[id]/_components/live-controls.tsx` (modifié — séparateur déplacé sous le graphique ; marges resserrées ; chevron réduit ; hauteur profil `h-[80px]` + `mb-[5px]`)
+- `apps/web/src/app/(app)/live/[id]/_components/live-controls.test.tsx` (modifié — assertions séparateur + hauteur `h-[80px]`)
+- `apps/web/src/app/(app)/live/[id]/_components/live-map-canvas.tsx` (modifié — padding bas du `fitBounds` (auto-zoom slider + `fitToSearchZone`) lit la hauteur réelle du panneau `live-controls` via `searchZoneBottomPadding()` au lieu d'un 240px codé en dur → le cercle de la zone de recherche n'est plus masqué par le panneau ; debounce 150→220 ms)
+- `apps/web/src/app/(app)/live/[id]/_components/live-map-canvas.test.tsx` (modifié — 3 tests `searchZoneBottomPadding` : fallback 240 / hauteur panneau + 16 / hauteur nulle)
+
+## Change Log
+
+| Date | Version | Description |
+|------|---------|-------------|
+| 2026-06-01 | 1.0 | Implémentation Story live-profile.2 : profil d'élévation interactif contextualisé en mode Live (fenêtre position→cible+100 km, marqueur position, surlignage zone, zoom piloté slider via `domain` XAxis sans recalcul des données). `ElevationProfile` étendu rétro-compatible, wrapper `LiveElevationProfile`, branchement `page.tsx`, suppression `ElevationStrip` orphelin. 1091/1091 tests verts, ESLint clean. Status → review. |
+| 2026-06-01 | 1.1 | Ajustement UI (retour Guillaume) : séparateur déplacé sous le graphique d'élévation (au-dessus de « MON HÔTEL DANS ») au lieu de sous l'en-tête « PROFIL ». `live-controls.tsx` : retrait `border-b` du bouton en-tête, ajout `border-t` au bloc MON HÔTEL. Test mis à jour. 1091/1091 verts. |
+| 2026-06-01 | 1.2 | Ajustement UI (retour Guillaume) : marges de la zone profil resserrées (`pt-2 pb-6` root, en-tête `min-h-[36px] py-1`, bloc MON HÔTEL `mt-2 mb-4 pt-3`) et chevron réduit (cercle `h-6 w-6`, icône `h-3.5`). Tout l'en-tête PROFIL reste cliquable pour ouvrir/fermer (bouton pleine largeur déjà en place). 1091/1091 verts. |
+| 2026-06-01 | 1.2.1 | Séparateur : `margin: 0` (`m-0`) sur le bloc `profile-separator`. |
+| 2026-06-01 | 1.3 | Fenêtrage **axe Y** (retour Guillaume — « énormément d'espace en dessous du graphique ») : l'axe Y était mis à l'échelle sur toute la trace (sommet lointain → courbe écrasée en bas, ~80 % vide). Ajout props additives `yDomainFromM`/`yDomainToM` + `allowDataOverflow` Y sur `ElevationProfile` (planning inchangé, défaut `['auto','auto']`). `LiveElevationProfile` calcule min/max des élévations **dans la fenêtre X visible** (boucle, pas de spread → pas de stack overflow), padding ~15 % (min 10 m), et borne l'axe Y → la courbe remplit la hauteur. Padding bas du bloc distance réduit `pt-2`. +4 tests (Y-window + non-régression Y auto). 1095/1095 verts, ESLint clean. |
+| 2026-06-01 | 1.4 | **Annulation du fenêtrage Y de la v1.3** (clarification Guillaume) : on garde le point le plus haut de la trace comme échelle d'altitude (meilleure lecture du dénivelé). Props `yDomain*` retirées. Le vrai problème = l'**espace sous l'axe de distance** : la bande X par défaut de Recharts fait 30 px, trop pour un libellé de 10 px. Ajout prop additive `compact` sur `ElevationProfile` → `XAxis height={16}` + `margin.bottom: 2` (planning inchangé, défaut 30/16). `LiveElevationProfile` passe `compact`. Tests Y-window remplacés par tests `compact` (bande X resserrée / non-régression). 1094/1094 verts, ESLint clean. |
+| 2026-06-01 | 1.5 | Ajustement UI (retour Guillaume) : hauteur du conteneur profil `h-[130px]` → `h-[80px]` + `mb-[5px]` (5 px sous le graphique, à l'état ouvert uniquement). Tests `live-controls` mis à jour (`h-[80px]`). 1094/1094 verts. |
+| 2026-06-01 | 1.7 | **Code review (patch P1)** : garde anti-inversion du domaine X dans `live-elevation-profile.tsx` — `domainToKm = Math.max(domainFromKm, Math.min(total, …))` pour ne jamais passer un domaine inversé/vide à Recharts si la position GPS dépasse la fin de trace (flottant) ou si `total` est indéterminé. +1 test (`currentKmOnRoute=305 > total 300` → `[305,305]`). 1098/1098 verts, ESLint clean. (Findings P2 doc + 3 reports : voir section Review Findings.) |
+| 2026-06-01 | 1.6 | **Fix carte** (retour Guillaume — « le cercle de la zone de recherche passe sous le panneau ») : depuis l'ajout de la section PROFIL, le panneau ouvert (~340 px) dépassait le padding bas `fitBounds` codé en dur à 240 px → le cercle `searchRadiusKm` était masqué. Remplacement par `searchZoneBottomPadding()` qui **lit la hauteur réelle du panneau** `[data-testid="live-controls"]` (+16 px de marge ; fallback 240 px si non monté) — robuste aux futures retouches de hauteur. Appliqué à l'auto-zoom slider ET à `fitToSearchZone`. Debounce slider 150→220 ms (laisse la section finir son expansion 200 ms avant la mesure). +3 tests. 1097/1097 verts, ESLint clean. |

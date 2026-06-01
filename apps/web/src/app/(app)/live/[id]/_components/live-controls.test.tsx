@@ -281,9 +281,12 @@ describe('LiveControls', () => {
       expect(screen.getByTestId('btn-profile-toggle')).toBeDefined()
     })
 
-    it('renders a separator border under the PROFIL header', () => {
+    it('renders the separator between the profile and the rest (not under the PROFIL header)', () => {
       render(<LiveControls {...defaultProps} />)
-      expect(screen.getByTestId('btn-profile-toggle').className).toContain('border-b')
+      // The PROFIL header no longer carries the separator…
+      expect(screen.getByTestId('btn-profile-toggle').className).not.toContain('border-b')
+      // …it sits above the "MON HÔTEL DANS" block instead.
+      expect(screen.getByTestId('profile-separator').className).toContain('border-t')
     })
 
     it('renders the chevron inside a light-green rounded circle', () => {
@@ -305,13 +308,13 @@ describe('LiveControls', () => {
       render(<LiveControls {...defaultProps} profileOpen={false} />)
       const section = screen.getByTestId('profile-section')
       expect(section.className).toContain('h-0')
-      expect(section.className).not.toContain('h-[130px]')
+      expect(section.className).not.toContain('h-[80px]')
     })
 
     it('expands the section when profileOpen is true', () => {
       render(<LiveControls {...defaultProps} profileOpen={true} />)
       const section = screen.getByTestId('profile-section')
-      expect(section.className).toContain('h-[130px]')
+      expect(section.className).toContain('h-[80px]')
     })
 
     it('uses a smooth height transition (NFR-LP-004)', () => {
@@ -374,7 +377,7 @@ describe('LiveControls', () => {
       render(<LiveControls {...defaultProps} profileContent={undefined} profileOpen={true} />)
       const section = screen.getByTestId('profile-section')
       expect(section.className).toContain('h-0')
-      expect(section.className).not.toContain('h-[130px]')
+      expect(section.className).not.toContain('h-[80px]')
       const toggle = screen.getByTestId('btn-profile-toggle')
       expect(toggle.getAttribute('disabled')).not.toBeNull()
       // no expandable region announced when there is nothing to expand

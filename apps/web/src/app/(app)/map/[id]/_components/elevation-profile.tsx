@@ -17,6 +17,16 @@ interface ElevationProfileProps {
   searchFromKm?: number
   searchToKm?: number
   searchRangeActive?: boolean
+  /** Live windowing — left edge of the X axis (km). When both domain bounds are set, the
+   *  axis is clamped to [domainFromKm, domainToKm] (zoom). Omit for full-trace planning view. */
+  domainFromKm?: number
+  /** Live windowing — right edge of the X axis (km). See domainFromKm. */
+  domainToKm?: number
+  /** Live position marker (km along route). Renders a vertical green reference line when set. */
+  currentKm?: number | null
+  /** Compact layout — tighter bottom margin + shorter X-axis band, removing the empty space
+   *  below the distance axis. Used by the Live panel; planning keeps the default spacing. */
+  compact?: boolean
 }
 
 interface TooltipEntry {
@@ -49,8 +59,15 @@ const ElevationTooltip = ({ active, payload, onHoverKm }: TooltipEntry) => {
   )
 }
 
-export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false, isClickModeActive, onClickKm, searchFromKm, searchToKm, searchRangeActive }: ElevationProfileProps) {
+export function ElevationProfile({ waypoints, segments, onHoverKm, className, stages, stagesVisible = false, isClickModeActive, onClickKm, searchFromKm, searchToKm, searchRangeActive, domainFromKm, domainToKm, currentKm, compact = false }: ElevationProfileProps) {
   const { points, boundaries, hasElevationData } = useElevationProfile(waypoints, segments)
+
+  // Live windowing — when both bounds are set, clamp the X axis to that range (zoom effect)
+  // and let recharts clip data outside it. Otherwise keep the full-trace planning domain.
+  const hasWindow = domainFromKm != null && domainToKm != null
+  const xDomain: [number, number] | [string, string] = hasWindow
+    ? [domainFromKm, domainToKm]
+    : ['dataMin', 'dataMax']
 
   // Measure container — bypasses ResponsiveContainer which creates a 0×0 wrapper
   const containerRef = useRef<HTMLDivElement>(null)
@@ -105,17 +122,21 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
           width={size.width}
           height={size.height}
           data={points}
-          margin={{ top: 4, right: 8, bottom: 16, left: 32 }}
+          margin={{ top: 4, right: 8, bottom: compact ? 2 : 16, left: 32 }}
           onMouseLeave={() => wrappedOnHoverKm(null)}
         >
           <XAxis
             dataKey="distKm"
             type="number"
-            domain={['dataMin', 'dataMax']}
+            domain={xDomain}
+            allowDataOverflow={hasWindow}
             tickFormatter={(v: number) => `${v.toFixed(0)}`}
             unit=" km"
             tick={{ fontSize: 10 }}
             tickLine={false}
+            // Default recharts band is 30px — too tall for a single 10px label, which leaves
+            // empty space below the distance axis. Tighten it in compact (Live) mode.
+            height={compact ? 16 : undefined}
           />
           <YAxis
             dataKey="ele"
@@ -140,6 +161,13 @@ export function ElevationProfile({ waypoints, segments, onHoverKm, className, st
               fill="#3498db"
               fillOpacity={0.2}
               stroke="none"
+            />
+          )}
+          {currentKm != null && (
+            <ReferenceLine
+              x={currentKm}
+              stroke="#16a34a"
+              strokeWidth={2}
             />
           )}
           {boundaries.map((b) => (
