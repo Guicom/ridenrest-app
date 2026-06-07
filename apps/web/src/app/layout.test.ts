@@ -8,9 +8,13 @@ vi.mock('next/font/google', () => ({
 vi.mock('next-plausible', () => ({
   default: vi.fn(() => null),
 }))
+vi.mock('@/components/shared/consent-banner', () => ({
+  ConsentBanner: vi.fn(() => null),
+}))
 
 const { viewport, default: RootLayout } = await import('./layout')
 const PlausibleProvider = (await import('next-plausible')).default as unknown as ReturnType<typeof vi.fn>
+const { ConsentBanner } = await import('@/components/shared/consent-banner')
 
 describe('Root layout viewport', () => {
   it('has viewport-fit=cover for iOS safe areas', () => {
@@ -26,21 +30,26 @@ describe('Root layout viewport', () => {
   })
 })
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function findElementOfType(element: any, type: unknown): any {
+  if (!element || typeof element !== 'object') return null
+  if (element.type === type) return element
+  if (element.props?.children) {
+    const children = Array.isArray(element.props.children)
+      ? element.props.children
+      : [element.props.children]
+    for (const child of children) {
+      const found = findElementOfType(child, type)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 describe('PlausibleProvider in layout', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function findPlausibleElement(element: any): any {
-    if (!element || typeof element !== 'object') return null
-    if (element.type === PlausibleProvider) return element
-    if (element.props?.children) {
-      const children = Array.isArray(element.props.children)
-        ? element.props.children
-        : [element.props.children]
-      for (const child of children) {
-        const found = findPlausibleElement(child)
-        if (found) return found
-      }
-    }
-    return null
+    return findElementOfType(element, PlausibleProvider)
   }
 
   it('renders PlausibleProvider with same-origin proxied src', () => {
@@ -62,5 +71,17 @@ describe('PlausibleProvider in layout', () => {
     expect(plausible.props.src).not.toContain('stats.ridenrest.app')
     expect(plausible.props.src).not.toContain('plausible.io')
     expect(plausible.props.init.endpoint).toBe('/api/event')
+  })
+})
+
+describe('ConsentBanner in layout (story posthog-1)', () => {
+  it('monte la bannière de consentement dans le body (couvre (marketing) et (app))', () => {
+    const tree = RootLayout({ children: null })
+    expect(findElementOfType(tree, ConsentBanner)).not.toBeNull()
+  })
+
+  it('garde PlausibleProvider en parallèle (coexistence durant l’epic)', () => {
+    const tree = RootLayout({ children: null })
+    expect(findElementOfType(tree, PlausibleProvider)).not.toBeNull()
   })
 })

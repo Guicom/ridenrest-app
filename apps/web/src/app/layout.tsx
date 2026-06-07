@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import PlausibleProvider from "next-plausible";
+import { ConsentBanner } from "@/components/shared/consent-banner";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -36,6 +37,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased" suppressHydrationWarning>
         {children}
+        <ConsentBanner />
       </body>
     </html>
   );

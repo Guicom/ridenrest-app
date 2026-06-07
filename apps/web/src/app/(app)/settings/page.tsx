@@ -6,6 +6,7 @@ import { StravaConnectionCard } from './_components/strava-connection-card'
 import { SignOutButton } from './_components/sign-out-button'
 import { DeleteAccountDialog } from './_components/delete-account-dialog'
 import { OverpassToggle } from './_components/overpass-toggle'
+import { PrivacyToggle } from './_components/privacy-toggle'
 import { AboutSection } from './_components/about-section'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -44,6 +45,15 @@ export default async function SettingsPage() {
         <Card>
           <CardContent className="pt-4">
             <OverpassToggle initialEnabled={overpassEnabled} />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">Confidentialité</h2>
+        <Card>
+          <CardContent className="pt-4">
+            <PrivacyToggle />
           </CardContent>
         </Card>
       </section>

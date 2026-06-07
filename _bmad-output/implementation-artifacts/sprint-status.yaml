@@ -305,3 +305,77 @@ development_status:
   live-profile-1-search-panel-redesign-collapsible-profile: done  # coquille : refonte layout (maquettes) + conteneur PROFIL repliable + comportement (replié défaut / ouverture slider / fermeture Rechercher / chevron) — code review 2026-06-01 (8/8 AC, 4 patchs appliqués, 2 items différés Story 2, 1081 tests verts)
   live-profile-2-interactive-elevation-profile: done  # contenu : profil interactif début=position GPS + surlignage zone recherchée + fin ~100km + zoom piloté slider + dégradation gracieuse — impl 2026-06-01 (8/8 AC, ElevationProfile étendu rétro-compat + wrapper LiveElevationProfile, ElevationStrip orphelin supprimé). Code review 2026-06-01 : 8/8 AC OK, patch P1 garde anti-inversion domaine X (v1.7), 1098/1098 verts, ESLint clean ; P2 doc + 3 reports (voir Review Findings)
   epic-live-profile-retrospective: optional
+
+  # Epic PostHog : Migration analytics Plausible → PostHog Cloud EU (web) — session replay + funnels + feature flags + MCP
+  # (ajouté 2026-06-07 — cf. epics-posthog.md + sprint-change-proposal-2026-06-07.md ; posthog-2 requis avant MOB-4.5)
+  epic-posthog: in-progress
+  posthog-1-sdk-web-consentement-coexistence-plausible: review  # impl 2026-06-07 — SDK+proxy /phrelay+bannière consentement+toggle settings ; décision AC6 : Plausible CE conservé (cookieless marketing). 1113 tests verts. Reste manuel : clé dans .env local+VPS  # posthog-js + instrumentation-client + proxy /phrelay + bannière consentement + toggle settings + décision coexistence Plausible. Story créée 2026-06-07
+  posthog-2-packages-analytics-taxonomie-instrumentation: ready-for-dev  # @ridenrest/analytics (transport injecté, zéro vendor) + migration 5 call sites + live_mode_activated + identify/reset. ⚠️ requis avant MOB-4.5. Story créée 2026-06-07
+  posthog-3-session-replay-web-masquage-rgpd: ready-for-dev  # replay gated consentement + ph-no-capture sur map-canvas/live-map-canvas (règle GPS-jamais-dehors étendue à l'écran) + PII + mentions légales + tests régression. Story créée 2026-06-07
+  posthog-4-mcp-dashboards-feature-flags: ready-for-dev  # MCP https://mcp.posthog.com/mcp (-s user, clé jamais commitée) + 2 funnels + dashboard Produit + flag démo + guide boucle produit. Story créée 2026-06-07
+  epic-posthog-retrospective: optional
+
+  # ─────────────────────────────────────────────────────────────
+  # Epic MOB-1 → MOB-6 : Application Mobile Native (iOS + Android)
+  # Expo / React Native — backend NestJS/Postgres/BRouter inchangé, partagé web↔mobile
+  # (ajouté 2026-06-02 — cf. _bmad-output/planning-artifacts/epics-mobile.md, 6 epics / 33 stories)
+  # Clés story = MOB-E-S-slug (préfixe MOB → exclues de l'auto-discovery backlog ; créer via `/bmad-create-story MOB-E.S`)
+  # ─────────────────────────────────────────────────────────────
+
+  # Epic MOB-1 : Fondation & coquille applicative
+  epic-MOB-1: in-progress
+  MOB-1-1-init-apps-mobile-monorepo-integration: ready-for-dev  # init apps/mobile Expo Router + .npmrc node-linker=hoisted + metro monorepo + turbo tasks + route placeholder. Story créée 2026-06-02
+  MOB-1-2-dev-accounts-eas-ota-pipeline: ready-for-dev  # comptes Apple individuel (sans D-U-N-S) + Google Play + eas.json 3 profils + build development iOS/Android + EAS Update OTA. Story créée 2026-06-02
+  MOB-1-3-design-system-tokens-nativewind-storybook: ready-for-dev  # packages/design-tokens (miroir globals.css) + NativeWind v4 + Storybook RN web (Button/Card/Skeleton). ⚠️ dark non défini côté web — décision requise. Story créée 2026-06-02
+  MOB-1-4-cross-config-i18n-tests-ci-deeplink-scheme: ready-for-dev  # i18n (expo-localization+i18next, fr défaut) + Jest/RNTL + Maestro + gate CI (turbo --filter='*', build natif exclu) + scheme ridenrest:// (app.config.ts). Story créée 2026-06-02
+  epic-MOB-1-retrospective: optional
+
+  # Epic MOB-2 : Authentification & Onboarding
+  epic-MOB-2: backlog
+  MOB-2-1-better-auth-client-secure-store-session: backlog
+  MOB-2-2-email-signup-login-password-reset: backlog
+  MOB-2-3-google-oauth-deeplink: backlog
+  MOB-2-4-strava-oauth-deeplink: backlog
+  MOB-2-5-logout-account-deletion-rgpd: backlog
+  epic-MOB-2-retrospective: optional
+
+  # Epic MOB-3 : Aventures & Gestion GPX
+  epic-MOB-3: backlog
+  MOB-3-1-adventures-list-create-rename-delete: backlog
+  MOB-3-2-gpx-upload-segments-parse-notification: backlog
+  MOB-3-3-segment-management-reorder-replace-distances: backlog
+  MOB-3-4-strava-activity-import: backlog
+  MOB-3-5-local-gpx-cache-offline: backlog
+  epic-MOB-3-retrospective: optional
+
+  # Epic MOB-4 : Carte & Planification POI
+  epic-MOB-4: backlog
+  MOB-4-1-maplibre-native-trace-themes-attribution: backlog
+  MOB-4-2-poi-layers-pins-clusters-detail-sheet: backlog
+  MOB-4-3-corridor-km-search: backlog
+  MOB-4-4-density-analysis-colorized-trace: backlog
+  MOB-4-5-booking-deeplinks-affiliate-tracking: backlog
+  MOB-4-6-poi-access-routing-sheet-profile: backlog
+  MOB-4-7-poi-access-polyline-autozoom-invalidation: backlog
+  MOB-4-8-planning-weather-pace-adjusted: backlog
+  epic-MOB-4-retrospective: optional
+
+  # Epic MOB-5 : Mode Live / Aventure ⭐
+  epic-MOB-5: backlog
+  MOB-5-1-live-activation-consent-permissions: backlog
+  MOB-5-2-realtime-background-geolocation: backlog
+  MOB-5-3-live-poi-discovery: backlog
+  MOB-5-4-live-search-panel-collapsible-profile: backlog
+  MOB-5-5-interactive-elevation-profile-contextual: backlog
+  MOB-5-6-live-weather: backlog
+  epic-MOB-5-retrospective: optional
+
+  # Epic MOB-6 : Observabilité, Conformité Stores & Release
+  epic-MOB-6: backlog
+  MOB-6-1-sentry-crash-posthog-analytics: backlog  # renommé 2026-06-07 — Plausible → PostHog via packages/analytics (sprint-change-proposal-2026-06-07)
+  MOB-6-2-push-notifications-apns-fcm: backlog
+  MOB-6-3-i18n-finalization: backlog
+  MOB-6-4-store-compliance-legal-links: backlog
+  MOB-6-5-beta-distribution-production-submission: backlog
+  MOB-6-6-session-replay-mobile-production: backlog  # post-v1 — replay prod (nouveau binaire + Privacy Labels), ajouté 2026-06-07
+  epic-MOB-6-retrospective: optional

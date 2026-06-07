@@ -14,6 +14,22 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
+  // Requis par le proxy PostHog : l'API PostHog utilise des trailing slashes
+  // que le redirect automatique de Next casserait (cf. posthog.com/docs/advanced/proxy/nextjs)
+  skipTrailingSlashRedirect: true,
+  // Reverse proxy anti-adblock PostHog Cloud EU (story posthog-1) — chemin non évident /phrelay/
+  async rewrites() {
+    return [
+      {
+        source: "/phrelay/static/:path*",
+        destination: "https://eu-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/phrelay/:path*",
+        destination: "https://eu.i.posthog.com/:path*",
+      },
+    ];
+  },
   webpack: (config) => {
     config.module.rules.push({
       test: /CHANGELOG\.md$/,
@@ -54,6 +70,13 @@ export default withPWA({
       },
       {
         urlPattern: /\/api\/event$/,
+        handler: "NetworkOnly",
+      },
+      // ── PostHog (proxy /phrelay) — never cache ──
+      // Placé AVANT la règle CacheFirst static-assets, sinon /phrelay/static/*.js
+      // (script posthog) serait mis en cache 30 jours par le service worker
+      {
+        urlPattern: /\/phrelay\//,
         handler: "NetworkOnly",
       },
       // ── OpenFreeMap tiles (PBF vector tiles) — SWR for offline map ──
