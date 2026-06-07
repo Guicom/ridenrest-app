@@ -38,7 +38,7 @@ import { PoiPopup } from '../../map/[id]/_components/poi-popup'
 import { LiveAccessPolyline } from '@/components/poi-access/LiveAccessPolyline'
 import { LiveElevationProfile } from './_components/live-elevation-profile'
 import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
-import { trackPoiSearchTriggered } from '@/lib/analytics'
+import { trackPoiSearchTriggered, trackLiveModeActivated, hashAdventureId } from '@ridenrest/analytics'
 
 const DEFAULT_RADIUS = 5
 
@@ -298,6 +298,8 @@ export default function LivePage() {
   const handleConsent = () => {
     setShowConsent(false)
     grantConsent()
+    // Event taxonomie live_mode_activated — RGPD : hash uniquement, jamais de GPS (story posthog-2)
+    trackLiveModeActivated({ adventure_id_hash: hashAdventureId(adventureId) })
   }
 
   const handleDismiss = () => {

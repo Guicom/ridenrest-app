@@ -17,6 +17,7 @@
     "@ducanh2912/next-pwa": "^10.2.9",
     "@formspree/react": "^3.0.0",
     "@hookform/resolvers": "^5.2.2",
+    "@ridenrest/analytics": "workspace:*",
     "@ridenrest/database": "workspace:*",
     "@ridenrest/gpx": "workspace:*",
     "@ridenrest/shared": "workspace:*",

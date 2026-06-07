@@ -51,7 +51,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { trackGpxUploaded } from '@/lib/analytics'
+import { trackGpxUploaded } from '@ridenrest/analytics'
 import { GpxUploadForm } from './gpx-upload-form'
 import { SortableSegmentCard } from './sortable-segment-card'
 import { StravaImportModal } from './strava-import-modal'

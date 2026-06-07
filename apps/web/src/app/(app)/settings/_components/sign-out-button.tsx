@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import posthog from 'posthog-js'
 import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 
@@ -13,6 +14,8 @@ export function SignOutButton() {
     setIsPending(true)
     try {
       await authClient.signOut()
+      // Dissocie la session analytics de l'utilisateur (story posthog-2, AC4)
+      posthog.reset()
       router.push('/')
       router.refresh()
     } finally {

@@ -3,6 +3,7 @@
 // via la bannière de consentement (consent-banner.tsx) ou le toggle Paramètres.
 // Le session replay est désactivé explicitement ici — activation en posthog-3 (masquage carte requis).
 import posthog from 'posthog-js'
+import { setAnalyticsClient } from '@ridenrest/analytics'
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
 
@@ -17,4 +18,8 @@ if (POSTHOG_KEY) {
     capture_pageview: true,
     disable_session_recording: true,
   })
+
+  // Transport web de la façade @ridenrest/analytics (story posthog-2).
+  // Sans clé, aucun client n'est branché → helpers no-ops (comportement dev historique).
+  setAnalyticsClient({ capture: (event, properties) => posthog.capture(event, properties) })
 }

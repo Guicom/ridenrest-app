@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/layout/app-header'
 import { PwaInstallBanner } from '@/components/shared/pwa-install-banner'
 import { ReconnectionHandler } from '@/components/providers/reconnection-handler'
 import { ReleaseNotesWrapper } from '@/components/shared/release-notes-wrapper'
+import { AnalyticsIdentity } from '@/components/providers/analytics-identity'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <PwaInstallBanner />
       <ReconnectionHandler />
       <ReleaseNotesWrapper />
+      <AnalyticsIdentity />
     </QueryProvider>
   )
 }

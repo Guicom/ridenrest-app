@@ -14,7 +14,7 @@ import { AccessMetrics } from '@/components/poi-access/AccessMetrics'
 import type { Poi, PoiCategory, AccessOrigin } from '@ridenrest/shared'
 import type { OpeningPeriod } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
-import { trackPoiDetailOpened } from '@/lib/analytics'
+import { trackPoiDetailOpened } from '@ridenrest/analytics'
 import type maplibregl from 'maplibre-gl'
 
 const CATEGORY_LABELS: Record<PoiCategory, string> = {

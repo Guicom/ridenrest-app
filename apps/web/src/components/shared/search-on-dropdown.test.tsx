@@ -10,7 +10,7 @@ vi.mock('@/lib/auth/client', () => ({
   useSession: () => ({ data: { user: { id: 'u1', email: 'test@test.com' } } }),
 }))
 
-vi.mock('@/lib/analytics', () => ({
+vi.mock('@ridenrest/analytics', () => ({
   trackBookingClick: vi.fn(),
 }))
 
@@ -161,7 +161,7 @@ describe('SearchOnDropdown', () => {
   // ── Analytics tracking (Story 15.2) ────────────────────────────────────────
 
   it('fires booking_click event with booking.com source on Booking link click', async () => {
-    const { trackBookingClick } = await import('@/lib/analytics')
+    const { trackBookingClick } = await import('@ridenrest/analytics')
     render(<SearchOnDropdown center={center} city="Toulouse" page="map" poiType="hotel" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     fireEvent.click(screen.getByTestId('search-on-booking'))
@@ -174,7 +174,7 @@ describe('SearchOnDropdown', () => {
   })
 
   it('fires booking_click event with airbnb source on Airbnb link click', async () => {
-    const { trackBookingClick } = await import('@/lib/analytics')
+    const { trackBookingClick } = await import('@ridenrest/analytics')
     render(<SearchOnDropdown center={center} page="live" poiType="camp_site" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     fireEvent.click(screen.getByTestId('search-on-airbnb'))
@@ -187,7 +187,7 @@ describe('SearchOnDropdown', () => {
   })
 
   it('uses none as poi_type when poiType prop not provided', async () => {
-    const { trackBookingClick } = await import('@/lib/analytics')
+    const { trackBookingClick } = await import('@ridenrest/analytics')
     render(<SearchOnDropdown center={center} page="map" />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     fireEvent.click(screen.getByTestId('search-on-airbnb'))
@@ -197,7 +197,7 @@ describe('SearchOnDropdown', () => {
   })
 
   it('defaults page to map when not specified', async () => {
-    const { trackBookingClick } = await import('@/lib/analytics')
+    const { trackBookingClick } = await import('@ridenrest/analytics')
     render(<SearchOnDropdown center={center} />)
     fireEvent.click(screen.getByTestId('search-on-trigger'))
     fireEvent.click(screen.getByTestId('search-on-airbnb'))

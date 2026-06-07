@@ -14,6 +14,10 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
+  // @ridenrest/analytics exporte sa source TS (main: ./src/index.ts) — l'entrée
+  // instrumentation-client n'est pas couverte par la transpilation auto des packages
+  // workspace, il faut le déclarer explicitement (story posthog-2)
+  transpilePackages: ["@ridenrest/analytics"],
   // Requis par le proxy PostHog : l'API PostHog utilise des trailing slashes
   // que le redirect automatique de Next casserait (cf. posthog.com/docs/advanced/proxy/nextjs)
   skipTrailingSlashRedirect: true,

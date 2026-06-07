@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { buildBookingSearchUrl, buildBookingCoordUrl, buildAirbnbSearchUrl } from '@/lib/booking-url'
-import { trackBookingClick } from '@/lib/analytics'
-import type { UserTier } from '@/lib/analytics'
+import { trackBookingClick } from '@ridenrest/analytics'
+import type { UserTier } from '@ridenrest/analytics'
 import { useProfile } from '@/hooks/use-profile'
 import { useSession } from '@/lib/auth/client'
 

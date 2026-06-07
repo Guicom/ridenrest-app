@@ -35,7 +35,7 @@ import { useEndDateSync } from '@/hooks/use-end-date-sync'
 import { EndDateSyncDialog } from '@/components/shared/end-date-sync-dialog'
 import { useElevationProfile } from '@/hooks/use-elevation-profile'
 import { getStoredWeatherPace } from '@/lib/weather-pace'
-import { trackMapOpened, trackPoiSearchTriggered, hashAdventureId } from '@/lib/analytics'
+import { trackMapOpened, trackPoiSearchTriggered, hashAdventureId } from '@ridenrest/analytics'
 import { useAccess } from '@/components/poi-access/useAccess'
 import type { AccessOrigin } from '@ridenrest/shared'
 
