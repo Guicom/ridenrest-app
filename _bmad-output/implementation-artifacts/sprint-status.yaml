@@ -324,7 +324,7 @@ development_status:
 
   # Epic MOB-1 : Fondation & coquille applicative
   epic-MOB-1: in-progress
-  MOB-1-1-init-apps-mobile-monorepo-integration: ready-for-dev  # init apps/mobile Expo Router + .npmrc node-linker=hoisted + metro monorepo + turbo tasks + route placeholder. Story créée 2026-06-02
+  MOB-1-1-init-apps-mobile-monorepo-integration: done  # impl + code review 2026-06-07 — Expo SDK 56/Expo Router (template default, with-router obsolète) + .npmrc hoisted (2 régressions corrigées : React 19.2.3 aligné web, eslint-plugin-react-hooks ^5 pinné web) + metro monorepo (disableHierarchicalLookup=false requis SDK 56) + turbo 5 tâches + lancement vérifié iOS (iPhone 17 Pro) & Android (Pixel 7/API 36, SDK installé via brew). 23/23 turbo --force vert. Code review : 6 patches (PostHog key retirée d'api/.env.example, .expo/** hors outputs turbo, TS ~5.9.3 aligné, app.json ridenrest, typecheck racine, doc sync archi), 2 defers. 23/23 vert post-patches. Commit manuel restant (Guillaume)
   MOB-1-2-dev-accounts-eas-ota-pipeline: ready-for-dev  # comptes Apple individuel (sans D-U-N-S) + Google Play + eas.json 3 profils + build development iOS/Android + EAS Update OTA. Story créée 2026-06-02
   MOB-1-2b-dark-mode-web-charbon-backport: ready-for-dev  # back-port palette dark « Charbon » (handoff Claude Design docs/design/dark-mode-charbon/) dans globals.css + toggle next-themes + passe composants dark web. Prérequis de MOB-1.3. Story créée 2026-06-07
   MOB-1-3-design-system-tokens-nativewind-storybook: ready-for-dev  # packages/design-tokens (miroir globals.css :root + .dark Charbon) + NativeWind v4 + Storybook RN web (Button/Card/Skeleton). ✅ dark résolu via MOB-1.2b (dépendance). Story créée 2026-06-02, MàJ 2026-06-07

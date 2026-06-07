@@ -140,6 +140,8 @@ Mobile cross-platform native (iOS + Android) — Expo + React Native + Expo Rout
 | TypeScript | strict (config monorepo partagée) | Réutilise `packages/typescript-config` |
 
 > SDK 56 prévu Q2 2026 (mai/juin) — décision : démarrer sur SDK 55 (stable depuis février 2026), upgrade vers 56 quand sortie stable.
+>
+> **Impl réelle (MOB-1.1, 2026-06-07)** : le template `create-expo-app` a livré directement **SDK 56 / RN 0.85.3 / React 19.2.3** (supérieur à la cible, non downgradé conformément à la consigne « ne pas downgrader »). Les versions cibles ci-dessus sont un plancher.
 
 ### Starter Options Considered
 
@@ -233,7 +235,7 @@ ridenrest-app/
 
 **Build Tooling :**
 
-- Metro bundler (configuré pour monorepo : `watchFolders` pointant vers `packages/`)
+- Metro bundler (configuré pour monorepo : `watchFolders = [racine du monorepo]`, `nodeModulesPaths` projet puis racine. ⚠️ `disableHierarchicalLookup` doit rester à **`false`** (défaut) sur SDK 56 : l'Expo Autolinking module resolution gère le monorepo nativement et le forcer à `true` casse le runtime Expo Go — vérifié MOB-1.1, confirmé par `expo doctor`)
 - EAS Build pour les binaires production (alternative locale via `expo run:ios` / `expo run:android` en dev)
 
 **Testing Framework :**
@@ -267,11 +269,13 @@ ridenrest-app/
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**", ".expo/**"]
+      "outputs": [".next/**", "dist/**"]
     }
   }
 }
 ```
+
+**Correction (code review MOB-1.1, 2026-06-07) :** ne **pas** mettre `.expo/**` dans les `outputs` de `build` — `expo export` écrit le bundle dans `apps/mobile/dist/` (déjà couvert par `dist/**`) ; `.expo/` est un cache local machine non déterministe (devices.json, caches Metro) qui polluerait le cache Turbo.
 
 **Note :** L'initialisation via cette commande sera la première story d'implémentation de l'Epic mobile (probablement Epic 18 dans `epics.md`). Les stories suivantes : config Better Auth client mobile, intégration MapLibre RN, écrans Auth, écrans Adventures, etc.
 
@@ -613,7 +617,7 @@ apps/mobile/
 | Config Expo | `app.config.ts` (TypeScript) — **jamais** `app.json` (TS plus puissant, conditionnels) |
 | Variables d'env publiques | `EXPO_PUBLIC_*` (exposées au bundle JS) — exemples : `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID` |
 | Secrets | **Jamais** dans le bundle JS — toujours côté serveur |
-| Path aliases | `@/*` pointant vers `apps/mobile/` (alignement web) — config dans `tsconfig.json` + `babel.config.js` |
+| Path aliases | `@/*` → `./src/*` (layout `src/` du template SDK 56, identique à `apps/web`) — config dans `tsconfig.json` + `babel.config.js` *(amendé MOB-1.1 : initialement « racine `apps/mobile/` »)* |
 | Plugins Expo | Déclarés dans `app.config.ts` (`plugins: [...]`) — chaque lib native (`@maplibre/maplibre-react-native`, `expo-location`, etc.) ajoute son entrée |
 
 ---
