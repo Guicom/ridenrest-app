@@ -118,7 +118,7 @@ NFRs réinterprétés pour le contexte natif :
 8. **Permissions runtime** — géoloc, notifications, accès fichiers, prompts iOS/Android avec rationale
 9. **Distribution & releases** — pipeline EAS Build → TestFlight + Internal Testing → stores production, OTA updates pour patches JS sans soumission
 10. **Conformité stores** — App Store 4.2, Privacy Nutrition Labels, Data Safety, age rating, content rating
-11. **Crash & analytics** — Sentry mobile (JS + crashes natifs avec source maps Metro), analytics via **Plausible Events API** (`POST /api/event` vers `stats.ridenrest.app` — réutilise l'infra existante, un seul dashboard web + mobile)
+11. **Crash & analytics** — Sentry mobile (JS + crashes natifs avec source maps Metro), analytics via **PostHog Cloud EU** (`posthog-react-native` + façade `packages/analytics` partagée web ↔ mobile — zéro cookie mobile, dashboard unifié ; session replay : builds beta uniquement, production = release dédiée post-v1)
 12. **Internationalisation** — actuellement FR uniquement, mobile devra prévoir architecture i18n (`expo-localization` + `i18next`) pour distribution stores
 13. **Tests** — Jest + React Native Testing Library (unit), Maestro (E2E smoke pré-release)
 
@@ -292,7 +292,7 @@ ridenrest-app/
 - TanStack Query v5 (server state) + Zustand v5 (client state)
 - React Hook Form + Zod (forms) depuis `packages/shared`
 - MapLibre RN v11 (carto native)
-- Plausible Events API (analytics)
+- PostHog Cloud EU via `packages/analytics` (analytics)
 
 **Décisions critiques (bloquent l'implémentation mobile) :**
 
@@ -323,13 +323,14 @@ ridenrest-app/
 | Décision | Choix | Version | Rationale |
 |---|---|---|---|
 | UI styling | NativeWind | v4 (stable) | Partage conventions Tailwind avec web, courbe d'apprentissage faible. Upgrade v5 quand stable |
-| Design tokens | `packages/design-tokens/` (nouveau package) | — | Single source of truth couleurs/spacings/typography, importé par `apps/web` (Tailwind config) ET `apps/mobile` (NativeWind config). Aligné sur le design system Claude Design |
+| Design tokens | `packages/design-tokens/` (nouveau package) | — | Single source of truth couleurs/spacings/typography, importé par `apps/web` (Tailwind config) ET `apps/mobile` (NativeWind config). **Source canonique = tokens web existants** (`apps/web/src/app/globals.css` `@theme`, vocabulaire shadcn + `packages/shared/src/constants/poi-colors.ts`) — extraction/miroir, pas redéfinition (cf. `epics-mobile.md` `UX-DR-MOB-001`) |
 | Storybook (doc vivante) | `@storybook/react-native-web` | v8 | Catalog des composants primitifs et partagés, validation isolée, hot reload en browser |
 | Icons | `lucide-react-native` | latest | Équivalent mobile de `lucide-react` web — cohérence visuelle |
 | Theming | preference système + override user | — | Light/Dark, aligné sur l'archi web |
 | Animations | `react-native-reanimated` | latest (Expo SDK 55) | Inclus dans Expo SDK |
 | Gestures | `react-native-gesture-handler` | latest (Expo SDK 55) | Inclus dans Expo SDK |
 | Bottom sheets | `@gorhom/bottom-sheet` | v5 (New Arch) | Pour les fiches POI mobile (alignement web) |
+| Charting (profil d'élévation) | `react-native-svg` | latest (Expo SDK 55) | **Décision 2026-06-02.** Port fidèle de l'approche SVG/Recharts web : profil = **un seul `<Path>` memoïsé**, zoom = `viewBox`/`transform` animé via `react-native-reanimated` (pas de re-slicing des `points[]` → satisfait NFR-LP-002). Léger, contrôle total (zone surlignée + marqueur). Fallback `@shopify/react-native-skia` **uniquement si** profiling montre du jank 60fps |
 
 ---
 
@@ -432,7 +433,7 @@ Cette logique se base uniquement sur les champs `start_date` et `end_date` exist
 | OTA Updates | EAS Update (gratuit) | Push patches JS sans soumission store |
 | CI/CD | GitHub Actions → trigger EAS Build sur push tag `v*` | Aligné avec workflow existant web |
 | Crash reporting | Sentry React Native (free 5k events/mois) | JS errors + native crashes via source maps Metro |
-| Analytics | Plausible Events API (`POST /api/event` vers `stats.ridenrest.app`) | Réutilise l'infra existante, un seul dashboard web + mobile |
+| Analytics | PostHog Cloud EU (`posthog-react-native` + `packages/analytics`) | Taxonomie partagée web ↔ mobile (epic-posthog), dashboard unifié, zéro cookie mobile — amendement 2026-06-07 |
 | Tests unit | Jest + React Native Testing Library | Préconfigurés via Expo |
 | Tests E2E | Maestro | Plus simple que Detox, smoke pré-release |
 | Distribution | TestFlight (iOS) + Internal Testing (Google) → Production stores | Pipeline standard |
@@ -476,7 +477,7 @@ Cette logique se base uniquement sur les champs `start_date` et `end_date` exist
 
 7. **Polish & sortie store**
    - i18n setup (`expo-localization` + `i18next` FR)
-   - Plausible Events integration
+   - Branchement PostHog (`packages/analytics`)
    - Sentry RN
    - Maestro E2E smoke
    - Privacy Nutrition Labels + Data Safety
@@ -591,7 +592,7 @@ apps/mobile/
       maplibre-config.ts
       pin-factory.ts
     analytics/
-      plausible.ts              ← POST /api/event vers stats.ridenrest.app
+      posthog.ts                ← init posthog-react-native + façade packages/analytics
     i18n/
       i18n.config.ts
       locales/
@@ -630,7 +631,7 @@ apps/mobile/
 | Combinaisons conditionnelles | Helper `cn()` (utilisant `clsx` + `tailwind-merge`) — alignement avec web |
 | Couleurs dynamiques (POI) | **Style inline obligatoire** (héritage web) — Tailwind JIT ne peut pas générer `bg-[${color}]` au runtime |
 | Theming light/dark | Variables CSS via `nativewind` config + `useColorScheme()` hook |
-| Reuse de conventions design | Tokens identiques au web (espacements, couleurs primary/secondary, typography) — partagés via `packages/shared/design-tokens.ts` (à créer) |
+| Reuse de conventions design | Tokens identiques au web (espacements, couleurs primary/secondary, typography) — extraits des tokens web canoniques (`globals.css` `@theme` + `poi-colors.ts`) et partagés via le package `packages/design-tokens/` (à créer) |
 
 ---
 
@@ -824,7 +825,7 @@ const { data } = useQuery({ queryKey: ['pois', ...], queryFn: () => apiFetch('/p
 | POI Planning (FR-030→036) | Epic 4+5 backend shippés | `components/map/search-range-slider.tsx`, `components/shared/poi-card.tsx`, `hooks/use-pois.ts`, `lib/cache/poi-cache.ts`, `lib/external-links.ts` (Linking.openURL pour Booking/Hotels.com/Airbnb) |
 | POI Live (FR-040→045) | Epic 7 backend shippé | `app/(app)/live/[id].tsx`, `components/live/live-map-canvas.tsx`, `components/live/geolocation-consent.tsx`, `components/live/speed-input.tsx`, `components/live/live-poi-list.tsx`, `hooks/use-live-mode.ts`, activation `expo-keep-awake` dans `app/(app)/live/_layout.tsx` |
 | Weather (FR-050→055) | Epic 6 backend shippé | `components/map/weather-strip.tsx`, `components/live/live-weather.tsx` (si réintroduit), `hooks/use-weather.ts`, `lib/cache/weather-cache.ts` |
-| External (FR-060→063) | — | `components/shared/poi-card.tsx` (deep links), `lib/external-links.ts`, `lib/analytics/plausible.ts` (event tracking clics) |
+| External (FR-060→063) | — | `components/shared/poi-card.tsx` (deep links), `lib/external-links.ts`, `lib/analytics/posthog.ts` (event tracking clics via packages/analytics) |
 | ~~PWA (FR-070→073)~~ | — | ❌ Hors périmètre — capacités natives à la place |
 
 **Cross-cutting concerns → fichiers mobile :**
@@ -836,7 +837,7 @@ const { data } = useQuery({ queryKey: ['pois', ...], queryFn: () => apiFetch('/p
 | Network detection | `hooks/use-network-status.ts` + bannière `components/shared/status-banner.tsx` |
 | Cache purge | `lib/cache/cache-manager.ts` — déclenché au foreground app via AppState |
 | i18n | `lib/i18n/i18n.config.ts`, `lib/i18n/locales/{fr,en}.json` |
-| Analytics | `lib/analytics/plausible.ts` — events vers `stats.ridenrest.app/api/event` |
+| Analytics | `lib/analytics/posthog.ts` — events via `packages/analytics` → PostHog Cloud EU |
 | Crash reporting | Sentry init dans `app/_layout.tsx` (avant tout autre code) |
 
 ---
@@ -1087,7 +1088,7 @@ apps/mobile/
       maplibre-config.ts
       pin-factory.ts
     analytics/
-      plausible.ts
+      posthog.ts
     i18n/
       i18n.config.ts
       locales/
@@ -1187,7 +1188,7 @@ apps/mobile/
 | POI Planning (FR-030→036) | 7 | ✅ Range slider + corridor backend + deep links + density |
 | POI Live (FR-040→045) | 6 | ✅ `expo-location` foreground + filtrage client-side + status banner |
 | Météo (FR-050→055) | 6 | ✅ Weather endpoint backend + cache local par aventure |
-| Affiliés (FR-060→063) | 4 | ✅ Deep links Linking.openURL + Plausible Events |
+| Affiliés (FR-060→063) | 4 | ✅ Deep links Linking.openURL + PostHog events |
 | ~~PWA (FR-070→073)~~ | ~~4~~ | ❌ Hors périmètre — décision projet |
 
 **Non-Functional Requirements :**
@@ -1258,7 +1259,7 @@ apps/mobile/
 
 - [x] Conventions de nommage établies (héritage web + spécifiques mobile)
 - [x] Patterns de structure définis (Expo Router, layouts, route groups)
-- [x] Patterns de communication spécifiés (Plausible, Better Auth, MapLibre RN)
+- [x] Patterns de communication spécifiés (PostHog, Better Auth, MapLibre RN)
 - [x] Patterns de process documentés (error handling, loading, permissions, lifecycle)
 - [x] Patterns Storybook stories définis (co-localisation, scope, decorators)
 
@@ -1331,7 +1332,7 @@ pnpm install
 5. Map + POIs (Story 18.5) — MapLibre RN intégration (Dev Client requis), recherche corridor, cache N3
 6. Live Mode (Story 18.6) — `expo-location` foreground + `expo-keep-awake` + filtrage client-side
 7. Météo + cache offline (Story 18.7) — réutilise backend, cache N3 météo
-8. i18n + Plausible + Sentry (Story 18.8) — finition observabilité et localisation
+8. i18n + PostHog + Sentry (Story 18.8) — finition observabilité et localisation
 9. Polish + soumission stores (Story 18.9) — Privacy Labels, Data Safety, TestFlight, Internal Testing
 
 ## Architecture Completion Summary
@@ -1383,3 +1384,15 @@ pnpm install
 **Prochaine phase :** Création de l'Epic 18 — Mobile Native dans `epics.md`, suivi de la première story `18.1 — Setup mobile foundation`.
 
 **Maintenance du document :** Mettre à jour ce document quand des décisions techniques majeures sont prises pendant l'implémentation mobile (déviations, choix de libs supplémentaires, retours terrain).
+
+---
+
+## Amendement 2026-06-07 — Analytics : Plausible → PostHog
+
+> Décision actée via `sprint-change-proposal-2026-06-07.md` (correct-course). Les références analytics de ce document ont été mises à jour en conséquence.
+
+- **Provider** : PostHog **Cloud EU** (pas de self-host — ClickHouse/Kafka trop lourds pour le VPS Hostinger). Remplace Plausible Events API.
+- **Motivation** : Session Replay (web + mobile), analytics produit (funnels, rétention), feature flags (rollout mobile), serveur MCP PostHog (boucle d'analyse UX dans Claude Code).
+- **Façade** : `packages/analytics` (livrée par l'epic web `epic-posthog`, dérivée des helpers typés `apps/web/src/lib/analytics.ts`) — le mobile la consomme via `posthog-react-native` (`lib/analytics/posthog.ts`). Zéro cookie mobile (distinct_id AsyncStorage).
+- **RGPD — extension de la règle « GPS jamais hors device » au replay** : l'écran Live affiche la carte avec la position → **masquage obligatoire** des vues carte (`ph-no-capture` / masking natif) et de toute PII dans les enregistrements.
+- **Session replay mobile** : module natif (nouveau binaire, pas OTA) — actif sur **builds beta uniquement** (EAS development/preview ou feature flag) pendant la v1 ; activation production = **story MOB-6.6 post-v1** (consentement in-app + mise à jour Privacy Nutrition Labels / Data Safety).
