@@ -89,12 +89,14 @@ Bonnes pratiques :
 
 ### Inventaire des objets PostHog (à garder à jour)
 
-| Type | Nom exact | Contenu |
-|---|---|---|
-| Dashboard | `RideNRest — Produit` | 2 funnels + tendance pageviews + `booking_click` par `source` + `poi_detail_opened` par `poi_type` |
-| Funnel | `Planning → réservation` | `gpx_uploaded` → `poi_search_triggered` (mode=planning) → `booking_click` |
-| Funnel | `Live → réservation` | `live_mode_activated` → `poi_search_triggered` (mode=live) → `booking_click` |
-| Feature flag | `demo-rollout` | Démo / kill-switch de référence, rollout 100 % |
+Projet PostHog Cloud EU : **Ride'n'Rest (195596)** — objets créés le 2026-06-07 via MCP.
+
+| Type | Nom exact | ID | Contenu |
+|---|---|---|---|
+| Dashboard | `RideNRest — Produit` | `730304` | 2 funnels + tendance `$pageview` + `booking_click` par `source` + `poi_detail_opened` par `poi_type` |
+| Funnel | `Planning → réservation` | insight `p5qzg8mz` | `gpx_uploaded` → `poi_search_triggered` (mode=planning) → `booking_click` — fenêtre 14 j |
+| Funnel | `Live → réservation` | insight `GbRD5v4y` | `live_mode_activated` → `poi_search_triggered` (mode=live) → `booking_click` — fenêtre 14 j |
+| Feature flag | `demo-rollout` | `200551` | Démo / kill-switch de référence, rollout 100 % (+ usage dashboard auto-créé `730305`) |
 
 ## Tests
 
