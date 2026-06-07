@@ -81,11 +81,32 @@ describe('GoogleSignInButton', () => {
   })
 
   describe('funnel acquisition (posthog)', () => {
+    // sessionStorage mock (pattern projet — jsdom n'en fournit pas ici)
+    const sessionStorageMock = (() => {
+      let store: Record<string, string> = {}
+      return {
+        getItem: (key: string) => store[key] ?? null,
+        setItem: (key: string, value: string) => { store[key] = value },
+        removeItem: (key: string) => { delete store[key] },
+        clear: () => { store = {} },
+      }
+    })()
+    Object.defineProperty(globalThis, 'sessionStorage', { value: sessionStorageMock, writable: true })
+
+    beforeEach(() => sessionStorageMock.clear())
+
     it('émet signup_started (google) avant la redirection quand flow="register"', () => {
       render(<GoogleSignInButton flow="register" />)
       fireEvent.click(screen.getByRole('button'))
 
       expect(trackSignupStarted).toHaveBeenCalledWith({ method: 'google' })
+    })
+
+    it('pose le marqueur rnr_auth_flow=google avant le redirect (résolu par PostAuthTracker)', () => {
+      render(<GoogleSignInButton flow="login" />)
+      fireEvent.click(screen.getByRole('button'))
+
+      expect(sessionStorageMock.getItem('rnr_auth_flow')).toBe('google')
     })
 
     it('n’émet PAS signup_started quand flow="login"', () => {

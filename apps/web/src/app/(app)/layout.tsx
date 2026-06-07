@@ -7,6 +7,7 @@ import { PwaInstallBanner } from '@/components/shared/pwa-install-banner'
 import { ReconnectionHandler } from '@/components/providers/reconnection-handler'
 import { ReleaseNotesWrapper } from '@/components/shared/release-notes-wrapper'
 import { AnalyticsIdentity } from '@/components/providers/analytics-identity'
+import { PostAuthTracker } from '@/components/providers/post-auth-tracker'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -18,6 +19,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <ReconnectionHandler />
       <ReleaseNotesWrapper />
       <AnalyticsIdentity />
+      <PostAuthTracker />
     </QueryProvider>
   )
 }

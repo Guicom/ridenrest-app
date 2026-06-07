@@ -151,7 +151,7 @@ Demande Guillaume après la livraison des 4 stories : tracker la landing, le cli
 |---|---|---|
 | `landing_cta_clicked` | `placement` (header / feature_step_one/two/three), `authenticated` | CTA « Se connecter / Mes aventures » (marketing-header + 3 feature steps) |
 | `signup_started` | `method` (email / google) | register-form (submit valide), google-sign-in-button (flow=register, avant redirect OAuth) |
-| `signup_completed` | `method` | register-form (succès email). ⚠️ google non émis web (redirect hors domaine) — complétion via persons PostHog |
-| `login_completed` | `method` | login-form (succès email). ⚠️ même limitation google |
+| `signup_completed` | `method` | register-form (succès email) ; google : PostAuthTracker au retour OAuth (marqueur sessionStorage + user.createdAt < 5 min) |
+| `login_completed` | `method` | login-form (succès email) ; google : PostAuthTracker (compte > 5 min) |
 
 Funnel : `$pageview` (landing) → `landing_cta_clicked` → `signup_started` → `signup_completed`. L'audience exhaustive de la landing reste Plausible (cookieless) ; PostHog = visiteurs consentants. Détail : `packages/analytics/README.md`.

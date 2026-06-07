@@ -40,8 +40,8 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 | `live_mode_activated` | `trackLiveModeActivated` | `adventure_id_hash` **uniquement** — JAMAIS de GPS | `live/[id]/page.tsx` (après acceptation `<GeolocationConsent />`) | MOB-5.1 activation Live |
 | `landing_cta_clicked` | `trackLandingCtaClicked` | `placement: 'header' \| 'feature_step_one' \| 'feature_step_two' \| 'feature_step_three'` · `authenticated` (stringifié) | `marketing-header.tsx`, `feature-step-{one,two,three}.tsx` | n/a (web only) |
 | `signup_started` | `trackSignupStarted` | `method: 'email' \| 'google'` | `register-form.tsx` (submit valide), `google-sign-in-button.tsx` (flow="register") | MOB-2.2 |
-| `signup_completed` | `trackSignupCompleted` | `method: 'email' \| 'google'` | `register-form.tsx` (succès). ⚠️ `google` non émis sur web (redirect hors domaine avant résolution — complétion lisible via la création de person PostHog) | MOB-2.2/2.3 (deep-link retour mesurable) |
-| `login_completed` | `trackLoginCompleted` | `method: 'email' \| 'google'` | `login-form.tsx` (succès). ⚠️ même limitation `google` que signup_completed | MOB-2.2/2.3 |
+| `signup_completed` | `trackSignupCompleted` | `method: 'email' \| 'google'` | email : `register-form.tsx` (succès). google : `post-auth-tracker.tsx` au retour OAuth (marqueur sessionStorage `rnr_auth_flow` + `user.createdAt` < 5 min) | MOB-2.2/2.3 |
+| `login_completed` | `trackLoginCompleted` | `method: 'email' \| 'google'` | email : `login-form.tsx` (succès). google : `post-auth-tracker.tsx` (compte > 5 min, ou `createdAt` indisponible — classification prudente) | MOB-2.2/2.3 |
 
 `UserTier = 'free' | 'pro' | 'team' | 'anonymous'` · `AuthMethod = 'email' | 'google'`
 
@@ -54,6 +54,11 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 `$pageview` (landing) → `landing_cta_clicked` → `signup_started` → `signup_completed`
 
 > Les pageviews PostHog ne couvrent que les visiteurs **consentants** — l'audience exhaustive de la landing reste mesurée par Plausible (cookieless).
+
+### Continuité anonyme → identifié (OAuth inclus)
+
+- Le funnel **traverse le redirect Google** sans rien faire : le cookie PostHog (`distinct_id`) persiste sur notre domaine, et `posthog.identify(user.id)` au retour fusionne la personne anonyme dans la personne identifiée — les events pré-auth (landing, CTA, signup_started) sont rattachés rétroactivement.
+- **Distinction signup vs login pour Google** : `GoogleSignInButton` pose le marqueur sessionStorage `rnr_auth_flow=google` avant le redirect ; `<PostAuthTracker />` (layout app) le consomme au retour et classe via `user.createdAt` (Better Auth) — compte < 5 min → `signup_completed`, sinon → `login_completed`. Émission unique (marqueur consommé), flows email non concernés (émis par les formulaires).
 
 ## Session replay & masquage (référence web → mobile)
 

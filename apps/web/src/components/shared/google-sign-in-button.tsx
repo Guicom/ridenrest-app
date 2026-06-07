@@ -5,6 +5,13 @@ import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { trackSignupStarted } from '@ridenrest/analytics'
 
+/**
+ * Marqueur sessionStorage posé avant le redirect OAuth (survit au retour,
+ * même onglet) — lu par <PostAuthTracker /> dans le layout (app) pour émettre
+ * signup_completed ou login_completed (method=google) selon la fraîcheur du compte.
+ */
+export const AUTH_FLOW_MARKER_KEY = 'rnr_auth_flow'
+
 interface GoogleSignInButtonProps {
   callbackURL?: string
   /** Contexte d'usage pour le funnel acquisition : 'register' émet signup_started (method=google). */
@@ -17,9 +24,15 @@ export function GoogleSignInButton({ callbackURL = '/adventures', flow }: Google
   const handleGoogleSignIn = async () => {
     setIsPending(true)
     // Funnel acquisition : le flow OAuth redirige hors domaine — on émet le
-    // "started" avant la redirection (la complétion se lit côté PostHog persons)
+    // "started" avant la redirection, et on pose le marqueur que PostAuthTracker
+    // résoudra au retour en signup_completed/login_completed (method=google)
     if (flow === 'register') {
       trackSignupStarted({ method: 'google' })
+    }
+    try {
+      window.sessionStorage.setItem(AUTH_FLOW_MARKER_KEY, 'google')
+    } catch {
+      // sessionStorage indisponible — la complétion google ne sera pas émise (non bloquant)
     }
     try {
       // Initiates redirect flow: user → Google → back to callbackURL
