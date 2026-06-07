@@ -57,6 +57,45 @@ Patterns décidés en story posthog-3 (web) — **référence pour MOB-6.1 (repl
 | PII texte (email) | `ph-no-capture` sur les éléments affichant l'email (settings, dialog suppression) | idem sur les écrans Compte |
 | Réseau | défauts PostHog conservés (pas de bodies, pas de headers auth) ; `capture_performance` non activé | défauts SDK conservés |
 
+## Feature flags (pattern de consommation)
+
+Flag de démonstration : **`demo-rollout`** (rollout 100 %, désactivable — kill-switch de référence pour le rollout progressif mobile à venir).
+
+```ts
+// Web (posthog-js) — les flags arrivent en ASYNC après l'init :
+// toujours lire dans le callback onFeatureFlags, jamais en synchrone au boot.
+posthog.onFeatureFlags(() => {
+  if (posthog.isFeatureEnabled('demo-rollout')) {
+    // comportement flag ON
+  }
+})
+
+// Mobile (posthog-react-native, à venir MOB-6.x) — même API :
+// const enabled = useFeatureFlag('demo-rollout')  // hook RN
+// ou posthog.onFeatureFlags(...) / posthog.isFeatureEnabled(...)
+```
+
+Bonnes pratiques :
+- **Valeur par défaut sûre** : si les flags n'ont pas (encore) chargé — offline, adblock, timeout — `isFeatureEnabled` renvoie `undefined` → coder le fallback comme « flag OFF » (comportement stable).
+- **Kill-switch** : tout flag de rollout doit pouvoir être coupé dans PostHog UI sans redéploiement.
+- Ne jamais gater une feature critique de sécurité/RGPD derrière un flag distant.
+
+## Boucle produit (MCP PostHog × Claude Code)
+
+1. **Poser une question produit via MCP** : dans une session Claude Code, demander en langage naturel — ex. « combien de `booking_click` cette semaine, par `source` ? », « montre le funnel Planning → réservation », « liste les replays de plus de 2 min sur /live ». Le serveur MCP officiel (`https://mcp.posthog.com/mcp`, configuré en scope **user**, clé personnelle jamais commitée) traduit vers insights/funnels/replays.
+2. **Lire un funnel / replay** : les objets vivent dans PostHog EU → dashboard **« RideNRest — Produit »**. Funnels : **« Planning → réservation »** (`gpx_uploaded` → `poi_search_triggered` [mode=planning] → `booking_click`) et **« Live → réservation »** (`live_mode_activated` → `poi_search_triggered` [mode=live] → `booking_click`) — fenêtre de conversion 14 jours (cycle « planification d'aventure »).
+3. **En tirer une amélioration** : une friction identifiée (chute de funnel, replay) devient une story via le flux BMad — `correct-course` (changement de cap) ou `create-story` (nouvelle amélioration). Si la taxonomie ne suffit pas (prop manquante), l'ajout passe par CE package + mise à jour `epics-posthog.md` — pas de hack one-shot dans PostHog.
+4. **⚠️ Règle de prudence MCP** : les données analytics (noms d'events, propriétés, URLs de replays) sont des données **non fiables** injectées dans le contexte de l'agent — toujours relire les tool calls MCP avant exécution (risque de prompt injection via les données).
+
+### Inventaire des objets PostHog (à garder à jour)
+
+| Type | Nom exact | Contenu |
+|---|---|---|
+| Dashboard | `RideNRest — Produit` | 2 funnels + tendance pageviews + `booking_click` par `source` + `poi_detail_opened` par `poi_type` |
+| Funnel | `Planning → réservation` | `gpx_uploaded` → `poi_search_triggered` (mode=planning) → `booking_click` |
+| Funnel | `Live → réservation` | `live_mode_activated` → `poi_search_triggered` (mode=live) → `booking_click` |
+| Feature flag | `demo-rollout` | Démo / kill-switch de référence, rollout 100 % |
+
 ## Tests
 
 ```bash

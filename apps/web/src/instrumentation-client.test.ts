@@ -6,6 +6,8 @@ vi.mock('posthog-js', () => ({
     capture: vi.fn(),
     startSessionRecording: vi.fn(),
     stopSessionRecording: vi.fn(),
+    onFeatureFlags: vi.fn(),
+    isFeatureEnabled: vi.fn(),
   },
 }))
 
@@ -74,6 +76,45 @@ describe('instrumentation-client (init PostHog)', () => {
     await import('./instrumentation-client')
 
     expect(posthog.startSessionRecording).toHaveBeenCalledOnce()
+  })
+
+  it('enregistre un callback onFeatureFlags (pattern flags, story posthog-4)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test_key')
+    const posthog = (await import('posthog-js')).default
+    await import('./instrumentation-client')
+
+    expect(posthog.onFeatureFlags).toHaveBeenCalledOnce()
+    expect(posthog.onFeatureFlags).toHaveBeenCalledWith(expect.any(Function))
+  })
+
+  it('le callback flags lit demo-rollout via isFeatureEnabled (dev uniquement)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test_key')
+    vi.stubEnv('NODE_ENV', 'development')
+    const posthog = (await import('posthog-js')).default
+    vi.mocked(posthog.isFeatureEnabled).mockReturnValue(true)
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    await import('./instrumentation-client')
+
+    const callback = vi.mocked(posthog.onFeatureFlags).mock.calls[0][0] as () => void
+    callback()
+
+    expect(posthog.isFeatureEnabled).toHaveBeenCalledWith('demo-rollout')
+    expect(infoSpy).toHaveBeenCalledWith('[analytics] feature flag demo-rollout:', true)
+    infoSpy.mockRestore()
+  })
+
+  it('le callback flags est silencieux hors dev (aucun impact produit)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test_key')
+    vi.stubEnv('NODE_ENV', 'production')
+    const posthog = (await import('posthog-js')).default
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    await import('./instrumentation-client')
+
+    const callback = vi.mocked(posthog.onFeatureFlags).mock.calls[0][0] as () => void
+    callback()
+
+    expect(infoSpy).not.toHaveBeenCalled()
+    infoSpy.mockRestore()
   })
 
   it('ne fait rien si NEXT_PUBLIC_POSTHOG_KEY est absente', async () => {

@@ -36,4 +36,14 @@ if (POSTHOG_KEY) {
   // Transport web de la façade @ridenrest/analytics (story posthog-2).
   // Sans clé, aucun client n'est branché → helpers no-ops (comportement dev historique).
   setAnalyticsClient({ capture: (event, properties) => posthog.capture(event, properties) })
+
+  // Feature flags — pattern de démonstration (story posthog-4) : lecture du flag
+  // demo-rollout via le callback onFeatureFlags (recommandé : les flags arrivent en
+  // async après l'init). Usage anodin, visible en dev uniquement — aucun impact produit.
+  // Pattern de consommation documenté dans packages/analytics/README.md (web + mobile).
+  posthog.onFeatureFlags(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.info('[analytics] feature flag demo-rollout:', posthog.isFeatureEnabled('demo-rollout'))
+    }
+  })
 }
