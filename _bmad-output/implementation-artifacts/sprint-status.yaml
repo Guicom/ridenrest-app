@@ -326,7 +326,8 @@ development_status:
   epic-MOB-1: in-progress
   MOB-1-1-init-apps-mobile-monorepo-integration: ready-for-dev  # init apps/mobile Expo Router + .npmrc node-linker=hoisted + metro monorepo + turbo tasks + route placeholder. Story créée 2026-06-02
   MOB-1-2-dev-accounts-eas-ota-pipeline: ready-for-dev  # comptes Apple individuel (sans D-U-N-S) + Google Play + eas.json 3 profils + build development iOS/Android + EAS Update OTA. Story créée 2026-06-02
-  MOB-1-3-design-system-tokens-nativewind-storybook: ready-for-dev  # packages/design-tokens (miroir globals.css) + NativeWind v4 + Storybook RN web (Button/Card/Skeleton). ⚠️ dark non défini côté web — décision requise. Story créée 2026-06-02
+  MOB-1-2b-dark-mode-web-charbon-backport: ready-for-dev  # back-port palette dark « Charbon » (handoff Claude Design docs/design/dark-mode-charbon/) dans globals.css + toggle next-themes + passe composants dark web. Prérequis de MOB-1.3. Story créée 2026-06-07
+  MOB-1-3-design-system-tokens-nativewind-storybook: ready-for-dev  # packages/design-tokens (miroir globals.css :root + .dark Charbon) + NativeWind v4 + Storybook RN web (Button/Card/Skeleton). ✅ dark résolu via MOB-1.2b (dépendance). Story créée 2026-06-02, MàJ 2026-06-07
   MOB-1-4-cross-config-i18n-tests-ci-deeplink-scheme: ready-for-dev  # i18n (expo-localization+i18next, fr défaut) + Jest/RNTL + Maestro + gate CI (turbo --filter='*', build natif exclu) + scheme ridenrest:// (app.config.ts). Story créée 2026-06-02
   epic-MOB-1-retrospective: optional
 

@@ -1,0 +1,106 @@
+/* ============================================================
+   Ride'n'Rest — Dark Mode "Charbon"
+   Drop-in token overrides for the WEBAPP (app palette).
+
+   These reuse the EXACT custom-property names already defined in
+   colors_and_type.css / globals.css, so nothing in your component
+   code needs to change — only the values flip when `.dark` is on
+   (or when the OS is in dark mode, see the @media block below).
+
+   How to wire it (Next.js + Tailwind v4):
+   1. Keep your existing :root{} light tokens as-is.
+   2. Paste the `.dark{}` block below into globals.css.
+   3. Toggle by adding/removing `class="dark"` on <html> (e.g. via
+      next-themes). The @media block makes it also follow the OS
+      automatically if you prefer no toggle — keep ONE of the two.
+   ============================================================ */
+
+.dark {
+  /* ─── Brand / app primary — lifted sage-green for dark bg ─── */
+  --primary:            #74C69D; /* in-app CTA, active states     */
+  --primary-hover:      #95D5B2;
+  --primary-light:      #18241E; /* pale green section bg → dark tint */
+  --primary-foreground: #0A1711; /* dark ink ON the bright green  */
+
+  /* ─── Earth + sage neutrals (shared) ─────────────────────── */
+  --earth-light:        #1B2025;
+  --earth-dark:         #ECEFF1;
+  --sage:               #9DAAB0; /* mid neutral, body copy        */
+  --sage-light:         #2A343B;
+
+  /* ─── Surfaces (app) ─────────────────────────────────────── */
+  --background:         #1B2025; /* card surface (was #FFF)       */
+  --background-page:    #14181C; /* page bg (charcoal)            */
+  --background-intro:   #1E2A24; /* Planning/Live explainer block */
+  --surface:            #1B2025;
+  --surface-raised:     #242B31; /* hover / pressed surface       */
+
+  /* ─── Typography (app) ───────────────────────────────────── */
+  --foreground:         #ECEFF1;
+  --text-primary:       #ECEFF1;
+  --text-secondary:     #AEB8BF;
+  --text-muted:         #727C83;
+
+  /* ─── Borders / inputs ───────────────────────────────────── */
+  --border:             #333B42;
+  --input:              #333B42;
+  --ring:               #74C69D;
+
+  /* ─── Density / status (lightened for dark surfaces) ─────── */
+  --density-high:       #4ADE80; /* green  — good coverage / Prêt */
+  --density-medium:     #FBBF24; /* amber  — moderate / En cours  */
+  --density-low:        #F87171; /* red    — scarce / Erreur      */
+  --destructive:        #F87171;
+
+  /* ─── Accent yellow — unchanged, reads fine on dark ──────── */
+  --accent-yellow:      #F4C542;
+
+  /* ─── Charts (dark-friendly) ─────────────────────────────── */
+  --chart-1: #74C69D;
+  --chart-2: #4ADE80;
+  --chart-3: #FBBF24;
+  --chart-4: #F87171;
+  --chart-5: #AEB8BF;
+
+  /* ─── Shadows — black-based, a touch stronger on dark ────── */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.40);
+  --shadow:     0 1px 3px rgba(0,0,0,0.50), 0 1px 2px rgba(0,0,0,0.40);
+  --shadow-md:  0 4px 6px -1px rgba(0,0,0,0.50), 0 2px 4px -2px rgba(0,0,0,0.40);
+  --shadow-lg:  0 10px 15px -3px rgba(0,0,0,0.55), 0 4px 6px -4px rgba(0,0,0,0.40);
+  --shadow-xl:  0 20px 25px -5px rgba(0,0,0,0.60), 0 8px 10px -6px rgba(0,0,0,0.45);
+  --shadow-2xl: 0 25px 50px -12px rgba(0,0,0,0.75);
+}
+
+/* ── OPTION B: follow the OS instead of a manual toggle ──────────
+   Delete the `.dark{}` block above and use this instead if you
+   want dark mode to track the system preference automatically.
+   (Keep only one approach to avoid specificity surprises.)
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #74C69D; --primary-hover: #95D5B2;
+    --primary-light: #18241E; --primary-foreground: #0A1711;
+    --background: #1B2025; --background-page: #14181C;
+    --background-intro: #1E2A24; --surface: #1B2025; --surface-raised: #242B31;
+    --foreground: #ECEFF1; --text-primary: #ECEFF1;
+    --text-secondary: #AEB8BF; --text-muted: #727C83;
+    --border: #333B42; --input: #333B42; --ring: #74C69D;
+    --density-high: #4ADE80; --density-medium: #FBBF24; --density-low: #F87171;
+    --destructive: #F87171;
+  }
+}
+─────────────────────────────────────────────────────────────── */
+
+/* ── Notes ──────────────────────────────────────────────────────
+   • Radii, spacing, type sizes/weights/tracking and font families
+     are mode-independent — do NOT redefine them here.
+   • Brand green vs density green stay intentionally distinct:
+     --primary #74C69D (action) ≠ --density-high #4ADE80 (data).
+   • Status pills read best as a tint, not a solid fill on dark:
+     background: color-mix(in srgb, var(--density-high) 15%, transparent);
+     color: var(--density-high);  (+ a 6px dot in the same colour)
+   • "Powered by Strava" needs the WHITE wordmark variant on dark
+     surfaces — see reference/assets/powered-by-strava-white.svg.
+   • Buttons: primary = solid var(--primary) + var(--primary-foreground);
+     hover → var(--primary-hover). Outline/ghost hover → var(--surface-raised).
+   ─────────────────────────────────────────────────────────────── */
