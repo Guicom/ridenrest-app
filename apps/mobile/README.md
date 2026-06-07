@@ -1,56 +1,111 @@
-# Welcome to your Expo app 👋
+# @ridenrest/mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application mobile native Ride'n'Rest (iOS + Android) — [Expo SDK 56](https://docs.expo.dev/versions/v56.0.0/) + expo-router, intégrée au monorepo Turborepo/pnpm.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Démarrage (développement local)
 
 ```bash
-npm run reset-project
+pnpm install                       # à la racine du monorepo
+pnpm --dir apps/mobile dev         # démarre le serveur Expo (Metro)
+# puis : i (simulateur iOS) / a (émulateur Android)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+> ⚠️ Depuis MOB-1.2, le projet utilise un **Dev Client** (`expo-dev-client`) : les libs natives à venir (MapLibre RN, expo-secure-store…) ne fonctionnent pas dans Expo Go. Installer le build `development` (voir ci-dessous) sur le simulateur/émulateur, puis `pnpm --dir apps/mobile dev`.
 
-### Other setup steps
+## Identité de l'app
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Élément | Valeur |
+|---|---|
+| Bundle ID iOS / Package Android | `app.ridenrest` |
+| Projet EAS | [`@ridenrest/ridenrest`](https://expo.dev/accounts/ridenrest/projects/ridenrest) |
+| `projectId` EAS | `4548dbd0-ee0d-4ba7-8acb-e42469ec1ec3` (dans `app.json` → `extra.eas`) |
 
-## Learn more
+> 📝 La migration `app.json` → `app.config.ts` et le scheme `ridenrest://` sont le périmètre de **MOB-1.4**. Lors de la migration, **ne pas perdre** le `projectId` ni la config `updates`.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Builds (EAS Build — cloud)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3 profils dans `eas.json`, chacun rattaché à un canal OTA du même nom :
 
-## Join the community
+| Profil | Usage | Distribution | Canal OTA | Notes |
+|---|---|---|---|---|
+| `development` | Dev Client (iOS : simulateur **uniquement** ; Android : émulateur/device) | `internal` | `development` | `developmentClient: true`, `ios.simulator: true` — un device iOS physique exigerait un build sans `simulator: true` + provisioning |
+| `preview` | QA installable hors store | `internal` | `preview` | APK Android / ad-hoc iOS |
+| `production` | Binaire de soumission store | `store` | `production` | `autoIncrement`, versions gérées côté EAS (`appVersionSource: remote`) |
 
-Join our community of developers creating universal apps.
+```bash
+# Builds development (Dev Client)
+pnpm --dir apps/mobile exec eas build --profile development --platform ios
+pnpm --dir apps/mobile exec eas build --profile development --platform android
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# Suivi
+pnpm --dir apps/mobile exec eas build:list --limit 5
+```
+
+**Credentials** : gérés automatiquement par EAS (signing iOS via le compte Apple Developer, keystore Android généré et stocké sur les serveurs Expo). Rien à stocker dans le repo.
+
+**Free tier EAS ≈ 30 builds/mois** → économiser les builds natifs : tout changement **JS/assets pur** passe par OTA (voir ci-dessous), un build natif n'est nécessaire que pour un changement natif.
+
+## OTA (EAS Update)
+
+- `runtimeVersion` : policy **`appVersion`** — un build ne reçoit que les updates publiées avec la même version d'app (`1.0.0`). Un mismatch de `runtimeVersion` est la cause n°1 d'une OTA « qui ne s'applique pas ».
+- Publier un patch JS :
+
+```bash
+pnpm --dir apps/mobile exec eas update --channel preview --message "fix: …"
+```
+
+- ⚠️ **Toujours passer `--channel`** : sans lui, l'update part sur une branche par défaut qu'aucun build ne consomme (OTA invisible). En `--non-interactive` (CI), eas-cli 20.x exige aussi `--environment`.
+- L'update est récupérée **au prochain lancement** d'un build du canal ciblé (2 lancements pour la voir : fetch en arrière-plan puis application).
+
+### ⚠️ Règle OTA (à respecter sur tous les epics)
+
+Une OTA ne peut livrer **que du JS et des assets**. Tout changement **natif** (nouveau plugin/config natif, lib native, bump SDK Expo) impose un **nouveau build EAS** + (en production) une soumission store. En cas de doute : si `pnpm exec expo install <lib>` ajoute du code natif → build requis.
+
+## CI/CD → EAS Build (pattern cible — implémentation gate CI en MOB-1.4)
+
+**Principe** : GitHub Actions ne compile **jamais** de natif. Il ne fait qu'**appeler** EAS Build/Submit — la compilation s'exécute sur le cloud EAS.
+
+- **Déclencheur** : push d'un tag `v*` (ex. `v1.1.0`) → job GitHub Actions dédié mobile.
+  (Le workflow web actuel `.github/workflows/ci.yml` se déclenche sur push `main` → deploy VPS ; le déclenchement mobile par tag s'y ajoutera sans le modifier.)
+- **Auth CI** : créer un access token sur [expo.dev → Access tokens](https://expo.dev/settings/access-tokens) et le stocker en secret GitHub `EXPO_TOKEN` (jamais dans le repo).
+
+```yaml
+# Squelette cible (à implémenter en MOB-1.4 avec la gate lint/test/typecheck)
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  eas-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: '10.32.1' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      # Pas de compilation native ici — EAS Build s'en charge en cloud :
+      - run: pnpm --dir apps/mobile exec eas build --profile production --platform all --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # eas submit (stores) → MOB-6.5
+```
+
+**Hors scope ici** (volontairement) : job CI lint/test/typecheck mobile → **MOB-1.4** ; distribution TestFlight/Internal Testing + `eas submit` → **MOB-6.5**.
+
+## Variables d'environnement
+
+- Variables publiques embarquées dans le bundle : préfixe **`EXPO_PUBLIC_*`** uniquement (via `eas.json` → `env` par profil, ou EAS Environment Variables).
+- **Aucun secret dans le bundle JS** (NFR-014). `BETTER_AUTH_SECRET` & co. restent côté serveur, toujours.
+
+## Scripts
+
+| Script | Action |
+|---|---|
+| `pnpm dev` / `pnpm start` | Serveur Expo (Metro) |
+| `pnpm ios` / `pnpm android` | Serveur Expo + ouverture simulateur/émulateur |
+| `pnpm build` | `expo export` (bundle JS, utilisé par Turbo) |
+| `pnpm lint` | ESLint (config Expo flat) |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm test` | Placeholder — framework Jest/RNTL en MOB-1.4 |
