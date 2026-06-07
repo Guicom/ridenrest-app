@@ -272,3 +272,47 @@ describe('SegmentCard — Strava badge', () => {
     expect(screen.queryByAltText('Powered by Strava')).not.toBeInTheDocument()
   })
 })
+
+describe('SegmentCard — dark mode « Charbon » (MOB-1.2b AC3)', () => {
+  it('pastille "En cours..." : teinte color-mix + texte densité en dark, animate-pulse conservé', () => {
+    render(
+      <SegmentCard segment={makeSegment({ parseStatus: 'pending' })} onRetry={vi.fn()} />,
+    )
+    const pill = screen.getByText('En cours...')
+    expect(pill.className).toContain('animate-pulse')
+    expect(pill.className).toContain('color-mix(in_srgb,var(--density-medium)_15%,transparent)')
+    expect(pill.className).toContain('dark:text-density-medium')
+  })
+
+  it('pastille "Prêt" : teinte color-mix + point 6px masqué en light', () => {
+    render(<SegmentCard segment={makeSegment({ parseStatus: 'done' })} onRetry={vi.fn()} />)
+    const pill = screen.getByText('Prêt')
+    expect(pill.className).toContain('color-mix(in_srgb,var(--density-high)_15%,transparent)')
+    expect(pill.className).toContain('dark:text-density-high')
+    const dot = pill.querySelector('span[aria-hidden]')
+    expect(dot).not.toBeNull()
+    expect(dot!.className).toContain('hidden')
+    expect(dot!.className).toContain('dark:inline-block')
+  })
+
+  it('pastille "Erreur" : teinte color-mix + texte densité en dark', () => {
+    render(<SegmentCard segment={makeSegment({ parseStatus: 'error' })} onRetry={vi.fn()} />)
+    const pill = screen.getByText('Erreur')
+    expect(pill.className).toContain('color-mix(in_srgb,var(--density-low)_15%,transparent)')
+    expect(pill.className).toContain('dark:text-density-low')
+  })
+
+  it('wordmark Strava : la variante blanche est présente, masquée en light (dark:inline)', () => {
+    const { container } = render(
+      <SegmentCard segment={makeSegment({ source: 'strava' })} onRetry={vi.fn()} />,
+    )
+    const white = container.querySelector('img[src="/powered-by-strava-white.svg"]')
+    expect(white).not.toBeNull()
+    expect(white!.className).toContain('hidden')
+    expect(white!.className).toContain('dark:inline')
+    // la variante noire reste celle annoncée aux lecteurs d'écran
+    const black = screen.getByAltText('Powered by Strava') as HTMLImageElement
+    expect(black.src).toContain('/powered-by-strava.svg')
+    expect(black.className).toContain('dark:hidden')
+  })
+})

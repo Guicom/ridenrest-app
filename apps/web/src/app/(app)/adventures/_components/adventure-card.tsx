@@ -3,6 +3,7 @@
 import { useRef, useTransition } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { AdventureResponse } from '@ridenrest/shared'
+import { PoweredByStrava } from '@/components/shared/powered-by-strava'
 
 interface AdventureCardProps {
   adventure: AdventureResponse
@@ -26,7 +27,7 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
 
   return (
     <div
-      className={`bg-white rounded-xl border border-[--border] p-4 transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.98]${isSelected ? ' ring-2 ring-[--primary]' : ''}`}
+      className={`bg-white dark:bg-surface rounded-xl border border-[--border] p-4 transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.98]${isSelected ? ' ring-2 ring-[--primary]' : ''}`}
       onClick={() => onSelect(adventure.id)}
     >
       <div className="flex items-center justify-between">
@@ -42,9 +43,7 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
                 ` · ↓ ${Math.round(adventure.totalElevationLossM).toLocaleString('fr-FR')} m`}
             </span>
           )}
-          {adventure.hasStravaSegment && (
-            <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
-          )}
+          {adventure.hasStravaSegment && <PoweredByStrava />}
         </div>
       </div>
       <div className="text-text-muted text-sm mt-1">
@@ -63,7 +62,7 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
         <button
           type="button"
           disabled={isPending}
-          className="px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-all duration-75 hover:opacity-90 active:scale-[0.97] cursor-pointer disabled:opacity-70 inline-flex items-center gap-2"
+          className="px-5 py-2 bg-[var(--text-primary)] text-white dark:text-background-page rounded-lg text-sm font-medium transition-all duration-75 hover:opacity-90 active:scale-[0.97] cursor-pointer disabled:opacity-70 inline-flex items-center gap-2"
           onClick={() => handleNavigate(`/map/${adventure.id}?mode=planning`)}
         >
           {isNavigating(`/map/${adventure.id}?mode=planning`) && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -72,7 +71,7 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
         <button
           type="button"
           disabled={isPending}
-          className="px-5 py-2 border border-[--border] text-text-primary bg-white rounded-lg text-sm font-medium transition-all duration-75 hover:bg-[var(--surface-raised)] active:scale-[0.97] cursor-pointer disabled:opacity-70 inline-flex items-center gap-2"
+          className="px-5 py-2 border border-[--border] text-text-primary bg-white dark:bg-transparent rounded-lg text-sm font-medium transition-all duration-75 hover:bg-[var(--surface-raised)] dark:hover:bg-surface-raised active:scale-[0.97] cursor-pointer disabled:opacity-70 inline-flex items-center gap-2"
           onClick={() => handleNavigate(`/adventures/${adventure.id}`)}
         >
           {isNavigating(`/adventures/${adventure.id}`) && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -97,7 +96,7 @@ export function AdventureCard({ adventure, isSelected, onSelect, onNavigate }: A
         <button
           type="button"
           disabled={isPending}
-          className="w-full px-5 py-2 bg-[var(--text-primary)] text-white rounded-lg text-sm font-medium transition-all duration-75 hover:opacity-90 active:scale-[0.97] cursor-pointer disabled:opacity-70 inline-flex items-center justify-center gap-2"
+          className="w-full px-5 py-2 bg-[var(--text-primary)] text-white dark:text-background-page rounded-lg text-sm font-medium transition-all duration-75 hover:opacity-90 active:scale-[0.97] cursor-pointer disabled:opacity-70 inline-flex items-center justify-center gap-2"
           onClick={() => handleNavigate(`/live/${adventure.id}`)}
         >
           {isNavigating(`/live/${adventure.id}`) && <Loader2 className="h-4 w-4 animate-spin" />}

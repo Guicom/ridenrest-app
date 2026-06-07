@@ -131,7 +131,7 @@ export function LiveControls({
         >
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
           {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-primary text-[10px] font-bold border border-primary">
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-white dark:bg-surface text-primary text-[10px] font-bold border border-primary">
               {activeFilterCount}
             </span>
           )}

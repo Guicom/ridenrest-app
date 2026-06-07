@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import type { AdventureSegmentResponse } from '@ridenrest/shared'
+import { PoweredByStrava } from '@/components/shared/powered-by-strava'
 
 export interface SegmentCardProps {
   segment: AdventureSegmentResponse
@@ -86,19 +87,22 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
               <p className="font-medium text-sm">{name ?? 'Segment sans nom'}</p>
             )}
             {isPending && (
-              <span className="bg-density-medium text-white text-xs font-medium px-2 py-0.5 rounded-full animate-pulse">
+              <span className="inline-flex items-center gap-1 bg-density-medium text-white dark:bg-[color-mix(in_srgb,var(--density-medium)_15%,transparent)] dark:text-density-medium text-xs font-medium px-2 py-0.5 rounded-full animate-pulse">
+                <span aria-hidden="true" className="hidden dark:inline-block size-1.5 rounded-full bg-current" />
                 En cours...
               </span>
             )}
             {isError && (
-              <span className="bg-density-low text-white text-xs font-medium px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 bg-density-low text-white dark:bg-[color-mix(in_srgb,var(--density-low)_15%,transparent)] dark:text-density-low text-xs font-medium px-2 py-0.5 rounded-full">
+                <span aria-hidden="true" className="hidden dark:inline-block size-1.5 rounded-full bg-current" />
                 Erreur
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {isDone && (
-              <span className="bg-density-high text-white text-xs font-medium px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 bg-density-high text-white dark:bg-[color-mix(in_srgb,var(--density-high)_15%,transparent)] dark:text-density-high text-xs font-medium px-2 py-0.5 rounded-full">
+                <span aria-hidden="true" className="hidden dark:inline-block size-1.5 rounded-full bg-current" />
                 Prêt
               </span>
             )}
@@ -182,9 +186,7 @@ export function SegmentCard({ segment, onRetry, onDelete, onReplace, onRename, i
           <div className="flex gap-4 text-xs text-muted-foreground">
             <span>{distanceLabel}</span>
             <span>{elevationLabel}</span>
-            {segment.source === 'strava' && (
-              <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
-            )}
+            {segment.source === 'strava' && <PoweredByStrava />}
           </div>
         )}
       </div>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Montserrat } from "next/font/google";
 import PlausibleProvider from "next-plausible";
 import { ConsentBanner } from "@/components/shared/consent-banner";
+import { ThemeProvider } from "@/components/shared/theme-provider";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -27,7 +28,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={montserrat.variable}>
+    // suppressHydrationWarning : next-themes pose la classe `dark` sur <html>
+    // avant l'hydratation (anti-flash) — story MOB-1.2b
+    <html lang="fr" className={montserrat.variable} suppressHydrationWarning>
       <head>
         <PlausibleProvider
           src="/js/script.outbound-links.pageview-props.tagged-events.js"
@@ -36,8 +39,10 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased" suppressHydrationWarning>
-        {children}
-        <ConsentBanner />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+          <ConsentBanner />
+        </ThemeProvider>
       </body>
     </html>
   );

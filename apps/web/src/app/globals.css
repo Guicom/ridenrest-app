@@ -150,6 +150,101 @@
   --accent-yellow:     #F4C542;
 }
 
+/* ─── Dark mode « Charbon » ───────────────────────────────────────────────
+   Source : docs/design/dark-mode-charbon/charbon-dark-tokens.css (handoff
+   Claude Design, high-fidelity — valeurs reprises exactement, zéro invention).
+   Bascule par classe `.dark` sur <html> (next-themes, attribute="class") —
+   approche unique retenue, pas de @media prefers-color-scheme.              */
+.dark {
+  /* Contrôles natifs (date-pickers, scrollbars) suivent le thème sombre */
+  color-scheme: dark;
+
+  /* ─── Brand / app primary — lifted sage-green for dark bg ─── */
+  --primary:            #74C69D; /* in-app CTA, active states     */
+  --primary-hover:      #95D5B2;
+  --primary-light:      #18241E; /* pale green section bg → dark tint */
+  --primary-foreground: #0A1711; /* dark ink ON the bright green  */
+
+  /* ─── Earth + sage neutrals (shared) ─────────────────────── */
+  --earth-light:        #1B2025;
+  --earth-dark:         #ECEFF1;
+  --sage:               #9DAAB0; /* mid neutral, body copy        */
+  --sage-light:         #2A343B;
+
+  /* ─── Surfaces (app) ─────────────────────────────────────── */
+  --background:         #1B2025; /* card surface (was #FFF)       */
+  --background-page:    #14181C; /* page bg (charcoal)            */
+  --background-intro:   #1E2A24; /* Planning/Live explainer block */
+  --surface:            #1B2025;
+  --surface-raised:     #242B31; /* hover / pressed surface       */
+
+  /* ─── Typography (app) ───────────────────────────────────── */
+  --foreground:         #ECEFF1;
+  --text-primary:       #ECEFF1;
+  --text-secondary:     #AEB8BF;
+  --text-muted:         #727C83;
+
+  /* ─── Borders / inputs ───────────────────────────────────── */
+  --border:             #333B42;
+  --input:              #333B42;
+  --ring:               #74C69D;
+
+  /* ─── Density / status (lightened for dark surfaces) ─────── */
+  --density-high:       #4ADE80; /* green  — good coverage / Prêt */
+  --density-medium:     #FBBF24; /* amber  — moderate / En cours  */
+  --density-low:        #F87171; /* red    — scarce / Erreur      */
+  --destructive:        #F87171;
+
+  /* --accent-yellow : volontairement non redéfini — mode-independent,
+     #F4C542 lisible tel quel sur fond sombre (cf. README handoff)   */
+
+  /* ─── Charts (dark-friendly) ─────────────────────────────── */
+  --chart-1: #74C69D;
+  --chart-2: #4ADE80;
+  --chart-3: #FBBF24;
+  --chart-4: #F87171;
+  --chart-5: #AEB8BF;
+
+  /* ─── Shadows — black-based, a touch stronger on dark ──────
+     NOTE : Tailwind v4 inline les valeurs des utilitaires shadow-* au build
+     (vérifié CSS compilé : `.shadow-sm{--tw-shadow:0 1px 3px 0 …}`) — ces
+     variables ne sont PAS consommées au runtime par les classes shadow-*
+     existantes. Intégrées comme valeurs canoniques du design system (AC1),
+     destinées au miroir packages/design-tokens (MOB-1.3).                  */
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.40);
+  --shadow:     0 1px 3px rgba(0,0,0,0.50), 0 1px 2px rgba(0,0,0,0.40);
+  --shadow-md:  0 4px 6px -1px rgba(0,0,0,0.50), 0 2px 4px -2px rgba(0,0,0,0.40);
+  --shadow-lg:  0 10px 15px -3px rgba(0,0,0,0.55), 0 4px 6px -4px rgba(0,0,0,0.40);
+  --shadow-xl:  0 20px 25px -5px rgba(0,0,0,0.60), 0 8px 10px -6px rgba(0,0,0,0.45);
+  --shadow-2xl: 0 25px 50px -12px rgba(0,0,0,0.75);
+
+  /* ─── shadcn/ui component tokens (aliases) ─────────────────────────────
+     Hors handoff (qui couvre la palette app uniquement) : reprise mécanique
+     du mapping light existant (--card=--surface, --popover=--background,
+     --muted=--background-page, --secondary=--surface-raised,
+     --accent=--primary-light…) via var() — aucune valeur inventée.         */
+  --card:               var(--surface);
+  --card-foreground:    var(--text-primary);
+  --popover:            var(--background);
+  --popover-foreground: var(--text-primary);
+  --muted:              var(--background-page);
+  --muted-foreground:   var(--text-muted);
+  --secondary:          var(--surface-raised);
+  --secondary-foreground: var(--text-primary);
+  --accent:             var(--primary-light);
+  --accent-foreground:  var(--primary);
+
+  /* ─── Sidebar tokens (même dérivation que le light) ──────── */
+  --sidebar:            var(--surface);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary:    var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent:     var(--primary-light);
+  --sidebar-accent-foreground: var(--primary);
+  --sidebar-border:     var(--border);
+  --sidebar-ring:       var(--ring);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -221,4 +316,13 @@ input[type='range']::-moz-range-thumb {
   background: var(--primary);
   border: none;
   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Piste du slider sur surfaces sombres (le thumb vert --primary suffit déjà) */
+.dark input[type='range']::-webkit-slider-runnable-track {
+  background: var(--surface-raised);
+}
+
+.dark input[type='range']::-moz-range-track {
+  background: var(--surface-raised);
 }

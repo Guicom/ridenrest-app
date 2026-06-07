@@ -14,7 +14,7 @@ export function MapStylePicker({ className }: { className?: string }) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         aria-label="Choisir le style de carte"
-        className={cn("absolute bottom-6 right-4 z-30 bg-white border border-[--border] rounded-xl shadow-sm p-2 w-10 h-10 flex items-center justify-center", className)}
+        className={cn("absolute bottom-6 right-4 z-30 bg-white dark:bg-surface border border-[--border] rounded-xl shadow-sm p-2 w-10 h-10 flex items-center justify-center", className)}
       >
         <Layers className="h-4 w-4 text-foreground" />
       </PopoverTrigger>

@@ -5,6 +5,7 @@ import { usePrefsStore } from '@/stores/prefs.store'
 import { MAP_STYLES } from '@/lib/map-styles'
 import { findPointAtKm } from '@ridenrest/gpx'
 import { OsmAttribution } from '@/components/shared/osm-attribution'
+import { PoweredByStrava } from '@/components/shared/powered-by-strava'
 import { usePoiLayers } from '@/hooks/use-poi-layers'
 import { WeatherLayer, LINE_COLOR_EXPRESSIONS } from './weather-layer'
 import type { MapSegmentData } from '@/lib/api-client'
@@ -486,7 +487,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
       <OsmAttribution />
       {hasStrava && (
         <div className="absolute bottom-5 left-2 z-10 bg-white/80 dark:bg-black/60 px-1.5 py-0.5 rounded pointer-events-none select-none">
-          <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
+          <PoweredByStrava />
         </div>
       )}
       {weatherActive && segmentsWeather?.map((sw) => (
