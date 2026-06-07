@@ -102,11 +102,18 @@ describe('GoogleSignInButton', () => {
       expect(trackSignupStarted).toHaveBeenCalledWith({ method: 'google' })
     })
 
-    it('pose le marqueur rnr_auth_flow=google avant le redirect (résolu par PostAuthTracker)', () => {
+    it('pose le marqueur rnr_auth_flow=google avant le redirect quand flow="login" (résolu par PostAuthTracker, backfill possible)', () => {
       render(<GoogleSignInButton flow="login" />)
       fireEvent.click(screen.getByRole('button'))
 
       expect(sessionStorageMock.getItem('rnr_auth_flow')).toBe('google')
+    })
+
+    it('pose le marqueur rnr_auth_flow=google-register quand flow="register" (started déjà émis — pas de backfill au retour)', () => {
+      render(<GoogleSignInButton flow="register" />)
+      fireEvent.click(screen.getByRole('button'))
+
+      expect(sessionStorageMock.getItem('rnr_auth_flow')).toBe('google-register')
     })
 
     it('n’émet PAS signup_started quand flow="login"', () => {

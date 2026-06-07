@@ -39,7 +39,7 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 | `poi_detail_opened` | `trackPoiDetailOpened` | `poi_type: string` · `source: 'overpass' \| 'google'` | `poi-popup.tsx` | MOB-4.2 detail sheet |
 | `live_mode_activated` | `trackLiveModeActivated` | `adventure_id_hash` **uniquement** — JAMAIS de GPS | `live/[id]/page.tsx` (après acceptation `<GeolocationConsent />`) | MOB-5.1 activation Live |
 | `landing_cta_clicked` | `trackLandingCtaClicked` | `placement: 'header' \| 'feature_step_one' \| 'feature_step_two' \| 'feature_step_three'` · `authenticated` (stringifié) | `marketing-header.tsx`, `feature-step-{one,two,three}.tsx` | n/a (web only) |
-| `signup_started` | `trackSignupStarted` | `method: 'email' \| 'google'` | `register-form.tsx` (submit valide), `google-sign-in-button.tsx` (flow="register") | MOB-2.2 |
+| `signup_started` | `trackSignupStarted` | `method: 'email' \| 'google'` | `register-form.tsx` (submit valide), `google-sign-in-button.tsx` (flow="register"), `post-auth-tracker.tsx` (**backfill** : inscription Google via /login — compte frais détecté au retour OAuth) | MOB-2.2 |
 | `signup_completed` | `trackSignupCompleted` | `method: 'email' \| 'google'` | email : `register-form.tsx` (succès). google : `post-auth-tracker.tsx` au retour OAuth (marqueur sessionStorage `rnr_auth_flow` + `user.createdAt` < 5 min) | MOB-2.2/2.3 |
 | `login_completed` | `trackLoginCompleted` | `method: 'email' \| 'google'` | email : `login-form.tsx` (succès). google : `post-auth-tracker.tsx` (compte > 5 min, ou `createdAt` indisponible — classification prudente) | MOB-2.2/2.3 |
 
@@ -58,7 +58,8 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 ### Continuité anonyme → identifié (OAuth inclus)
 
 - Le funnel **traverse le redirect Google** sans rien faire : le cookie PostHog (`distinct_id`) persiste sur notre domaine, et `posthog.identify(user.id)` au retour fusionne la personne anonyme dans la personne identifiée — les events pré-auth (landing, CTA, signup_started) sont rattachés rétroactivement.
-- **Distinction signup vs login pour Google** : `GoogleSignInButton` pose le marqueur sessionStorage `rnr_auth_flow=google` avant le redirect ; `<PostAuthTracker />` (layout app) le consomme au retour et classe via `user.createdAt` (Better Auth) — compte < 5 min → `signup_completed`, sinon → `login_completed`. Émission unique (marqueur consommé), flows email non concernés (émis par les formulaires).
+- **Distinction signup vs login pour Google** : `GoogleSignInButton` pose le marqueur sessionStorage `rnr_auth_flow` avant le redirect (`google-register` depuis /register, `google` sinon) ; `<PostAuthTracker />` (layout app) le consomme au retour et classe via `user.createdAt` (Better Auth) — compte < 5 min → `signup_completed`, sinon → `login_completed`. Émission unique (marqueur consommé), flows email non concernés (émis par les formulaires).
+- **Backfill `signup_started` (chemin login)** : Google crée le compte même depuis /login — chemin majoritaire (les CTA landing mènent à /adventures → redirect /login), où le clic n'émet pas `signup_started` (on ignore encore si c'est une inscription). Au retour OAuth, si le compte est frais et le marqueur vaut `google`, `PostAuthTracker` émet `signup_started` **puis** `signup_completed` (ordre du funnel préservé). Compromis assumé : temps de conversion started→completed ≈ 0 s pour ce chemin, et pas de mesure du drop-off pendant l'OAuth. Le marqueur `google-register` ne backfille pas (started déjà émis au clic — éviterait un double comptage).
 
 ## Session replay & masquage (référence web → mobile)
 

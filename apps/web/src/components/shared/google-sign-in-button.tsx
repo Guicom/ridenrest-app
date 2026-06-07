@@ -9,6 +9,11 @@ import { trackSignupStarted } from '@ridenrest/analytics'
  * Marqueur sessionStorage posé avant le redirect OAuth (survit au retour,
  * même onglet) — lu par <PostAuthTracker /> dans le layout (app) pour émettre
  * signup_completed ou login_completed (method=google) selon la fraîcheur du compte.
+ * La valeur encode le chemin d'entrée pour le backfill de signup_started :
+ * - 'google-register' : signup_started déjà émis au clic (page /register)
+ * - 'google' : rien d'émis au clic (page /login) — PostAuthTracker backfille
+ *   signup_started si le compte s'avère fraîchement créé (Google crée le
+ *   compte même depuis /login, sans passer par /register).
  */
 export const AUTH_FLOW_MARKER_KEY = 'rnr_auth_flow'
 
@@ -30,7 +35,7 @@ export function GoogleSignInButton({ callbackURL = '/adventures', flow }: Google
       trackSignupStarted({ method: 'google' })
     }
     try {
-      window.sessionStorage.setItem(AUTH_FLOW_MARKER_KEY, 'google')
+      window.sessionStorage.setItem(AUTH_FLOW_MARKER_KEY, flow === 'register' ? 'google-register' : 'google')
     } catch {
       // sessionStorage indisponible — la complétion google ne sera pas émise (non bloquant)
     }

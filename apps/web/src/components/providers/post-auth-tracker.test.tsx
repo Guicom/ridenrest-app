@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 import { PostAuthTracker } from './post-auth-tracker'
-import { trackSignupCompleted, trackLoginCompleted } from '@ridenrest/analytics'
+import { trackSignupStarted, trackSignupCompleted, trackLoginCompleted } from '@ridenrest/analytics'
 import { AUTH_FLOW_MARKER_KEY } from '@/components/shared/google-sign-in-button'
 
 vi.mock('@ridenrest/analytics', () => ({
+  trackSignupStarted: vi.fn(),
   trackSignupCompleted: vi.fn(),
   trackLoginCompleted: vi.fn(),
 }))
@@ -36,7 +37,7 @@ describe('PostAuthTracker (résolution post-OAuth google)', () => {
     vi.clearAllMocks()
   })
 
-  it('compte créé à l’instant + marqueur google → signup_completed', () => {
+  it('compte créé à l’instant + marqueur google (chemin login) → backfill signup_started puis signup_completed', () => {
     sessionStorageMock.setItem(AUTH_FLOW_MARKER_KEY, 'google')
     mockUseSession.mockReturnValue({
       data: { user: { id: 'u1', createdAt: new Date().toISOString() } },
@@ -44,11 +45,29 @@ describe('PostAuthTracker (résolution post-OAuth google)', () => {
 
     render(<PostAuthTracker />)
 
+    expect(trackSignupStarted).toHaveBeenCalledWith({ method: 'google' })
+    expect(trackSignupCompleted).toHaveBeenCalledWith({ method: 'google' })
+    // Ordre du funnel : started AVANT completed
+    expect(vi.mocked(trackSignupStarted).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(trackSignupCompleted).mock.invocationCallOrder[0],
+    )
+    expect(trackLoginCompleted).not.toHaveBeenCalled()
+  })
+
+  it('compte créé à l’instant + marqueur google-register → signup_completed SANS backfill (started déjà émis au clic)', () => {
+    sessionStorageMock.setItem(AUTH_FLOW_MARKER_KEY, 'google-register')
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'u1', createdAt: new Date().toISOString() } },
+    })
+
+    render(<PostAuthTracker />)
+
+    expect(trackSignupStarted).not.toHaveBeenCalled()
     expect(trackSignupCompleted).toHaveBeenCalledWith({ method: 'google' })
     expect(trackLoginCompleted).not.toHaveBeenCalled()
   })
 
-  it('compte ancien + marqueur google → login_completed', () => {
+  it('compte ancien + marqueur google → login_completed (aucun backfill)', () => {
     sessionStorageMock.setItem(AUTH_FLOW_MARKER_KEY, 'google')
     mockUseSession.mockReturnValue({
       data: { user: { id: 'u1', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() } },
@@ -57,6 +76,20 @@ describe('PostAuthTracker (résolution post-OAuth google)', () => {
     render(<PostAuthTracker />)
 
     expect(trackLoginCompleted).toHaveBeenCalledWith({ method: 'google' })
+    expect(trackSignupStarted).not.toHaveBeenCalled()
+    expect(trackSignupCompleted).not.toHaveBeenCalled()
+  })
+
+  it('compte ancien + marqueur google-register → login_completed (utilisateur existant passé par /register)', () => {
+    sessionStorageMock.setItem(AUTH_FLOW_MARKER_KEY, 'google-register')
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'u1', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() } },
+    })
+
+    render(<PostAuthTracker />)
+
+    expect(trackLoginCompleted).toHaveBeenCalledWith({ method: 'google' })
+    expect(trackSignupStarted).not.toHaveBeenCalled()
     expect(trackSignupCompleted).not.toHaveBeenCalled()
   })
 
