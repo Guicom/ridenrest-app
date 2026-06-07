@@ -480,7 +480,9 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(function Ma
 
   return (
     <div className="relative h-full w-full">
-      <div ref={mapContainerRef} className="h-full w-full" aria-label={`Carte de l'aventure ${adventureName}`} role="application" />
+      {/* ph-no-capture : RGPD — la carte (trace GPX, zone de recherche) est exclue
+          des session replays PostHog (story posthog-3). NE PAS retirer. */}
+      <div ref={mapContainerRef} className="ph-no-capture h-full w-full" aria-label={`Carte de l'aventure ${adventureName}`} role="application" />
       <OsmAttribution />
       {hasStrava && (
         <div className="absolute bottom-5 left-2 z-10 bg-white/80 dark:bg-black/60 px-1.5 py-0.5 rounded pointer-events-none select-none">

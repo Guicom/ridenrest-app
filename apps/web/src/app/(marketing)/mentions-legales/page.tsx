@@ -91,22 +91,67 @@ export default function MentionsLegalesPage() {
               <h2 className="text-xl font-semibold text-[#4A7C44] uppercase tracking-wider mb-4">
                 6. Données personnelles
               </h2>
-              <p className="text-sage leading-relaxed">
-                Les informations recueillies sur ce site sont enregistrées dans un fichier informatisé pour la gestion des demandes de
-                contact et de la relation utilisateur. Conformément à la loi « informatique et libertés » et au RGPD, vous pouvez
-                exercer votre droit d&apos;accès, de rectification, de suppression et de portabilité de vos données en nous contactant
-                à l&apos;adresse indiquée ci-dessus.
-              </p>
+              <div className="text-sage leading-relaxed space-y-3">
+                <p>
+                  Les informations recueillies sur ce site sont enregistrées dans un fichier informatisé pour la gestion des demandes de
+                  contact et de la relation utilisateur. Conformément à la loi « informatique et libertés » et au RGPD, vous pouvez
+                  exercer votre droit d&apos;accès, de rectification, de suppression et de portabilité de vos données en nous contactant
+                  à l&apos;adresse indiquée ci-dessus.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Mesure d&apos;audience et d&apos;usage (PostHog) :</strong> avec votre consentement
+                  explicite uniquement, nous utilisons PostHog Cloud EU (PostHog Inc., données hébergées exclusivement à Francfort,
+                  Allemagne — sous-traitant au sens du RGPD) pour mesurer l&apos;usage du produit : pages vues, évènements
+                  d&apos;interaction (recherche de points d&apos;intérêt, clics de réservation…) et enregistrement de session
+                  (« session replay »). Finalité : comprendre les parcours d&apos;utilisation et améliorer le produit. Aucune donnée
+                  n&apos;est collectée avant votre accord, ni après un refus.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Enregistrements de session et masquage :</strong> les enregistrements de session
+                  rejouent l&apos;interface telle qu&apos;affichée, avec un masquage strict : <strong className="text-earth-dark">les vues
+                  cartographiques sont exclues des enregistrements</strong> (votre position GPS, vos traces et zones de recherche
+                  n&apos;apparaissent dans aucun enregistrement — conformément à notre règle « votre position ne quitte jamais votre
+                  appareil »), tous les champs de formulaire sont masqués, ainsi que votre adresse email. Les identifiants
+                  d&apos;aventure sont anonymisés dans les évènements de mesure.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Durée de conservation :</strong> les enregistrements de session sont conservés au
+                  maximum 30 jours par PostHog ; les évènements de mesure agrégés sont conservés le temps nécessaire à l&apos;analyse
+                  produit.
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Droit de retrait :</strong> vous pouvez retirer votre consentement à tout moment
+                  via la section « Confidentialité » de la page Paramètres (effet immédiat — arrêt de la collecte et des
+                  enregistrements), ou ne jamais l&apos;accorder via la bannière de consentement.
+                </p>
+              </div>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold text-[#4A7C44] uppercase tracking-wider mb-4">
-                7. Cookies
+                7. Cookies et stockage local
               </h2>
-              <p className="text-sage leading-relaxed">
-                Le site Ride&apos;n&apos;Rest peut être amené à utiliser des cookies pour le bon fonctionnement des services. Vous
-                pouvez configurer votre navigateur pour refuser les cookies ou être informé de leur dépôt.
-              </p>
+              <div className="text-sage leading-relaxed space-y-3">
+                <p>
+                  Ride&apos;n&apos;Rest utilise des cookies et le stockage local de votre navigateur pour deux finalités distinctes :
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Fonctionnement du service (exempté de consentement) :</strong> cookie de session
+                  d&apos;authentification (Better Auth), préférences d&apos;interface, et la clé <code>rnr_analytics_consent</code> qui
+                  mémorise votre choix de consentement (y compris un refus, pour ne pas redemander).
+                </p>
+                <p>
+                  <strong className="text-earth-dark">Mesure d&apos;audience PostHog (soumise à consentement) :</strong> déposés
+                  uniquement après acceptation — cookie et entrées de stockage local préfixés <code>ph_</code> (identifiant anonyme de
+                  visiteur, état de session, état d&apos;enregistrement de session ; durée de vie maximale 12 mois). En cas de refus ou
+                  de retrait du consentement, aucun élément <code>ph_</code> n&apos;est déposé.
+                </p>
+                <p>
+                  Les statistiques de fréquentation des pages publiques utilisent par ailleurs Plausible Analytics (auto-hébergé en
+                  France sur nos serveurs), une solution <strong className="text-earth-dark">sans cookie</strong> et sans suivi
+                  individuel.
+                </p>
+              </div>
             </section>
 
             <section>
@@ -145,7 +190,7 @@ export default function MentionsLegalesPage() {
             </section>
           </div>
 
-          <p className="mt-16 text-sage text-sm">Dernière mise à jour : mars 2026</p>
+          <p className="mt-16 text-sage text-sm">Dernière mise à jour : juin 2026</p>
         </article>
       </main>
       <MarketingFooter />

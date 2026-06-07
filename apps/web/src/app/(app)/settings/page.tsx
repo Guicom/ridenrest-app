@@ -64,7 +64,8 @@ export default async function SettingsPage() {
           <CardContent className="pt-4 flex items-center justify-between">
             <div>
               <p className="font-medium">Compte</p>
-              <p className="text-sm text-muted-foreground">{session.user.email}</p>
+              {/* ph-no-capture : email = PII, masqué dans les session replays (story posthog-3) */}
+              <p className="ph-no-capture text-sm text-muted-foreground">{session.user.email}</p>
             </div>
             <SignOutButton />
           </CardContent>

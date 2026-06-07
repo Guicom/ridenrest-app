@@ -35,7 +35,11 @@ export function setConsent(consent: AnalyticsConsent): void {
   }
   if (consent === 'granted') {
     posthog.opt_in_capturing()
+    // Session replay gated consentement (story posthog-3) — l'init le laisse
+    // désactivé (disable_session_recording: true), seul un opt-in le démarre
+    posthog.startSessionRecording()
   } else {
+    posthog.stopSessionRecording()
     posthog.opt_out_capturing()
   }
   window.dispatchEvent(new CustomEvent<AnalyticsConsent>(CONSENT_CHANGE_EVENT, { detail: consent }))

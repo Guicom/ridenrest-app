@@ -451,9 +451,13 @@ export const LiveMapCanvas = forwardRef<LiveMapCanvasHandle, LiveMapCanvasProps>
 
   return (
     <div className="relative h-full w-full">
+      {/* ph-no-capture : RGPD CRITIQUE — la carte Live affiche la position GPS de
+          l'utilisateur ; elle est exclue des session replays PostHog (story posthog-3).
+          La règle « le GPS ne quitte jamais le device » s'étend à l'écran enregistré.
+          NE PAS retirer. */}
       <div
         ref={mapContainerRef}
-        className="h-full w-full"
+        className="ph-no-capture h-full w-full"
         aria-label={`Carte Live — aventure ${adventureId}`}
         role="application"
       />

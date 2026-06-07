@@ -68,7 +68,8 @@ export function DeleteAccountDialog({ userEmail }: DeleteAccountDialogProps) {
         <div className="space-y-2">
           <Label htmlFor="confirm-email">
             Tapez votre email pour confirmer :{' '}
-            <span className="font-mono text-xs">{userEmail}</span>
+            {/* ph-no-capture : email = PII, masqué dans les session replays (story posthog-3) */}
+            <span className="ph-no-capture font-mono text-xs">{userEmail}</span>
           </Label>
           <Input
             id="confirm-email"

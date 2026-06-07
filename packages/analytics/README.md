@@ -45,6 +45,18 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 
 `gpx_uploaded` → `map_opened` → `poi_search_triggered` → `poi_detail_opened` → `booking_click`
 
+## Session replay & masquage (référence web → mobile)
+
+Patterns décidés en story posthog-3 (web) — **référence pour MOB-6.1 (replay beta mobile) et MOB-6.6 (prod)** :
+
+| Règle | Web (posthog-js) | Mobile (posthog-react-native, à venir) |
+|---|---|---|
+| Replay jamais auto | `disable_session_recording: true` à l'init ; `startSessionRecording()` uniquement si consentement `granted` (au boot + à l'opt-in) ; `stopSessionRecording()` à l'opt-out | `sessionReplay: false` par défaut ; démarrage explicite gated consentement |
+| **Carte = exclue des replays** (GPS jamais hors device, étendu à l'écran) | classe `ph-no-capture` sur les conteneurs MapLibre (`map-canvas.tsx`, `live-map-canvas.tsx`) + tests de régression | masquer la vue MapLibre RN (`ph-no-capture` view tag / `maskAllImages`+vue bloquée selon SDK) |
+| Inputs masqués globalement | `session_recording: { maskAllInputs: true }` | `maskAllTextInputs: true` |
+| PII texte (email) | `ph-no-capture` sur les éléments affichant l'email (settings, dialog suppression) | idem sur les écrans Compte |
+| Réseau | défauts PostHog conservés (pas de bodies, pas de headers auth) ; `capture_performance` non activé | défauts SDK conservés |
+
 ## Tests
 
 ```bash

@@ -10,6 +10,8 @@ vi.mock('posthog-js', () => ({
     init: vi.fn(),
     opt_in_capturing: vi.fn(),
     opt_out_capturing: vi.fn(),
+    startSessionRecording: vi.fn(),
+    stopSessionRecording: vi.fn(),
   },
 }))
 
@@ -49,6 +51,8 @@ describe('PrivacyToggle', () => {
     await user.click(screen.getByRole('switch'))
 
     expect(posthog.opt_in_capturing).toHaveBeenCalledOnce()
+    // Session replay démarré à l'opt-in (story posthog-3)
+    expect(posthog.startSessionRecording).toHaveBeenCalledOnce()
     expect(localStorageMock.getItem(CONSENT_STORAGE_KEY)).toBe('granted')
     expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true')
   })
@@ -60,6 +64,8 @@ describe('PrivacyToggle', () => {
     await user.click(screen.getByRole('switch'))
 
     expect(posthog.opt_out_capturing).toHaveBeenCalledOnce()
+    // Session replay stoppé à l'opt-out (story posthog-3)
+    expect(posthog.stopSessionRecording).toHaveBeenCalledOnce()
     expect(localStorageMock.getItem(CONSENT_STORAGE_KEY)).toBe('denied')
     expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
   })

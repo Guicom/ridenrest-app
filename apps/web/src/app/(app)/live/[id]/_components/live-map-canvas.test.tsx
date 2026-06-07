@@ -104,6 +104,17 @@ describe('LiveMapCanvas', () => {
     expect(mapDiv?.getAttribute('aria-label')).toContain('Live')
   })
 
+  // RÉGRESSION RGPD CRITIQUE (story posthog-3) : la carte Live affiche la POSITION GPS
+  // de l'utilisateur — le conteneur DOIT porter ph-no-capture pour être exclu des
+  // session replays PostHog (règle projet « le GPS ne quitte jamais le device » étendue
+  // à l'écran enregistré). Si ce test gêne un refactor : remettre la classe, ne pas
+  // supprimer le test.
+  it('live map container has ph-no-capture (position GPS exclue des replays — RGPD)', () => {
+    render(<LiveMapCanvas adventureId="adv-1" segments={[makeSegment()]} />)
+    const mapDiv = document.querySelector('[role="application"]')
+    expect(mapDiv?.classList.contains('ph-no-capture')).toBe(true)
+  })
+
   it('initializes MapLibre map via dynamic import', async () => {
     const { Map: MockMap } = await import('maplibre-gl')
     const callsBefore = (MockMap as ReturnType<typeof vi.fn>).mock.calls.length

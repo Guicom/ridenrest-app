@@ -108,6 +108,17 @@ describe('MapCanvas', () => {
     expect(mapDiv?.getAttribute('aria-label')).toContain('Transcantabrique')
   })
 
+  // RÉGRESSION RGPD (story posthog-3) : le conteneur carte DOIT porter ph-no-capture
+  // pour être exclu des session replays PostHog (trace GPX + zone de recherche =
+  // données sensibles ; règle projet « le GPS ne quitte jamais le device » étendue
+  // à l'écran enregistré). Si ce test gêne un refactor : remettre la classe, ne pas
+  // supprimer le test.
+  it('map container has ph-no-capture (exclusion des session replays — RGPD)', () => {
+    render(<MapCanvas segments={[]} adventureName="Test" poisByLayer={emptyPoisByLayer} />)
+    const mapDiv = document.querySelector('[role="application"]')
+    expect(mapDiv?.classList.contains('ph-no-capture')).toBe(true)
+  })
+
   it('calls fitBounds on mount after map load event fires', async () => {
     // Capture the 'load' callback registered via map.on('load', cb)
     let loadCallback: (() => void) | undefined

@@ -10,6 +10,8 @@ vi.mock('posthog-js', () => ({
     init: vi.fn(),
     opt_in_capturing: vi.fn(),
     opt_out_capturing: vi.fn(),
+    startSessionRecording: vi.fn(),
+    stopSessionRecording: vi.fn(),
   },
 }))
 
@@ -66,6 +68,8 @@ describe('ConsentBanner', () => {
 
     expect(posthog.opt_in_capturing).toHaveBeenCalledOnce()
     expect(posthog.opt_out_capturing).not.toHaveBeenCalled()
+    // Session replay démarré à l'opt-in (story posthog-3)
+    expect(posthog.startSessionRecording).toHaveBeenCalledOnce()
     expect(localStorageMock.getItem(CONSENT_STORAGE_KEY)).toBe('granted')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -77,6 +81,9 @@ describe('ConsentBanner', () => {
 
     expect(posthog.opt_out_capturing).toHaveBeenCalledOnce()
     expect(posthog.opt_in_capturing).not.toHaveBeenCalled()
+    // Session replay stoppé (et jamais démarré) au refus (story posthog-3)
+    expect(posthog.stopSessionRecording).toHaveBeenCalledOnce()
+    expect(posthog.startSessionRecording).not.toHaveBeenCalled()
     expect(localStorageMock.getItem(CONSENT_STORAGE_KEY)).toBe('denied')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
