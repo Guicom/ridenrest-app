@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ErrorMessage } from '@/components/shared/error-message'
 import { GoogleSignInButton } from '@/components/shared/google-sign-in-button'
+import { trackSignupStarted, trackSignupCompleted } from '@ridenrest/analytics'
 
 const registerSchema = z
   .object({
@@ -43,6 +44,8 @@ export function RegisterForm() {
 
   const onSubmit = async (values: RegisterValues) => {
     setAuthError(null)
+    // Funnel acquisition : soumission valide du formulaire d'inscription
+    trackSignupStarted({ method: 'email' })
 
     const { data, error } = await authClient.signUp.email({
       name: values.name,
@@ -60,6 +63,7 @@ export function RegisterForm() {
     }
 
     if (data) {
+      trackSignupCompleted({ method: 'email' })
       router.push('/adventures')
       router.refresh()
     }
@@ -67,7 +71,7 @@ export function RegisterForm() {
 
   return (
     <div className="space-y-4">
-      <GoogleSignInButton />
+      <GoogleSignInButton flow="register" />
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">

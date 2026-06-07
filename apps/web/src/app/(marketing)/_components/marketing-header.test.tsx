@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { MarketingHeader } from './marketing-header'
+import { trackLandingCtaClicked } from '@ridenrest/analytics'
 
 // ── Auth mock ─────────────────────────────────────────────────────────────────
 
@@ -8,6 +9,10 @@ const useSessionMock = vi.fn()
 
 vi.mock('@/lib/auth/client', () => ({
   useSession: (...args: unknown[]) => useSessionMock(...args),
+}))
+
+vi.mock('@ridenrest/analytics', () => ({
+  trackLandingCtaClicked: vi.fn(),
 }))
 
 afterEach(() => {
@@ -61,6 +66,32 @@ describe('MarketingHeader', () => {
       render(<MarketingHeader />)
 
       expect(screen.queryByRole('link', { name: /se connecter/i })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('funnel acquisition — landing_cta_clicked (posthog)', () => {
+    it('émet landing_cta_clicked (header, non authentifié) au clic sur le CTA', () => {
+      mockUnauthenticated()
+      render(<MarketingHeader />)
+
+      fireEvent.click(screen.getAllByRole('link', { name: /se connecter/i })[0])
+
+      expect(trackLandingCtaClicked).toHaveBeenCalledWith({
+        placement: 'header',
+        authenticated: false,
+      })
+    })
+
+    it('émet landing_cta_clicked avec authenticated=true pour « Mes aventures »', () => {
+      mockAuthenticated()
+      render(<MarketingHeader />)
+
+      fireEvent.click(screen.getAllByRole('link', { name: /mes aventures/i })[1]) // CTA mobile
+
+      expect(trackLandingCtaClicked).toHaveBeenCalledWith({
+        placement: 'header',
+        authenticated: true,
+      })
     })
   })
 

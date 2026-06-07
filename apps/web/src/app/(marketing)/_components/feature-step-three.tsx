@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useSession } from '@/lib/auth/client';
+import { trackLandingCtaClicked } from '@ridenrest/analytics';
 
 export function FeatureStepThree() {
   const { data: session } = useSession();
@@ -60,6 +61,7 @@ export function FeatureStepThree() {
         </div>
         <Link
               href="/adventures"
+              onClick={() => trackLandingCtaClicked({ placement: 'feature_step_three', authenticated: isAuthenticated })}
               className="mt-8 sm:mt-10 inline-flex items-center justify-center px-5 py-3 bg-[#4A7C44] text-white text-[10px] font-semibold tracking-[0.2em] uppercase rounded-lg hover:bg-[#3D6B39] transition-colors text-center w-fit self-center lg:self-start"
             >
               {ctaLabel}

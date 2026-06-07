@@ -8,6 +8,10 @@ import {
   trackPoiDetailOpened,
   trackPoiSearchTriggered,
   trackLiveModeActivated,
+  trackLandingCtaClicked,
+  trackSignupStarted,
+  trackSignupCompleted,
+  trackLoginCompleted,
 } from './events'
 
 describe('trackBookingClick', () => {
@@ -229,6 +233,63 @@ describe('trackLiveModeActivated', () => {
   it('no-op sans client injecté', () => {
     setAnalyticsClient(null)
     expect(() => trackLiveModeActivated({ adventure_id_hash: 'abc12345' })).not.toThrow()
+  })
+})
+
+describe('funnel acquisition (landing → signup)', () => {
+  let captureSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    captureSpy = vi.fn()
+    setAnalyticsClient({ capture: captureSpy })
+  })
+
+  afterEach(() => {
+    setAnalyticsClient(null)
+  })
+
+  it('landing_cta_clicked avec placement et authenticated stringifié', () => {
+    trackLandingCtaClicked({ placement: 'header', authenticated: false })
+
+    expect(captureSpy).toHaveBeenCalledWith('landing_cta_clicked', {
+      placement: 'header',
+      authenticated: 'false',
+    })
+  })
+
+  it('landing_cta_clicked depuis un feature step, session active', () => {
+    trackLandingCtaClicked({ placement: 'feature_step_two', authenticated: true })
+
+    expect(captureSpy).toHaveBeenCalledWith('landing_cta_clicked', {
+      placement: 'feature_step_two',
+      authenticated: 'true',
+    })
+  })
+
+  it('signup_started avec method', () => {
+    trackSignupStarted({ method: 'google' })
+    expect(captureSpy).toHaveBeenCalledWith('signup_started', { method: 'google' })
+  })
+
+  it('signup_completed avec method', () => {
+    trackSignupCompleted({ method: 'email' })
+    expect(captureSpy).toHaveBeenCalledWith('signup_completed', { method: 'email' })
+  })
+
+  it('login_completed avec method', () => {
+    trackLoginCompleted({ method: 'email' })
+    expect(captureSpy).toHaveBeenCalledWith('login_completed', { method: 'email' })
+  })
+
+  it('no-op sans client injecté', () => {
+    setAnalyticsClient(null)
+    expect(() => {
+      trackLandingCtaClicked({ placement: 'header', authenticated: false })
+      trackSignupStarted({ method: 'email' })
+      trackSignupCompleted({ method: 'email' })
+      trackLoginCompleted({ method: 'email' })
+    }).not.toThrow()
+    expect(captureSpy).not.toHaveBeenCalled()
   })
 })
 

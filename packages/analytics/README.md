@@ -38,12 +38,22 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 | `poi_search_triggered` | `trackPoiSearchTriggered` | `mode: 'planning' \| 'live'` · `poi_categories` (join `,`) · `result_count` (stringifié) | `map-view.tsx` (planning), `live/[id]/page.tsx` (live) | MOB-4.3 / MOB-5.3 |
 | `poi_detail_opened` | `trackPoiDetailOpened` | `poi_type: string` · `source: 'overpass' \| 'google'` | `poi-popup.tsx` | MOB-4.2 detail sheet |
 | `live_mode_activated` | `trackLiveModeActivated` | `adventure_id_hash` **uniquement** — JAMAIS de GPS | `live/[id]/page.tsx` (après acceptation `<GeolocationConsent />`) | MOB-5.1 activation Live |
+| `landing_cta_clicked` | `trackLandingCtaClicked` | `placement: 'header' \| 'feature_step_one' \| 'feature_step_two' \| 'feature_step_three'` · `authenticated` (stringifié) | `marketing-header.tsx`, `feature-step-{one,two,three}.tsx` | n/a (web only) |
+| `signup_started` | `trackSignupStarted` | `method: 'email' \| 'google'` | `register-form.tsx` (submit valide), `google-sign-in-button.tsx` (flow="register") | MOB-2.2 |
+| `signup_completed` | `trackSignupCompleted` | `method: 'email' \| 'google'` | `register-form.tsx` (succès). ⚠️ `google` non émis sur web (redirect hors domaine avant résolution — complétion lisible via la création de person PostHog) | MOB-2.2/2.3 (deep-link retour mesurable) |
+| `login_completed` | `trackLoginCompleted` | `method: 'email' \| 'google'` | `login-form.tsx` (succès). ⚠️ même limitation `google` que signup_completed | MOB-2.2/2.3 |
 
-`UserTier = 'free' | 'pro' | 'team' | 'anonymous'`
+`UserTier = 'free' | 'pro' | 'team' | 'anonymous'` · `AuthMethod = 'email' | 'google'`
 
 ## Funnel produit (référence posthog-4)
 
 `gpx_uploaded` → `map_opened` → `poi_search_triggered` → `poi_detail_opened` → `booking_click`
+
+## Funnel acquisition (ajout 2026-06-07)
+
+`$pageview` (landing) → `landing_cta_clicked` → `signup_started` → `signup_completed`
+
+> Les pageviews PostHog ne couvrent que les visiteurs **consentants** — l'audience exhaustive de la landing reste mesurée par Plausible (cookieless).
 
 ## Session replay & masquage (référence web → mobile)
 

@@ -17,6 +17,10 @@ export type AnalyticsEvent =
   | 'poi_search_triggered'
   | 'poi_detail_opened'
   | 'live_mode_activated'
+  | 'landing_cta_clicked'
+  | 'signup_started'
+  | 'signup_completed'
+  | 'login_completed'
 
 /**
  * Transport injecté (vendor-agnostic).
@@ -59,4 +63,33 @@ export interface PoiDetailOpenedProps {
 export interface LiveModeActivatedProps {
   /** Seule prop autorisée — JAMAIS de coordonnée GPS (règle RGPD projet). */
   adventure_id_hash: string
+}
+
+// ── Funnel d'acquisition (landing → signup) ────────────────────────────────
+
+/** Emplacement du CTA « Se connecter / Mes aventures » sur la landing. */
+export type LandingCtaPlacement =
+  | 'header'
+  | 'feature_step_one'
+  | 'feature_step_two'
+  | 'feature_step_three'
+
+export interface LandingCtaClickedProps {
+  placement: LandingCtaPlacement
+  /** true si le CTA affichait « Mes aventures » (session active), false pour « Se connecter ». */
+  authenticated: boolean
+}
+
+export type AuthMethod = 'email' | 'google'
+
+export interface SignupStartedProps {
+  method: AuthMethod
+}
+
+export interface SignupCompletedProps {
+  method: AuthMethod
+}
+
+export interface LoginCompletedProps {
+  method: AuthMethod
 }

@@ -3,16 +3,24 @@
 import { useState } from 'react'
 import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
+import { trackSignupStarted } from '@ridenrest/analytics'
 
 interface GoogleSignInButtonProps {
   callbackURL?: string
+  /** Contexte d'usage pour le funnel acquisition : 'register' émet signup_started (method=google). */
+  flow?: 'login' | 'register'
 }
 
-export function GoogleSignInButton({ callbackURL = '/adventures' }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({ callbackURL = '/adventures', flow }: GoogleSignInButtonProps) {
   const [isPending, setIsPending] = useState(false)
 
   const handleGoogleSignIn = async () => {
     setIsPending(true)
+    // Funnel acquisition : le flow OAuth redirige hors domaine — on émet le
+    // "started" avant la redirection (la complétion se lit côté PostHog persons)
+    if (flow === 'register') {
+      trackSignupStarted({ method: 'google' })
+    }
     try {
       // Initiates redirect flow: user → Google → back to callbackURL
       // On cancel: Better Auth redirects back to the app (current page)

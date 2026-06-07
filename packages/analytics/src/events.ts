@@ -7,10 +7,14 @@ import { capture } from './client'
 import type {
   BookingClickProps,
   GpxUploadedProps,
+  LandingCtaClickedProps,
   LiveModeActivatedProps,
+  LoginCompletedProps,
   MapOpenedProps,
   PoiDetailOpenedProps,
   PoiSearchTriggeredProps,
+  SignupCompletedProps,
+  SignupStartedProps,
 } from './types'
 
 /**
@@ -60,4 +64,33 @@ export function trackPoiDetailOpened(props: PoiDetailOpenedProps): void {
  */
 export function trackLiveModeActivated(props: LiveModeActivatedProps): void {
   capture('live_mode_activated', { ...props })
+}
+
+// ── Funnel d'acquisition (landing → signup) ────────────────────────────────
+
+/** Clic sur un CTA « Se connecter / Mes aventures » de la landing. */
+export function trackLandingCtaClicked(props: LandingCtaClickedProps): void {
+  capture('landing_cta_clicked', {
+    placement: props.placement,
+    authenticated: String(props.authenticated),
+  })
+}
+
+/** Début d'inscription : soumission du formulaire email ou clic Google sur /register. */
+export function trackSignupStarted(props: SignupStartedProps): void {
+  capture('signup_started', { ...props })
+}
+
+/**
+ * Compte créé avec succès. Émis côté client pour method='email' uniquement —
+ * le flow Google redirige hors domaine avant résolution (limitation documentée
+ * au README ; la complétion Google se lit via la création de person PostHog).
+ */
+export function trackSignupCompleted(props: SignupCompletedProps): void {
+  capture('signup_completed', { ...props })
+}
+
+/** Connexion réussie (même limitation Google que signup_completed). */
+export function trackLoginCompleted(props: LoginCompletedProps): void {
+  capture('login_completed', { ...props })
 }

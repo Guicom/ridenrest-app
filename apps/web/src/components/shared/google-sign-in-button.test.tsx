@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { GoogleSignInButton } from './google-sign-in-button'
+import { trackSignupStarted } from '@ridenrest/analytics'
 
 const { mockSignInSocial } = vi.hoisted(() => ({
   mockSignInSocial: vi.fn(),
@@ -14,8 +15,13 @@ vi.mock('@/lib/auth/client', () => ({
   },
 }))
 
+vi.mock('@ridenrest/analytics', () => ({
+  trackSignupStarted: vi.fn(),
+}))
+
 describe('GoogleSignInButton', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     mockSignInSocial.mockReset()
     // Simulate redirect: promise never resolves (redirect happens before it)
     mockSignInSocial.mockReturnValue(new Promise(() => {}))
@@ -71,6 +77,29 @@ describe('GoogleSignInButton', () => {
       const button = screen.getByRole('button')
       expect(button.textContent).toBe('Redirection...')
       expect((button as HTMLButtonElement).disabled).toBe(true)
+    })
+  })
+
+  describe('funnel acquisition (posthog)', () => {
+    it('émet signup_started (google) avant la redirection quand flow="register"', () => {
+      render(<GoogleSignInButton flow="register" />)
+      fireEvent.click(screen.getByRole('button'))
+
+      expect(trackSignupStarted).toHaveBeenCalledWith({ method: 'google' })
+    })
+
+    it('n’émet PAS signup_started quand flow="login"', () => {
+      render(<GoogleSignInButton flow="login" />)
+      fireEvent.click(screen.getByRole('button'))
+
+      expect(trackSignupStarted).not.toHaveBeenCalled()
+    })
+
+    it('n’émet PAS signup_started sans flow (usage hors funnel)', () => {
+      render(<GoogleSignInButton />)
+      fireEvent.click(screen.getByRole('button'))
+
+      expect(trackSignupStarted).not.toHaveBeenCalled()
     })
   })
 })

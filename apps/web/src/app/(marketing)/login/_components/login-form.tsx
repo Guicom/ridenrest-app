@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ErrorMessage } from '@/components/shared/error-message'
 import { GoogleSignInButton } from '@/components/shared/google-sign-in-button'
+import { trackLoginCompleted } from '@ridenrest/analytics'
 
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -50,6 +51,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     }
 
     if (data) {
+      trackLoginCompleted({ method: 'email' })
       router.push(redirectTo)
       router.refresh() // Revalidate server components (clears cached session state)
     }
@@ -57,7 +59,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
 
   return (
     <div className="space-y-4">
-      <GoogleSignInButton callbackURL={redirectTo} />
+      <GoogleSignInButton callbackURL={redirectTo} flow="login" />
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
