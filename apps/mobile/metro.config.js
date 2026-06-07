@@ -6,6 +6,7 @@
 //   à true casse le runtime Expo Go ([runtime not ready] TypeError au boot) — confirmé
 //   par `expo doctor` (« Expected false, got: true »).
 const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
 const path = require('path');
 
 const projectRoot = __dirname;
@@ -19,4 +20,6 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-module.exports = config;
+// NativeWind v4 (MOB-1.3) : compile src/global.css en styles RN. Enveloppe
+// APRÈS la config monorepo pour préserver watchFolders / nodeModulesPaths.
+module.exports = withNativeWind(config, { input: './src/global.css' });

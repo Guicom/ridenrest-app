@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { haversine } from '@ridenrest/gpx';
 import { LAYER_CATEGORIES } from '@ridenrest/shared';
+
+import { Button } from '@/components/ui/button';
 
 // Vérification résolution monorepo (MOB-1.1 / AC3) : Metro doit résoudre
 // @ridenrest/shared et @ridenrest/gpx depuis packages/* sans duplication.
@@ -11,70 +13,35 @@ const PARIS_LYON_KM = Math.round(
   haversine({ lat: 48.8566, lng: 2.3522 }, { lat: 45.764, lng: 4.8357 }),
 );
 
+// MOB-1.3 : écran stylé via NativeWind + design-tokens (dogfooding du DS) — et
+// bouton issu du primitif partagé `<Button>` (className, plus de `Pressable` à
+// `style`-fonction, que le wrapping NativeWind n'appliquait pas).
 export default function HomeScreen() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Ride&apos;n&apos;Rest</Text>
-      <Text style={styles.subtitle}>apps/mobile — coquille MOB-1.1</Text>
+    <View className="flex-1 items-center justify-center gap-4 bg-background-page p-6">
+      <Text className="text-3xl font-montserrat-bold text-text-primary">
+        Ride&apos;n&apos;Rest
+      </Text>
+      <Text className="text-sm font-montserrat text-text-muted">
+        apps/mobile — coquille MOB-1.1 · design system MOB-1.3
+      </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardText}>
+      <View className="w-full gap-2 rounded-xl border border-border bg-primary-light p-4">
+        <Text className="text-sm font-montserrat text-text-secondary">
           @ridenrest/shared → {LAYER_COUNT} layers POI
         </Text>
-        <Text style={styles.cardText}>
+        <Text className="text-sm font-montserrat text-text-secondary">
           @ridenrest/gpx → Paris–Lyon ≈ {PARIS_LYON_KM} km (haversine)
         </Text>
       </View>
 
-      <Pressable
-        style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+      <Button
+        size="lg"
+        label="Naviguer vers /explore"
         onPress={() => router.push('/explore')}
-      >
-        <Text style={styles.buttonText}>Naviguer vers /explore</Text>
-      </Pressable>
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    padding: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  card: {
-    alignSelf: 'stretch',
-    borderRadius: 12,
-    backgroundColor: 'rgba(45, 106, 74, 0.08)',
-    padding: 16,
-    gap: 8,
-  },
-  cardText: {
-    fontSize: 14,
-  },
-  button: {
-    borderRadius: 8,
-    backgroundColor: '#2D6A4A',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-});

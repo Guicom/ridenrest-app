@@ -1,0 +1,35 @@
+<!-- Montserrat pour la cible WEB de Storybook.
+     NativeWind applique fontFamily EN INLINE (ex. 'Montserrat_600SemiBold') ;
+     on définit donc des @font-face portant EXACTEMENT ces noms de familles
+     natives, sourcées depuis le CDN fontsource (équivalent web des poids chargés
+     par @expo-google-fonts/montserrat côté natif). -->
+<style>
+  @font-face {
+    font-family: 'Montserrat_400Regular';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://cdn.jsdelivr.net/fontsource/fonts/montserrat@5/latin-400-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Montserrat_500Medium';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://cdn.jsdelivr.net/fontsource/fonts/montserrat@5/latin-500-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Montserrat_600SemiBold';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://cdn.jsdelivr.net/fontsource/fonts/montserrat@5/latin-600-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Montserrat_700Bold';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('https://cdn.jsdelivr.net/fontsource/fonts/montserrat@5/latin-700-normal.woff2') format('woff2');
+  }
+</style>
