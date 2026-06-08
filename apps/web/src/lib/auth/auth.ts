@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { jwt, genericOAuth } from 'better-auth/plugins'
+import { expo } from '@better-auth/expo'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { Resend } from 'resend'
 import { authDb, profiles, account } from '@ridenrest/database'
@@ -20,6 +21,11 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:3011',
 
+  // Mobile (MOB-2.1): allow Better Auth to redirect OAuth callbacks back to the
+  // native app via its custom URL scheme `ridenrest://`. Additive — the web client
+  // keeps using same-site session cookies; this only widens the redirect allow-list.
+  trustedOrigins: ['ridenrest://', 'ridenrest://*'],
+
   // Strava doesn't provide an email — allow different email when linking
   account: {
     accountLinking: {
@@ -38,6 +44,10 @@ export const auth = betterAuth({
       jwt: { expirationTime: '15m' },
       refreshToken: { expiresIn: 60 * 60 * 24 * 30 }, // 30 days
     }),
+    // Mobile (MOB-2.1): enables the `@better-auth/expo` native client — handles the
+    // OAuth deep-link return (`ridenrest://`) and exposes session/cookie helpers to
+    // the Expo app. Pinned to the server's better-auth line (1.5.5). Additive.
+    expo(),
     genericOAuth({
       config: [
         {

@@ -42,6 +42,9 @@ jobs:
       - name: Lint
         run: pnpm turbo run lint --filter='*'
 
+      - name: Typecheck
+        run: pnpm turbo run typecheck --filter='*'
+
       - name: Build
         run: pnpm turbo run build --filter='*'
         env:

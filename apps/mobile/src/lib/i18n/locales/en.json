@@ -1,0 +1,26 @@
+{
+  "home": {
+    "subtitle": "apps/mobile — MOB-1.1 shell · MOB-1.3 design system · MOB-1.4 i18n",
+    "navigateExplore": "Navigate to /explore"
+  },
+  "explore": {
+    "title": "Explore",
+    "routerOk": "Expo Router navigation working ✓",
+    "back": "Back"
+  },
+  "oauthCallback": {
+    "title": "OAuth callback",
+    "subtitle": "ridenrest:// deep link routed by Expo Router ✓"
+  },
+  "auth": {
+    "loadingSession": "Restoring session…",
+    "login": {
+      "title": "Sign in",
+      "placeholder": "The sign-in form is coming soon (MOB-2.2)."
+    },
+    "adventures": {
+      "title": "My adventures",
+      "placeholder": "Your adventures list is coming soon (MOB-3.1)."
+    }
+  }
+}

@@ -12,15 +12,24 @@ pnpm --dir apps/mobile dev         # démarre le serveur Expo (Metro)
 
 > ⚠️ Depuis MOB-1.2, le projet utilise un **Dev Client** (`expo-dev-client`) : les libs natives à venir (MapLibre RN, expo-secure-store…) ne fonctionnent pas dans Expo Go. Installer le build `development` (voir ci-dessous) sur le simulateur/émulateur, puis `pnpm --dir apps/mobile dev`.
 
+### ⚠️ Prérequis pour un build natif **en local** (`expo run:ios` / `run:android`)
+
+**Expo SDK 56 exige Xcode 26.4** (iOS deployment target **16.4**). Avec un Xcode plus ancien (ex. 26.1), `expo run:ios` **échoue à la compilation** (erreur Swift `'weak' must be a mutable variable` dans `expo-modules-jsi`, `xcodebuild error code 65`). Vérifier : `xcodebuild -version` → `Xcode 26.4`. Mettre à jour via l'App Store, puis `sudo xcodebuild -runFirstLaunch`.
+
+> 💡 **Pourquoi ça « marchait avant » sans Xcode 26.4 ?** Parce que les builds natifs du projet passent normalement par **EAS Build (cloud)**, dont les serveurs ont la bonne toolchain — la compilation **locale** n'est jamais sollicitée. Un `expo start` ne compile pas non plus (il sert juste le JS). Le besoin de Xcode 26.4 **en local** n'apparaît qu'au premier `expo run:ios` (utile p.ex. pour tester un **deep link `ridenrest://`** sans attendre un build cloud).
+
+> 🛠️ Gotcha runtime simulateur : si `xcodebuild -showdestinations` ne liste aucun simulateur (« iOS 26.1 is not installed » alors que `simctl` boote bien un sim), installer le **runtime de build** : `xcodebuild -downloadPlatform iOS`. Un runtime peut suffire à *lancer* un sim sans suffire à *compiler* vers lui.
+
 ## Identité de l'app
 
 | Élément | Valeur |
 |---|---|
 | Bundle ID iOS / Package Android | `app.ridenrest` |
 | Projet EAS | [`@ridenrest/ridenrest`](https://expo.dev/accounts/ridenrest/projects/ridenrest) |
-| `projectId` EAS | `4548dbd0-ee0d-4ba7-8acb-e42469ec1ec3` (dans `app.json` → `extra.eas`) |
+| `projectId` EAS | `4548dbd0-ee0d-4ba7-8acb-e42469ec1ec3` (dans `app.config.ts` → `extra.eas`) |
+| Scheme deep link | `ridenrest://` (`app.config.ts` → `scheme`) |
 
-> 📝 La migration `app.json` → `app.config.ts` et le scheme `ridenrest://` sont le périmètre de **MOB-1.4**. Lors de la migration, **ne pas perdre** le `projectId` ni la config `updates`.
+> 📝 Depuis **MOB-1.4** : la config Expo est en **`app.config.ts`** (TypeScript ; plus de `app.json`), `projectId` EAS + config `updates` (OTA) préservés. Le scheme `ridenrest://` génère au prebuild les `CFBundleURLTypes` (iOS) et l'intent filter (Android) — prérequis des callbacks OAuth `ridenrest://oauth-*` (MOB-2.3/2.4).
 
 ## Builds (EAS Build — cloud)
 
@@ -99,6 +108,30 @@ jobs:
 - Variables publiques embarquées dans le bundle : préfixe **`EXPO_PUBLIC_*`** uniquement (via `eas.json` → `env` par profil, ou EAS Environment Variables).
 - **Aucun secret dans le bundle JS** (NFR-014). `BETTER_AUTH_SECRET` & co. restent côté serveur, toujours.
 
+### Auth — `EXPO_PUBLIC_*` (MOB-2.1)
+
+Copier `.env.example` → `.env` et renseigner :
+
+| Variable | Rôle | Dev (simulateur iOS) |
+|---|---|---|
+| `EXPO_PUBLIC_BETTER_AUTH_URL` | Serveur **Better Auth** (`apps/web`) — sign-in, session, endpoint token JWT | `http://localhost:3011` |
+| `EXPO_PUBLIC_API_URL` | API **NestJS** (données) — appelée par `apiFetch` avec `Authorization: Bearer` | `http://localhost:3010` |
+
+> ⚠️ **Gotcha device physique / émulateur Android** : `localhost` pointe sur le **device lui-même**, pas sur la machine de dev. Utiliser l'**IP LAN** de la machine (ex. `http://192.168.1.42:3011` / `:3010`). La trouver via `ipconfig getifaddr en0` (macOS). Le simulateur iOS, lui, partage `localhost` avec l'hôte.
+
+## Auth & session (MOB-2.1)
+
+Fondation auth posée par MOB-2.1 (aucun écran de login fonctionnel ici — il arrive en MOB-2.2).
+
+- **Client** : `src/lib/auth/client.ts` — `@better-auth/expo` (`expoClient`) configuré sur le scheme `ridenrest` + stockage **`expo-secure-store`** (Keychain iOS / Keystore Android). **Jamais** `AsyncStorage` pour l'auth. Persistance + restauration de session au cold start **automatiques**.
+- **Versions** : `better-auth` **1.5.5** + `@better-auth/expo` **1.5.5** côté mobile, **alignées exactement** sur le serveur Better Auth (`apps/web`, `better-auth@1.5.5`). Pin exact (pas de `^`) — le plugin a un peer `better-auth: 1.5.5` strict, et monter le serveur en 1.6.x casserait les sessions web en prod.
+- **Serveur** (`apps/web/src/lib/auth/auth.ts`) : ajout **additif** du plugin `expo()` + `trustedOrigins: ['ridenrest://', 'ridenrest://*']` (autorise le retour deep-link OAuth). Le web continue d'utiliser les cookies de session — comportement inchangé.
+- **Client API** : `src/lib/api/api-client.ts` — `apiFetch()` (wrapper `fetch`, jamais axios/ky) injecte `Authorization: Bearer <JWT>`, cache le JWT (~13 min, buffer 2 min) et gère `401 → refresh → 1 retry`. Le JWT vient de `GET {BETTER_AUTH_URL}/api/auth/token` (cookie de session via `authClient.getCookie()`).
+- **Routes & guard** : groupes `(auth)` / `(app)` ; le **guard centralisé** vit dans `src/app/(app)/_layout.tsx` (un seul point, jamais par écran) — non connecté → `(auth)/login`, connecté → enfants, session non résolue → loader (pas de flash). Guard inverse dans `(auth)/_layout.tsx`.
+- **Socle data** : `QueryClientProvider` (TanStack Query v5) + un **unique** listener `AppState`/netinfo (`src/lib/query/use-app-state-refetch.ts`) monté au root — refocus/refetch de la session au retour foreground.
+
+> 🔐 **Secret partagé** : `BETTER_AUTH_SECRET` **identique** entre `apps/web`, `apps/api` et le serveur — **ne jamais régénérer** (casserait toutes les sessions web existantes). Jamais exposé au client mobile.
+
 ## Scripts
 
 | Script | Action |
@@ -108,4 +141,48 @@ jobs:
 | `pnpm build` | `expo export` (bundle JS, utilisé par Turbo) |
 | `pnpm lint` | ESLint (config Expo flat) |
 | `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` | Placeholder — framework Jest/RNTL en MOB-1.4 |
+| `pnpm test` | Jest + React Native Testing Library (preset `jest-expo`) |
+
+## Tests (MOB-1.4)
+
+### Unitaires — Jest + RNTL
+
+- Preset **`jest-expo`** (`jest.config.js`), setup global `jest.setup.ts`. Tests **co-localisés** `*.test.ts(x)` à côté du code.
+- Mocks des libs natives dans **`__mocks__/`** (racine `apps/mobile/`) : `expo-localization`, `expo-location`, `expo-secure-store` (variantes sync `setItem`/`getItem` pour le client Better Auth), `expo-web-browser`, `@maplibre/maplibre-react-native` — placeholders étoffés au fil des epics MOB-2+.
+
+> ⚠️ **Tests de routes : jamais sous `src/app/`.** Expo Router bundle via `require.context` **tout** `.tsx` sous `src/app` (y compris les `*.test.tsx`) → `expo export` casserait sur l'import de `@testing-library/react-native`. Les tests qui doivent importer un fichier de route vivent sous **`src/__tests__/`** (ex. `app-group-guard.test.tsx`) ; les tests de logique/composants restent co-localisés ailleurs (`src/lib/**`, `src/components/**`).
+
+```bash
+pnpm --dir apps/mobile test          # suite Jest/RNTL
+```
+
+### E2E — Maestro (smoke, **pré-release uniquement**)
+
+- Flow : `.maestro/launch.yaml` — « l'app se lance et affiche l'écran d'accueil ».
+- ⚠️ **Cadence pré-release** (avant soumission stores), **jamais** sur les PR CI : émulateur lent/coûteux + flakiness E2E. Volontairement absent du job GitHub Actions.
+- Maestro est un **CLI système** (hors `package.json`) : `curl -fsSL https://get.maestro.mobile.dev | bash`. Nécessite un simulateur/émulateur avec l'app installée (`npx expo run:ios` / `run:android`, ou un build dev-client EAS).
+
+```bash
+maestro test apps/mobile/.maestro/launch.yaml
+```
+
+## Gate CI (MOB-1.4)
+
+`apps/mobile` expose les tâches turbo `lint` / `test` / `typecheck`, **captées automatiquement** par le `--filter='*'` existant de `.github/workflows/ci.yml` — aucune modification du YAML. Le lint + les tests unitaires mobile tournent donc sur **chaque PR vers `main`** et **bloquent** le merge en cas d'échec.
+
+> 🚫 **Aucun build natif en GitHub Actions** : la tâche `build` mobile = `expo export` (bundle JS, léger). La compilation native iOS/Android reste **exclusivement sur EAS Build (cloud)** — cf. section CI/CD → EAS ci-dessus (FR-MOB-003).
+
+## i18n (MOB-1.4)
+
+Scaffold `i18next` + `react-i18next` + `expo-localization` dans `src/lib/i18n/` :
+
+- `i18n.config.ts` : init, détection de la locale device, **locale par défaut + fallback = `fr`** (jamais `en`).
+- `locales/{fr,en}.json` ; provider `I18nextProvider` monté au root (`app/_layout.tsx`).
+- Toutes les chaînes des écrans placeholder sont résolues via `t('…')` (preuve de câblage). L'externalisation **complète** des chaînes est déférée à **MOB-6.3**.
+
+### Vérifier le deep link `ridenrest://` (manuel, simulateur)
+
+```bash
+npx uri-scheme open ridenrest://oauth-callback --ios       # ou --android
+# → ouvre l'app sur l'écran oauth-callback (routé par Expo Router)
+```

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Animated, Easing, type ViewProps } from 'react-native'
 
 import { cn } from '@/lib/cn'
@@ -19,7 +19,10 @@ export function Skeleton({
   style,
   ...props
 }: ViewProps & { className?: string }) {
-  const opacity = useRef(new Animated.Value(1)).current
+  // Instance `Animated.Value` créée une seule fois via l'initialiseur paresseux
+  // de `useState` (stable entre les rendus, sans lire de ref pendant le rendu —
+  // règle `react-hooks/refs`).
+  const [opacity] = useState(() => new Animated.Value(1))
 
   useEffect(() => {
     const loop = Animated.loop(

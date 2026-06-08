@@ -1,0 +1,26 @@
+{
+  "home": {
+    "subtitle": "apps/mobile — coquille MOB-1.1 · design system MOB-1.3 · i18n MOB-1.4",
+    "navigateExplore": "Naviguer vers /explore"
+  },
+  "explore": {
+    "title": "Explorer",
+    "routerOk": "Navigation Expo Router opérationnelle ✓",
+    "back": "Retour"
+  },
+  "oauthCallback": {
+    "title": "Callback OAuth",
+    "subtitle": "Deep link ridenrest:// routé par Expo Router ✓"
+  },
+  "auth": {
+    "loadingSession": "Restauration de la session…",
+    "login": {
+      "title": "Connexion",
+      "placeholder": "Le formulaire de connexion arrive prochainement (MOB-2.2)."
+    },
+    "adventures": {
+      "title": "Mes aventures",
+      "placeholder": "La liste de vos aventures arrive prochainement (MOB-3.1)."
+    }
+  }
+}

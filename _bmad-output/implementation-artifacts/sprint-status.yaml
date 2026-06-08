@@ -34,6 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-12
+last_updated: 2026-06-08  # MOB-2-1 done (code review : 1 decision résolue + 7 patchs)
 project: ridenrest-app
 project_key: N/A
 tracking_system: file-system
@@ -328,16 +329,16 @@ development_status:
   MOB-1-2-dev-accounts-eas-ota-pipeline: done  # impl + code review 2026-06-07 — EAS init (projectId 4548dbd0, app.ridenrest), eas.json 3 profils+canaux, builds dev iOS/Android + preview Android verts, Dev Clients vérifiés, OTA smoke test preview ✅, doc CI→EAS (README mobile), 23/23 régression vert. Code review : 2 patches README appliqués (iOS dev = simulateur only ; eas update toujours --channel), 2 defers → MOB-1.4 (reactCompiler phantom dep, gate CI --no-wait), 19 dismiss. ⏳ RESTE-À-FAIRE tracé (décision PO) : compte Google Play (paiement OR_MIVEM_04, résolution bancaire en cours, deadline réelle MOB-6.5). Story créée 2026-06-02
   MOB-1-2b-dark-mode-web-charbon-backport: done  # CODE REVIEW 2026-06-07 (3 couches adversariales) : 0 decision-needed · 5 patch APPLIQUÉS · 7 defer · 8 dismissed. AC1/AC2/AC3 confirmés par l'Acceptance Auditor (parité exacte bloc .dark, :root inchangé, pas de @media, toggle conforme, pastilles teinte/wordmark/cartes). Patchs : (1) SVG wordmark blanc fill dupliqué → fill="black" retiré ; (2) color-scheme:dark ajouté à .dark (date-pickers/scrollbars natifs) ; (3) override .dark de la piste slider range (#e5e7eb→--surface-raised) ; (4) PoweredByStrava nom accessible en dark via span role=img ; (5) ThemeToggle roving tabindex + nav flèches (contrat radiogroup). 72 tests ciblés verts, lint 0 erreur. 7 defer → deferred-work.md (contraste AA light pré-existant, fallback color-mix, chip Live, a11y pré-mount, couverture tests, @media print, fragilité test parité). || IMPL : back-port palette dark « Charbon » (handoff Claude Design docs/design/dark-mode-charbon/) dans globals.css + toggle next-themes + passe composants dark web. Prérequis de MOB-1.3. Story créée 2026-06-07
   MOB-1-3-design-system-tokens-nativewind-storybook: done  # impl 2026-06-07 — design-tokens (miroir vérifié globals.css :root + .dark Charbon) + NativeWind v4 + 3 primitifs + Storybook RN web v8 (Button/Card/Skeleton, build OK) ; régression 23/23, web intact. ✅ dark résolu via MOB-1.2b (dépendance). Code review 2026-06-07 : AC1/2/3 OK, 9 patches appliqués (Skeleton Animated, tokens canaux /opacity, parité durcie 8/8), 3 différés. Story créée 2026-06-02, MàJ 2026-06-07
-  MOB-1-4-cross-config-i18n-tests-ci-deeplink-scheme: ready-for-dev  # i18n (expo-localization+i18next, fr défaut) + Jest/RNTL + Maestro + gate CI (turbo --filter='*', build natif exclu) + scheme ridenrest:// (app.config.ts). Story créée 2026-06-02
+  MOB-1-4-cross-config-i18n-tests-ci-deeplink-scheme: done  # i18n (expo-localization+i18next, fr défaut) + Jest/RNTL + Maestro + gate CI (turbo --filter='*', build natif exclu) + scheme ridenrest:// (app.config.ts). Story créée 2026-06-02 ; impl. terminée 2026-06-08 (5 tâches, gate 21/21 verte). Code review 2026-06-08 (3 couches adversariales, tests réexécutés 7/7) : 1 decision RÉSOLUE (typecheck ajouté à ci.yml, gate 7/7) · 1 defer (validation params oauth-callback → MOB-2.3/2.4) · 9 dismissed (dont 2 « High » faux positifs réfutés empiriquement : alias @/ Jest, auto-mock expo-localization)
   epic-MOB-1-retrospective: optional
 
   # Epic MOB-2 : Authentification & Onboarding
-  epic-MOB-2: backlog
-  MOB-2-1-better-auth-client-secure-store-session: backlog
-  MOB-2-2-email-signup-login-password-reset: backlog
-  MOB-2-3-google-oauth-deeplink: backlog
-  MOB-2-4-strava-oauth-deeplink: backlog
-  MOB-2-5-logout-account-deletion-rgpd: backlog
+  epic-MOB-2: in-progress
+  MOB-2-1-better-auth-client-secure-store-session: done  # impl T1-T7 + T7 simulateur iOS OK. Code review 2026-06-08 (3 couches adversariales) : 1 decision RÉSOLUE (bridge apiFetch→signOut sur 401 terminal) + 7 patchs appliqués (apiFetch : 204/empty, erreur réseau→ApiError, base64url, dedup token, getSession .catch ; deps test→devDeps ; test guard inverse (auth)) · 3 defer (durcissement OAuth deep-link→MOB-2.3/4, HTTPS prod, seed online state→MOB-3.5) · ~13 dismissed. Gate mobile re-vérifiée : 19 tests, typecheck, lint, build verts
+  MOB-2-2-email-signup-login-password-reset: ready-for-dev
+  MOB-2-3-google-oauth-deeplink: ready-for-dev
+  MOB-2-4-strava-oauth-deeplink: ready-for-dev
+  MOB-2-5-logout-account-deletion-rgpd: ready-for-dev
   epic-MOB-2-retrospective: optional
 
   # Epic MOB-3 : Aventures & Gestion GPX

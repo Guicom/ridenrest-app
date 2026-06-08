@@ -11,6 +11,10 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
+import { I18nextProvider, i18n } from '@/lib/i18n';
+import { QueryProvider } from '@/lib/query/query-provider';
+import { useAppStateRefetch } from '@/lib/query/use-app-state-refetch';
+
 // Garde le splash visible tant que Montserrat n'est pas chargée (MOB-1.3).
 SplashScreen.preventAutoHideAsync();
 
@@ -22,6 +26,10 @@ export default function RootLayout() {
     Montserrat_700Bold,
   });
 
+  // Listener de cycle de vie unique (MOB-2.1 / AC3) : refocus/refetch session +
+  // bridge online. Centralisé ici — jamais dupliqué ailleurs.
+  useAppStateRefetch();
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
       void SplashScreen.hideAsync();
@@ -32,10 +40,14 @@ export default function RootLayout() {
     return null;
   }
 
+  // Providers root (MOB-2.1) : TanStack Query (socle data) au-dessus de i18n
+  // (MOB-1.4). Les routes sont auto-découvertes par Expo Router (groupes
+  // `(auth)`/`(app)` + `oauth-callback`) ; le guard vit dans `(app)/_layout`.
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ title: "Ride'n'Rest" }} />
-      <Stack.Screen name="explore" options={{ title: 'Explore' }} />
-    </Stack>
+    <QueryProvider>
+      <I18nextProvider i18n={i18n}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </I18nextProvider>
+    </QueryProvider>
   );
 }
