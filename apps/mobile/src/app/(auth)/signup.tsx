@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { signInSchema, type SignInInput } from '@ridenrest/shared';
+import { signUpSchema, type SignUpInput } from '@ridenrest/shared';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -18,13 +18,13 @@ import { TextField } from '@/components/ui/text-field';
 import { authClient } from '@/lib/auth/client';
 import { useTranslation } from '@/lib/i18n';
 
-// Écran de connexion email/mot de passe (MOB-2.2 / AC2, AC4) — remplace le
-// placeholder MOB-2.1. RHF + zodResolver(signInSchema) partagé. Anti-énumération :
-// toute erreur d'identifiants → message GÉNÉRIQUE (jamais « email inexistant »).
-// Slot OAuth (« Continuer avec Google ») réservé visuellement → flow en MOB-2.3.
-export default function LoginScreen() {
+// Écran d'inscription email/mot de passe (MOB-2.2 / AC1, AC4).
+// RHF + zodResolver(signUpSchema) — schéma PARTAGÉ (`@ridenrest/shared`), jamais
+// dupliqué. Succès = session établie en secure-store (MOB-2.1) → `(app)/adventures`.
+export default function SignUpScreen() {
   const { t } = useTranslation();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   // Focus-advance : la touche « Next » du champ email passe au mot de passe.
   const passwordRef = useRef<TextInput>(null);
 
@@ -32,32 +32,31 @@ export default function LoginScreen() {
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<SignInInput>({
-    resolver: zodResolver(signInSchema),
+  } = useForm<SignUpInput>({
+    resolver: zodResolver(signUpSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  const onSubmit = async (values: SignInInput) => {
+  const onSubmit = async (values: SignUpInput) => {
     setAuthError(null);
+    // `name` est requis par Better Auth ; au MVP on le dérive de l'email
+    // (partie locale). L'utilisateur pourra l'éditer dans son profil (MOB-2.5).
+    const derivedName = values.email.split('@')[0] || values.email;
+
     try {
-      const { data, error } = await authClient.signIn.email({
+      const { data, error } = await authClient.signUp.email({
+        name: derivedName,
         email: values.email,
         password: values.password,
       });
 
       if (error) {
-        // Anti-énumération (AC2) : les erreurs d'AUTHENTIFICATION restent génériques
-        // (ne distinguent PAS email inexistant / mauvais mdp). En revanche on NE masque
-        // PAS les pannes non liées aux identifiants (rate-limit, serveur) en « mdp faux »
-        // — ce qui induirait l'utilisateur en erreur (décision revue MOB-2.2 / D1).
-        const status = (error as { status?: number }).status ?? 0;
-        if (status === 429) {
-          setAuthError(t('auth.errors.tooManyRequests'));
-        } else if (status >= 500) {
-          setAuthError(t('auth.errors.serverError'));
-        } else {
-          setAuthError(t('auth.errors.invalidCredentials'));
-        }
+        // On ne montre jamais le message brut serveur ; on mappe vers une clé i18n.
+        setAuthError(
+          error.code === 'USER_ALREADY_EXISTS'
+            ? t('auth.errors.emailTaken')
+            : t('auth.errors.generic'),
+        );
         return;
       }
 
@@ -66,8 +65,7 @@ export default function LoginScreen() {
         return;
       }
 
-      // Réponse résolue sans `data` ni `error` (corps vide/204) : éviter l'impasse
-      // silencieuse (bouton réactivé, aucun feedback) → message générique.
+      // Réponse résolue sans `data` ni `error` : éviter l'impasse silencieuse.
       setAuthError(t('auth.errors.generic'));
     } catch {
       // Rejet réseau (offline/timeout) : non converti en `{ error }` côté client.
@@ -86,33 +84,11 @@ export default function LoginScreen() {
       >
         <View className="gap-2">
           <Text className="text-2xl font-montserrat-bold text-text-primary">
-            {t('auth.login.title')}
+            {t('auth.signup.title')}
           </Text>
           <Text className="text-sm font-montserrat text-text-muted">
-            {t('auth.login.subtitle')}
+            {t('auth.signup.subtitle')}
           </Text>
-        </View>
-
-        {/* Slot OAuth réservé (MOB-2.3) — bouton désactivé, flow non implémenté ici. */}
-        <View className="gap-2">
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
-            disabled
-            label={t('auth.login.googleCta')}
-          />
-          <Text className="text-center text-xs font-montserrat text-text-muted">
-            {t('auth.login.googleSoon')}
-          </Text>
-        </View>
-
-        <View className="flex-row items-center gap-3">
-          <View className="h-px flex-1 bg-border" />
-          <Text className="text-xs font-montserrat uppercase text-text-muted">
-            {t('auth.login.orContinueWith')}
-          </Text>
-          <View className="h-px flex-1 bg-border" />
         </View>
 
         <View className="gap-4">
@@ -139,11 +115,11 @@ export default function LoginScreen() {
             )}
           />
 
-          <View className="gap-1.5">
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <View className="gap-1.5">
                 <TextField
                   ref={passwordRef}
                   label={t('auth.common.passwordLabel')}
@@ -154,24 +130,34 @@ export default function LoginScreen() {
                   error={
                     errors.password ? t(errors.password.message ?? '') : undefined
                   }
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   autoCapitalize="none"
-                  autoComplete="current-password"
-                  textContentType="password"
+                  autoComplete="new-password"
+                  textContentType="newPassword"
                   returnKeyType="go"
                   onSubmitEditing={handleSubmit(onSubmit)}
                 />
-              )}
-            />
-            <Button
-              variant="link"
-              size="sm"
-              className="self-end px-0"
-              textClassName="text-xs"
-              label={t('auth.login.forgotPassword')}
-              onPress={() => router.push('/(auth)/reset-password')}
-            />
-          </View>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="self-end px-0"
+                  label={
+                    showPassword
+                      ? t('auth.common.hidePassword')
+                      : t('auth.common.showPassword')
+                  }
+                  textClassName="text-xs"
+                  accessibilityLabel={
+                    showPassword
+                      ? t('auth.common.hidePassword')
+                      : t('auth.common.showPassword')
+                  }
+                  accessibilityState={{ expanded: showPassword }}
+                  onPress={() => setShowPassword((v) => !v)}
+                />
+              </View>
+            )}
+          />
 
           {authError ? <ErrorBanner message={authError} /> : null}
 
@@ -180,7 +166,7 @@ export default function LoginScreen() {
             className="w-full"
             loading={isSubmitting}
             label={
-              isSubmitting ? t('auth.login.submitting') : t('auth.login.submit')
+              isSubmitting ? t('auth.signup.submitting') : t('auth.signup.submit')
             }
             onPress={handleSubmit(onSubmit)}
           />
@@ -188,14 +174,14 @@ export default function LoginScreen() {
 
         <View className="flex-row items-center justify-center gap-1">
           <Text className="text-sm font-montserrat text-text-muted">
-            {t('auth.login.noAccount')}
+            {t('auth.signup.haveAccount')}
           </Text>
           <Button
             variant="link"
             size="sm"
             className="px-0"
-            label={t('auth.login.signupLink')}
-            onPress={() => router.push('/(auth)/signup')}
+            label={t('auth.signup.signinLink')}
+            onPress={() => router.replace('/(auth)/login')}
           />
         </View>
       </ScrollView>

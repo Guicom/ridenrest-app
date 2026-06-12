@@ -14,9 +14,53 @@
   },
   "auth": {
     "loadingSession": "Restauration de la session…",
+    "common": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "votre@email.com",
+      "passwordLabel": "Mot de passe",
+      "passwordPlaceholder": "••••••••",
+      "showPassword": "Afficher le mot de passe",
+      "hidePassword": "Masquer le mot de passe"
+    },
+    "signup": {
+      "title": "Créer un compte",
+      "subtitle": "Rejoignez Ride'n'Rest et planifiez vos aventures.",
+      "submit": "Créer mon compte",
+      "submitting": "Création…",
+      "haveAccount": "Déjà un compte ?",
+      "signinLink": "Se connecter"
+    },
     "login": {
       "title": "Connexion",
-      "placeholder": "Le formulaire de connexion arrive prochainement (MOB-2.2)."
+      "subtitle": "Heureux de vous revoir.",
+      "submit": "Se connecter",
+      "submitting": "Connexion…",
+      "forgotPassword": "Mot de passe oublié ?",
+      "noAccount": "Pas encore de compte ?",
+      "signupLink": "Créer un compte",
+      "orContinueWith": "ou continuer avec",
+      "googleCta": "Continuer avec Google",
+      "googleSoon": "Bientôt disponible"
+    },
+    "reset": {
+      "title": "Mot de passe oublié",
+      "subtitle": "Saisissez votre email pour recevoir un lien de réinitialisation.",
+      "submit": "Envoyer le lien",
+      "submitting": "Envoi…",
+      "neutralTitle": "Vérifiez votre boîte mail",
+      "neutralMessage": "Si un compte existe pour cette adresse, un email de réinitialisation a été envoyé.",
+      "backToLogin": "Retour à la connexion"
+    },
+    "errors": {
+      "emailInvalid": "Email invalide",
+      "passwordTooShort": "Mot de passe : 8 caractères minimum",
+      "passwordRequired": "Mot de passe requis",
+      "emailTaken": "Un compte existe déjà avec cet email",
+      "invalidCredentials": "Email ou mot de passe incorrect",
+      "tooManyRequests": "Trop de tentatives. Réessayez plus tard.",
+      "serverError": "Service momentanément indisponible. Réessayez.",
+      "network": "Connexion impossible. Vérifiez votre réseau.",
+      "generic": "Une erreur est survenue. Réessayez."
     },
     "adventures": {
       "title": "Mes aventures",

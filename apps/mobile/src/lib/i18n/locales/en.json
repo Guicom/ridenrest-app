@@ -14,9 +14,53 @@
   },
   "auth": {
     "loadingSession": "Restoring session…",
+    "common": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@email.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "••••••••",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
+    },
+    "signup": {
+      "title": "Create an account",
+      "subtitle": "Join Ride'n'Rest and plan your adventures.",
+      "submit": "Create my account",
+      "submitting": "Creating…",
+      "haveAccount": "Already have an account?",
+      "signinLink": "Sign in"
+    },
     "login": {
       "title": "Sign in",
-      "placeholder": "The sign-in form is coming soon (MOB-2.2)."
+      "subtitle": "Good to see you again.",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "No account yet?",
+      "signupLink": "Create an account",
+      "orContinueWith": "or continue with",
+      "googleCta": "Continue with Google",
+      "googleSoon": "Coming soon"
+    },
+    "reset": {
+      "title": "Forgot password",
+      "subtitle": "Enter your email to receive a reset link.",
+      "submit": "Send link",
+      "submitting": "Sending…",
+      "neutralTitle": "Check your inbox",
+      "neutralMessage": "If an account exists for this address, a reset email has been sent.",
+      "backToLogin": "Back to sign in"
+    },
+    "errors": {
+      "emailInvalid": "Invalid email",
+      "passwordTooShort": "Password: 8 characters minimum",
+      "passwordRequired": "Password required",
+      "emailTaken": "An account already exists with this email",
+      "invalidCredentials": "Incorrect email or password",
+      "tooManyRequests": "Too many attempts. Please try again later.",
+      "serverError": "Service temporarily unavailable. Please try again.",
+      "network": "Can't connect. Check your network.",
+      "generic": "Something went wrong. Please try again."
     },
     "adventures": {
       "title": "My adventures",

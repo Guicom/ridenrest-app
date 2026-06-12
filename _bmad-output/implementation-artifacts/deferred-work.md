@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-2-2 (2026-06-12)
+
+- **reset-redirectto-localhost-fallback** — `reset-password.tsx` : `const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? process.env.EXPO_PUBLIC_BETTER_AUTH_URL ?? 'http://localhost:3011'` puis `redirectTo: ${WEB_URL}/reset-password`. Si un build de prod ne reçoit aucune de ces deux vars `EXPO_PUBLIC_*` (inlinées au build), chaque email de reset pointe vers `http://localhost:3011/reset-password` (lien mort, non-TLS) → l'utilisateur ne peut jamais terminer le reset. Même classe que le defer **`better-auth-url-https-guard`** de MOB-2.1 (le client auth `client.ts` partage le même défaut localhost) → à traiter dans la même passe de durcissement config/ops (forcer/vérifier HTTPS + présence de la var pour la valeur de prod). [Blind Hunter #3 + Edge Case Hunter]
+- **signup-name-derivation-sanitize** — `signup.tsx` : `const derivedName = values.email.split('@')[0] || values.email` envoie à `signUp.email({ name })` un `name` non borné/non assaini : `first.last@b.com` → `"first.last"`, `a+tag@b.com` → `"a+tag"`, unicode (`café`), local-part 64 car. → `name` 64 car. Pas de crash (Better Auth accepte la string ; le `||` couvre le local-part vide), mais qualité de donnée dégradée. Follow-up = capper la longueur / assainir, ou demander un vrai champ `name` si l'affichage du nom devient visible produit. [Blind Hunter #16 + Edge Case Hunter]
+
 ## Deferred from: code review of MOB-2-1 (2026-06-08)
 
 - **oauth-deeplink-hardening** — `trustedOrigins: ['ridenrest://', 'ridenrest://*']` (`apps/web/src/lib/auth/auth.ts:27`) autorise tout host/path sous le scheme custom. Les schemes custom mobiles ne sont pas exclusifs (collision possible avec une app tierce) → risque d'interception du callback OAuth. Follow-up = durcir au moment où le flux OAuth est réellement implémenté (**MOB-2.3** Google / **MOB-2.4** Strava) : confirmer PKCE actif côté `@better-auth/expo`, restreindre à un path de callback précis, envisager App/Universal Links. Ici = uniquement le prérequis de redirection. [Blind Hunter #14]

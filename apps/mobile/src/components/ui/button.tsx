@@ -1,6 +1,12 @@
 import { cva, type VariantProps } from 'class-variance-authority'
 import type { ReactNode } from 'react'
-import { Pressable, Text, type PressableProps } from 'react-native'
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  View,
+  type PressableProps,
+} from 'react-native'
 
 import { cn } from '@/lib/cn'
 
@@ -52,6 +58,9 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   /** Libellé texte (raccourci ; ignoré si `children` est fourni). */
   label?: string
+  /** État chargement : affiche un `ActivityIndicator`, désactive l'appui et
+   *  expose `accessibilityState.busy` (AC4 — « désactivé + indicateur »). */
+  loading?: boolean
   className?: string
   textClassName?: string
   children?: ReactNode
@@ -61,22 +70,46 @@ export function Button({
   variant,
   size,
   label,
+  loading,
   className,
   textClassName,
   children,
+  disabled,
+  accessibilityState,
   ...props
 }: ButtonProps) {
+  const isDisabled = Boolean(disabled) || Boolean(loading)
   return (
     <Pressable
       accessibilityRole="button"
+      // Fusionne l'état entrant (ex. `expanded` du toggle mdp) avec disabled/busy.
+      accessibilityState={{
+        disabled: isDisabled,
+        busy: Boolean(loading),
+        ...accessibilityState,
+      }}
+      disabled={isDisabled}
       className={cn(buttonVariants({ variant, size }), className)}
       {...props}
     >
-      {children ?? (
-        <Text className={cn(buttonTextVariants({ variant }), textClassName)}>
-          {label}
-        </Text>
-      )}
+      {children ??
+        (loading ? (
+          <View className="flex-row items-center gap-2">
+            {/* `className` text-* → couleur de l'indicateur (mappée par NativeWind),
+                cohérente avec le libellé et thème-safe. */}
+            <ActivityIndicator
+              size="small"
+              className={buttonTextVariants({ variant })}
+            />
+            <Text className={cn(buttonTextVariants({ variant }), textClassName)}>
+              {label}
+            </Text>
+          </View>
+        ) : (
+          <Text className={cn(buttonTextVariants({ variant }), textClassName)}>
+            {label}
+          </Text>
+        ))}
     </Pressable>
   )
 }
