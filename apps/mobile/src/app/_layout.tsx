@@ -10,6 +10,7 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { I18nextProvider, i18n } from '@/lib/i18n';
 import { QueryProvider } from '@/lib/query/query-provider';
@@ -41,13 +42,18 @@ export default function RootLayout() {
   }
 
   // Providers root (MOB-2.1) : TanStack Query (socle data) au-dessus de i18n
-  // (MOB-1.4). Les routes sont auto-découvertes par Expo Router (groupes
-  // `(auth)`/`(app)` + `oauth-callback`) ; le guard vit dans `(app)/_layout`.
+  // (MOB-1.4). `SafeAreaProvider` (MOB-2.4) expose les insets aux écrans à header
+  // custom (`headerShown: false`) — sans lui, les écrans top-alignés (ex. Paramètres)
+  // chevauchent la status bar / Dynamic Island. Les routes sont auto-découvertes par
+  // Expo Router (groupes `(auth)`/`(app)` + `oauth-callback`) ; le guard vit dans
+  // `(app)/_layout`.
   return (
-    <QueryProvider>
-      <I18nextProvider i18n={i18n}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </I18nextProvider>
-    </QueryProvider>
+    <SafeAreaProvider>
+      <QueryProvider>
+        <I18nextProvider i18n={i18n}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </I18nextProvider>
+      </QueryProvider>
+    </SafeAreaProvider>
   );
 }

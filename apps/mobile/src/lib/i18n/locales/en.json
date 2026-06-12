@@ -43,6 +43,22 @@
     "google": {
       "continue": "Continue with Google"
     },
+    "strava": {
+      "title": "Strava",
+      "description": "Connect your account to import your Strava routes.",
+      "connected": "Account connected",
+      "notConnected": "Not connected",
+      "connect": "Connect Strava",
+      "connecting": "Connecting…",
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting…",
+      "errors": {
+        "loadFailed": "Couldn't load Strava status.",
+        "cancelled": "Strava connection cancelled.",
+        "connectFailed": "Strava connection failed. Please try again.",
+        "disconnectFailed": "Couldn't disconnect Strava. Please try again."
+      }
+    },
     "reset": {
       "title": "Forgot password",
       "subtitle": "Enter your email to receive a reset link.",
@@ -67,7 +83,13 @@
     },
     "adventures": {
       "title": "My adventures",
-      "placeholder": "Your adventures list is coming soon (MOB-3.1)."
+      "placeholder": "Your adventures list is coming soon (MOB-3.1).",
+      "settingsLink": "Settings"
     }
+  },
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "integrationsSection": "Integrations"
   }
 }

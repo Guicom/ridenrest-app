@@ -43,6 +43,22 @@
     "google": {
       "continue": "Continuer avec Google"
     },
+    "strava": {
+      "title": "Strava",
+      "description": "Connectez votre compte pour importer vos itinéraires Strava.",
+      "connected": "Compte connecté",
+      "notConnected": "Non connecté",
+      "connect": "Connecter Strava",
+      "connecting": "Connexion…",
+      "disconnect": "Déconnecter",
+      "disconnecting": "Déconnexion…",
+      "errors": {
+        "loadFailed": "Impossible de charger l'état Strava.",
+        "cancelled": "Connexion Strava annulée.",
+        "connectFailed": "La connexion à Strava a échoué. Réessayez.",
+        "disconnectFailed": "Impossible de déconnecter Strava. Réessayez."
+      }
+    },
     "reset": {
       "title": "Mot de passe oublié",
       "subtitle": "Saisissez votre email pour recevoir un lien de réinitialisation.",
@@ -67,7 +83,13 @@
     },
     "adventures": {
       "title": "Mes aventures",
-      "placeholder": "La liste de vos aventures arrive prochainement (MOB-3.1)."
+      "placeholder": "La liste de vos aventures arrive prochainement (MOB-3.1).",
+      "settingsLink": "Paramètres"
     }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "back": "Retour",
+    "integrationsSection": "Intégrations"
   }
 }

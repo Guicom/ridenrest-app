@@ -145,6 +145,9 @@ export const auth = betterAuth({
               await fetch('https://www.strava.com/oauth/deauthorize', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${stravaAccount.accessToken}` },
+                // Best-effort: cap the call so a slow/unreachable Strava can't block
+                // the user-delete cascade on the socket-level OS timeout.
+                signal: AbortSignal.timeout(5000),
               })
             }
           } catch (err) {
@@ -168,6 +171,41 @@ export const auth = betterAuth({
             }
           } catch (err) {
             console.error('[auth] Failed to update stravaAthleteId for user', acct.userId, err)
+          }
+        },
+      },
+      // MOB-2.4: centralized Strava-unlink side effects. Fires whenever a `strava`
+      // account row is deleted — including the **mobile** client's `unlinkAccount()`
+      // (which by itself only removes the row). Mirrors the web Server Action
+      // `disconnectStrava` so web + mobile reach the SAME end state: token revoked +
+      // profiles.stravaAthleteId cleared. Best-effort & idempotent (a re-run after a
+      // user cascade-delete simply no-ops on an already-revoked token / missing profile).
+      delete: {
+        before: async (acct) => {
+          if (acct.providerId !== 'strava') return
+          // Best-effort deauthorize — revoke the access token with Strava.
+          try {
+            if (acct.accessToken) {
+              await fetch('https://www.strava.com/oauth/deauthorize', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${acct.accessToken}` },
+                // Best-effort: cap the call so a slow/unreachable Strava can't make the
+                // interactive mobile `unlinkAccount` request hang on the OS socket timeout.
+                signal: AbortSignal.timeout(5000),
+              })
+            }
+          } catch (err) {
+            console.warn('[auth] Strava deauthorize on unlink failed (best-effort):', err)
+          }
+          // Reset the denormalized athlete id so the web settings page (which reads
+          // profiles.stravaAthleteId) reflects the disconnect performed from mobile.
+          try {
+            await authDb
+              .update(profiles)
+              .set({ stravaAthleteId: null })
+              .where(eq(profiles.id, acct.userId))
+          } catch (err) {
+            console.error('[auth] Failed to clear stravaAthleteId on Strava unlink for user', acct.userId, err)
           }
         },
       },
