@@ -90,6 +90,26 @@
   "settings": {
     "title": "Paramètres",
     "back": "Retour",
-    "integrationsSection": "Intégrations"
+    "integrationsSection": "Intégrations",
+    "accountSection": "Compte",
+    "dangerSection": "Zone de danger",
+    "logout": {
+      "button": "Se déconnecter",
+      "loading": "Déconnexion…",
+      "hint": "Vous déconnecte de votre compte sur cet appareil",
+      "error": "La déconnexion a échoué. Veuillez réessayer."
+    },
+    "deleteAccount": {
+      "button": "Supprimer mon compte",
+      "hint": "Supprime définitivement votre compte et toutes vos données",
+      "warningTitle": "Supprimer définitivement le compte ?",
+      "warning": "Cette action est irréversible. Votre compte ainsi que toutes vos aventures et segments seront définitivement supprimés.",
+      "confirmWord": "SUPPRIMER",
+      "confirmLabel": "Saisissez {{word}} pour confirmer",
+      "confirm": "Supprimer définitivement",
+      "deleting": "Suppression…",
+      "cancel": "Annuler",
+      "error": "La suppression a échoué. Votre compte est intact."
+    }
   }
 }

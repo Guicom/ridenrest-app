@@ -90,6 +90,26 @@
   "settings": {
     "title": "Settings",
     "back": "Back",
-    "integrationsSection": "Integrations"
+    "integrationsSection": "Integrations",
+    "accountSection": "Account",
+    "dangerSection": "Danger zone",
+    "logout": {
+      "button": "Log out",
+      "loading": "Logging out…",
+      "hint": "Signs you out of your account on this device",
+      "error": "Logout failed. Please try again."
+    },
+    "deleteAccount": {
+      "button": "Delete my account",
+      "hint": "Permanently deletes your account and all your data",
+      "warningTitle": "Permanently delete account?",
+      "warning": "This action is irreversible. Your account and all your adventures and segments will be permanently deleted.",
+      "confirmWord": "DELETE",
+      "confirmLabel": "Type {{word}} to confirm",
+      "confirm": "Delete permanently",
+      "deleting": "Deleting…",
+      "cancel": "Cancel",
+      "error": "Deletion failed. Your account is intact."
+    }
   }
 }

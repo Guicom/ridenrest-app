@@ -2,16 +2,15 @@ import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountSection } from '@/components/shared/account-section';
 import { StravaConnectionCard } from '@/components/shared/strava-connection-card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/i18n';
 
-// Écran Paramètres (MOB-2.4 / AC1) — route protégée par le guard `(app)/_layout`
-// (utilisateur connecté garanti, prérequis de l'account-linking Strava). Pour cette
-// story, il n'héberge que l'intégration Strava ; les autres sections (apparence,
-// confidentialité, session/suppression de compte) arrivent en MOB-2.5+.
-//
-// La carte Strava possède son propre `<Card>` → on ne la re-wrappe pas ici.
+// Écran Paramètres — route protégée par le guard `(app)/_layout` (utilisateur
+// connecté garanti). Héberge l'intégration Strava (MOB-2.4) puis les sections
+// « Compte » (déconnexion) et « Zone de danger » (suppression de compte RGPD,
+// MOB-2.5). Chaque section possède sa propre `<Card>` → on ne les re-wrappe pas.
 export default function SettingsScreen() {
   const { t } = useTranslation();
   // En-tête custom (`headerShown: false`) → on décale le contenu sous la status bar /
@@ -42,6 +41,8 @@ export default function SettingsScreen() {
         </Text>
         <StravaConnectionCard />
       </View>
+
+      <AccountSection />
     </ScrollView>
   );
 }
