@@ -17,7 +17,12 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/lib/auth/client', () => ({
-  authClient: { signIn: { email: jest.fn() } },
+  authClient: {
+    // `signIn.social` + `getCookie` requis par <GoogleSignInButton> branché dans
+    // le slot OAuth (MOB-2.3). Le flow Google a ses propres tests dédiés.
+    signIn: { email: jest.fn(), social: jest.fn() },
+    getCookie: jest.fn(() => ''),
+  },
 }));
 
 const mockSignIn = authClient.signIn.email as unknown as jest.Mock;
@@ -36,8 +41,8 @@ describe('Écran connexion (MOB-2.2 / AC2, AC4)', () => {
     expect(screen.getByText(t('auth.login.title'))).toBeTruthy();
     expect(screen.getByLabelText(t('auth.common.emailLabel'))).toBeTruthy();
     expect(screen.getByLabelText(t('auth.common.passwordLabel'))).toBeTruthy();
-    // Slot OAuth réservé (MOB-2.3) : présent mais désactivé.
-    expect(screen.getByText(t('auth.login.googleCta'))).toBeDisabled();
+    // Bouton Google ACTIF (MOB-2.3) branché dans le slot OAuth.
+    expect(screen.getByText(t('auth.google.continue'))).toBeEnabled();
   });
 
   it('affiche une erreur de validation inline pour un email invalide', async () => {

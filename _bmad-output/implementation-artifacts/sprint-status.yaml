@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-12
-last_updated: 2026-06-12  # MOB-2-2 done : code review (7 patches) + T7 validée (device/email) + bouton DEV retiré
+last_updated: 2026-06-12  # MOB-2-3 → done (Google OAuth deep link, code review : 3 patchs appliqués, gate verte)
 project: ridenrest-app
 project_key: N/A
 tracking_system: file-system
@@ -336,18 +336,18 @@ development_status:
   epic-MOB-2: in-progress
   MOB-2-1-better-auth-client-secure-store-session: done  # impl T1-T7 + T7 simulateur iOS OK. Code review 2026-06-08 (3 couches adversariales) : 1 decision RÉSOLUE (bridge apiFetch→signOut sur 401 terminal) + 7 patchs appliqués (apiFetch : 204/empty, erreur réseau→ApiError, base64url, dedup token, getSession .catch ; deps test→devDeps ; test guard inverse (auth)) · 3 defer (durcissement OAuth deep-link→MOB-2.3/4, HTTPS prod, seed online state→MOB-3.5) · ~13 dismissed. Gate mobile re-vérifiée : 19 tests, typecheck, lint, build verts
   MOB-2-2-email-signup-login-password-reset: done  # impl T1-T7 (T7 validée device/email 2026-06-12). Code review 2026-06-12 (3 couches adversariales) : 1 decision résolue (login distingue rate-limit/serveur/réseau vs anti-énum credentials) + 7 patches appliqués (try/catch rejet réseau ; fallback {data:null,error:null} ; email .trim() schéma partagé ; indicateur loading + a11y busy ; tests chemins d'échec ; focus-advance + accessibilityState toggle) · 2 defer (redirectTo localhost→durcissement HTTPS MOB-2.1 ; sanitize name dérivé) · 9 dismissed. Gate verte : mobile 39 tests + typecheck + lint ; shared 39 tests + build. Bouton DEV logout retiré post-T7 (logout UI réel → MOB-2.5)
-  MOB-2-3-google-oauth-deeplink: ready-for-dev
+  MOB-2-3-google-oauth-deeplink: done  # 2026-06-12 — impl T1-T5 + code review. GoogleSignInButton réutilisable (signIn.social server-mediated, succès via getCookie, cancel/échec sans état partiel), oauth-callback → écran transition + validation params, i18n, branché login+signup. T1 : redirect URI Google déjà whitelisté (même endpoint serveur que web prod). T5 validé device (dev build iOS iPhone 17 Pro : succès + persistance kill/relaunch + annulation propre). Code review adversariale 3 couches : 0 écart d'acceptance, 3 patchs appliqués (dep useEffect stable, pas de reset pending au succès, wording doc), 3 différés (cold-start cookie, télémétrie OAuth, namespace i18n). Gate verte : 50 tests, typecheck, lint
   MOB-2-4-strava-oauth-deeplink: ready-for-dev
   MOB-2-5-logout-account-deletion-rgpd: ready-for-dev
   epic-MOB-2-retrospective: optional
 
   # Epic MOB-3 : Aventures & Gestion GPX
-  epic-MOB-3: backlog
-  MOB-3-1-adventures-list-create-rename-delete: backlog
-  MOB-3-2-gpx-upload-segments-parse-notification: backlog
-  MOB-3-3-segment-management-reorder-replace-distances: backlog
-  MOB-3-4-strava-activity-import: backlog
-  MOB-3-5-local-gpx-cache-offline: backlog
+  epic-MOB-3: in-progress
+  MOB-3-1-adventures-list-create-rename-delete: ready-for-dev
+  MOB-3-2-gpx-upload-segments-parse-notification: ready-for-dev
+  MOB-3-3-segment-management-reorder-replace-distances: ready-for-dev
+  MOB-3-4-strava-activity-import: ready-for-dev
+  MOB-3-5-local-gpx-cache-offline: ready-for-dev
   epic-MOB-3-retrospective: optional
 
   # Epic MOB-4 : Carte & Planification POI

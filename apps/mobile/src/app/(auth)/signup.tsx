@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { GoogleSignInButton } from '@/components/shared/google-sign-in-button';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { TextField } from '@/components/ui/text-field';
@@ -89,6 +90,17 @@ export default function SignUpScreen() {
           <Text className="text-sm font-montserrat text-text-muted">
             {t('auth.signup.subtitle')}
           </Text>
+        </View>
+
+        {/* OAuth Google (MOB-2.3) — Google = sign-in/registration (crée le user). */}
+        <GoogleSignInButton />
+
+        <View className="flex-row items-center gap-3">
+          <View className="h-px flex-1 bg-border" />
+          <Text className="text-xs font-montserrat uppercase text-text-muted">
+            {t('auth.login.orContinueWith')}
+          </Text>
+          <View className="h-px flex-1 bg-border" />
         </View>
 
         <View className="gap-4">

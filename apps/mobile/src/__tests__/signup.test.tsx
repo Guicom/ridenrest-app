@@ -17,7 +17,13 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('@/lib/auth/client', () => ({
-  authClient: { signUp: { email: jest.fn() } },
+  authClient: {
+    signUp: { email: jest.fn() },
+    // Requis par <GoogleSignInButton> ajouté au slot OAuth (MOB-2.3). Le flow
+    // Google est testé dans google-sign-in-button.test.tsx.
+    signIn: { social: jest.fn() },
+    getCookie: jest.fn(() => ''),
+  },
 }));
 
 const mockSignUp = authClient.signUp.email as unknown as jest.Mock;
@@ -35,6 +41,8 @@ describe('Écran inscription (MOB-2.2 / AC1, AC4)', () => {
     expect(screen.getByText(t('auth.signup.title'))).toBeTruthy();
     expect(screen.getByLabelText(t('auth.common.emailLabel'))).toBeTruthy();
     expect(screen.getByLabelText(t('auth.common.passwordLabel'))).toBeTruthy();
+    // Bouton Google ACTIF (MOB-2.3) — Google = sign-in/registration.
+    expect(screen.getByText(t('auth.google.continue'))).toBeEnabled();
   });
 
   it('affiche les erreurs de validation inline (email invalide, mdp < 8) sans appeler le serveur', async () => {

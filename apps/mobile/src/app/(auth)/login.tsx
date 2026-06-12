@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { GoogleSignInButton } from '@/components/shared/google-sign-in-button';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { TextField } from '@/components/ui/text-field';
@@ -93,19 +94,8 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {/* Slot OAuth réservé (MOB-2.3) — bouton désactivé, flow non implémenté ici. */}
-        <View className="gap-2">
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full"
-            disabled
-            label={t('auth.login.googleCta')}
-          />
-          <Text className="text-center text-xs font-montserrat text-text-muted">
-            {t('auth.login.googleSoon')}
-          </Text>
-        </View>
+        {/* OAuth Google (MOB-2.3) — flow server-mediated `signIn.social`. */}
+        <GoogleSignInButton />
 
         <View className="flex-row items-center gap-3">
           <View className="h-px flex-1 bg-border" />

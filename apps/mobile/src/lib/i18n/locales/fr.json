@@ -38,9 +38,10 @@
       "forgotPassword": "Mot de passe oublié ?",
       "noAccount": "Pas encore de compte ?",
       "signupLink": "Créer un compte",
-      "orContinueWith": "ou continuer avec",
-      "googleCta": "Continuer avec Google",
-      "googleSoon": "Bientôt disponible"
+      "orContinueWith": "ou continuer avec"
+    },
+    "google": {
+      "continue": "Continuer avec Google"
     },
     "reset": {
       "title": "Mot de passe oublié",
@@ -60,7 +61,9 @@
       "tooManyRequests": "Trop de tentatives. Réessayez plus tard.",
       "serverError": "Service momentanément indisponible. Réessayez.",
       "network": "Connexion impossible. Vérifiez votre réseau.",
-      "generic": "Une erreur est survenue. Réessayez."
+      "generic": "Une erreur est survenue. Réessayez.",
+      "oauthCancelled": "Connexion Google annulée.",
+      "oauthFailed": "La connexion Google a échoué. Réessayez."
     },
     "adventures": {
       "title": "Mes aventures",
