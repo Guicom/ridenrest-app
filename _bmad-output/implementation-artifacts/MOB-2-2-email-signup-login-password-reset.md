@@ -4,7 +4,7 @@ baseline_commit: ac20da855f765e84f8cf9686374961b469eae300
 
 # Story MOB-2.2 : Inscription / connexion email & réinitialisation du mot de passe
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -75,9 +75,9 @@ So that **je peux accéder à l'application sans dépendre d'un fournisseur OAut
   - [x] Mock `@/lib/auth/client` + `expo-router` (aucun réseau réel) ; `userEvent` (pas `fireEvent`) pour awaiter les updates async RHF (RNTL v14 + React 19)
   - [x] `pnpm --filter @ridenrest/mobile test|typecheck|lint` **verts** (33 tests mobile + 38 shared ; typecheck OK ; lint exit 0)
 
-- [ ] **T7 — Validation manuelle** (AC: 1, 2, 3) — ⏳ **À FAIRE par l'utilisateur** (interaction device + boîte mail : non automatisable par l'agent)
-  - [ ] Signup nouvel email → compte créé + connecté + redirigé `adventures` + session persistée (kill/relaunch)
-  - [ ] Login OK / login KO (message générique) ; reset → email Resend reçu (si `RESEND_API_KEY` configuré) + message neutre
+- [x] **T7 — Validation manuelle** (AC: 1, 2, 3) — ✅ **validée par Guillaume le 2026-06-12** (device + email Resend)
+  - [x] Signup nouvel email → compte créé + connecté + redirigé `adventures` + session persistée (kill/relaunch)
+  - [x] Login OK / login KO (message générique) ; reset → email Resend reçu + message neutre
 
 ## Dev Notes
 
@@ -222,7 +222,7 @@ _Revue adversariale (3 couches : Blind Hunter, Edge Case Hunter, Acceptance Audi
 ### Decision-needed
 
 - [x] [Review][Decision→Patch] **Login écrase TOUTES les erreurs en `invalidCredentials`** — _résolu (Guillaume, 2026-06-12) : **distinguer les non-credentials**._ Surfacer un message distinct pour réseau / `TOO_MANY_REQUESTS` / 5xx, en gardant le message générique uniquement sur les vraies erreurs d'authentification (anti-énumération préservée). → voir patch P7 ci-dessous. [Blind Hunter #4]
-- [x] [Review][Decision] **Bouton DEV « Déconnexion (DEV — T7) » (chaîne FR en dur) dans `adventures/index.tsx`** — _résolu (Guillaume, 2026-06-12) : **conservé jusqu'à T7**._ Affordance nécessaire à la validation manuelle T7 (encore à faire). À retirer juste après T7. Pas de modif code maintenant ; reste un item ouvert lié à T7. [Blind Hunter #17 + Acceptance Auditor]
+- [x] [Review][Decision→Patch] **Bouton DEV « Déconnexion (DEV — T7) » (chaîne FR en dur) dans `adventures/index.tsx`** — _résolu (Guillaume, 2026-06-12) : conservé pour T7, **retiré après validation T7**._ T7 validée le 2026-06-12 → bouton DEV + imports `Button`/`signOut` supprimés (`adventures/index.tsx` revenu au placeholder pur). Plus aucune chaîne en dur (AC4 OK). Logout UI réel → MOB-2.5. [Blind Hunter #17 + Acceptance Auditor]
 
 ### Patch
 
