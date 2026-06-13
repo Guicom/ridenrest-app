@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import {
-  Sortable,
+  DropProvider,
   SortableItem,
-  type SortableRenderItemProps,
+  useSortableList,
 } from 'react-native-reanimated-dnd';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
@@ -56,7 +56,6 @@ function positionsToOrderedIds(positions: Record<string, number>): string[] {
 }
 
 export function SegmentList({
-  adventureId,
   segments,
   totalDistanceKm,
   onReorder,
@@ -81,36 +80,19 @@ export function SegmentList({
     [segments, onReorder],
   );
 
-  const renderItem = useCallback(
-    (props: SortableRenderItemProps<AdventureSegmentResponse>) => {
-      const segment = props.item;
-      return (
-        <SortableItem
-          key={segment.id}
-          id={segment.id}
-          data={segment}
-          positions={props.positions}
-          lowerBound={props.lowerBound}
-          autoScrollDirection={props.autoScrollDirection}
-          itemsCount={props.itemsCount}
-          itemHeight={ITEM_HEIGHT}
-          onDrop={(_id, _position, allPositions) => {
-            if (allPositions) handleDrop(allPositions);
-          }}
-        >
-          <SegmentRow
-            segment={segment}
-            locale={locale}
-            disabled={Boolean(isReordering)}
-            onRename={onRename}
-            onDelete={onDelete}
-            onReplace={onReplace}
-          />
-        </SortableItem>
-      );
-    },
-    [locale, isReordering, handleDrop, onRename, onDelete, onReplace],
-  );
+  // La liste triable est rendue dans un conteneur NON-scrollable (une `View` de
+  // hauteur `contentHeight`), PAS via le composant `<Sortable>` qui embarque sa
+  // propre `FlatList`/`ScrollView`. L'écran détail (`[id].tsx`) est déjà un
+  // `<ScrollView>` vertical : y imbriquer une VirtualizedList déclenche
+  // l'avertissement RN « VirtualizedLists should never be nested… » et écrase la
+  // hauteur (le `flex:1` interne de `<Sortable>` colle à 0 dans un ScrollView). On
+  // consomme donc les hooks `useSortableList` + `<DropProvider>` et on laisse le
+  // ScrollView de page gérer le défilement (liste courte → auto-scroll non requis).
+  const { dropProviderRef, getItemProps, contentHeight } = useSortableList({
+    data: segments,
+    itemHeight: ITEM_HEIGHT,
+    itemKeyExtractor: (s) => s.id,
+  });
 
   return (
     <View className="gap-3">
@@ -123,12 +105,29 @@ export function SegmentList({
         })}
       </Text>
 
-      <Sortable
-        key={adventureId}
-        data={segments}
-        renderItem={renderItem}
-        itemHeight={ITEM_HEIGHT}
-      />
+      <DropProvider ref={dropProviderRef}>
+        <View style={{ height: contentHeight }}>
+          {segments.map((segment, index) => (
+            <SortableItem
+              key={segment.id}
+              {...getItemProps(segment, index)}
+              data={segment}
+              onDrop={(_id, _position, allPositions) => {
+                if (allPositions) handleDrop(allPositions);
+              }}
+            >
+              <SegmentRow
+                segment={segment}
+                locale={locale}
+                disabled={Boolean(isReordering)}
+                onRename={onRename}
+                onDelete={onDelete}
+                onReplace={onReplace}
+              />
+            </SortableItem>
+          ))}
+        </View>
+      </DropProvider>
     </View>
   );
 }
@@ -155,7 +154,6 @@ function SegmentRow({
 
   return (
     <Card
-      className="mb-3"
       accessibilityRole="summary"
       accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
     >
