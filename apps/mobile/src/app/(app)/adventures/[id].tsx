@@ -323,6 +323,9 @@ export default function AdventureDetailScreen() {
               <>
                 <Button
                   variant="outline"
+                  size="lg"
+                  className="h-14 rounded-full"
+                  textClassName="text-base text-primary"
                   label={t('strava.import.openButton')}
                   onPress={() => setStravaImportOpen(true)}
                 />

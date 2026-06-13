@@ -127,6 +127,10 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
       <View className="gap-2">
         <Button
           variant="secondary"
+          size="lg"
+          // Parité web mobile : pill haute + texte/icône verts (primary).
+          className="h-14 rounded-full"
+          textClassName="text-base text-primary"
           // Libellé (utilisé pour l'état `loading` : le spinner remplace l'icône).
           label={
             upload.isPending
@@ -141,8 +145,8 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
               affiche son `ActivityIndicator` + `label`. */}
           {upload.isPending || picking ? undefined : (
             <View className="flex-row items-center gap-2">
-              <UploadIcon size={18} className="text-secondary-foreground" />
-              <Text className="text-sm font-montserrat-semibold text-secondary-foreground">
+              <UploadIcon size={18} className="text-primary" />
+              <Text className="text-base font-montserrat-semibold text-primary">
                 {t('adventures.segments.addButton')}
               </Text>
             </View>
