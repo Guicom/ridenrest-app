@@ -80,23 +80,21 @@ jest.mock('@/components/adventure/gpx-uploader', () => {
 
 // DnD : Fragment/children nus (cf. segment-list.test.tsx — gotcha NativeWind).
 jest.mock('react-native-reanimated-dnd', () => {
-  const useSortableList = ({ data }: { data: { id: string }[] }) => ({
-    positions: { value: {} },
-    dropProviderRef: { current: null },
-    contentHeight: data.length * 132,
-    getItemProps: (item: { id: string }) => ({
-      id: item.id,
-      positions: { value: {} },
-      lowerBound: { value: 0 },
-      autoScrollDirection: { value: 'none' },
-      itemsCount: data.length,
-      itemHeight: 132,
-    }),
-  });
-  const DropProvider = ({ children }: any) => children;
+  const Sortable = ({ data, renderItem }: any) =>
+    data.map((item: { id: string }, index: number) =>
+      renderItem({
+        item,
+        index,
+        id: item.id,
+        positions: { value: {} },
+        lowerBound: { value: 0 },
+        autoScrollDirection: { value: 'none' },
+        itemsCount: data.length,
+      }),
+    );
   const SortableItem = ({ children }: any) => children;
   SortableItem.Handle = ({ children }: any) => children;
-  return { useSortableList, DropProvider, SortableItem };
+  return { Sortable, SortableItem };
 });
 
 const mockPick = jest.fn();

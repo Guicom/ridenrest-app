@@ -27,24 +27,19 @@ jest.mock('react-native-reanimated-dnd', () => {
   // viennent des `children` du composant testé. On capture le `onDrop` du dernier
   // `SortableItem` pour simuler la fin d'un drag (parité « simulate-drag-end » web 3.3).
 
-  // `useSortableList` : hook de liste triable (conteneur non-scrollable). On renvoie
-  // des props factices + un `getItemProps` minimal — le composant testé mappe lui-même
-  // les items et rend un `<SortableItem>` par segment.
-  const useSortableList = ({ data }: { data: { id: string }[] }) => ({
-    positions: { value: {} },
-    dropProviderRef: { current: null },
-    contentHeight: data.length * 132,
-    getItemProps: (item: { id: string }) => ({
-      id: item.id,
-      positions: { value: {} },
-      lowerBound: { value: 0 },
-      autoScrollDirection: { value: 'none' },
-      itemsCount: data.length,
-      itemHeight: 132,
-    }),
-  });
-
-  const DropProvider = ({ children }: any) => children;
+  // `Sortable` : rend `renderItem` pour chaque item avec des props factices.
+  const Sortable = ({ data, renderItem }: any) =>
+    data.map((item: { id: string }, index: number) =>
+      renderItem({
+        item,
+        index,
+        id: item.id,
+        positions: { value: {} },
+        lowerBound: { value: 0 },
+        autoScrollDirection: { value: 'none' },
+        itemsCount: data.length,
+      }),
+    );
 
   const SortableItem = ({ children, onDrop }: any) => {
     if (onDrop) mockLastOnDrop = onDrop;
@@ -52,7 +47,7 @@ jest.mock('react-native-reanimated-dnd', () => {
   };
   SortableItem.Handle = ({ children }: any) => children;
 
-  return { useSortableList, DropProvider, SortableItem };
+  return { Sortable, SortableItem };
 });
 
 const t = (k: string, opts?: Record<string, unknown>) => i18n.t(k, opts);
