@@ -64,6 +64,7 @@ function makeRoutes(count: number, offset = 0) {
 async function renderSheet(props: {
   stravaConnected: boolean;
   onClose?: () => void;
+  onImportStarted?: () => void;
 }) {
   // `useStravaRoutes` force `retry: 1` (override du défaut client) ; on annule le
   // BACKOFF (`retryDelay: 0`) pour que l'unique retry échoue instantanément en test
@@ -90,6 +91,7 @@ async function renderSheet(props: {
           adventureId={ADVENTURE_ID}
           open
           onClose={onClose}
+          onImportStarted={props.onImportStarted}
           stravaConnected={props.stravaConnected}
         />
       </QueryClientProvider>
@@ -159,14 +161,15 @@ describe('StravaImportSheet (MOB-3.4 / T7)', () => {
     expect(screen.queryByLabelText('Powered by Strava')).toBeNull();
   });
 
-  it('import OK → POST /import avec { adventureId }, invalide segments, ferme la sheet (AC2)', async () => {
+  it('import OK → POST /import, feedback succès, ferme la sheet (AC2)', async () => {
     mockApiFetch.mockImplementation((path: string) => {
       if (path === '/strava/routes?page=1') return Promise.resolve(makeRoutes(1));
       return Promise.resolve({ id: 'seg-1', parseStatus: 'pending' });
     });
     const onClose = jest.fn();
+    const onImportStarted = jest.fn();
     const user = userEvent.setup();
-    await renderSheet({ stravaConnected: true, onClose });
+    await renderSheet({ stravaConnected: true, onClose, onImportStarted });
 
     await user.press(await screen.findByText(t('strava.import.importButton')));
 
@@ -176,7 +179,53 @@ describe('StravaImportSheet (MOB-3.4 / T7)', () => {
         body: JSON.stringify({ adventureId: ADVENTURE_ID }),
       });
     });
+    await waitFor(() => expect(onImportStarted).toHaveBeenCalled());
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('import pending → le bouton Annuler est désactivé et ne reset pas la mutation', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/strava/routes?page=1') return Promise.resolve(makeRoutes(1));
+      return new Promise(() => {});
+    });
+    const onClose = jest.fn();
+    const user = userEvent.setup();
+    await renderSheet({ stravaConnected: true, onClose });
+
+    await user.press(await screen.findByText(t('strava.import.importButton')));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: t('common.cancel') }).props
+          .accessibilityState,
+      ).toMatchObject({ disabled: true });
+    });
+    await user.press(screen.getByText(t('common.cancel')));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('erreur page suivante → garde le bouton Charger plus pour retry la même page', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/strava/routes?page=1') return Promise.resolve(makeRoutes(30));
+      if (path === '/strava/routes?page=2') {
+        return Promise.reject(new ApiError('Erreur Strava API', 502));
+      }
+      return Promise.resolve([]);
+    });
+    const user = userEvent.setup();
+    await renderSheet({ stravaConnected: true });
+
+    await user.press(await screen.findByText(t('strava.import.loadMore')));
+    expect(await screen.findByText(t('strava.errors.stravaDown'))).toBeTruthy();
+    expect(screen.getByText(t('strava.import.loadMore'))).toBeTruthy();
+
+    await user.press(screen.getByText(t('strava.import.loadMore')));
+    await waitFor(() => {
+      const pageTwoCalls = mockApiFetch.mock.calls.filter(
+        ([path]) => path === '/strava/routes?page=2',
+      );
+      expect(pageTwoCalls.length).toBeGreaterThan(1);
+    });
   });
 
   it('erreur 429 → ErrorBanner i18n rate-limit', async () => {

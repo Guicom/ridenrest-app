@@ -451,6 +451,7 @@ export default function AdventureDetailScreen() {
         adventureId={id}
         open={stravaImportOpen}
         onClose={() => setStravaImportOpen(false)}
+        onImportStarted={() => setParsedMessage(t('strava.import.successToast'))}
         stravaConnected={stravaConnected}
       />
 

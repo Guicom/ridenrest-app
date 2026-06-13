@@ -114,8 +114,13 @@ describe('mapStravaError', () => {
     );
   });
   it('404 → notConnected', () => {
-    expect(mapStravaError(new ApiError('x', 404))).toBe(
+    expect(mapStravaError(new ApiError('Compte Strava non connecté', 404))).toBe(
       'strava.errors.notConnected',
+    );
+  });
+  it('404 non-Strava → generic', () => {
+    expect(mapStravaError(new ApiError('Adventure not found', 404))).toBe(
+      'strava.errors.generic',
     );
   });
   it('429 défaut → rateLimit15', () => {

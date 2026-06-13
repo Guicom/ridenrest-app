@@ -50,7 +50,9 @@ const STRAVA_ROUTES_STALE_TIME_MS = 1000 * 60 * 60; // 1h — miroir du TTL Redi
  * Mappe une erreur (`ApiError` ou autre) vers une clé i18n affichable.
  *
  * - `status 0` / `NETWORK_ERROR` → clé réseau générique existante.
- * - `404` → `notConnected` (l'appelant bascule sur l'état « non connecté »).
+ * - `404` Strava/token absent → `notConnected` (l'appelant bascule sur l'état
+ *   « non connecté »). Les autres 404 (aventure absente/non autorisée) restent
+ *   génériques pour ne pas afficher un faux problème de compte Strava.
  * - `429` → discrimine via le message serveur (« demain » → quota journalier),
  *   sinon limite 15 min.
  * - `502` → Strava indisponible.
@@ -61,7 +63,9 @@ export function mapStravaError(error: unknown): StravaErrorKey {
     if (error.status === 0 || error.code === 'NETWORK_ERROR') {
       return 'strava.errors.network';
     }
-    if (error.status === 404) return 'strava.errors.notConnected';
+    if (error.status === 404 && /strava|compte/i.test(error.message)) {
+      return 'strava.errors.notConnected';
+    }
     if (error.status === 429) {
       // Le serveur renvoie deux libellés distincts (15 min vs quota journalier).
       // On discrimine sur le message ; par défaut, limite 15 min.
@@ -76,7 +80,11 @@ export function mapStravaError(error: unknown): StravaErrorKey {
 
 /** `true` si l'erreur est un 404 (token Strava absent → état « non connecté »). */
 export function isStravaNotConnectedError(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 404;
+  return (
+    error instanceof ApiError &&
+    error.status === 404 &&
+    /strava|compte/i.test(error.message)
+  );
 }
 
 export interface UseStravaRoutesOptions {

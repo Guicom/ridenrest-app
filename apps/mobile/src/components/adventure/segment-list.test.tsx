@@ -18,6 +18,10 @@ import { i18n } from '@/lib/i18n';
 // Capture l'`onReorder` de la ReorderableList → déclencheur de reorder testable.
 let mockLastOnReorder: ((e: { from: number; to: number }) => void) | null = null;
 
+jest.mock('@/hooks/use-color-scheme', () => ({
+  useColorScheme: () => ({ colorScheme: 'light' }),
+}));
+
 jest.mock('react-native-reorderable-list', () => {
   const ReorderableList = ({
     data,
@@ -134,6 +138,16 @@ describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
       />,
     );
     expect(screen.getByText(t('adventures.segments.parsing'))).toBeTruthy();
+  });
+
+  it('affiche l’attribution Strava sur un segment importé', async () => {
+    await render(
+      <SegmentList
+        {...baseProps}
+        segments={[makeSegment('a', { source: 'strava' })]}
+      />,
+    );
+    expect(screen.getByLabelText('Powered by Strava')).toBeTruthy();
   });
 
   it('expose un drag handle avec label a11y', async () => {

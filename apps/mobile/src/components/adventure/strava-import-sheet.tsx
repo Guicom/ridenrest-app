@@ -38,6 +38,7 @@ export interface StravaImportSheetProps {
   adventureId: string;
   open: boolean;
   onClose: () => void;
+  onImportStarted?: () => void;
   /** Dérivé de `useStravaConnection().isConnected` (MOB-2.4). Pilote l'état/lazy. */
   stravaConnected: boolean;
 }
@@ -46,6 +47,7 @@ export function StravaImportSheet({
   adventureId,
   open,
   onClose,
+  onImportStarted,
   stravaConnected,
 }: StravaImportSheetProps) {
   const { t } = useTranslation();
@@ -92,10 +94,11 @@ export function StravaImportSheet({
     importMutation.reset();
   }, [importMutation]);
 
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback((force = false) => {
+    if (!force && importMutation.isPending) return;
     reset();
     onClose();
-  }, [reset, onClose]);
+  }, [importMutation.isPending, reset, onClose]);
 
   const handleImport = useCallback(
     (stravaRouteId: string) => {
@@ -104,12 +107,15 @@ export function StravaImportSheet({
       importMutation.mutate(
         { stravaRouteId },
         {
-          onSuccess: () => handleClose(), // ferme la sheet (le polling MOB-3.2 prend le relais).
+          onSuccess: () => {
+            onImportStarted?.();
+            handleClose(true); // ferme la sheet (le polling MOB-3.2 prend le relais).
+          },
           onError: () => setImportingId(null),
         },
       );
     },
-    [importMutation, handleClose],
+    [importMutation, handleClose, onImportStarted],
   );
 
   const goToSettings = useCallback(() => {
@@ -119,8 +125,12 @@ export function StravaImportSheet({
     router.push('/(app)/settings');
   }, [onClose]);
 
-  // Une page pleine (= PAGE_SIZE) ⇒ il peut y avoir une page suivante.
-  const hasMore = (pageData?.length ?? 0) >= PAGE_SIZE;
+  // Une page pleine (= PAGE_SIZE) ⇒ il peut y avoir une page suivante. Pendant le
+  // chargement/erreur d'une page > 1, on garde le CTA visible pour montrer le loading
+  // puis permettre un retry de la même page sans devoir fermer/réouvrir la sheet.
+  const hasMore =
+    (page > 1 && (routesQuery.isPending || routesQuery.isError)) ||
+    (pageData?.length ?? 0) >= PAGE_SIZE;
   const isLoadingFirstPage = routesQuery.isPending && routes.length === 0;
   const listError = routesQuery.error;
   // Un 404 sur le listing = token Strava absent → on bascule sur l'état « non
@@ -136,7 +146,11 @@ export function StravaImportSheet({
   const bannerMessage = bannerError ? t(mapStravaError(bannerError)) : null;
 
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={handleClose}>
+    <Modal
+      visible={open}
+      animationType="slide"
+      onRequestClose={() => handleClose()}
+    >
       <View
         className="flex-1 bg-background-page"
         style={{ paddingTop: insets.top + 16 }}
@@ -150,7 +164,8 @@ export function StravaImportSheet({
             size="sm"
             className="px-0"
             label={t('common.cancel')}
-            onPress={handleClose}
+            disabled={importMutation.isPending}
+            onPress={() => handleClose()}
           />
         </View>
 
@@ -207,7 +222,10 @@ export function StravaImportSheet({
                     variant="outline"
                     label={t('strava.import.loadMore')}
                     loading={routesQuery.isFetching}
-                    onPress={() => setPage((p) => p + 1)}
+                    onPress={() => {
+                      if (routesQuery.isError) void routesQuery.refetch();
+                      else setPage((p) => p + 1);
+                    }}
                   />
                 ) : null}
               </>

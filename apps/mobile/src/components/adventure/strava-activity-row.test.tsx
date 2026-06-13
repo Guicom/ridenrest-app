@@ -32,6 +32,11 @@ describe('StravaActivityRow (MOB-3.4 / T3)', () => {
     expect(screen.getByText('42,3 km')).toBeTruthy();
     expect(screen.getByText('+1234 m')).toBeTruthy();
     expect(screen.getByText(t('strava.import.importButton'))).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        `${t('strava.import.importButton')} Tour du Mont-Blanc, 42,3 km`,
+      ),
+    ).toBeTruthy();
   });
 
   it('D+ null → pas de dénivelé affiché', async () => {

@@ -41,6 +41,7 @@ export function StravaActivityRow({
 
   // Libellé a11y consolidé (nom + distance) pour la ligne entière.
   const accessibilityLabel = `${route.name}, ${distanceLabel}`;
+  const importAccessibilityLabel = `${t('strava.import.importButton')} ${route.name}, ${distanceLabel}`;
 
   return (
     <Card
@@ -77,6 +78,7 @@ export function StravaActivityRow({
         }
         loading={importing}
         disabled={disabled || importing}
+        accessibilityLabel={importAccessibilityLabel}
         onPress={onImport}
       />
     </Card>

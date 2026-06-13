@@ -4,7 +4,7 @@ baseline_commit: d37e04047f1f48daa5bbee92f089478c8aeaa2ce
 
 # Story 3.4 : Import d'activité Strava (mobile)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -122,6 +122,15 @@ So that **je n'ai pas à exporter/importer manuellement un fichier GPX**.
   - [ ] Strava connecté (MOB-2.4) → écran détail aventure → « Importer depuis Strava » → liste des routes → « Importer » → sheet se ferme, segment apparaît `pending` puis `done` (polling MOB-3.2), badge « Powered by Strava » sur le segment.
   - [ ] Strava **non** connecté → état « connecte ton compte » + CTA vers settings.
   - [ ] Couper le réseau / forcer un `429` → `<ErrorBanner>` clair, pas de segment fantôme.
+
+### Review Findings
+
+- [x] [Review][Patch] Empêcher la fermeture/reset pendant un import Strava en cours [apps/mobile/src/components/adventure/strava-import-sheet.tsx:89]
+- [x] [Review][Patch] Afficher le feedback `strava.import.successToast` après import réussi [apps/mobile/src/components/adventure/strava-import-sheet.tsx:107]
+- [x] [Review][Patch] Afficher l'attribution Strava dans le rendu réellement utilisé des segments [apps/mobile/src/components/adventure/segment-list.tsx:196]
+- [x] [Review][Patch] Garder un chemin retry/chargement visible quand une page Strava suivante échoue [apps/mobile/src/components/adventure/strava-import-sheet.tsx:122]
+- [x] [Review][Patch] Distinguer les 404 d'import aventure des 404 Strava non connecté [apps/mobile/src/hooks/use-strava.ts:64]
+- [x] [Review][Patch] Rendre les boutons d'import distinguables au lecteur d'écran [apps/mobile/src/components/adventure/strava-activity-row.tsx:70]
 
 ## Dev Notes
 

@@ -15,6 +15,7 @@ import ReorderableList, {
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
 import { Card } from '@/components/ui/card';
+import { PoweredByStrava } from '@/components/shared/powered-by-strava';
 import {
   GripVerticalIcon,
   PencilIcon,
@@ -164,6 +165,7 @@ function SegmentRow({
   // l'intérieur d'un item rendu par `ReorderableList` (contexte requis).
   const drag = useReorderableDrag();
   const isDone = segment.parseStatus === 'done';
+  const isStrava = segment.source === 'strava';
 
   return (
     <Card
@@ -218,6 +220,12 @@ function SegmentRow({
           </Text>
         )}
       </View>
+
+      {isStrava ? (
+        <View className="mt-3 flex-row">
+          <PoweredByStrava height={16} />
+        </View>
+      ) : null}
 
       <View className="mt-3 flex-row gap-4">
         <SegmentAction
