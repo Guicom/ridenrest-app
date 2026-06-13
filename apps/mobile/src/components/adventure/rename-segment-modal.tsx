@@ -87,7 +87,7 @@ function RenameForm({
 
   const handleSubmit = () => {
     setTouched(true);
-    if (error) return;
+    if (isPending || error) return;
     onSubmit(trimmed);
   };
 
@@ -107,9 +107,15 @@ function RenameForm({
         onSubmitEditing={handleSubmit}
       />
       <View className="flex-row justify-end gap-2">
-        <Button variant="ghost" label={t('common.cancel')} onPress={onCancel} />
+        <Button
+          variant="ghost"
+          label={t('common.cancel')}
+          disabled={isPending}
+          onPress={onCancel}
+        />
         <Button
           loading={isPending}
+          disabled={Boolean(error)}
           label={t('common.save')}
           onPress={handleSubmit}
         />

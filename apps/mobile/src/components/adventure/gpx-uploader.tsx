@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { UploadIcon } from '@/components/ui/icon';
 import { useUploadSegment } from '@/hooks/use-segments';
+import type { RnFile } from '@/lib/api/segments';
 import { useTranslation } from '@/lib/i18n';
 
 // Uploader de segment GPX (MOB-3.2 / AC1, AC3). Sélection via `expo-document-picker`
@@ -31,7 +32,9 @@ import { useTranslation } from '@/lib/i18n';
 // - `result.canceled` → no-op silencieux (AC1).
 // - Erreurs (extension/taille → client ; réseau/serveur → ApiError) affichées
 //   inline via `<ErrorBanner />`, jamais `Alert.alert`.
-// - `ref.pick()` : déclenche le picker depuis l'extérieur (flux « Réessayer », AC3).
+// - `ref.pick()` : déclenche le picker + upload depuis l'extérieur.
+// - `ref.pickFile()` : ne fait que sélectionner/valider un GPX, utilisé par le flux
+//   « Remplacer » pour uploader le nouveau segment avant de supprimer l'ancien.
 
 // MIME permissif : iOS/Android ne déclarent pas tous l'UTI `application/gpx+xml`.
 // On valide l'extension `.gpx` côté client après sélection (gotcha type MIME).
@@ -49,9 +52,10 @@ export interface GpxUploaderProps {
   onUploaded?: (segment: AdventureSegmentResponse) => void;
 }
 
-/** Handle impératif : déclenche le picker depuis l'extérieur (flux « Réessayer », AC3). */
+/** Handle impératif : picker complet ou sélection seule selon le flux appelant. */
 export interface GpxUploaderHandle {
-  pick: () => void;
+  pick: () => Promise<boolean>;
+  pickFile: () => Promise<RnFile | null>;
 }
 
 export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
@@ -70,10 +74,10 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
     // le bouton désactivé. Un flag ref bloque les deux sans attendre un rerender.
     const busyRef = useRef(false);
 
-    const handlePress = useCallback(async () => {
+    const pickFile = useCallback(async (): Promise<RnFile | null> => {
       // Court-circuit si un picker est déjà ouvert ou un upload est en cours
       // (évite pickers/uploads concurrents — double-press et retry mid-upload).
-      if (busyRef.current || upload.isPending) return;
+      if (busyRef.current || upload.isPending) return null;
       busyRef.current = true;
       setPicking(true);
       setValidationError(null);
@@ -90,14 +94,14 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
           multiple: false,
         });
 
-        if (result.canceled) return; // AC1 : annulation = no-op silencieux.
+        if (result.canceled) return null; // AC1 : annulation = no-op silencieux.
         const asset = result.assets?.[0];
-        if (!asset) return;
+        if (!asset) return null;
 
         // Validation extension `.gpx` (le MIME n'est pas fiable cross-plateforme).
         if (!asset.name.toLowerCase().endsWith('.gpx')) {
           setValidationError(t('adventures.segments.invalidExtension'));
-          return;
+          return null;
         }
 
         // Validation taille AVANT tout réseau (parité web AC7). `asset.size` peut
@@ -105,23 +109,35 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
         const size = asset.size ?? new File(asset.uri).size ?? null;
         if (size != null && size > MAX_GPX_FILE_SIZE_BYTES) {
           setValidationError(t('adventures.segments.fileTooLarge'));
-          return;
+          return null;
         }
 
-        upload.mutate(
-          { file: { uri: asset.uri, name: asset.name, type: GPX_MIME } },
-          { onSuccess: (segment) => onUploaded?.(segment) },
-        );
+        return { uri: asset.uri, name: asset.name, type: GPX_MIME };
       } catch {
         // Échec inattendu du picker / lecture taille → feedback générique inline.
         setValidationError(t('adventures.segments.uploadError'));
+        return null;
       } finally {
         busyRef.current = false;
         setPicking(false);
       }
-    }, [t, upload, onUploaded]);
+    }, [t, upload]);
 
-    useImperativeHandle(ref, () => ({ pick: handlePress }), [handlePress]);
+    const handlePress = useCallback(async (): Promise<boolean> => {
+      const file = await pickFile();
+      if (!file) return false;
+      upload.mutate(
+        { file },
+        { onSuccess: (segment) => onUploaded?.(segment) },
+      );
+      return true;
+    }, [pickFile, upload, onUploaded]);
+
+    useImperativeHandle(
+      ref,
+      () => ({ pick: handlePress, pickFile }),
+      [handlePress, pickFile],
+    );
 
     return (
       <View className="gap-2">

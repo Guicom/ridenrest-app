@@ -29,13 +29,16 @@ jest.mock('react-native-reorderable-list', () => {
   }: any) => {
     if (onReorder) mockLastOnReorder = onReorder;
     const list = data ?? [];
-    const items = list.map((item: { id: string }, index: number) =>
-      renderItem({ item, index }),
-    );
+    const withKey = (child: any, key: string) =>
+      child && typeof child === 'object' ? { ...child, key } : child;
+    const items = list.map((item: { id: string }, index: number) => {
+      const child = renderItem({ item, index });
+      return withKey(child, item.id);
+    });
     return [
-      ListHeaderComponent ?? null,
-      ...(list.length === 0 ? [ListEmptyComponent ?? null] : items),
-      ListFooterComponent ?? null,
+      withKey(ListHeaderComponent, 'header'),
+      ...(list.length === 0 ? [withKey(ListEmptyComponent, 'empty')] : items),
+      withKey(ListFooterComponent, 'footer'),
     ];
   };
   const useReorderableDrag = () => () => {};
@@ -167,6 +170,33 @@ describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
       />,
     );
     mockLastOnReorder?.({ from: 1, to: 1 });
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('n’appelle pas onReorder pendant une mutation reorder/delete en vol', async () => {
+    const onReorder = jest.fn();
+    await render(
+      <SegmentList
+        {...baseProps}
+        onReorder={onReorder}
+        segments={[makeSegment('a'), makeSegment('b'), makeSegment('c')]}
+        isReordering
+      />,
+    );
+    mockLastOnReorder?.({ from: 2, to: 0 });
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it('ignore un événement reorder hors bornes', async () => {
+    const onReorder = jest.fn();
+    await render(
+      <SegmentList
+        {...baseProps}
+        onReorder={onReorder}
+        segments={[makeSegment('a'), makeSegment('b')]}
+      />,
+    );
+    mockLastOnReorder?.({ from: 2, to: 0 });
     expect(onReorder).not.toHaveBeenCalled();
   });
 

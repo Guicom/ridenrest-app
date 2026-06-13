@@ -40,6 +40,7 @@ import {
   useRenameSegment,
   useReorderSegments,
   useSegments,
+  useUploadSegment,
 } from '@/hooks/use-segments';
 import { useStravaConnection } from '@/hooks/use-strava-connection';
 import { useNetworkStatus } from '@/hooks/use-network-status';
@@ -68,10 +69,13 @@ export default function AdventureDetailScreen() {
   const reorderSegmentsMutation = useReorderSegments(id);
   const renameSegmentMutation = useRenameSegment(id);
   const deleteSegmentMutation = useDeleteSegment(id);
+  const uploadReplacementMutation = useUploadSegment(id);
 
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [segmentRenameTarget, setSegmentRenameTarget] =
     useState<RenameSegmentTarget | null>(null);
+  const [replaceError, setReplaceError] = useState(false);
+  const [isReplacing, setIsReplacing] = useState(false);
 
   // Import Strava (MOB-3.4). Détection « connecté » réutilise le hook de MOB-2.4
   // (`['strava-connection']` via `listAccounts`) — aucune détection dupliquée.
@@ -142,11 +146,9 @@ export default function AdventureDetailScreen() {
     [t, deleteSegmentMutation],
   );
 
-  // Remplacement = delete PUIS ré-upload via le `gpx-uploader` existant (pas
-  // d'endpoint dédié). Ordre : on supprime d'abord ; au succès du delete, on ouvre
-  // le picker (nouveau segment `pending`, appended en fin). En cas d'échec d'upload
-  // après delete, l'ErrorBanner de l'uploader surface l'erreur — l'utilisateur
-  // peut ré-essayer l'ajout (le segment a déjà été retiré).
+  // Remplacement = sélection/upload du nouveau GPX PUIS suppression de l'ancien et
+  // reorder du nouveau segment à l'emplacement remplacé. On ne supprime jamais
+  // l'ancien segment avant que le nouveau fichier soit effectivement uploadé.
   const handleSegmentReplace = useCallback(
     (segment: AdventureSegmentResponse) => {
       Alert.alert(
@@ -157,15 +159,43 @@ export default function AdventureDetailScreen() {
           {
             text: t('adventures.segments.replace'),
             style: 'destructive',
-            onPress: () =>
-              deleteSegmentMutation.mutate(segment.id, {
-                onSuccess: () => uploaderRef.current?.pick(),
-              }),
+            onPress: async () => {
+              setReplaceError(false);
+              const file = await uploaderRef.current?.pickFile();
+              if (!file) return;
+
+              setIsReplacing(true);
+              try {
+                const newSegment =
+                  await uploadReplacementMutation.mutateAsync({ file });
+                const currentSegments = segments ?? [];
+                const orderedIds = currentSegments.map((s) =>
+                  s.id === segment.id ? newSegment.id : s.id,
+                );
+                if (!orderedIds.includes(newSegment.id)) {
+                  orderedIds.push(newSegment.id);
+                }
+
+                await deleteSegmentMutation.mutateAsync(segment.id);
+                await reorderSegmentsMutation.mutateAsync(orderedIds);
+                setParsedMessage(null);
+              } catch {
+                setReplaceError(true);
+              } finally {
+                setIsReplacing(false);
+              }
+            },
           },
         ],
       );
     },
-    [t, deleteSegmentMutation],
+    [
+      t,
+      segments,
+      deleteSegmentMutation,
+      reorderSegmentsMutation,
+      uploadReplacementMutation,
+    ],
   );
 
   const confirmDelete = () => {
@@ -303,8 +333,11 @@ export default function AdventureDetailScreen() {
         {renameSegmentMutation.isError ? (
           <ErrorBanner message={t('adventures.segments.errors.rename')} />
         ) : null}
-        {deleteSegmentMutation.isError ? (
+        {deleteSegmentMutation.isError && !replaceError ? (
           <ErrorBanner message={t('adventures.segments.errors.delete')} />
+        ) : null}
+        {replaceError || uploadReplacementMutation.isError ? (
+          <ErrorBanner message={t('adventures.segments.errors.replace')} />
         ) : null}
 
         {isOnline ? (
@@ -398,7 +431,10 @@ export default function AdventureDetailScreen() {
           onDelete={handleSegmentDelete}
           onReplace={handleSegmentReplace}
           isReordering={
-            reorderSegmentsMutation.isPending || deleteSegmentMutation.isPending
+            reorderSegmentsMutation.isPending ||
+            deleteSegmentMutation.isPending ||
+            isReplacing ||
+            uploadReplacementMutation.isPending
           }
           ListHeaderComponent={header}
           ListFooterComponent={footer}

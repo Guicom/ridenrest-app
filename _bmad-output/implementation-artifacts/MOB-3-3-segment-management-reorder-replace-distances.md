@@ -4,7 +4,7 @@ baseline_commit: 35e5cc4
 
 # Story MOB-3.3 : Gestion des segments (réordre, suppression, remplacement, renommage, distances)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -142,6 +142,17 @@ So that **je structure mon itinéraire en étapes ordonnées**.
   - [ ] Supprimer (avec confirm) ; remplacer un segment (delete + nouvel upload `pending` → `done`).
   - [ ] Renommer un segment → nom persiste.
   - [ ] Distances : total + cumul par segment affichés et cohérents après reorder/delete (recompute serveur).
+
+### Review Findings
+
+- [x] [Review][Patch] Le remplacement ou l'ajout GPX peut laisser `totalDistanceKm` obsolète car `useUploadSegment` n'invalide pas `['adventures', adventureId]` [apps/mobile/src/hooks/use-segments.ts:146]
+- [x] [Review][Patch] Le drag peut relancer un reorder pendant une mutation en vol car `isReordering` ne bloque que les boutons, pas `handleDrop` [apps/mobile/src/components/adventure/segment-list.tsx:71]
+- [x] [Review][Patch] Le remplacement affiche les échecs sous l'erreur de suppression/upload générique et n'utilise jamais `adventures.segments.errors.replace` [apps/mobile/src/app/(app)/adventures/[id].tsx:258]
+- [x] [Review][Patch] Le remplacement peut supprimer le segment sans remplacement si le picker est annulé après le delete réussi [apps/mobile/src/app/(app)/adventures/[id].tsx:139]
+- [x] [Review][Patch] Le remplacement ré-upload le nouveau GPX en append, sans préserver la position du segment remplacé [apps/mobile/src/app/(app)/adventures/[id].tsx:141]
+- [x] [Review][Patch] L'optimistic reorder accepte une map de positions partielle/stale et peut retirer temporairement des segments du cache avant le rollback [apps/mobile/src/hooks/use-segments.ts:181]
+- [x] [Review][Patch] La DnD suppose `ITEM_HEIGHT = 132` sans verrouiller/mesurer la hauteur réelle des cartes, ce qui peut fausser les positions avec textes longs ou tailles d'accessibilité [apps/mobile/src/components/adventure/segment-list.tsx:37]
+- [x] [Review][Patch] Le submit clavier du modal de renommage ignore `isPending` et peut déclencher deux requêtes rename [apps/mobile/src/components/adventure/rename-segment-modal.tsx:88]
 
 ## Dev Notes
 

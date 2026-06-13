@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  render,
+  screen,
+  userEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type {
   AdventureResponse,
@@ -13,7 +19,8 @@ import { i18n } from '@/lib/i18n';
 
 // ⚠️ Hors de `src/app/` À DESSEIN : importe une route (`require.context` bundlerait
 // ce test sinon — cf. AGENTS.md). Couvre AC2 : la suppression d'un segment appelle
-// la mutation APRÈS confirmation ; le remplacement = delete PUIS ré-upload (pick()).
+// la mutation APRÈS confirmation ; le remplacement sélectionne/upload le nouveau GPX
+// AVANT de supprimer l'ancien, puis réordonne le nouveau à l'ancienne position.
 // On mocke les façades réseau, expo-router, safe-area, le gpx-uploader (expose
 // `pick`) et `react-native-reanimated-dnd` (sans JSX RN → Fragment/children nus,
 // gotcha NativeWind). `Alert.alert` est espionné pour déclencher le bouton confirm.
@@ -66,13 +73,16 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// gpx-uploader : expose un `pick` espionnable via le handle impératif (forwardRef).
+// gpx-uploader : expose un `pickFile` espionnable via le handle impératif.
 // Pas de JSX RN dans la factory → on retourne `null` et on câble la ref.
 jest.mock('@/components/adventure/gpx-uploader', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { forwardRef, useImperativeHandle } = require('react');
   const GpxUploader = forwardRef(function GpxUploader(_props: any, ref: any) {
-    useImperativeHandle(ref, () => ({ pick: mockPick }));
+    useImperativeHandle(ref, () => ({
+      pick: mockPick,
+      pickFile: mockPickFile,
+    }));
     return null;
   });
   return { GpxUploader };
@@ -89,13 +99,16 @@ jest.mock('react-native-reorderable-list', () => {
     ListEmptyComponent,
   }: any) => {
     const list = data ?? [];
-    const items = list.map((item: { id: string }, index: number) =>
-      renderItem({ item, index }),
-    );
+    const withKey = (child: any, key: string) =>
+      child && typeof child === 'object' ? { ...child, key } : child;
+    const items = list.map((item: { id: string }, index: number) => {
+      const child = renderItem({ item, index });
+      return withKey(child, item.id);
+    });
     return [
-      ListHeaderComponent ?? null,
-      ...(list.length === 0 ? [ListEmptyComponent ?? null] : items),
-      ListFooterComponent ?? null,
+      withKey(ListHeaderComponent, 'header'),
+      ...(list.length === 0 ? [withKey(ListEmptyComponent, 'empty')] : items),
+      withKey(ListFooterComponent, 'footer'),
     ];
   };
   const useReorderableDrag = () => () => {};
@@ -114,9 +127,12 @@ jest.mock('react-native-reorderable-list', () => {
 });
 
 const mockPick = jest.fn();
+const mockPickFile = jest.fn();
 const mockGetAdventure = adventuresApi.getAdventure as jest.Mock;
 const mockListSegments = segmentsApi.listSegments as jest.Mock;
 const mockDeleteSegment = segmentsApi.deleteSegment as jest.Mock;
+const mockUploadSegment = segmentsApi.uploadSegment as jest.Mock;
+const mockReorderSegments = segmentsApi.reorderSegments as jest.Mock;
 const t = (k: string, opts?: Record<string, unknown>) => i18n.t(k, opts);
 
 const ADVENTURE: AdventureResponse = {
@@ -154,6 +170,13 @@ const SEGMENT: AdventureSegmentResponse = {
   updatedAt: '2026-06-01T10:00:00.000Z',
 };
 
+const REPLACEMENT_SEGMENT: AdventureSegmentResponse = {
+  ...SEGMENT,
+  id: 'seg-new',
+  name: 'Remplacement',
+  parseStatus: 'pending',
+};
+
 async function renderScreen(): Promise<void> {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -170,6 +193,13 @@ beforeEach(() => {
   mockGetAdventure.mockResolvedValue(ADVENTURE);
   mockListSegments.mockResolvedValue([SEGMENT]);
   mockDeleteSegment.mockResolvedValue({ deleted: true });
+  mockUploadSegment.mockResolvedValue(REPLACEMENT_SEGMENT);
+  mockReorderSegments.mockResolvedValue([REPLACEMENT_SEGMENT]);
+  mockPickFile.mockResolvedValue({
+    uri: 'file:///replacement.gpx',
+    name: 'replacement.gpx',
+    type: 'application/gpx+xml',
+  });
 });
 
 describe('Écran détail aventure — actions segment (MOB-3.3 / AC2)', () => {
@@ -195,14 +225,16 @@ describe('Écran détail aventure — actions segment (MOB-3.3 / AC2)', () => {
     const [, , buttons] = alertSpy.mock.calls.at(-1)!;
     const confirm = buttons?.find((b) => b.style === 'destructive');
     expect(confirm).toBeTruthy();
-    confirm!.onPress?.();
+    await act(async () => {
+      await confirm!.onPress?.();
+    });
 
     await waitFor(() =>
       expect(mockDeleteSegment).toHaveBeenCalledWith('adv-1', 'seg-1'),
     );
   });
 
-  it('remplacement : delete confirmé PUIS pick() (ré-upload)', async () => {
+  it('remplacement : upload confirmé PUIS delete et reorder à la même position', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert');
     const user = userEvent.setup();
     await renderScreen();
@@ -212,12 +244,30 @@ describe('Écran détail aventure — actions segment (MOB-3.3 / AC2)', () => {
 
     const [, , buttons] = alertSpy.mock.calls.at(-1)!;
     const confirm = buttons?.find((b) => b.style === 'destructive');
-    confirm!.onPress?.();
+    await act(async () => {
+      await confirm!.onPress?.();
+    });
 
-    // delete d'abord ; le pick() suit au succès du delete (onSuccess).
+    await waitFor(() => expect(mockPickFile).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockUploadSegment).toHaveBeenCalledWith(
+        'adv-1',
+        {
+          uri: 'file:///replacement.gpx',
+          name: 'replacement.gpx',
+          type: 'application/gpx+xml',
+        },
+        undefined,
+      ),
+    );
     await waitFor(() =>
       expect(mockDeleteSegment).toHaveBeenCalledWith('adv-1', 'seg-1'),
     );
-    await waitFor(() => expect(mockPick).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockReorderSegments).toHaveBeenCalledWith('adv-1', ['seg-new']),
+    );
+    expect(mockUploadSegment.mock.invocationCallOrder[0]).toBeLessThan(
+      mockDeleteSegment.mock.invocationCallOrder[0],
+    );
   });
 });

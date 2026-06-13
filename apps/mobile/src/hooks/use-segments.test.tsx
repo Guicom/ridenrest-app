@@ -7,6 +7,8 @@ import {
   useDeleteSegment,
   useRenameSegment,
   useReorderSegments,
+  useSegments,
+  useUploadSegment,
 } from '@/hooks/use-segments';
 import * as segmentsApi from '@/lib/api/segments';
 
@@ -30,6 +32,8 @@ jest.mock('@/lib/api/segments', () => ({
 const mockReorder = segmentsApi.reorderSegments as jest.Mock;
 const mockRename = segmentsApi.renameSegment as jest.Mock;
 const mockDelete = segmentsApi.deleteSegment as jest.Mock;
+const mockList = segmentsApi.listSegments as jest.Mock;
+const mockUpload = segmentsApi.uploadSegment as jest.Mock;
 
 function makeSegment(
   id: string,
@@ -190,5 +194,57 @@ describe('useDeleteSegment (AC2)', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['adventures', 'adv-1'],
     });
+  });
+});
+
+describe('useUploadSegment (AC2/AC4)', () => {
+  it('invalide les segments ET l’aventure après upload', async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
+    mockUpload.mockResolvedValue(makeSegment('new', 1));
+
+    const hook = await mountHook(() => useUploadSegment('adv-1'), qc);
+
+    await act(async () => {
+      hook.current.mutate({
+        file: {
+          uri: 'file:///trace.gpx',
+          name: 'trace.gpx',
+          type: 'application/gpx+xml',
+        },
+      });
+    });
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: SEG_KEY });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['adventures', 'adv-1'],
+    });
+  });
+});
+
+describe('useSegments parse transitions (AC4)', () => {
+  it('invalide l’aventure quand un segment termine son parsing', async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
+    mockList
+      .mockResolvedValueOnce([makeSegment('a', 0, 'Segment a')])
+      .mockResolvedValue([
+        makeSegment('a', 0, 'Segment a'),
+        makeSegment('b', 1, 'Segment b'),
+      ]);
+
+    const hook = await mountHook(() => useSegments('adv-1'), qc);
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+
+    await act(async () => {
+      await hook.current.refetch();
+    });
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['adventures', 'adv-1'],
+      }),
+    );
   });
 });

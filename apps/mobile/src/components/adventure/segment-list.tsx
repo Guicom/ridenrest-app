@@ -97,11 +97,20 @@ export function SegmentList({
 
   const handleReorder = useCallback(
     ({ from, to }: ReorderableListReorderEvent) => {
+      if (isReordering) return;
       if (from === to) return;
+      if (
+        from < 0 ||
+        to < 0 ||
+        from >= segments.length ||
+        to >= segments.length
+      ) {
+        return;
+      }
       const orderedIds = reorderItems(segments, from, to).map((s) => s.id);
       onReorder(orderedIds);
     },
-    [segments, onReorder],
+    [isReordering, segments, onReorder],
   );
 
   const renderItem = useCallback(
@@ -165,11 +174,13 @@ function SegmentRow({
       <View className="flex-row items-center gap-2">
         {/* Poignée de drag explicite (appui long → réordonne). */}
         <Pressable
-          onLongPress={drag}
+          onLongPress={disabled ? undefined : drag}
           delayLongPress={150}
           accessibilityRole="button"
           accessibilityLabel={t('adventures.segments.reorderA11y')}
-          className="p-1"
+          accessibilityState={{ disabled }}
+          disabled={disabled}
+          className="p-1 disabled:opacity-50"
         >
           <GripVerticalIcon size={20} className="text-text-muted" />
         </Pressable>

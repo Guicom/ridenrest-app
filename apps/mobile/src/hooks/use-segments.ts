@@ -109,6 +109,7 @@ export interface UseSegmentsOptions {
  *   `onParseError` que le composant utilise pour le feedback in-app (AC2/AC3).
  */
 export function useSegments(adventureId: string, opts?: UseSegmentsOptions) {
+  const qc = useQueryClient();
   const query = useQuery({
     queryKey: segmentsKey(adventureId),
     queryFn: () => listSegments(adventureId),
@@ -129,11 +130,14 @@ export function useSegments(adventureId: string, opts?: UseSegmentsOptions) {
     );
     parsed.forEach((s) => onParsed?.(s));
     errored.forEach((s) => onParseError?.(s));
+    if (parsed.length > 0 || errored.length > 0) {
+      void qc.invalidateQueries({ queryKey: ['adventures', adventureId] });
+    }
     // Ne pas baseliner sur une liste vide/indéfinie : un `[]` transitoire comme
     // snapshot précédent ferait passer un segment pré-existant `done` pour un
     // fast-parse au prochain poll (faux positif). Parité web 3.2 (`length > 0`).
     if (query.data && query.data.length > 0) prevRef.current = query.data;
-  }, [query.data, onParsed, onParseError]);
+  }, [adventureId, qc, query.data, onParsed, onParseError]);
 
   return query;
 }
@@ -148,10 +152,12 @@ export function useUploadSegment(adventureId: string) {
   return useMutation({
     mutationFn: (vars: { file: RnFile; name?: string }) =>
       uploadSegment(adventureId, vars.file, vars.name),
-    onSuccess: () =>
+    onSuccess: () => {
       qc.invalidateQueries({
         queryKey: segmentsKey(adventureId),
-      }),
+      });
+      qc.invalidateQueries({ queryKey: ['adventures', adventureId] });
+    },
   });
 }
 
