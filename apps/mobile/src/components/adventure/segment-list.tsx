@@ -67,6 +67,65 @@ export function SegmentList({
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
 
+  return (
+    <View className="gap-3">
+      <Text
+        className="text-sm font-montserrat-semibold text-text-primary"
+        accessibilityRole="header"
+      >
+        {t('adventures.segments.totalDistance', {
+          km: formatKm(totalDistanceKm, locale),
+        })}
+      </Text>
+
+      {/* Remontage quand l'ENSEMBLE ou l'ORDRE des segments change : `useSortableList`
+          n'initialise sa map `positions` qu'au montage (`useSharedValue`) et ne la
+          resynchronise PAS sur changement de `data`. Sans ce `key`, un segment ajouté
+          (ex. import Strava) n'a pas d'entrée dans la map → position 0 par défaut →
+          il chevauche le 1er segment. Le composant `<Sortable>` faisait ce remontage
+          en interne via `key={dataHash(data)}` ; on le reproduit ici. */}
+      <DraggableSegmentList
+        key={segments.map((s) => s.id).join('|')}
+        segments={segments}
+        locale={locale}
+        isReordering={Boolean(isReordering)}
+        onReorder={onReorder}
+        onRename={onRename}
+        onDelete={onDelete}
+        onReplace={onReplace}
+      />
+    </View>
+  );
+}
+
+interface DraggableSegmentListProps {
+  segments: AdventureSegmentResponse[];
+  locale: string;
+  isReordering: boolean;
+  onReorder: (orderedIds: string[]) => void;
+  onRename: (segment: AdventureSegmentResponse) => void;
+  onDelete: (segment: AdventureSegmentResponse) => void;
+  onReplace: (segment: AdventureSegmentResponse) => void;
+}
+
+/**
+ * Liste triable rendue dans un conteneur NON-scrollable (une `View` de hauteur
+ * `contentHeight`), PAS via le composant `<Sortable>` qui embarque sa propre
+ * `FlatList`/`ScrollView`. L'écran détail (`[id].tsx`) est déjà un `<ScrollView>`
+ * vertical : y imbriquer une VirtualizedList déclenche l'avertissement RN
+ * « VirtualizedLists should never be nested… » et écrase la hauteur. On consomme
+ * donc `useSortableList` + `<DropProvider>` et on laisse le ScrollView de page gérer
+ * le défilement (liste courte → auto-scroll non requis).
+ */
+function DraggableSegmentList({
+  segments,
+  locale,
+  isReordering,
+  onReorder,
+  onRename,
+  onDelete,
+  onReplace,
+}: DraggableSegmentListProps) {
   const handleDrop = useCallback(
     (positions: Record<string, number>) => {
       const orderedIds = positionsToOrderedIds(positions);
@@ -80,14 +139,6 @@ export function SegmentList({
     [segments, onReorder],
   );
 
-  // La liste triable est rendue dans un conteneur NON-scrollable (une `View` de
-  // hauteur `contentHeight`), PAS via le composant `<Sortable>` qui embarque sa
-  // propre `FlatList`/`ScrollView`. L'écran détail (`[id].tsx`) est déjà un
-  // `<ScrollView>` vertical : y imbriquer une VirtualizedList déclenche
-  // l'avertissement RN « VirtualizedLists should never be nested… » et écrase la
-  // hauteur (le `flex:1` interne de `<Sortable>` colle à 0 dans un ScrollView). On
-  // consomme donc les hooks `useSortableList` + `<DropProvider>` et on laisse le
-  // ScrollView de page gérer le défilement (liste courte → auto-scroll non requis).
   const { dropProviderRef, getItemProps, contentHeight } = useSortableList({
     data: segments,
     itemHeight: ITEM_HEIGHT,
@@ -95,40 +146,29 @@ export function SegmentList({
   });
 
   return (
-    <View className="gap-3">
-      <Text
-        className="text-sm font-montserrat-semibold text-text-primary"
-        accessibilityRole="header"
-      >
-        {t('adventures.segments.totalDistance', {
-          km: formatKm(totalDistanceKm, locale),
-        })}
-      </Text>
-
-      <DropProvider ref={dropProviderRef}>
-        <View style={{ height: contentHeight }}>
-          {segments.map((segment, index) => (
-            <SortableItem
-              key={segment.id}
-              {...getItemProps(segment, index)}
-              data={segment}
-              onDrop={(_id, _position, allPositions) => {
-                if (allPositions) handleDrop(allPositions);
-              }}
-            >
-              <SegmentRow
-                segment={segment}
-                locale={locale}
-                disabled={Boolean(isReordering)}
-                onRename={onRename}
-                onDelete={onDelete}
-                onReplace={onReplace}
-              />
-            </SortableItem>
-          ))}
-        </View>
-      </DropProvider>
-    </View>
+    <DropProvider ref={dropProviderRef}>
+      <View style={{ height: contentHeight }}>
+        {segments.map((segment, index) => (
+          <SortableItem
+            key={segment.id}
+            {...getItemProps(segment, index)}
+            data={segment}
+            onDrop={(_id, _position, allPositions) => {
+              if (allPositions) handleDrop(allPositions);
+            }}
+          >
+            <SegmentRow
+              segment={segment}
+              locale={locale}
+              disabled={isReordering}
+              onRename={onRename}
+              onDelete={onDelete}
+              onReplace={onReplace}
+            />
+          </SortableItem>
+        ))}
+      </View>
+    </DropProvider>
   );
 }
 
