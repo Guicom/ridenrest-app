@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { cssInterop } from 'nativewind';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
@@ -44,6 +46,18 @@ import {
 import { useStravaConnection } from '@/hooks/use-strava-connection';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useTranslation } from '@/lib/i18n';
+
+// La page utilise le `ScrollView` de `react-native-gesture-handler` (et NON celui de
+// `react-native`) : c'est la condition pour que le glisser-déposer des segments
+// (gesture-handler Pan via `react-native-reanimated-dnd`) puisse prendre le pas sur
+// le scroll vertical. Le Pan de la lib n'a aucune coordination externe → sans un
+// ScrollView gesture-handler comme ancêtre, le scroll capte le geste et le drag ne
+// s'active jamais. On ré-enregistre le mapping NativeWind (className → style/
+// contentContainerStyle) car ce composant n'est pas un primitif RN auto-géré.
+cssInterop(ScrollView, {
+  className: { target: 'style' },
+  contentContainerClassName: { target: 'contentContainerStyle' },
+});
 
 // Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
 // nom + actions (renommer/supprimer), puis la liste des segments GPX, l'uploader et
