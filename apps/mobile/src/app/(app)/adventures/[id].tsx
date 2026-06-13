@@ -1,6 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { cssInterop } from 'nativewind';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
@@ -44,6 +46,18 @@ import {
 import { useStravaConnection } from '@/hooks/use-strava-connection';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useTranslation } from '@/lib/i18n';
+
+// La page utilise le `ScrollView` de `react-native-gesture-handler` (et NON celui de
+// `react-native`) : c'est la condition pour que le glisser-déposer des segments
+// (gesture-handler Pan via `react-native-reanimated-dnd`) puisse prendre le pas sur
+// le scroll vertical. Le Pan de la lib n'a aucune coordination externe → sans un
+// ScrollView gesture-handler comme ancêtre, le scroll capte le geste et le drag ne
+// s'active jamais. On ré-enregistre le mapping NativeWind (className → style/
+// contentContainerStyle) car ce composant n'est pas un primitif RN auto-géré.
+cssInterop(ScrollView, {
+  className: { target: 'style' },
+  contentContainerClassName: { target: 'contentContainerStyle' },
+});
 
 // Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
 // nom + actions (renommer/supprimer), puis la liste des segments GPX, l'uploader et
@@ -188,13 +202,13 @@ export default function AdventureDetailScreen() {
     );
   };
 
-  // Écran en COLONNE (et non un ScrollView global) : en-tête figé → liste de segments
-  // scrollable (le `<Sortable>` EST le scroller, condition du drag) → pied figé
-  // (« Supprimer l'aventure »). Le drag ne peut fonctionner que si la liste triable
-  // n'est PAS imbriquée dans un autre ScrollView vertical (cf. segment-list.tsx).
   return (
-    <View className="flex-1 bg-background-page" style={{ paddingTop }}>
-      <View className="flex-row items-center justify-between px-6 pb-2">
+    <ScrollView
+      className="flex-1 bg-background-page"
+      contentContainerClassName="gap-6 p-6"
+      contentContainerStyle={{ paddingTop }}
+    >
+      <View className="flex-row items-center justify-between">
         <Button
           variant="link"
           size="sm"
@@ -205,20 +219,16 @@ export default function AdventureDetailScreen() {
       </View>
 
       {isPending ? (
-        <View className="gap-3 px-6">
+        <View className="gap-3">
           <Skeleton className="h-8 w-2/3 rounded-lg" />
           <Skeleton className="h-20 rounded-xl" />
         </View>
       ) : isError || !data ? (
-        <View className="px-6">
-          <ErrorBanner message={t('adventures.errors.loadFailed')} />
-        </View>
+        <ErrorBanner message={t('adventures.errors.loadFailed')} />
       ) : (
         <>
-          {/* EN-TÊTE FIGÉ (ne défile pas avec la liste de segments). */}
-          <View className="gap-4 px-6 pb-3">
-          {/* Titre + crayon de renommage (parité web : icône à côté du titre, pas un
-              bouton plein). Désactivé offline. */}
+          {/* Titre + crayon de renommage (parité web mobile : l'action « renommer »
+              est une icône à côté du titre, pas un bouton plein). Désactivée offline. */}
           <View className="flex-row items-center gap-2">
             <Text className="flex-1 text-2xl font-montserrat-bold text-text-primary">
               {data.name}
@@ -339,10 +349,15 @@ export default function AdventureDetailScreen() {
                 — la trace cachée reste consultable mais on ne peut plus muter (AC2). */}
             {isOnline ? (
               <>
-                {/* Parité web : pill outline (bordure verte) + pill ghost vert. */}
+                {/* Parité web (adventure-detail.tsx) : size lg = h-11 (= le web),
+                    pill rounded-full, bordure verte légère, texte vert. La hauteur
+                    vient du `size` (comme le web), PAS d'un padding/h-auto. */}
                 <Button
                   variant="outline"
                   size="lg"
+                  // `!border-primary/30` (important) : force le vert faible du web
+                  // par-dessus le `border-border` (gris #D4E0DA) du variant outline,
+                  // que tailwind-merge ne dédoublonne pas de façon fiable côté mobile.
                   className="rounded-full !border-primary/30 px-6 active:bg-primary/10"
                   textClassName="text-primary"
                   label={t('strava.import.openButton')}
@@ -355,12 +370,7 @@ export default function AdventureDetailScreen() {
                 />
               </>
             ) : null}
-          </View>
-          </View>
 
-          {/* LISTE DE SEGMENTS SCROLLABLE (flex-1) : le <Sortable> EST le scroller
-              (condition du drag — cf. segment-list.tsx). */}
-          <View className="flex-1 px-6">
             {segmentsPending ? (
               <View className="gap-3">
                 <Skeleton className="h-20 rounded-xl" />
@@ -390,33 +400,33 @@ export default function AdventureDetailScreen() {
             )}
           </View>
 
-          {/* PIED FIGÉ : suppression de l'aventure (rouge clair), tout en bas. */}
-          <View className="gap-2 px-6 pb-6 pt-3">
-            {deleteMutation.isError ? (
-              <ErrorBanner message={t('adventures.errors.deleteFailed')} />
-            ) : null}
-            <Button
-              variant="ghost"
-              className="bg-destructive/10 active:bg-destructive/20"
-              textClassName="text-destructive"
-              disabled={!isOnline}
-              loading={deleteMutation.isPending}
-              label={t('adventures.delete.button')}
-              accessibilityHint={
-                !isOnline ? t('offline.actionUnavailable') : undefined
-              }
-              onPress={confirmDelete}
-            >
-              {deleteMutation.isPending ? undefined : (
-                <View className="flex-row items-center gap-2">
-                  <Trash2Icon size={18} className="text-destructive" />
-                  <Text className="text-sm font-montserrat-semibold text-destructive">
-                    {t('adventures.delete.button')}
-                  </Text>
-                </View>
-              )}
-            </Button>
-          </View>
+          {/* Suppression de l'aventure (parité web mobile) : bouton « rouge clair »
+              (fond destructive atténué + texte/icône rouges), tout en bas de l'écran.
+              Désactivé offline. */}
+          {deleteMutation.isError ? (
+            <ErrorBanner message={t('adventures.errors.deleteFailed')} />
+          ) : null}
+          <Button
+            variant="ghost"
+            className="bg-destructive/10 active:bg-destructive/20"
+            textClassName="text-destructive"
+            disabled={!isOnline}
+            loading={deleteMutation.isPending}
+            label={t('adventures.delete.button')}
+            accessibilityHint={
+              !isOnline ? t('offline.actionUnavailable') : undefined
+            }
+            onPress={confirmDelete}
+          >
+            {deleteMutation.isPending ? undefined : (
+              <View className="flex-row items-center gap-2">
+                <Trash2Icon size={18} className="text-destructive" />
+                <Text className="text-sm font-montserrat-semibold text-destructive">
+                  {t('adventures.delete.button')}
+                </Text>
+              </View>
+            )}
+          </Button>
         </>
       )}
 
@@ -450,6 +460,6 @@ export default function AdventureDetailScreen() {
           )
         }
       />
-    </View>
+    </ScrollView>
   );
 }

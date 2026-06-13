@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import {
-  Sortable,
+  DropProvider,
   SortableItem,
-  type SortableRenderItemProps,
+  useSortableList,
 } from 'react-native-reanimated-dnd';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
@@ -84,6 +84,54 @@ export function SegmentList({
   const { i18n } = useTranslation();
   const locale = i18n.language;
 
+  // Remontage quand l'ENSEMBLE ou l'ORDRE des segments change : `useSortableList`
+  // n'initialise sa map `positions` qu'au montage (`useSharedValue`) et ne la
+  // resynchronise PAS sur changement de `data`. Sans ce `key`, un segment ajouté
+  // (ex. import Strava) n'a pas d'entrée dans la map → position 0 par défaut → il
+  // chevauche le 1er segment. Le composant `<Sortable>` faisait ce remontage en
+  // interne via `key={dataHash(data)}` ; on le reproduit ici.
+  return (
+    <DraggableSegmentList
+      key={segments.map((s) => s.id).join('|')}
+      segments={segments}
+      locale={locale}
+      isReordering={Boolean(isReordering)}
+      onReorder={onReorder}
+      onRename={onRename}
+      onDelete={onDelete}
+      onReplace={onReplace}
+    />
+  );
+}
+
+interface DraggableSegmentListProps {
+  segments: AdventureSegmentResponse[];
+  locale: string;
+  isReordering: boolean;
+  onReorder: (orderedIds: string[]) => void;
+  onRename: (segment: AdventureSegmentResponse) => void;
+  onDelete: (segment: AdventureSegmentResponse) => void;
+  onReplace: (segment: AdventureSegmentResponse) => void;
+}
+
+/**
+ * Liste triable rendue dans un conteneur NON-scrollable (une `View` de hauteur
+ * `contentHeight`), PAS via le composant `<Sortable>` qui embarque sa propre
+ * `FlatList`/`ScrollView`. L'écran détail (`[id].tsx`) est déjà un `<ScrollView>`
+ * vertical : y imbriquer une VirtualizedList déclenche l'avertissement RN
+ * « VirtualizedLists should never be nested… » et écrase la hauteur. On consomme
+ * donc `useSortableList` + `<DropProvider>` et on laisse le ScrollView de page gérer
+ * le défilement (liste courte → auto-scroll non requis).
+ */
+function DraggableSegmentList({
+  segments,
+  locale,
+  isReordering,
+  onReorder,
+  onRename,
+  onDelete,
+  onReplace,
+}: DraggableSegmentListProps) {
   const handleDrop = useCallback(
     (positions: Record<string, number>) => {
       const orderedIds = positionsToOrderedIds(positions);
@@ -97,54 +145,36 @@ export function SegmentList({
     [segments, onReorder],
   );
 
-  const renderItem = useCallback(
-    (props: SortableRenderItemProps<AdventureSegmentResponse>) => {
-      const segment = props.item;
-      return (
-        <SortableItem
-          key={segment.id}
-          id={segment.id}
-          data={segment}
-          positions={props.positions}
-          lowerBound={props.lowerBound}
-          autoScrollDirection={props.autoScrollDirection}
-          itemsCount={props.itemsCount}
-          itemHeight={ITEM_HEIGHT}
-          onDrop={(_id, _position, allPositions) => {
-            if (allPositions) handleDrop(allPositions);
-          }}
-        >
-          <SegmentRow
-            segment={segment}
-            locale={locale}
-            disabled={Boolean(isReordering)}
-            onRename={onRename}
-            onDelete={onDelete}
-            onReplace={onReplace}
-          />
-        </SortableItem>
-      );
-    },
-    [locale, isReordering, handleDrop, onRename, onDelete, onReplace],
-  );
+  const { dropProviderRef, getItemProps, contentHeight } = useSortableList({
+    data: segments,
+    itemHeight: ITEM_HEIGHT,
+    itemKeyExtractor: (s) => s.id,
+  });
 
-  // On utilise le composant `<Sortable>` de la lib (et NON les hooks bas niveau) :
-  // il embarque son propre `GestureHandlerRootView` + `ScrollView` gesture-handler
-  // câblés pour le drag (le Pan de la lib n'a aucune coordination de geste externe →
-  // il DOIT vivre dans ce scroller dédié). Conséquence : `<Sortable>` doit être le
-  // SCROLLER (hauteur réelle via `flex-1` du parent), jamais imbriqué dans un autre
-  // `ScrollView` (sinon son `flex:1` s'effondre). L'écran détail est donc restructuré
-  // en colonne (en-tête figé / liste scrollable / pied figé). `<Sortable>` se remonte
-  // en interne via `key={dataHash(data)}` → un segment ajouté ne chevauche plus le 1er.
   return (
-    <Sortable
-      data={segments}
-      renderItem={renderItem}
-      itemHeight={ITEM_HEIGHT}
-      // Le style par défaut du scroller de la lib est `backgroundColor:'white'` →
-      // on le rend transparent pour suivre le fond de page.
-      style={{ backgroundColor: 'transparent' }}
-    />
+    <DropProvider ref={dropProviderRef}>
+      <View style={{ height: contentHeight }}>
+        {segments.map((segment, index) => (
+          <SortableItem
+            key={segment.id}
+            {...getItemProps(segment, index)}
+            data={segment}
+            onDrop={(_id, _position, allPositions) => {
+              if (allPositions) handleDrop(allPositions);
+            }}
+          >
+            <SegmentRow
+              segment={segment}
+              locale={locale}
+              disabled={isReordering}
+              onRename={onRename}
+              onDelete={onDelete}
+              onReplace={onReplace}
+            />
+          </SortableItem>
+        ))}
+      </View>
+    </DropProvider>
   );
 }
 
