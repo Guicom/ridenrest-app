@@ -241,7 +241,7 @@ export default function AdventureDetailScreen() {
           {/* Structure copiée du web (adventure-detail.tsx) : `gap-4` entre la
               distance et le groupe dénivelé, qui réunit D+ et D- séparés par un
               « · » (mx-0.5). Icônes 16px, texte muted. */}
-          <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
+          <View className="flex-row flex-wrap items-center gap-4">
             <View className="flex-row items-center gap-1">
               <RouteIcon size={16} className="text-text-muted" />
               <Text className="text-sm font-montserrat text-text-muted">
