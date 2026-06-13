@@ -21,8 +21,15 @@ import { StravaImportSheet } from '@/components/adventure/strava-import-sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
-import { PencilIcon, Trash2Icon } from '@/components/ui/icon';
+import {
+  PencilIcon,
+  RouteIcon,
+  Trash2Icon,
+  TrendingDownIcon,
+  TrendingUpIcon,
+} from '@/components/ui/icon';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatKm } from '@/lib/format/distance';
 import {
   useAdventure,
   useDeleteAdventure,
@@ -42,7 +49,8 @@ import { useTranslation } from '@/lib/i18n';
 // nom + actions (renommer/supprimer), puis la liste des segments GPX, l'uploader et
 // la notification in-app de fin de parsing. MOB-3.3 y greffera dates/vitesse/profil.
 export default function AdventureDetailScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -209,6 +217,40 @@ export default function AdventureDetailScreen() {
             {data.name}
           </Text>
 
+          {/* Stats de l'aventure (parité web mobile) : distance totale + D+/D-,
+              valeurs SERVEUR (`totalDistanceKm`/`totalElevationGainM/LossM`),
+              jamais recalculées. D+/D- omis si la donnée est absente. */}
+          <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
+            <View className="flex-row items-center gap-1.5">
+              <RouteIcon size={16} className="text-text-muted" />
+              <Text className="text-sm font-montserrat text-text-muted">
+                {t('adventures.segments.distanceKm', {
+                  value: formatKm(data.totalDistanceKm, locale),
+                })}
+              </Text>
+            </View>
+            {data.totalElevationGainM != null ? (
+              <View className="flex-row items-center gap-1.5">
+                <TrendingUpIcon size={16} className="text-text-muted" />
+                <Text className="text-sm font-montserrat text-text-muted">
+                  {t('adventures.segments.gainDPlus', {
+                    value: Math.round(data.totalElevationGainM),
+                  })}
+                </Text>
+              </View>
+            ) : null}
+            {data.totalElevationLossM != null ? (
+              <View className="flex-row items-center gap-1.5">
+                <TrendingDownIcon size={16} className="text-text-muted" />
+                <Text className="text-sm font-montserrat text-text-muted">
+                  {t('adventures.segments.lossDMinus', {
+                    value: Math.round(data.totalElevationLossM),
+                  })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
           {/* Lecture seule offline (MOB-3.5 / AC2) : message explicite + actions
               réseau désactivées. La trace/POIs cachés restent consultables. */}
           {!isOnline ? (
@@ -310,7 +352,6 @@ export default function AdventureDetailScreen() {
               <SegmentList
                 adventureId={id}
                 segments={segments}
-                totalDistanceKm={data.totalDistanceKm}
                 onReorder={handleSegmentReorder}
                 onRename={handleSegmentRename}
                 onDelete={handleSegmentDelete}

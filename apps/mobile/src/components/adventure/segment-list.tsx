@@ -39,7 +39,6 @@ const ITEM_HEIGHT = 132;
 export interface SegmentListProps {
   adventureId: string;
   segments: AdventureSegmentResponse[];
-  totalDistanceKm: number;
   onReorder: (orderedIds: string[]) => void;
   onRename: (segment: AdventureSegmentResponse) => void;
   onDelete: (segment: AdventureSegmentResponse) => void;
@@ -55,46 +54,53 @@ function positionsToOrderedIds(positions: Record<string, number>): string[] {
     .map(([id]) => id);
 }
 
+/**
+ * Formate le dénivelé d'un segment au format web mobile : « 527 m D+ · 1013 m D- »
+ * (valeurs serveur, arrondies). Omet une part si la donnée est absente (`null`).
+ */
+function formatElevationDelta(
+  gainM: number | null,
+  lossM: number | null,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  const parts: string[] = [];
+  if (gainM != null) {
+    parts.push(t('adventures.segments.gainDPlus', { value: Math.round(gainM) }));
+  }
+  if (lossM != null) {
+    parts.push(t('adventures.segments.lossDMinus', { value: Math.round(lossM) }));
+  }
+  return parts.join(' · ');
+}
+
 export function SegmentList({
   segments,
-  totalDistanceKm,
   onReorder,
   onRename,
   onDelete,
   onReplace,
   isReordering,
 }: SegmentListProps) {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const locale = i18n.language;
 
+  // Remontage quand l'ENSEMBLE ou l'ORDRE des segments change : `useSortableList`
+  // n'initialise sa map `positions` qu'au montage (`useSharedValue`) et ne la
+  // resynchronise PAS sur changement de `data`. Sans ce `key`, un segment ajouté
+  // (ex. import Strava) n'a pas d'entrée dans la map → position 0 par défaut → il
+  // chevauche le 1er segment. Le composant `<Sortable>` faisait ce remontage en
+  // interne via `key={dataHash(data)}` ; on le reproduit ici.
   return (
-    <View className="gap-3">
-      <Text
-        className="text-sm font-montserrat-semibold text-text-primary"
-        accessibilityRole="header"
-      >
-        {t('adventures.segments.totalDistance', {
-          km: formatKm(totalDistanceKm, locale),
-        })}
-      </Text>
-
-      {/* Remontage quand l'ENSEMBLE ou l'ORDRE des segments change : `useSortableList`
-          n'initialise sa map `positions` qu'au montage (`useSharedValue`) et ne la
-          resynchronise PAS sur changement de `data`. Sans ce `key`, un segment ajouté
-          (ex. import Strava) n'a pas d'entrée dans la map → position 0 par défaut →
-          il chevauche le 1er segment. Le composant `<Sortable>` faisait ce remontage
-          en interne via `key={dataHash(data)}` ; on le reproduit ici. */}
-      <DraggableSegmentList
-        key={segments.map((s) => s.id).join('|')}
-        segments={segments}
-        locale={locale}
-        isReordering={Boolean(isReordering)}
-        onReorder={onReorder}
-        onRename={onRename}
-        onDelete={onDelete}
-        onReplace={onReplace}
-      />
-    </View>
+    <DraggableSegmentList
+      key={segments.map((s) => s.id).join('|')}
+      segments={segments}
+      locale={locale}
+      isReordering={Boolean(isReordering)}
+      onReorder={onReorder}
+      onRename={onRename}
+      onDelete={onDelete}
+      onReplace={onReplace}
+    />
   );
 }
 
@@ -219,17 +225,22 @@ function SegmentRow({
 
       <View className="mt-2">
         {isDone ? (
-          <View className="flex-row items-center gap-3">
-            <Text className="text-sm font-montserrat text-text-muted">
-              {t('adventures.segments.cumulative', {
-                km: formatKm(segment.cumulativeStartKm, locale),
-              })}
-            </Text>
+          <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
             <Text className="text-sm font-montserrat-semibold text-text-primary">
-              {t('adventures.segments.length', {
-                km: formatKm(segment.distanceKm, locale),
+              {t('adventures.segments.distanceKm', {
+                value: formatKm(segment.distanceKm, locale),
               })}
             </Text>
+            {segment.elevationGainM != null ||
+            segment.elevationLossM != null ? (
+              <Text className="text-sm font-montserrat text-text-muted">
+                {formatElevationDelta(
+                  segment.elevationGainM,
+                  segment.elevationLossM,
+                  t,
+                )}
+              </Text>
+            ) : null}
           </View>
         ) : (
           <Text className="text-sm font-montserrat text-text-muted">

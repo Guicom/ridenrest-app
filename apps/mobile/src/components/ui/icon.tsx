@@ -6,8 +6,11 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Route,
   Settings,
   Trash2,
+  TrendingDown,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -37,7 +40,10 @@ export const GripVerticalIcon = enableClassName(GripVertical);
 export const PencilIcon = enableClassName(Pencil);
 export const PlusIcon = enableClassName(Plus);
 export const RefreshCwIcon = enableClassName(RefreshCw);
+export const RouteIcon = enableClassName(Route);
 export const SettingsIcon = enableClassName(Settings);
 export const Trash2Icon = enableClassName(Trash2);
+export const TrendingDownIcon = enableClassName(TrendingDown);
+export const TrendingUpIcon = enableClassName(TrendingUp);
 
 export type { LucideIcon };

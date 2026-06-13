@@ -159,11 +159,11 @@ beforeEach(() => {
 });
 
 describe('Écran détail aventure — actions segment (MOB-3.3 / AC2)', () => {
-  it('affiche la distance totale et le segment', async () => {
+  it('affiche la distance totale (stats aventure) et le segment', async () => {
     await renderScreen();
     expect(
       await screen.findByText(
-        t('adventures.segments.totalDistance', { km: '120,5' }),
+        t('adventures.segments.distanceKm', { value: '120,5' }),
       ),
     ).toBeTruthy();
     expect(screen.getByText('Étape 1')).toBeTruthy();

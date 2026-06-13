@@ -4,16 +4,15 @@ import { render, screen, userEvent } from '@testing-library/react-native';
 import { SegmentList } from '@/components/adventure/segment-list';
 import { i18n } from '@/lib/i18n';
 
-// Test de composant (co-localisé — pas une route). Vérifie : distances formatées
-// (total + cumul/longueur via formatKm), libellé « Analyse en cours… » pour un
-// segment non `done`, présence du drag handle (a11y label), et appel
-// `onReorder(orderedIds)` quand le drag termine.
+// Test de composant (co-localisé — pas une route). Vérifie : distance + dénivelé
+// (D+/D-) formatés (valeurs serveur, parité web mobile), libellé « Analyse en
+// cours… » pour un segment non `done`, présence du drag handle (a11y label), et
+// appel `onReorder(orderedIds)` quand le drag termine.
 //
 // ⚠️ Mock de `react-native-reanimated-dnd` SANS JSX RN dans la factory (le transform
-// NativeWind injecte une variable hors-scope interdite par jest) : on construit les
-// éléments via `React.createElement` et on capture le dernier `onDrop` reçu pour
-// pouvoir simuler la fin d'un drag (gotcha AGENTS.md ; parité « simulate-drag-end »
-// de la story web 3.3).
+// NativeWind injecte une variable hors-scope interdite par jest) : les composants
+// mockés retournent leurs `children` ; on capture le dernier `onDrop` reçu pour
+// simuler la fin d'un drag (parité « simulate-drag-end » de la story web 3.3).
 
 // Capture le `onDrop` du dernier SortableItem rendu → déclencheur de reorder testable.
 let mockLastOnDrop:
@@ -84,7 +83,7 @@ beforeEach(() => {
   mockLastOnDrop = null;
 });
 
-describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
+describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
   const baseProps = {
     adventureId: 'adv-1',
     onReorder: jest.fn(),
@@ -93,37 +92,37 @@ describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
     onReplace: jest.fn(),
   };
 
-  it('affiche la distance totale formatée (serveur)', async () => {
-    await render(
-      <SegmentList
-        {...baseProps}
-        segments={[makeSegment('a')]}
-        totalDistanceKm={128.6}
-      />,
-    );
-    expect(
-      screen.getByText(
-        t('adventures.segments.totalDistance', { km: '128,6' }),
-      ),
-    ).toBeTruthy();
-  });
-
-  it('affiche cumul + longueur formatés pour un segment done', async () => {
+  it('affiche distance + dénivelé (D+/D-) formatés (serveur) pour un segment done', async () => {
     await render(
       <SegmentList
         {...baseProps}
         segments={[
-          makeSegment('a', { cumulativeStartKm: 0, distanceKm: 42.34 }),
+          makeSegment('a', {
+            distanceKm: 42.34,
+            elevationGainM: 527,
+            elevationLossM: 1013,
+          }),
         ]}
-        totalDistanceKm={42.3}
       />,
     );
     expect(
-      screen.getByText(t('adventures.segments.cumulative', { km: '0' })),
+      screen.getByText(t('adventures.segments.distanceKm', { value: '42,3' })),
     ).toBeTruthy();
     expect(
-      screen.getByText(t('adventures.segments.length', { km: '42,3' })),
+      screen.getByText(
+        `${t('adventures.segments.gainDPlus', { value: 527 })} · ${t(
+          'adventures.segments.lossDMinus',
+          { value: 1013 },
+        )}`,
+      ),
     ).toBeTruthy();
+  });
+
+  it('n’affiche pas de cumul (info retirée)', async () => {
+    await render(
+      <SegmentList {...baseProps} segments={[makeSegment('a')]} />,
+    );
+    expect(screen.queryByText(/Cumul/i)).toBeNull();
   });
 
   it('affiche « Analyse en cours… » pour un segment non done', async () => {
@@ -131,7 +130,6 @@ describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
       <SegmentList
         {...baseProps}
         segments={[makeSegment('a', { parseStatus: 'processing' })]}
-        totalDistanceKm={0}
       />,
     );
     expect(screen.getByText(t('adventures.segments.parsing'))).toBeTruthy();
@@ -139,11 +137,7 @@ describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
 
   it('expose un drag handle avec label a11y', async () => {
     await render(
-      <SegmentList
-        {...baseProps}
-        segments={[makeSegment('a')]}
-        totalDistanceKm={42.3}
-      />,
+      <SegmentList {...baseProps} segments={[makeSegment('a')]} />,
     );
     expect(
       screen.getByLabelText(t('adventures.segments.reorderA11y')),
@@ -157,7 +151,6 @@ describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
         {...baseProps}
         onReorder={onReorder}
         segments={[makeSegment('a'), makeSegment('b'), makeSegment('c')]}
-        totalDistanceKm={120}
       />,
     );
     // Simule la fin d'un drag qui place c, a, b.
@@ -173,7 +166,6 @@ describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
         {...baseProps}
         onReorder={onReorder}
         segments={[makeSegment('a'), makeSegment('b')]}
-        totalDistanceKm={84}
       />,
     );
     mockLastOnDrop?.('a', 0, { a: 0, b: 1 });
@@ -193,7 +185,6 @@ describe('SegmentList (MOB-3.3 / AC1, AC4)', () => {
         onReplace={onReplace}
         onDelete={onDelete}
         segments={[segment]}
-        totalDistanceKm={42.3}
       />,
     );
     await user.press(screen.getByLabelText(t('adventures.segments.rename')));
