@@ -327,7 +327,10 @@ export default function AdventureDetailScreen() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="rounded-full border-primary/30 px-6 active:bg-primary/10"
+                  // `!border-primary/30` (important) : force le vert faible du web
+                  // par-dessus le `border-border` (gris #D4E0DA) du variant outline,
+                  // que tailwind-merge ne dédoublonne pas de façon fiable côté mobile.
+                  className="rounded-full !border-primary/30 px-6 active:bg-primary/10"
                   textClassName="text-primary"
                   label={t('strava.import.openButton')}
                   onPress={() => setStravaImportOpen(true)}
