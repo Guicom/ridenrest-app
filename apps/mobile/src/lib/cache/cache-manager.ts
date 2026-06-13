@@ -28,9 +28,14 @@ const TWENTY_DAYS = 20 * 24 * 60 * 60 * 1000;
  * (gpx/poi/weather).
  */
 export function ensureDir(dirUri: string): void {
-  const dir = new Directory(dirUri);
-  if (!dir.exists) {
-    dir.create({ intermediates: true });
+  try {
+    const dir = new Directory(dirUri);
+    if (!dir.exists) {
+      dir.create({ intermediates: true });
+    }
+  } catch {
+    // Race exists→create (dossier créé en parallèle) ou parent non inscriptible :
+    // best-effort, on ignore. Une écriture aval qui échouerait est gérée par son appelant.
   }
 }
 
@@ -50,18 +55,25 @@ export function shouldPurgeAdventure(
   now: number = Date.now(),
 ): boolean {
   if (adventure.endDate) {
-    return now - new Date(adventure.endDate).getTime() > TEN_DAYS;
+    const t = new Date(adventure.endDate).getTime();
+    // Date ISO illisible → `NaN` : on ne purge pas (sinon `now - NaN > X` = false silencieux).
+    return !Number.isNaN(t) && now - t > TEN_DAYS;
   }
   if (adventure.startDate) {
-    return now - new Date(adventure.startDate).getTime() > TWENTY_DAYS;
+    const t = new Date(adventure.startDate).getTime();
+    return !Number.isNaN(t) && now - t > TWENTY_DAYS;
   }
   return false; // Ni start ni end : pas de purge auto, fallback manuel (AC4).
 }
 
 /** Supprime un fichier s'il existe (idempotent — ignore les absents). */
 function deleteIfExists(fileUri: string): void {
-  const file = new File(fileUri);
-  if (file.exists) file.delete();
+  try {
+    const file = new File(fileUri);
+    if (file.exists) file.delete();
+  } catch {
+    // Race exists→delete ou fichier verrouillé : purge idempotente best-effort, on ignore.
+  }
 }
 
 /**
@@ -128,8 +140,12 @@ export function clearAdventureCache(
  */
 export function hasCachedData(): boolean {
   for (const dirUri of [GPX_DIR, POIS_DIR, WEATHER_DIR]) {
-    const dir = new Directory(dirUri);
-    if (dir.exists && dir.list().length > 0) return true;
+    try {
+      const dir = new Directory(dirUri);
+      if (dir.exists && dir.list().length > 0) return true;
+    } catch {
+      // Dossier disparu entre `exists` et `list` (purge OS) : traité comme vide.
+    }
   }
   return false;
 }
@@ -142,8 +158,12 @@ export function hasCachedData(): boolean {
  */
 export function clearAllCache(): Promise<void> {
   for (const dirUri of [GPX_DIR, POIS_DIR, WEATHER_DIR]) {
-    const dir = new Directory(dirUri);
-    if (dir.exists) dir.delete();
+    try {
+      const dir = new Directory(dirUri);
+      if (dir.exists) dir.delete();
+    } catch {
+      // FS verrouillé/race : best-effort, on continue avec les autres dossiers.
+    }
   }
   return Promise.resolve();
 }

@@ -188,8 +188,7 @@
   "offline": {
     "banner": "Offline mode",
     "readOnly": "Offline viewing (read-only)",
-    "actionUnavailable": "Action unavailable offline",
-    "cacheCleared": "Adventure cache cleared"
+    "actionUnavailable": "Action unavailable offline"
   },
   "settings": {
     "title": "Settings",

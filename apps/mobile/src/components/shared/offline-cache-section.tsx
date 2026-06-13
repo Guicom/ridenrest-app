@@ -30,7 +30,11 @@ export function OfflineCacheSection() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: () => {
-            void clearAll().then(() => setDone(true));
+            // `.catch` : la purge FS est best-effort (cf. cache-manager) ; on garde
+            // le garde-fou anti red-box RN, cohérent avec le reste du code offline.
+            void clearAll()
+              .then(() => setDone(true))
+              .catch(() => {});
           },
         },
       ],

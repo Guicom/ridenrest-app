@@ -63,12 +63,19 @@ export async function loadSegmentGpx(
   if (!isOnline) {
     return getCachedGpx(segmentId);
   }
+  let text: string;
   try {
-    const text = await fetcher();
-    await setCachedGpx(segmentId, text);
-    return text;
+    text = await fetcher();
   } catch {
     // Fetch en échec (réseau intermittent) → on retombe sur le cache si présent.
     return getCachedGpx(segmentId);
   }
+  // Écriture cache best-effort : un échec d'écriture (disque plein / dossier purgé)
+  // ne doit PAS jeter le texte tout juste téléchargé.
+  try {
+    await setCachedGpx(segmentId, text);
+  } catch {
+    // Cache non écrit — on renvoie quand même le texte fetché.
+  }
+  return text;
 }

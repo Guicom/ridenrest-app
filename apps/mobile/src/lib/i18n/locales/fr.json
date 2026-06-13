@@ -188,8 +188,7 @@
   "offline": {
     "banner": "Mode hors ligne",
     "readOnly": "Consultation hors ligne (lecture seule)",
-    "actionUnavailable": "Action indisponible hors ligne",
-    "cacheCleared": "Cache de l'aventure vidé"
+    "actionUnavailable": "Action indisponible hors ligne"
   },
   "settings": {
     "title": "Paramètres",

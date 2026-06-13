@@ -4,7 +4,7 @@ baseline_commit: 4dee3b163c1b51a6b675238cb8a9072e045bf861
 
 # Story 3.5 : Cache GPX local pour consultation offline
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -97,6 +97,26 @@ So that **l'app reste utile en autonomie, loin de toute couverture cellulaire**.
   - [ ] Charger une aventure online (trace + liste) → mode avion → rouvrir : trace + POIs consultables, actions réseau grisées, `<StatusBanner>` visible
   - [ ] Réactiver le réseau → données rafraîchies, banner disparaît, **écran courant préservé**
   - [ ] Aventure `endDate` > 10 j → relancer (foreground) → cache purgé ; bouton « Vider le cache » → cache vidé + confirmation
+
+### Review Findings
+
+> Code review du 2026-06-13 (périmètre MOB-3.5 strict, 27 fichiers, baseline `4dee3b1`→`522fe5f`). 3 couches adversariales (Blind Hunter, Edge Case Hunter, Acceptance Auditor). `adventures/[id].tsx` exclu du périmètre → désactivation des actions offline (T7) et câblage par-aventure (AC4) **non vérifiables dans ce diff**.
+
+**Décision résolue (2026-06-13)** — acceptée + consignée comme différé (cf. ci-dessous).
+
+**Patches**
+
+- [x] [Review][Patch] Rejet non géré à la purge manuelle (red-box + `done` jamais positionné) [`apps/mobile/src/lib/cache/cache-manager.ts:62,143-149`, `apps/mobile/src/hooks/use-offline-cache.ts:26-34`, `apps/mobile/src/components/shared/offline-cache-section.tsx:33`] — `deleteIfExists`/`clearAllCache`/`ensureDir` peuvent jeter (race `exists`→`delete/create`, FS verrouillé) ; `clearAll` n'a pas de `catch` et `void clearAll().then(() => setDone(true))` non plus → rejet non géré (red-box RN) + `done` jamais à `true`. Incohérent avec la règle `.catch` appliquée partout ailleurs dans ce diff. Fix : try/catch défensif sur les ops FS (idempotent) + `.catch` côté UI.
+- [x] [Review][Patch] `hasCachedData()` peut jeter dans l'initialiseur `useState` [`apps/mobile/src/lib/cache/cache-manager.ts:129-135`] — `dir.exists && dir.list()` est un TOCTOU ; si l'OS purge le dossier cache entre les deux appels, `dir.list()` jette de façon synchrone dans `useState(() => hasCachedData())` (`use-offline-cache.ts:23`) → crash au render de l'écran Paramètres. Fix : try/catch par dossier → `false`.
+- [x] [Review][Patch] Date ISO malformée jamais purgée [`apps/mobile/src/lib/cache/cache-manager.ts:53,56`] — `new Date(isoCorrompu).getTime()` → `NaN` ; `now - NaN > TEN_DAYS` est toujours `false` → l'aventure n'est jamais purgée auto (fuite cache silencieuse). Source serveur ISO (peu probable) mais garde `Number.isNaN` triviale et correcte.
+- [x] [Review][Patch] Clé i18n morte `offline.cacheCleared` [`apps/mobile/src/lib/i18n/locales/fr.json:192`, `en.json:192`] — définie FR+EN mais référencée nulle part (reliquat du flux v1.0 par-aventure, remplacé par `settings.offlineCache.done`). Fix : retirer des deux locales (parité préservée).
+- [x] [Review][Patch] `loadSegmentGpx` jette/perd le texte fraîchement fetché si l'écriture cache échoue [`apps/mobile/src/lib/cache/gpx-cache.ts:66-73`] — un throw de `setCachedGpx` retombe dans le `catch` et renvoie le cache (périmé/`null`) en jetant le texte tout juste téléchargé. Fix : isoler l'écriture dans son propre try pour renvoyer quand même le texte fetché. (Code dormant, fix non ambigu.)
+
+**Différés**
+
+- [x] [Review][Defer] Purge auto GPX (N2) jamais effective — `purgeStaleCache` appelle `runCachePurge(adventures)` **sans `getSegmentIds` resolver** [`apps/mobile/src/lib/query/use-app-state-refetch.ts:45`] → seuls pois/weather (N3 squelettes) seraient purgés, jamais `/cache/gpx/{segmentId}.gpx`. **Différé** (décision Guillaume) : impact nul aujourd'hui (`loadSegmentGpx` dormant, aucun GPX écrit) ; le câblage du resolver de purge arrivera avec l'epic loader-trace, en même temps que l'écriture GPX réelle.
+- [x] [Review][Defer] `hasCache` périmé si le cache est alimenté après le montage des Paramètres [`apps/mobile/src/hooks/use-offline-cache.ts:23`] — lu une seule fois au mount, relu seulement après une purge manuelle. SDK 56 n'a pas de FS-watcher ; re-check au focus d'écran serait le fix. Différé — UX mineure, l'écran Paramètres est normalement monté à froid.
+- [x] [Review][Defer] Tempête de refetch sur réseau instable [`apps/mobile/src/lib/query/use-app-state-refetch.ts:100-102`] — chaque front offline→online invalide le préfixe `['adventures']` (liste + détails + segments), sans debounce. Différé — TanStack déduplique les refetch en vol ; ajouter un debounce est une amélioration, pas un correctif.
 
 ## Dev Notes
 
