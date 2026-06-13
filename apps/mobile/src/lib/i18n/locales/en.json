@@ -80,11 +80,67 @@
       "generic": "Something went wrong. Please try again.",
       "oauthCancelled": "Google sign-in cancelled.",
       "oauthFailed": "Google sign-in failed. Please try again."
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "delete": "Delete",
+    "rename": "Rename",
+    "save": "Save"
+  },
+  "adventures": {
+    "title": "My adventures",
+    "newButton": "New adventure",
+    "settingsA11y": "Open settings",
+    "pastSection": "Past adventures ({{count}})",
+    "intro": {
+      "planningLabel": "Planning",
+      "planningText": "Plan your route: accommodation, density, weather on each leg.",
+      "liveLabel": "Live",
+      "liveText": "On the bike: see the options for the kilometres ahead of you."
     },
-    "adventures": {
-      "title": "My adventures",
-      "placeholder": "Your adventures list is coming soon (MOB-3.1).",
-      "settingsLink": "Settings"
+    "card": {
+      "renameA11y": "Rename adventure",
+      "deleteA11y": "Delete adventure",
+      "openA11y": "Open adventure",
+      "live": "Start Live",
+      "planning": "Planning",
+      "edit": "Edit"
+    },
+    "empty": {
+      "title": "No adventures yet",
+      "subtitle": "Create your first adventure to start planning your bike trips.",
+      "cta": "Create an adventure"
+    },
+    "new": {
+      "title": "New adventure",
+      "nameLabel": "Adventure name",
+      "namePlaceholder": "e.g. Tour du Mont-Blanc",
+      "submit": "Create adventure",
+      "submitting": "Creating…"
+    },
+    "rename": {
+      "title": "Rename adventure",
+      "nameLabel": "New name",
+      "submit": "Rename",
+      "submitting": "Renaming…"
+    },
+    "delete": {
+      "confirmTitle": "Delete “{{name}}”?",
+      "confirmMessage": "This action is irreversible. All associated segments and data will be deleted.",
+      "confirm": "Delete"
+    },
+    "detail": {
+      "comingSoon": "GPX segments, dates and the map are coming soon (MOB-3.2 / MOB-3.3)."
+    },
+    "errors": {
+      "loadFailed": "Couldn't load your adventures.",
+      "createFailed": "Creation failed. Please try again.",
+      "renameFailed": "Rename failed.",
+      "deleteFailed": "Delete failed.",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name cannot exceed 100 characters."
     }
   },
   "settings": {

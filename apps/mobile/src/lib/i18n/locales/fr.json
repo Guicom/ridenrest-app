@@ -80,11 +80,67 @@
       "generic": "Une erreur est survenue. Réessayez.",
       "oauthCancelled": "Connexion Google annulée.",
       "oauthFailed": "La connexion Google a échoué. Réessayez."
+    }
+  },
+  "common": {
+    "cancel": "Annuler",
+    "retry": "Réessayer",
+    "delete": "Supprimer",
+    "rename": "Renommer",
+    "save": "Enregistrer"
+  },
+  "adventures": {
+    "title": "Mes aventures",
+    "newButton": "Nouvelle aventure",
+    "settingsA11y": "Ouvrir les paramètres",
+    "pastSection": "Aventures passées ({{count}})",
+    "intro": {
+      "planningLabel": "Planning",
+      "planningText": "Prépare ton itinéraire : hébergements, densité, météo sur chaque tronçon.",
+      "liveLabel": "Live",
+      "liveText": "Sur le vélo : visualise les options pour les prochains kilomètres devant toi."
     },
-    "adventures": {
-      "title": "Mes aventures",
-      "placeholder": "La liste de vos aventures arrive prochainement (MOB-3.1).",
-      "settingsLink": "Paramètres"
+    "card": {
+      "renameA11y": "Renommer l'aventure",
+      "deleteA11y": "Supprimer l'aventure",
+      "openA11y": "Ouvrir l'aventure",
+      "live": "Démarrer en Live",
+      "planning": "Planning",
+      "edit": "Modifier"
+    },
+    "empty": {
+      "title": "Aucune aventure",
+      "subtitle": "Créez votre première aventure pour commencer à planifier vos voyages à vélo.",
+      "cta": "Créer une aventure"
+    },
+    "new": {
+      "title": "Nouvelle aventure",
+      "nameLabel": "Nom de l'aventure",
+      "namePlaceholder": "Ex. Tour du Mont-Blanc",
+      "submit": "Créer l'aventure",
+      "submitting": "Création…"
+    },
+    "rename": {
+      "title": "Renommer l'aventure",
+      "nameLabel": "Nouveau nom",
+      "submit": "Renommer",
+      "submitting": "Renommage…"
+    },
+    "delete": {
+      "confirmTitle": "Supprimer « {{name}} » ?",
+      "confirmMessage": "Cette action est irréversible. Tous les segments et données associées seront supprimés.",
+      "confirm": "Supprimer"
+    },
+    "detail": {
+      "comingSoon": "Les segments GPX, dates et la carte arrivent prochainement (MOB-3.2 / MOB-3.3)."
+    },
+    "errors": {
+      "loadFailed": "Impossible de charger vos aventures.",
+      "createFailed": "La création a échoué. Réessayez.",
+      "renameFailed": "Le renommage a échoué.",
+      "deleteFailed": "La suppression a échoué.",
+      "nameRequired": "Le nom est requis.",
+      "nameTooLong": "Le nom ne peut pas dépasser 100 caractères."
     }
   },
   "settings": {

@@ -5,11 +5,12 @@
 //   - nativewind / react-native-css-interop : runtime `className`
 //   - @ridenrest/* : packages workspace exportés en **source TS** (./src/index.ts)
 //   - @expo-google-fonts/* : modules de police
+//   - react-native-svg / lucide-react-native : icônes SVG (MOB-3.1), ship du JSX/ESM
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(?:.pnpm/)?(?:jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-clone-referenced-element|@react-native-community|expo-router|@react-navigation/.*|nativewind|react-native-css-interop|@ridenrest/.*)',
+    'node_modules/(?!(?:.pnpm/)?(?:jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-clone-referenced-element|@react-native-community|expo-router|@react-navigation/.*|nativewind|react-native-css-interop|react-native-svg|lucide-react-native|@ridenrest/.*)',
   ],
 };

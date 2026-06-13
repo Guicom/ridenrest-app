@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-12
-last_updated: 2026-06-12  # MOB-2-5 → done (logout + suppression compte RGPD ; T5 device validée + code review : 2 patch corrigés, 3 defer, gate verte). Clôt l'Epic MOB-2.
+last_updated: 2026-06-13  # MOB-3-1 → done (CRUD aventures mobile : liste/création/renommage/suppression ; code review adversariale, 3 patchs appliqués, gates verts).
 project: ridenrest-app
 project_key: N/A
 tracking_system: file-system
@@ -343,7 +343,7 @@ development_status:
 
   # Epic MOB-3 : Aventures & Gestion GPX
   epic-MOB-3: in-progress
-  MOB-3-1-adventures-list-create-rename-delete: ready-for-dev
+  MOB-3-1-adventures-list-create-rename-delete: done  # 2026-06-13 — impl T1-T9 (CRUD aventures, carte iso web + lucide/Strava SVG, rebuild natif) ; T9 device validée Guillaume ; code review adversariale (3 couches) : 1 decision résolue + 3 patchs appliqués (trim schéma partagé +2 tests, modal renommage key-remount ≠ onShow Android, garde double-submit clavier), 6 defer → deferred-work.md, 11 dismissed. Gates : mobile 84/84 + tsc + lint, shared 41/41.
   MOB-3-2-gpx-upload-segments-parse-notification: ready-for-dev
   MOB-3-3-segment-management-reorder-replace-distances: ready-for-dev
   MOB-3-4-strava-activity-import: ready-for-dev

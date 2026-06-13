@@ -7,7 +7,13 @@ import { authClient } from '@/lib/auth/client';
 // Deux base URLs distinctes :
 //   - `EXPO_PUBLIC_API_URL`         → API NestJS (données)
 //   - `EXPO_PUBLIC_BETTER_AUTH_URL` → serveur Better Auth (`apps/web`, endpoint token)
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010';
+// `EXPO_PUBLIC_API_URL` = HÔTE de l'API NestJS (sans chemin). Le serveur monte
+// TOUTES ses routes sous le préfixe global `/api` (`app.setGlobalPrefix('api')`,
+// apps/api/src/main.ts) → on le centralise ici dans `API_BASE` pour que les
+// façades utilisent des chemins propres (`/adventures`, pas `/api/adventures`).
+// (Découvert en MOB-3.1 : 1er consommateur réel de l'API NestJS depuis le mobile.)
+const API_HOST = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3010';
+const API_BASE = `${API_HOST.replace(/\/+$/, '')}/api`;
 const BETTER_AUTH_URL =
   process.env.EXPO_PUBLIC_BETTER_AUTH_URL ?? 'http://localhost:3011';
 
@@ -125,7 +131,7 @@ async function requestWithAuth<T>(
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),

@@ -58,6 +58,12 @@ vérifier le module dans `ios/Podfile.lock`) **puis** `npx expo run:ios`. Vécu 
 (le `ios/` datait d'avant l'ajout des modules secure-store/localization). Une build
 **EAS cloud** fait toujours un prebuild propre → le souci n'arrive qu'en build locale.
 
+**Re-vécu en MOB-3.1** avec `react-native-svg` (peer de `lucide-react-native` + rendu
+du wordmark Strava) : les composants SVG s'affichaient en boîtes roses *« Unimplemented
+component: RNSVG… »* tant que `RNSVG` n'était pas dans `Podfile.lock`. Même fix
+(`prebuild --clean -p ios` + `run:ios`). Règle : **toute icône lucide / SVG sur mobile
+dépend de `react-native-svg` (natif)** — pas de rendu sans rebuild du dev client.
+
 ## Tests de routes : JAMAIS sous `src/app/` (CRITIQUE)
 
 Expo Router découvre les routes via `require.context(process.env.EXPO_ROUTER_APP_ROOT, …)`
@@ -90,3 +96,18 @@ La regex `require.context` est figée dans `expo-router/_ctx.js` — non configu
   directement — sous-chemin `/client` peu fiable en auto-mock). Dans une factory `jest.mock`,
   **pas** de JSX RN (le transform NativeWind injecte une variable hors-scope interdite par
   jest) → utiliser `jest.fn(() => null)` + assertions sur les appels/props.
+
+## API NestJS : préfixe global `/api` (CRITIQUE)
+
+L'API NestJS monte **toutes** ses routes sous le préfixe global `/api`
+(`app.setGlobalPrefix('api')`, `apps/api/src/main.ts`). `apiFetch` le préfixe
+**déjà** (`API_BASE = ${EXPO_PUBLIC_API_URL}/api`) → les façades utilisent des
+chemins **propres** (`/adventures`, **pas** `/api/adventures`). `EXPO_PUBLIC_API_URL`
+ne contient que l'**hôte** (`http://localhost:3010`, sans chemin). Oublier ce préfixe
+= **404** sur toutes les routes data (découvert en MOB-3.1, 1er consommateur réel).
+
+## Screenshots simulateur iOS : la roue dentée ⚙️ n'est PAS de l'app
+
+La **roue dentée** visible en haut à droite des captures du **simulateur iOS** est un
+**overlay système du simulateur**, pas un composant de l'app Ride'n'Rest. Ne jamais
+l'interpréter comme un bouton Settings, un bug de layout ou un élément d'UI.
