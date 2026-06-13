@@ -156,7 +156,25 @@
       "distanceKm": "{{value}} km",
       "elevationGain": "↑ {{value}} m",
       "elevationLoss": "↓ {{value}} m",
-      "elevationNA": "N/A"
+      "elevationNA": "N/A",
+      "totalDistance": "Total distance: {{km}} km",
+      "cumulative": "Cumulative {{km}} km",
+      "length": "Length {{km}} km",
+      "parsing": "Analysing…",
+      "reorderA11y": "Reorder segment",
+      "rename": "Rename",
+      "delete": "Delete",
+      "replace": "Replace",
+      "deleteConfirmTitle": "Delete “{{name}}”?",
+      "deleteConfirmBody": "This action is irreversible.",
+      "renameTitle": "Rename segment",
+      "renameLabel": "New name",
+      "errors": {
+        "reorder": "Reordering failed. Please try again.",
+        "rename": "Rename failed. Please try again.",
+        "delete": "Delete failed. Please try again.",
+        "replace": "Replace failed. Please try again."
+      }
     },
     "errors": {
       "loadFailed": "Couldn't load your adventures.",

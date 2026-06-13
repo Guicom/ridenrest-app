@@ -12,7 +12,11 @@ import {
   RenameAdventureModal,
   type RenameTarget,
 } from '@/components/adventure/rename-adventure-modal';
-import { SegmentCard } from '@/components/adventure/segment-card';
+import {
+  RenameSegmentModal,
+  type RenameSegmentTarget,
+} from '@/components/adventure/rename-segment-modal';
+import { SegmentList } from '@/components/adventure/segment-list';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -23,7 +27,12 @@ import {
   useDeleteAdventure,
   useRenameAdventure,
 } from '@/hooks/use-adventures';
-import { useSegments } from '@/hooks/use-segments';
+import {
+  useDeleteSegment,
+  useRenameSegment,
+  useReorderSegments,
+  useSegments,
+} from '@/hooks/use-segments';
 import { useTranslation } from '@/lib/i18n';
 
 // Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
@@ -38,7 +47,15 @@ export default function AdventureDetailScreen() {
   const renameMutation = useRenameAdventure();
   const deleteMutation = useDeleteAdventure();
 
+  // Mutations segments (MOB-3.3). `reorder` est optimiste ; `rename`/`delete`
+  // invalident. Toutes exposent `isPending` (anti double-submit + ErrorBanner).
+  const reorderSegmentsMutation = useReorderSegments(id);
+  const renameSegmentMutation = useRenameSegment(id);
+  const deleteSegmentMutation = useDeleteSegment(id);
+
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
+  const [segmentRenameTarget, setSegmentRenameTarget] =
+    useState<RenameSegmentTarget | null>(null);
 
   // Notification in-app de fin de parsing (succès). Push natif = hors MVP (archi
   // §Native Capabilities) → bandeau transitoire local + carte qui passe en `done`.
@@ -70,6 +87,65 @@ export default function AdventureDetailScreen() {
   }, [parsedMessage]);
 
   const paddingTop = insets.top + 24;
+
+  // --- Actions segment (MOB-3.3 / AC2, AC3) ---
+
+  const handleSegmentReorder = useCallback(
+    (orderedIds: string[]) => reorderSegmentsMutation.mutate(orderedIds),
+    [reorderSegmentsMutation],
+  );
+
+  const handleSegmentRename = useCallback(
+    (segment: AdventureSegmentResponse) =>
+      setSegmentRenameTarget({ id: segment.id, currentName: segment.name }),
+    [],
+  );
+
+  // Suppression d'un segment : confirmation native (Alert tolérée pour une action
+  // DESTRUCTIVE — distincte d'un affichage d'erreur, lui interdit via Alert).
+  const handleSegmentDelete = useCallback(
+    (segment: AdventureSegmentResponse) => {
+      Alert.alert(
+        t('adventures.segments.deleteConfirmTitle', { name: segment.name }),
+        t('adventures.segments.deleteConfirmBody'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('common.delete'),
+            style: 'destructive',
+            onPress: () => deleteSegmentMutation.mutate(segment.id),
+          },
+        ],
+      );
+    },
+    [t, deleteSegmentMutation],
+  );
+
+  // Remplacement = delete PUIS ré-upload via le `gpx-uploader` existant (pas
+  // d'endpoint dédié). Ordre : on supprime d'abord ; au succès du delete, on ouvre
+  // le picker (nouveau segment `pending`, appended en fin). En cas d'échec d'upload
+  // après delete, l'ErrorBanner de l'uploader surface l'erreur — l'utilisateur
+  // peut ré-essayer l'ajout (le segment a déjà été retiré).
+  const handleSegmentReplace = useCallback(
+    (segment: AdventureSegmentResponse) => {
+      Alert.alert(
+        t('adventures.segments.replace'),
+        t('adventures.segments.deleteConfirmBody'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('adventures.segments.replace'),
+            style: 'destructive',
+            onPress: () =>
+              deleteSegmentMutation.mutate(segment.id, {
+                onSuccess: () => uploaderRef.current?.pick(),
+              }),
+          },
+        ],
+      );
+    },
+    [t, deleteSegmentMutation],
+  );
 
   const confirmDelete = () => {
     if (!data) return;
@@ -177,6 +253,18 @@ export default function AdventureDetailScreen() {
               </View>
             ) : null}
 
+            {/* Erreurs de mutation segment (réordre/rename/delete) — inline,
+                jamais via Alert. */}
+            {reorderSegmentsMutation.isError ? (
+              <ErrorBanner message={t('adventures.segments.errors.reorder')} />
+            ) : null}
+            {renameSegmentMutation.isError ? (
+              <ErrorBanner message={t('adventures.segments.errors.rename')} />
+            ) : null}
+            {deleteSegmentMutation.isError ? (
+              <ErrorBanner message={t('adventures.segments.errors.delete')} />
+            ) : null}
+
             {segmentsPending ? (
               <View className="gap-3">
                 <Skeleton className="h-20 rounded-xl" />
@@ -185,15 +273,19 @@ export default function AdventureDetailScreen() {
             ) : segmentsError ? (
               <ErrorBanner message={t('adventures.segments.loadFailed')} />
             ) : segments && segments.length > 0 ? (
-              <View className="gap-3">
-                {segments.map((segment) => (
-                  <SegmentCard
-                    key={segment.id}
-                    segment={segment}
-                    onRetry={() => uploaderRef.current?.pick()}
-                  />
-                ))}
-              </View>
+              <SegmentList
+                adventureId={id}
+                segments={segments}
+                totalDistanceKm={data.totalDistanceKm}
+                onReorder={handleSegmentReorder}
+                onRename={handleSegmentRename}
+                onDelete={handleSegmentDelete}
+                onReplace={handleSegmentReplace}
+                isReordering={
+                  reorderSegmentsMutation.isPending ||
+                  deleteSegmentMutation.isPending
+                }
+              />
             ) : (
               <Card>
                 <Text className="text-sm font-montserrat text-text-muted">
@@ -219,6 +311,18 @@ export default function AdventureDetailScreen() {
           renameMutation.mutate(
             { id: targetId, name },
             { onSuccess: () => setRenameTarget(null) },
+          )
+        }
+      />
+
+      <RenameSegmentModal
+        target={segmentRenameTarget}
+        isPending={renameSegmentMutation.isPending}
+        onClose={() => setSegmentRenameTarget(null)}
+        onSubmit={(segmentId, name) =>
+          renameSegmentMutation.mutate(
+            { segmentId, name },
+            { onSuccess: () => setSegmentRenameTarget(null) },
           )
         }
       />

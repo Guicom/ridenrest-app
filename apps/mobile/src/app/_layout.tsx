@@ -10,6 +10,7 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { I18nextProvider, i18n } from '@/lib/i18n';
@@ -47,13 +48,20 @@ export default function RootLayout() {
   // chevauchent la status bar / Dynamic Island. Les routes sont auto-découvertes par
   // Expo Router (groupes `(auth)`/`(app)` + `oauth-callback`) ; le guard vit dans
   // `(app)/_layout`.
+  //
+  // `GestureHandlerRootView` (MOB-3.3) enveloppe TOUT l'arbre : prérequis de
+  // `react-native-gesture-handler` pour que le drag-and-drop des segments
+  // (`react-native-reanimated-dnd`) reçoive les gestes. Ajouté une seule fois ici,
+  // jamais par écran.
   return (
-    <SafeAreaProvider>
-      <QueryProvider>
-        <I18nextProvider i18n={i18n}>
-          <Stack screenOptions={{ headerShown: false }} />
-        </I18nextProvider>
-      </QueryProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <QueryProvider>
+          <I18nextProvider i18n={i18n}>
+            <Stack screenOptions={{ headerShown: false }} />
+          </I18nextProvider>
+        </QueryProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

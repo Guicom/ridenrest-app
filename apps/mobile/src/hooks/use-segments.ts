@@ -6,7 +6,20 @@ import {
 import { useEffect, useRef } from 'react';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
-import { listSegments, uploadSegment, type RnFile } from '@/lib/api/segments';
+import {
+  deleteSegment,
+  listSegments,
+  renameSegment,
+  reorderSegments,
+  uploadSegment,
+  type RnFile,
+} from '@/lib/api/segments';
+
+// Query key STRICTE partagée par toute la feature segments (MOB-3.2 + 3.3). Une
+// SEULE clé — réutilisée par `useSegments` (lecture/polling) et les mutations
+// reorder/rename/delete (3.3). Ne JAMAIS en créer une seconde.
+const segmentsKey = (adventureId: string) =>
+  ['adventures', adventureId, 'segments'] as const;
 
 // Hooks data des segments d'une aventure (MOB-3.2 / AC1-3). Server-state =
 // TanStack Query v5.
@@ -97,7 +110,7 @@ export interface UseSegmentsOptions {
  */
 export function useSegments(adventureId: string, opts?: UseSegmentsOptions) {
   const query = useQuery({
-    queryKey: ['adventures', adventureId, 'segments'],
+    queryKey: segmentsKey(adventureId),
     queryFn: () => listSegments(adventureId),
     enabled: Boolean(adventureId),
     refetchInterval: (q) => segmentsPollInterval(q.state.data),
@@ -137,7 +150,84 @@ export function useUploadSegment(adventureId: string) {
       uploadSegment(adventureId, vars.file, vars.name),
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: ['adventures', adventureId, 'segments'],
+        queryKey: segmentsKey(adventureId),
       }),
+  });
+}
+
+/**
+ * Réordre OPTIMISTE des segments (MOB-3.3 / AC1). Le drag termine en produisant
+ * `orderedIds` → on réordonne le cache localement AVANT la réponse (UX instantanée),
+ * snapshot conservé pour rollback `onError`, et invalidation `onSettled` pour
+ * resynchroniser sur la liste recalculée par le serveur (cumuls/total).
+ *
+ * ⚠️ On n'écrit PAS de `cumulativeStartKm` optimiste (ce serait recalculer une
+ * distance côté UI — anti-pattern proscrit) : seul l'ORDRE est optimiste, plus un
+ * `orderIndex` local cohérent. Les distances vraies arrivent à l'invalidation.
+ */
+export function useReorderSegments(adventureId: string) {
+  const qc = useQueryClient();
+  const key = segmentsKey(adventureId);
+
+  return useMutation({
+    mutationFn: (orderedIds: string[]) =>
+      reorderSegments(adventureId, orderedIds),
+
+    onMutate: async (orderedIds) => {
+      // Évite qu'un refetch en vol écrase l'update optimiste.
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<AdventureSegmentResponse[]>(key);
+      if (previous) {
+        const byId = new Map(previous.map((s) => [s.id, s]));
+        const reordered = orderedIds
+          .map((id) => byId.get(id))
+          .filter((s): s is AdventureSegmentResponse => Boolean(s))
+          .map((s, i) => ({ ...s, orderIndex: i }));
+        qc.setQueryData(key, reordered);
+      }
+      return { previous };
+    },
+
+    onError: (_err, _vars, ctx) => {
+      // Rollback vers le snapshot pré-mutation. L'écran affiche l'erreur
+      // (ErrorBanner i18n) en lisant `isError` — jamais d'Alert.alert ici.
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+    },
+
+    onSettled: () => {
+      // Resynchronise sur le serveur (cumuls/total recalculés côté API).
+      qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/**
+ * Renomme un segment (MOB-3.3 / AC3). Invalidation simple au succès (le nom ne
+ * touche pas les distances) — l'optimisme n'est pas requis ici. `onError` → l'écran
+ * affiche un `ErrorBanner` i18n.
+ */
+export function useRenameSegment(adventureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { segmentId: string; name: string }) =>
+      renameSegment(adventureId, vars.segmentId, vars.name),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: segmentsKey(adventureId) }),
+  });
+}
+
+/**
+ * Supprime un segment (MOB-3.3 / AC2). Invalide DEUX clés : la liste des segments
+ * ET `['adventures', adventureId]` — car la suppression déclenche un recompute
+ * serveur (`totalDistanceKm` de l'aventure change). `onError` → `ErrorBanner` i18n.
+ */
+export function useDeleteSegment(adventureId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (segmentId: string) => deleteSegment(adventureId, segmentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: segmentsKey(adventureId) });
+      qc.invalidateQueries({ queryKey: ['adventures', adventureId] });
+    },
   });
 }

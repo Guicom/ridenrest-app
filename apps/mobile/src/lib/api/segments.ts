@@ -51,3 +51,57 @@ export function uploadSegment(
     { method: 'POST', body: form },
   );
 }
+
+// --- MOB-3.3 : réordre / renommage / suppression ---
+//
+// ⚠️ Contrat reorder : le DTO serveur réel (`ReorderSegmentsDto`) attend
+// **`orderedIds`** (pas `segmentIds`). Le `reorderSegmentsSchema` de
+// `@ridenrest/shared` diverge (`{ segmentIds }`) — NE PAS s'en servir pour ce
+// payload ; la source de vérité est le controller/DTO.
+
+/**
+ * PATCH /adventures/:adventureId/segments/reorder — payload `{ orderedIds }`.
+ * `orderedIds` doit contenir EXACTEMENT tous les ids de segments de l'aventure
+ * (même cardinalité, sans doublon ni inconnu), sinon 400. Le serveur réassigne
+ * `orderIndex` puis recalcule les distances cumulées → renvoie la liste complète
+ * triée et à jour.
+ */
+export function reorderSegments(
+  adventureId: string,
+  orderedIds: string[],
+): Promise<AdventureSegmentResponse[]> {
+  return apiFetch<AdventureSegmentResponse[]>(
+    `/adventures/${adventureId}/segments/reorder`,
+    { method: 'PATCH', body: JSON.stringify({ orderedIds }) },
+  );
+}
+
+/**
+ * PATCH /adventures/:adventureId/segments/:segmentId — payload `{ name }`.
+ * Le serveur trim le nom (≤ 100). Renvoie le segment à jour.
+ */
+export function renameSegment(
+  adventureId: string,
+  segmentId: string,
+  name: string,
+): Promise<AdventureSegmentResponse> {
+  return apiFetch<AdventureSegmentResponse>(
+    `/adventures/${adventureId}/segments/${segmentId}`,
+    { method: 'PATCH', body: JSON.stringify({ name }) },
+  );
+}
+
+/**
+ * DELETE /adventures/:adventureId/segments/:segmentId → `{ deleted: true }`.
+ * Le serveur supprime la ligne + le fichier GPX puis recalcule les distances de
+ * l'aventure (totalDistanceKm change) → l'écran invalide aussi `['adventures', id]`.
+ */
+export function deleteSegment(
+  adventureId: string,
+  segmentId: string,
+): Promise<{ deleted: boolean }> {
+  return apiFetch<{ deleted: boolean }>(
+    `/adventures/${adventureId}/segments/${segmentId}`,
+    { method: 'DELETE' },
+  );
+}

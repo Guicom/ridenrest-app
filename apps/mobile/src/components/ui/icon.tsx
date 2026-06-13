@@ -2,8 +2,10 @@ import { cssInterop } from 'nativewind';
 import {
   Bike,
   ChevronDown,
+  GripVertical,
   Pencil,
   Plus,
+  RefreshCw,
   Settings,
   Trash2,
   type LucideIcon,
@@ -31,8 +33,10 @@ function enableClassName(icon: LucideIcon): LucideIcon {
 
 export const BikeIcon = enableClassName(Bike);
 export const ChevronDownIcon = enableClassName(ChevronDown);
+export const GripVerticalIcon = enableClassName(GripVertical);
 export const PencilIcon = enableClassName(Pencil);
 export const PlusIcon = enableClassName(Plus);
+export const RefreshCwIcon = enableClassName(RefreshCw);
 export const SettingsIcon = enableClassName(Settings);
 export const Trash2Icon = enableClassName(Trash2);
 
