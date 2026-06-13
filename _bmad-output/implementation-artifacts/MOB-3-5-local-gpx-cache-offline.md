@@ -327,9 +327,20 @@ Opus 4.8 (claude-opus-4-8) — subagent BMAD dev-story.
 - `apps/mobile/package.json` (+ `@tanstack/react-query-persist-client`, `@tanstack/query-async-storage-persister`)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (MOB-3-5 → review)
 
+**Correctifs post-review (purge manuelle relocalisée dans les Paramètres)**
+- Créés : `apps/mobile/src/hooks/use-offline-cache.ts`, `apps/mobile/src/components/shared/offline-cache-section.tsx`
+- Supprimés : `apps/mobile/src/hooks/use-cache-purge.ts`, `apps/mobile/src/components/shared/clear-adventure-cache-button.tsx`
+- `apps/mobile/src/lib/cache/cache-manager.ts` — `hasCachedData()` + `clearAllCache()` (purge GLOBALE)
+- `apps/mobile/src/lib/cache/cache-manager.test.ts` — tests `hasCachedData`/`clearAllCache`
+- `apps/mobile/__mocks__/expo-file-system.js` — ajout `Directory.list()`
+- `apps/mobile/src/app/(app)/settings.tsx` — montage `<OfflineCacheSection>` (affichée seulement si du cache existe)
+- `apps/mobile/src/app/(app)/adventures/[id].tsx` — retrait du bouton clear-cache par-aventure
+- `apps/mobile/src/lib/i18n/locales/{fr,en}.json` — `settings.clearCache.*` → `settings.offlineCache.*` (+ texte explicatif)
+
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-12 | 0.1 | Création story MOB-3.5 (ready-for-dev) — infra cache offline : N2 GPX câblé + N1 persist TanStack Query + N3 POIs/météo squelette ; `useNetworkStatus` + `<StatusBanner>` global ; purge `shouldPurgeAdventure` au foreground + bouton manuel settings ; enrichissement du listener AppState/NetInfo centralisé (seed online boot, invalidate critiques, purge) + résolution de la dette online différée MOB-2.1. Aucune modif backend. | bmad-create-story |
 | 2026-06-13 | 1.0 | Implémentation T1-T8 + T10 (dev-story, TDD). lib/cache (cache-manager + gpx-cache câblé N2 via `loadSegmentGpx` + poi/weather squelettes N3) ; persist TanStack Query N1 (`PersistQueryClientProvider` + AsyncStorage, gcTime/maxAge 24 h, dehydrate `['adventures']` only) ; `useNetworkStatus` + `<StatusBanner>` global a11y ; listener AppState/NetInfo enrichi (seed online boot, invalidate critiques en place, `runCachePurge` foreground) + dette MOB-2.1 résolue ; actions réseau désactivées offline + `<ClearAdventureCacheButton>` ; i18n FR/EN `offline.*`/`settings.clearCache.*` ; mocks `expo-file-system` (API NOUVELLE File/Directory/Paths, FS mémoire) + netinfo pilotable. Gates verts : typecheck 0 / lint 0 / 195 tests (34 suites) + `expo export` iOS OK. T9 satisfait sans action native nouvelle (module déjà lié MOB-3.2 + paquets persist JS pur), T11 device déféré. Status → review. | Amelia (dev, Opus 4.8) |
+| 2026-06-13 | 1.1 | Correctif post-review (décision UX) : la purge manuelle passe d'un bouton **par-aventure** (écran détail) à une section **« Cache hors ligne » GLOBALE** dans les Paramètres, avec texte explicatif, affichée uniquement si du cache existe. Ajout `hasCachedData()`/`clearAllCache()` au cache-manager + `Directory.list()` au mock ; nouveau hook `use-offline-cache` + composant `offline-cache-section` (remplacent `use-cache-purge`/`clear-adventure-cache-button`) ; i18n `settings.offlineCache.*`. Purge auto (`shouldPurgeAdventure`/`runCachePurge`) inchangée. Gates verts (200 tests). | Opus 4.8 |

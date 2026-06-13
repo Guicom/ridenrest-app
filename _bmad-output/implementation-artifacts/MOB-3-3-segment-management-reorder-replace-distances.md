@@ -384,9 +384,19 @@ Opus 4.8 (claude-opus-4-8) via subagent BMAD dev-story.
 - `apps/mobile/package.json` (dépendance react-native-reanimated-dnd@^2.0.0)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (MOB-3-3 → review + last_updated)
 
+**Modifiés (correctifs post-review — parité UX web mobile / device feedback)**
+- `apps/mobile/src/components/adventure/segment-list.tsx` — refonte : `<Sortable>` (scroll interne) remplacé par `useSortableList` + `<DropProvider>` dans une `View` non-scrollable (évite « VirtualizedLists nested » dans le ScrollView de l'écran) ; remontage via `key={ids}` (fix segment importé qui chevauchait le 1er) ; cartes au format web `distance · {D+} m D+ · {D-} m D-` (cumul retiré) ; suppression de l'en-tête « Distance totale »
+- `apps/mobile/src/components/adventure/segment-list.test.tsx` — mock `useSortableList`/`DropProvider` ; tests format D+/D-
+- `apps/mobile/src/components/adventure/gpx-uploader.tsx` — bouton « Ajouter un segment » (wording, variant `ghost` pill verte `bg-primary/10`, `UploadIcon`)
+- `apps/mobile/src/app/(app)/adventures/[id].tsx` — ligne stats aventure (distance + D+ · D-, séparateur `·`, `gap-4`) ; renommage = crayon à côté du titre ; CTAs (Strava outline + Ajouter) déplacés sous le titre « Segments » en pills `size=lg rounded-full` (bordure `!border-primary/30`) ; « Supprimer l'aventure » (rouge clair) déplacé tout en bas
+- `apps/mobile/src/components/ui/icon.tsx` — `RouteIcon`, `TrendingUpIcon`, `TrendingDownIcon`, `UploadIcon`
+- `apps/mobile/src/__tests__/adventure-detail.test.tsx` — mock dnd (hooks) + assertion distance
+- `apps/mobile/src/lib/i18n/locales/{fr,en}.json` — `gainDPlus`/`lossDMinus` (remplacent `totalDistance`/`cumulative`/`length`), `addButton` reformulé (« Ajouter un segment »), `adventures.delete.button`
+
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-12 | 0.1 | Création story MOB-3.3 (ready-for-dev) — réordre DnD optimiste+rollback, suppression (confirm), remplacement (delete+ré-upload), renommage segment, distances (total+cumul formatées, source serveur), i18n FR/EN, tests. Contrats API réels (orderedIds), lib DnD `react-native-reanimated-dnd` (Reanimated 4 + New Arch). | bmad-create-story |
 | 2026-06-13 | 1.0 | Implémentation T1–T7 (T8 device déférée user) : `react-native-reanimated-dnd@2.0.0` + `GestureHandlerRootView` ; API segments reorder/rename/delete ; mutations optimistes (reorder) + invalidations ; `SegmentList` draggable + distances serveur ; `formatKm` ; `RenameSegmentModal` ; i18n FR/EN parité ; 19 tests MOB-3.3 (optimistic+rollback explicites). Gates typecheck/lint/test verts (126 suites). Status → review. | Opus 4.8 (dev-story) |
+| 2026-06-13 | 1.1 | Correctifs post-review (test device + parité UX web mobile) : (1) `SegmentList` rebâti sur `useSortableList`+`DropProvider` (fix « VirtualizedLists nested » + segment importé chevauchant le 1er) ; (2) cartes segment au format web `distance · D+ · D-` (cumul retiré) ; (3) ligne stats aventure (distance + D+ · D-) sous le titre ; (4) refonte layout détail : crayon de renommage près du titre, CTAs (Strava/Ajouter) en pills vertes sous « Segments », « Supprimer l'aventure » rouge clair en bas ; (5) i18n : `gainDPlus`/`lossDMinus`, `addButton`, `adventures.delete.button`. Gates verts (200 tests). | Opus 4.8 |
