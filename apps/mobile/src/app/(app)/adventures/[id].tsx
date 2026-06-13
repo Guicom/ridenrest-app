@@ -17,6 +17,7 @@ import {
   type RenameSegmentTarget,
 } from '@/components/adventure/rename-segment-modal';
 import { SegmentList } from '@/components/adventure/segment-list';
+import { StravaImportSheet } from '@/components/adventure/strava-import-sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -33,6 +34,7 @@ import {
   useReorderSegments,
   useSegments,
 } from '@/hooks/use-segments';
+import { useStravaConnection } from '@/hooks/use-strava-connection';
 import { useTranslation } from '@/lib/i18n';
 
 // Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
@@ -56,6 +58,11 @@ export default function AdventureDetailScreen() {
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [segmentRenameTarget, setSegmentRenameTarget] =
     useState<RenameSegmentTarget | null>(null);
+
+  // Import Strava (MOB-3.4). Détection « connecté » réutilise le hook de MOB-2.4
+  // (`['strava-connection']` via `listAccounts`) — aucune détection dupliquée.
+  const [stravaImportOpen, setStravaImportOpen] = useState(false);
+  const { isConnected: stravaConnected } = useStravaConnection();
 
   // Notification in-app de fin de parsing (succès). Push natif = hors MVP (archi
   // §Native Capabilities) → bandeau transitoire local + carte qui passe en `done`.
@@ -299,9 +306,23 @@ export default function AdventureDetailScreen() {
               adventureId={id}
               onUploaded={() => setParsedMessage(null)}
             />
+
+            {/* Import d'itinéraires Strava (MOB-3.4) — à côté de l'uploader GPX. */}
+            <Button
+              variant="outline"
+              label={t('strava.import.openButton')}
+              onPress={() => setStravaImportOpen(true)}
+            />
           </View>
         </>
       )}
+
+      <StravaImportSheet
+        adventureId={id}
+        open={stravaImportOpen}
+        onClose={() => setStravaImportOpen(false)}
+        stravaConnected={stravaConnected}
+      />
 
       <RenameAdventureModal
         target={renameTarget}

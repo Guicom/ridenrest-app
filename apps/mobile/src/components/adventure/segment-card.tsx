@@ -1,6 +1,7 @@
 import { Platform, Text, View } from 'react-native';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
+import { PoweredByStrava } from '@/components/shared/powered-by-strava';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -39,6 +40,10 @@ export function SegmentCard({ segment, onRetry }: SegmentCardProps) {
   const isParsing =
     segment.parseStatus === 'pending' || segment.parseStatus === 'processing';
   const isError = segment.parseStatus === 'error';
+  // Attribution obligatoire « Powered by Strava » (AC3 / FR-063) dès qu'un segment
+  // provient de Strava (`source === 'strava'`). Réutilise le composant officiel
+  // existant (SvgXml, variante claire/sombre auto) — pas de badge maison.
+  const isStrava = segment.source === 'strava';
 
   return (
     <Card
@@ -94,6 +99,12 @@ export function SegmentCard({ segment, onRetry }: SegmentCardProps) {
           </Text>
         </View>
       )}
+
+      {isStrava ? (
+        <View className="mt-3 flex-row">
+          <PoweredByStrava height={16} />
+        </View>
+      ) : null}
     </Card>
   );
 }

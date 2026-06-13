@@ -39,6 +39,29 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(() => ({ id: 'adv-1' })),
 }));
 
+// Import Strava (MOB-3.4) câblé dans l'écran : on neutralise la détection de
+// connexion (sinon `@/lib/auth/client` → `@better-auth/expo` ESM non transpilé fait
+// échouer le parse du suite). La sheet reste fermée par défaut (bouton non pressé).
+jest.mock('@/hooks/use-strava-connection', () => ({
+  useStravaConnection: () => ({
+    isConnected: false,
+    isLoading: false,
+    isError: false,
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    isConnecting: false,
+    isDisconnecting: false,
+  }),
+}));
+
+// `@/lib/api/api-client` (importé par la sheet via `use-strava`) tire `@/lib/auth/
+// client` (ESM). On le stube : ce test mocke déjà les façades réseau, l'`apiFetch`
+// réel n'est jamais appelé ici.
+jest.mock('@/lib/api/api-client', () => ({
+  apiFetch: jest.fn(),
+  ApiError: class ApiError extends Error {},
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

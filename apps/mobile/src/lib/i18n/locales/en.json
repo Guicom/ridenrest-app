@@ -209,5 +209,34 @@
       "cancel": "Cancel",
       "error": "Deletion failed. Your account is intact."
     }
+  },
+  "strava": {
+    "import": {
+      "openButton": "Import from Strava",
+      "title": "Strava routes",
+      "loadMore": "Load more",
+      "empty": "No Strava routes found.",
+      "importButton": "Import",
+      "importing": "Importing…",
+      "distance": "{{value}} km",
+      "elevation": "+{{value}} m",
+      "successToast": "Import started — analysing route",
+      "notConnected": {
+        "title": "Strava not connected",
+        "message": "Connect your Strava account in settings to import your routes.",
+        "cta": "Connect Strava"
+      }
+    },
+    "attribution": {
+      "poweredBy": "Powered by Strava"
+    },
+    "errors": {
+      "network": "Connection failed. Check your network.",
+      "rateLimit15": "Try again in a few minutes (Strava limit reached).",
+      "rateLimitDaily": "Strava limit reached for today, try again tomorrow.",
+      "stravaDown": "Strava is temporarily unavailable. Try again.",
+      "notConnected": "Strava account not connected.",
+      "generic": "Strava import failed. Try again."
+    }
   }
 }

@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-12
-last_updated: 2026-06-13  # MOB-3-3 → review (réordre DnD optimiste+rollback, rename/delete/replace segments, distances serveur formatées ; gates verts/126 tests ; T8 device = user).
+last_updated: 2026-06-13  # MOB-3-4 → review (import itinéraires Strava : hook use-strava routes paginées/lazy + mutation import, sheet d'import Modal, StravaActivityRow, attribution PoweredByStrava réutilisée, détection via useStravaConnection ; gates verts/153 tests ; T8 device = user).
 project: ridenrest-app
 project_key: N/A
 tracking_system: file-system
@@ -346,7 +346,7 @@ development_status:
   MOB-3-1-adventures-list-create-rename-delete: done  # 2026-06-13 — impl T1-T9 (CRUD aventures, carte iso web + lucide/Strava SVG, rebuild natif) ; T9 device validée Guillaume ; code review adversariale (3 couches) : 1 decision résolue + 3 patchs appliqués (trim schéma partagé +2 tests, modal renommage key-remount ≠ onShow Android, garde double-submit clavier), 6 defer → deferred-work.md, 11 dismissed. Gates : mobile 84/84 + tsc + lint, shared 41/41.
   MOB-3-2-gpx-upload-segments-parse-notification: done  # 2026-06-13 — code review adversariale (3 couches) : 1 decision résolue (bandeau succès auto-dismiss 4s ; échec via carte seule) + 5 patchs appliqués (garde ré-entrance picker double-press/retry + clé i18n picking, transition fast-parse parité web +2 tests, distanceKm null-safe, commentaire mutate, banner auto-dismiss), 4 defer → deferred-work.md, 10 dismissed. Gates : typecheck 0 + lint clean + 107 tests (suites MOB-3.2 vertes). T10 device = user (différé ~MOB-3.4).
   MOB-3-3-segment-management-reorder-replace-distances: review  # 2026-06-13 — impl T1-T7 (react-native-reanimated-dnd 2.0.0, GestureHandlerRootView, mutations optimistes reorder/rename/delete, SegmentList draggable + distances serveur, formatKm, i18n FR/EN parité, 26 tests MOB-3.3 ; gates verts/126 ; T8 device = user).
-  MOB-3-4-strava-activity-import: ready-for-dev
+  MOB-3-4-strava-activity-import: review  # 2026-06-13 — impl T1-T7 : hook use-strava (useStravaRoutes lazy page-based staleTime 1h retry 1 ; useImportStravaRoute → invalide segments, jamais routes ; mapStravaError 0/404/429-15min|daily/502 → i18n), StravaImportSheet (Modal, états non-connecté/loading/liste/vide/erreur, pagination, attribution), StravaActivityRow, branchement écran détail via useStravaConnection (MOB-2.4), badge PoweredByStrava sur segment-card source==='strava', i18n strava.* FR/EN parité, 27 tests MOB-3.4 ; gates verts/153 ; T8 device = user. StravaRouteItem déclaré localement (pas dans shared).
   MOB-3-5-local-gpx-cache-offline: ready-for-dev
   epic-MOB-3-retrospective: optional
 

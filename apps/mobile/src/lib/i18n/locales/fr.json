@@ -209,5 +209,34 @@
       "cancel": "Annuler",
       "error": "La suppression a échoué. Votre compte est intact."
     }
+  },
+  "strava": {
+    "import": {
+      "openButton": "Importer depuis Strava",
+      "title": "Itinéraires Strava",
+      "loadMore": "Charger plus",
+      "empty": "Aucun itinéraire Strava trouvé.",
+      "importButton": "Importer",
+      "importing": "Import…",
+      "distance": "{{value}} km",
+      "elevation": "+{{value}} m",
+      "successToast": "Import en cours — analyse du tracé",
+      "notConnected": {
+        "title": "Strava non connecté",
+        "message": "Connecte ton compte Strava dans les paramètres pour importer tes itinéraires.",
+        "cta": "Connecter Strava"
+      }
+    },
+    "attribution": {
+      "poweredBy": "Powered by Strava"
+    },
+    "errors": {
+      "network": "Connexion impossible. Vérifie ta connexion réseau.",
+      "rateLimit15": "Réessaie dans quelques minutes (limite Strava atteinte).",
+      "rateLimitDaily": "Limite Strava atteinte pour aujourd'hui, réessaie demain.",
+      "stravaDown": "Strava est momentanément indisponible. Réessaie.",
+      "notConnected": "Compte Strava non connecté.",
+      "generic": "L'import Strava a échoué. Réessaie."
+    }
   }
 }
