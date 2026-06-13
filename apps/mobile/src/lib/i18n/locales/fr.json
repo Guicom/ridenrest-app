@@ -134,6 +134,30 @@
     "detail": {
       "comingSoon": "Les segments GPX, dates et la carte arrivent prochainement (MOB-3.2 / MOB-3.3)."
     },
+    "segments": {
+      "title": "Segments",
+      "empty": "Aucun segment pour l'instant. Ajoutez un fichier GPX pour commencer.",
+      "addButton": "Ajouter un segment GPX",
+      "picking": "Sélection…",
+      "uploading": "Envoi…",
+      "status": {
+        "pending": "En attente",
+        "processing": "Analyse en cours",
+        "done": "Analysé",
+        "error": "Échec"
+      },
+      "parsedSuccess": "Segment « {{name}} » analysé",
+      "parseFailed": "Analyse échouée — vérifiez le format du fichier GPX",
+      "retry": "Réessayer",
+      "fileTooLarge": "Fichier trop volumineux (max 10 Mo)",
+      "invalidExtension": "Sélectionnez un fichier .gpx",
+      "uploadError": "L'envoi a échoué. Vérifiez votre réseau et réessayez.",
+      "loadFailed": "Impossible de charger les segments.",
+      "distanceKm": "{{value}} km",
+      "elevationGain": "↑ {{value}} m",
+      "elevationLoss": "↓ {{value}} m",
+      "elevationNA": "N/A"
+    },
     "errors": {
       "loadFailed": "Impossible de charger vos aventures.",
       "createFailed": "La création a échoué. Réessayez.",

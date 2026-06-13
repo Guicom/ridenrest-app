@@ -134,6 +134,30 @@
     "detail": {
       "comingSoon": "GPX segments, dates and the map are coming soon (MOB-3.2 / MOB-3.3)."
     },
+    "segments": {
+      "title": "Segments",
+      "empty": "No segments yet. Add a GPX file to get started.",
+      "addButton": "Add a GPX segment",
+      "picking": "Selecting…",
+      "uploading": "Uploading…",
+      "status": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "done": "Analysed",
+        "error": "Failed"
+      },
+      "parsedSuccess": "Segment “{{name}}” analysed",
+      "parseFailed": "Parsing failed — check the GPX file format",
+      "retry": "Retry",
+      "fileTooLarge": "File too large (max 10 MB)",
+      "invalidExtension": "Select a .gpx file",
+      "uploadError": "Upload failed. Check your network and try again.",
+      "loadFailed": "Couldn't load segments.",
+      "distanceKm": "{{value}} km",
+      "elevationGain": "↑ {{value}} m",
+      "elevationLoss": "↓ {{value}} m",
+      "elevationNA": "N/A"
+    },
     "errors": {
       "loadFailed": "Couldn't load your adventures.",
       "createFailed": "Creation failed. Please try again.",

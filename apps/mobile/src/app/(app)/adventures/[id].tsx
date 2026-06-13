@@ -1,12 +1,18 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
+import {
+  GpxUploader,
+  type GpxUploaderHandle,
+} from '@/components/adventure/gpx-uploader';
 import {
   RenameAdventureModal,
   type RenameTarget,
 } from '@/components/adventure/rename-adventure-modal';
+import { SegmentCard } from '@/components/adventure/segment-card';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -17,12 +23,12 @@ import {
   useDeleteAdventure,
   useRenameAdventure,
 } from '@/hooks/use-adventures';
+import { useSegments } from '@/hooks/use-segments';
 import { useTranslation } from '@/lib/i18n';
 
-// Écran détail d'aventure — SQUELETTE (MOB-3.1 / AC1, AC3, AC4, AC7). Affiche le
-// nom + actions (renommer/supprimer). Volontairement minimal : MOB-3.2 y greffera
-// les segments/upload GPX et MOB-3.3 les dates/vitesse/profil → ne pas verrouiller
-// la structure ni sur-construire. Un placeholder `comingSoon` l'indique.
+// Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
+// nom + actions (renommer/supprimer), puis la liste des segments GPX, l'uploader et
+// la notification in-app de fin de parsing. MOB-3.3 y greffera dates/vitesse/profil.
 export default function AdventureDetailScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -33,6 +39,35 @@ export default function AdventureDetailScreen() {
   const deleteMutation = useDeleteAdventure();
 
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
+
+  // Notification in-app de fin de parsing (succès). Push natif = hors MVP (archi
+  // §Native Capabilities) → bandeau transitoire local + carte qui passe en `done`.
+  // L'échec est porté par la carte du segment fautif (ErrorBanner + Réessayer).
+  const [parsedMessage, setParsedMessage] = useState<string | null>(null);
+  const uploaderRef = useRef<GpxUploaderHandle>(null);
+
+  const onParsed = useCallback(
+    (segment: AdventureSegmentResponse) => {
+      setParsedMessage(
+        t('adventures.segments.parsedSuccess', { name: segment.name }),
+      );
+    },
+    [t],
+  );
+
+  const {
+    data: segments,
+    isPending: segmentsPending,
+    isError: segmentsError,
+  } = useSegments(id, { onParsed });
+
+  // Notification transitoire : le bandeau succès s'efface seul après ~4s (timer
+  // ré-armé à chaque nouveau message, nettoyé au démontage) — pas de bandeau sticky.
+  useEffect(() => {
+    if (!parsedMessage) return;
+    const timer = setTimeout(() => setParsedMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [parsedMessage]);
 
   const paddingTop = insets.top + 24;
 
@@ -124,12 +159,55 @@ export default function AdventureDetailScreen() {
             <ErrorBanner message={t('adventures.errors.deleteFailed')} />
           ) : null}
 
-          {/* Placeholder explicite : segments/dates/carte arrivent en MOB-3.2/3.3. */}
-          <Card>
-            <Text className="text-sm font-montserrat text-text-muted">
-              {t('adventures.detail.comingSoon')}
+          {/* Section segments GPX (MOB-3.2). */}
+          <View className="gap-3">
+            <Text className="text-lg font-montserrat-semibold text-text-primary">
+              {t('adventures.segments.title')}
             </Text>
-          </Card>
+
+            {/* Notification in-app de fin de parsing (succès). */}
+            {parsedMessage ? (
+              <View
+                accessibilityRole="alert"
+                className="rounded-lg border border-primary bg-primary/10 px-3 py-2"
+              >
+                <Text className="text-sm font-montserrat text-primary">
+                  {parsedMessage}
+                </Text>
+              </View>
+            ) : null}
+
+            {segmentsPending ? (
+              <View className="gap-3">
+                <Skeleton className="h-20 rounded-xl" />
+                <Skeleton className="h-20 rounded-xl" />
+              </View>
+            ) : segmentsError ? (
+              <ErrorBanner message={t('adventures.segments.loadFailed')} />
+            ) : segments && segments.length > 0 ? (
+              <View className="gap-3">
+                {segments.map((segment) => (
+                  <SegmentCard
+                    key={segment.id}
+                    segment={segment}
+                    onRetry={() => uploaderRef.current?.pick()}
+                  />
+                ))}
+              </View>
+            ) : (
+              <Card>
+                <Text className="text-sm font-montserrat text-text-muted">
+                  {t('adventures.segments.empty')}
+                </Text>
+              </Card>
+            )}
+
+            <GpxUploader
+              ref={uploaderRef}
+              adventureId={id}
+              onUploaded={() => setParsedMessage(null)}
+            />
+          </View>
         </>
       )}
 
