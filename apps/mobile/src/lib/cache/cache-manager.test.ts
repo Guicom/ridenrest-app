@@ -4,8 +4,10 @@ import type { AdventureResponse } from '@ridenrest/shared';
 import {
   CACHE_ROOT,
   clearAdventureCache,
+  clearAllCache,
   ensureDir,
   GPX_DIR,
+  hasCachedData,
   POIS_DIR,
   purgeAdventureCache,
   runCachePurge,
@@ -166,6 +168,45 @@ describe('clearAdventureCache (MOB-3.5 / AC4 — fallback manuel)', () => {
 
     expect(mockFs.__files.has(`${POIS_DIR}/manual.json`)).toBe(false);
     expect(mockFs.__files.has(`${GPX_DIR}/s.gpx`)).toBe(false);
+  });
+});
+
+describe('hasCachedData (MOB-3.5 / section Paramètres)', () => {
+  it('false quand aucun cache', () => {
+    expect(hasCachedData()).toBe(false);
+  });
+
+  it('false si les dossiers existent mais sont vides', () => {
+    ensureDir(GPX_DIR);
+    ensureDir(POIS_DIR);
+    expect(hasCachedData()).toBe(false);
+  });
+
+  it('true dès qu’un fichier de cache existe', () => {
+    ensureDir(GPX_DIR);
+    mockFs.__files.set(`${GPX_DIR}/seg1.gpx`, '<gpx/>');
+    expect(hasCachedData()).toBe(true);
+  });
+});
+
+describe('clearAllCache (MOB-3.5 / AC4 — purge globale)', () => {
+  it('supprime gpx + pois + weather de TOUTES les aventures', async () => {
+    ensureDir(GPX_DIR);
+    ensureDir(POIS_DIR);
+    ensureDir(WEATHER_DIR);
+    mockFs.__files.set(`${GPX_DIR}/a-seg1.gpx`, '<gpx/>');
+    mockFs.__files.set(`${GPX_DIR}/b-seg1.gpx`, '<gpx/>');
+    mockFs.__files.set(`${POIS_DIR}/a.json`, '[]');
+    mockFs.__files.set(`${WEATHER_DIR}/b.json`, '{}');
+
+    await clearAllCache();
+
+    expect(hasCachedData()).toBe(false);
+    expect(mockFs.__files.size).toBe(0);
+  });
+
+  it('idempotent : ne jette pas quand rien n’est caché', async () => {
+    await expect(clearAllCache()).resolves.toBeUndefined();
   });
 });
 

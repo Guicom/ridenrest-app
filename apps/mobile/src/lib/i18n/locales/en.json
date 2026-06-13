@@ -197,9 +197,11 @@
     "integrationsSection": "Integrations",
     "accountSection": "Account",
     "dangerSection": "Danger zone",
-    "clearCache": {
-      "label": "Clear this adventure's cache",
-      "confirm": "Delete the cached track and POIs for this adventure?",
+    "offlineCache": {
+      "title": "Offline cache",
+      "description": "GPX tracks you view are stored on this device for offline use. Clearing the cache frees up space; data will be re-downloaded next time you're online.",
+      "clear": "Clear offline cache",
+      "confirm": "Delete all tracks and POIs stored offline on this device?",
       "done": "Cache cleared"
     },
     "logout": {

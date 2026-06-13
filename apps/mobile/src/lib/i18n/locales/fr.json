@@ -197,9 +197,11 @@
     "integrationsSection": "Intégrations",
     "accountSection": "Compte",
     "dangerSection": "Zone de danger",
-    "clearCache": {
-      "label": "Vider le cache de cette aventure",
-      "confirm": "Supprimer la trace et les POIs cachés de cette aventure ?",
+    "offlineCache": {
+      "title": "Cache hors ligne",
+      "description": "Les traces GPX que vous consultez sont enregistrées sur cet appareil pour la consultation hors ligne. Vider le cache libère de l'espace ; les données seront retéléchargées à la prochaine connexion.",
+      "clear": "Vider le cache hors ligne",
+      "confirm": "Supprimer toutes les traces et POIs enregistrés hors ligne sur cet appareil ?",
       "done": "Cache vidé"
     },
     "logout": {

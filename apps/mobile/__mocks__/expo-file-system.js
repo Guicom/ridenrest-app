@@ -51,6 +51,21 @@ class Directory {
   create(_options) {
     dirs.add(this.uri);
   }
+  /** Enfants DIRECTS (fichiers + sous-dossiers) — API SDK 56 `Directory.list()`. */
+  list() {
+    const prefix = this.uri + '/';
+    const out = [];
+    for (const key of files.keys()) {
+      if (key.startsWith(prefix) && !key.slice(prefix.length).includes('/')) {
+        out.push(new File(key));
+      }
+    }
+    for (const d of dirs) {
+      const rest = d.startsWith(prefix) ? d.slice(prefix.length) : null;
+      if (rest && !rest.includes('/')) out.push(new Directory(d));
+    }
+    return out;
+  }
   delete() {
     dirs.delete(this.uri);
     const prefix = this.uri + '/';

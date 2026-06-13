@@ -111,13 +111,39 @@ export async function runCachePurge(
 }
 
 /**
- * Purge MANUELLE d'une aventure (fallback bouton settings — AC4), SANS condition
- * de date. Indispensable pour les aventures sans `startDate`/`endDate` (jamais
- * purgées auto). Même effet que `purgeAdventureCache`.
+ * Purge MANUELLE d'une aventure (SANS condition de date). Conservée pour la purge
+ * ciblée par aventure ; même effet que `purgeAdventureCache`.
  */
 export function clearAdventureCache(
   adventureId: string,
   segmentIds: string[] = [],
 ): Promise<void> {
   return purgeAdventureCache(adventureId, segmentIds);
+}
+
+/**
+ * Vrai si au moins un fichier de cache offline existe (gpx/pois/weather). Lecture
+ * SYNCHRONE du FS (nouvelle API SDK 56). Sert à n'afficher la section « Vider le
+ * cache hors ligne » des Paramètres QUE s'il y a réellement quelque chose à vider.
+ */
+export function hasCachedData(): boolean {
+  for (const dirUri of [GPX_DIR, POIS_DIR, WEATHER_DIR]) {
+    const dir = new Directory(dirUri);
+    if (dir.exists && dir.list().length > 0) return true;
+  }
+  return false;
+}
+
+/**
+ * Purge GLOBALE du cache offline (toutes aventures) — action manuelle des
+ * Paramètres (fallback AC4, couvre aussi les aventures sans dates jamais purgées
+ * auto). Supprime les répertoires gpx/pois/weather + leur contenu (idempotent ;
+ * recréés à la prochaine écriture).
+ */
+export function clearAllCache(): Promise<void> {
+  for (const dirUri of [GPX_DIR, POIS_DIR, WEATHER_DIR]) {
+    const dir = new Directory(dirUri);
+    if (dir.exists) dir.delete();
+  }
+  return Promise.resolve();
 }

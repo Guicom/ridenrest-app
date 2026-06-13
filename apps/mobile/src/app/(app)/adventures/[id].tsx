@@ -18,7 +18,6 @@ import {
 } from '@/components/adventure/rename-segment-modal';
 import { SegmentList } from '@/components/adventure/segment-list';
 import { StravaImportSheet } from '@/components/adventure/strava-import-sheet';
-import { ClearAdventureCacheButton } from '@/components/shared/clear-adventure-cache-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -347,14 +346,6 @@ export default function AdventureDetailScreen() {
                 />
               </>
             ) : null}
-
-            {/* Fallback manuel (MOB-3.5 / AC4) : vide le cache de CETTE aventure
-                (trace GPX des segments + POIs + météo). Disponible online comme
-                offline (purge locale, pas d'appel réseau). */}
-            <ClearAdventureCacheButton
-              adventureId={id}
-              segmentIds={(segments ?? []).map((s) => s.id)}
-            />
           </View>
         </>
       )}

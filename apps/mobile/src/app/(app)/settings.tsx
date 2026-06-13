@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountSection } from '@/components/shared/account-section';
+import { OfflineCacheSection } from '@/components/shared/offline-cache-section';
 import { StravaConnectionCard } from '@/components/shared/strava-connection-card';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/lib/i18n';
@@ -41,6 +42,8 @@ export default function SettingsScreen() {
         </Text>
         <StravaConnectionCard />
       </View>
+
+      <OfflineCacheSection />
 
       <AccountSection />
     </ScrollView>
