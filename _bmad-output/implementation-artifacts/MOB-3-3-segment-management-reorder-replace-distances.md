@@ -381,7 +381,7 @@ Opus 4.8 (claude-opus-4-8) via subagent BMAD dev-story.
 - `apps/mobile/src/components/ui/icon.tsx` (GripVerticalIcon + RefreshCwIcon)
 - `apps/mobile/src/lib/i18n/locales/fr.json` (clés adventures.segments.*)
 - `apps/mobile/src/lib/i18n/locales/en.json` (clés adventures.segments.*)
-- `apps/mobile/package.json` (dépendance react-native-reanimated-dnd@^2.0.0)
+- `apps/mobile/package.json` (dépendance lib drag — **finalement `react-native-reorderable-list`**, cf. Change Log v1.2)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (MOB-3-3 → review + last_updated)
 
 **Modifiés (correctifs post-review — parité UX web mobile / device feedback)**
@@ -393,6 +393,12 @@ Opus 4.8 (claude-opus-4-8) via subagent BMAD dev-story.
 - `apps/mobile/src/__tests__/adventure-detail.test.tsx` — mock dnd (hooks) + assertion distance
 - `apps/mobile/src/lib/i18n/locales/{fr,en}.json` — `gainDPlus`/`lossDMinus` (remplacent `totalDistance`/`cumulative`/`length`), `addButton` reformulé (« Ajouter un segment »), `adventures.delete.button`
 
+**Modifiés (v1.2 — bascule de lib drag pour la bonne UX, validé device)**
+- `apps/mobile/package.json` + `pnpm-lock.yaml` — `react-native-reanimated-dnd` **retiré**, `react-native-reorderable-list@^0.18.0` **ajouté** (FlatList réordonnable, peer `react-native-reanimated >= 3.12` → OK avec 4.3.1 ; pas de module natif nouveau → pas de prebuild)
+- `apps/mobile/src/components/adventure/segment-list.tsx` — réécrit sur `ReorderableList` (la liste EST le scroller) + `useReorderableDrag` (appui long sur la poignée) + `reorderItems` ; expose `ListHeaderComponent`/`ListFooterComponent`/`ListEmptyComponent`
+- `apps/mobile/src/app/(app)/adventures/[id].tsx` — l'écran n'est plus un `ScrollView` : la `SegmentList` (FlatList) est le scroller ; en-tête (retour/titre/stats/CTAs) en `ListHeaderComponent`, « Supprimer l'aventure » en `ListFooterComponent`, états loading/erreur/vide en `ListEmptyComponent` → **tout défile** (plus d'en-tête figé)
+- `apps/mobile/src/components/adventure/segment-list.test.tsx` + `apps/mobile/src/__tests__/adventure-detail.test.tsx` — mocks alignés sur `react-native-reorderable-list` (`ReorderableList`/`useReorderableDrag`/`reorderItems`)
+
 ## Change Log
 
 | Date | Version | Description | Auteur |
@@ -400,3 +406,4 @@ Opus 4.8 (claude-opus-4-8) via subagent BMAD dev-story.
 | 2026-06-12 | 0.1 | Création story MOB-3.3 (ready-for-dev) — réordre DnD optimiste+rollback, suppression (confirm), remplacement (delete+ré-upload), renommage segment, distances (total+cumul formatées, source serveur), i18n FR/EN, tests. Contrats API réels (orderedIds), lib DnD `react-native-reanimated-dnd` (Reanimated 4 + New Arch). | bmad-create-story |
 | 2026-06-13 | 1.0 | Implémentation T1–T7 (T8 device déférée user) : `react-native-reanimated-dnd@2.0.0` + `GestureHandlerRootView` ; API segments reorder/rename/delete ; mutations optimistes (reorder) + invalidations ; `SegmentList` draggable + distances serveur ; `formatKm` ; `RenameSegmentModal` ; i18n FR/EN parité ; 19 tests MOB-3.3 (optimistic+rollback explicites). Gates typecheck/lint/test verts (126 suites). Status → review. | Opus 4.8 (dev-story) |
 | 2026-06-13 | 1.1 | Correctifs post-review (test device + parité UX web mobile) : (1) `SegmentList` rebâti sur `useSortableList`+`DropProvider` (fix « VirtualizedLists nested » + segment importé chevauchant le 1er) ; (2) cartes segment au format web `distance · D+ · D-` (cumul retiré) ; (3) ligne stats aventure (distance + D+ · D-) sous le titre ; (4) refonte layout détail : crayon de renommage près du titre, CTAs (Strava/Ajouter) en pills vertes sous « Segments », « Supprimer l'aventure » rouge clair en bas ; (5) i18n : `gainDPlus`/`lossDMinus`, `addButton`, `adventures.delete.button`. Gates verts (200 tests). | Opus 4.8 |
+| 2026-06-13 | 1.2 | Bascule de lib drag (UX validée sur device) : `react-native-reanimated-dnd` (conçu pour être le scroller → conflits geste/scroll, drag inopérant dans un ScrollView de page) **remplacé par `react-native-reorderable-list`** (FlatList réordonnable, Reanimated 4 + New Arch). L'écran détail devient cette FlatList : en-tête/CTAs/pied via `ListHeaderComponent`/`ListFooterComponent` → tout défile ; drag par **appui long** sur la poignée + auto-scroll intégré (aucun conflit). `onReorder({from,to})` → `reorderItems` → `orderedIds` → mutation optimiste inchangée. Aucun module natif nouveau (pas de prebuild). Mocks de test alignés. Gates verts (200 tests). **Drag confirmé fonctionnel par l'utilisateur.** | Opus 4.8 |
