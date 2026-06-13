@@ -125,13 +125,14 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
 
     return (
       <View className="gap-2">
-        {/* Style copié à l'identique du web (adventure-detail.tsx) : variant ghost,
-            pill (rounded-full), padding px-6 py-6, fond VERT clair (bg-primary/10),
-            texte/icône verts. `h-auto` → c'est le padding qui dicte la hauteur. */}
+        {/* Parité web (adventure-detail.tsx) : variant ghost, size lg (= h-11 comme
+            le web), pill rounded-full, fond VERT clair (bg-primary/10), texte/icône
+            verts. La hauteur vient du `size`, PAS d'un padding/h-auto. */}
         <Button
           variant="ghost"
-          className="h-auto rounded-full bg-primary/10 px-6 py-6 active:bg-primary/20"
-          textClassName="text-base text-primary"
+          size="lg"
+          className="rounded-full bg-primary/10 px-6 active:bg-primary/20"
+          textClassName="text-primary"
           // Libellé (utilisé pour l'état `loading` : le spinner remplace l'icône).
           label={
             upload.isPending
@@ -146,8 +147,8 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
               affiche son `ActivityIndicator` + `label`. */}
           {upload.isPending || picking ? undefined : (
             <View className="flex-row items-center gap-2">
-              <UploadIcon size={18} className="text-primary" />
-              <Text className="text-base font-montserrat-semibold text-primary">
+              <UploadIcon size={16} className="text-primary" />
+              <Text className="text-sm font-montserrat-semibold text-primary">
                 {t('adventures.segments.addButton')}
               </Text>
             </View>
