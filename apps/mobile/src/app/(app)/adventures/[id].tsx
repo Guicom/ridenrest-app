@@ -1,8 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { cssInterop } from 'nativewind';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
@@ -46,18 +44,6 @@ import {
 import { useStravaConnection } from '@/hooks/use-strava-connection';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useTranslation } from '@/lib/i18n';
-
-// La page utilise le `ScrollView` de `react-native-gesture-handler` (et NON celui de
-// `react-native`) : c'est la condition pour que le glisser-déposer des segments
-// (gesture-handler Pan via `react-native-reanimated-dnd`) puisse prendre le pas sur
-// le scroll vertical. Le Pan de la lib n'a aucune coordination externe → sans un
-// ScrollView gesture-handler comme ancêtre, le scroll capte le geste et le drag ne
-// s'active jamais. On ré-enregistre le mapping NativeWind (className → style/
-// contentContainerStyle) car ce composant n'est pas un primitif RN auto-géré.
-cssInterop(ScrollView, {
-  className: { target: 'style' },
-  contentContainerClassName: { target: 'contentContainerStyle' },
-});
 
 // Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
 // nom + actions (renommer/supprimer), puis la liste des segments GPX, l'uploader et
@@ -202,232 +188,227 @@ export default function AdventureDetailScreen() {
     );
   };
 
-  return (
-    <ScrollView
-      className="flex-1 bg-background-page"
-      contentContainerClassName="gap-6 p-6"
-      contentContainerStyle={{ paddingTop }}
-    >
-      <View className="flex-row items-center justify-between">
+  // En-tête défilant (parité web : tout défile). Rendu par `ListHeaderComponent` de
+  // la liste réordonnable. `data` est garanti non-null dans la branche d'affichage.
+  const header = data ? (
+    <View className="gap-4 pb-1">
+      <Button
+        variant="link"
+        size="sm"
+        className="self-start px-0"
+        label={t('settings.back')}
+        onPress={() => router.back()}
+      />
+
+      {/* Titre + crayon de renommage (parité web : icône à côté du titre). */}
+      <View className="flex-row items-center gap-2">
+        <Text className="flex-1 text-2xl font-montserrat-bold text-text-primary">
+          {data.name}
+        </Text>
         <Button
-          variant="link"
-          size="sm"
-          className="px-0"
-          label={t('settings.back')}
-          onPress={() => router.back()}
-        />
+          variant="ghost"
+          size="icon"
+          disabled={!isOnline}
+          accessibilityLabel={t('adventures.card.renameA11y')}
+          accessibilityHint={
+            !isOnline ? t('offline.actionUnavailable') : undefined
+          }
+          onPress={() =>
+            setRenameTarget({ id: data.id, currentName: data.name })
+          }
+        >
+          <PencilIcon size={20} className="text-text-primary" />
+        </Button>
       </View>
 
+      {/* Stats aventure (parité web) : distance + D+ · D-, valeurs SERVEUR. */}
+      <View className="flex-row flex-wrap items-center gap-4">
+        <View className="flex-row items-center gap-1">
+          <RouteIcon size={16} className="text-text-muted" />
+          <Text className="text-sm font-montserrat text-text-muted">
+            {t('adventures.segments.distanceKm', {
+              value: formatKm(data.totalDistanceKm, locale),
+            })}
+          </Text>
+        </View>
+        {data.totalElevationGainM != null ||
+        data.totalElevationLossM != null ? (
+          <View className="flex-row items-center gap-1">
+            {data.totalElevationGainM != null ? (
+              <>
+                <TrendingUpIcon size={16} className="text-text-muted" />
+                <Text className="text-sm font-montserrat text-text-muted">
+                  {t('adventures.segments.gainDPlus', {
+                    value: Math.round(data.totalElevationGainM),
+                  })}
+                </Text>
+              </>
+            ) : null}
+            {data.totalElevationGainM != null &&
+            data.totalElevationLossM != null ? (
+              <Text className="mx-0.5 text-sm font-montserrat text-text-muted">
+                ·
+              </Text>
+            ) : null}
+            {data.totalElevationLossM != null ? (
+              <>
+                <TrendingDownIcon size={16} className="text-text-muted" />
+                <Text className="text-sm font-montserrat text-text-muted">
+                  {t('adventures.segments.lossDMinus', {
+                    value: Math.round(data.totalElevationLossM),
+                  })}
+                </Text>
+              </>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
+      {/* Lecture seule offline (MOB-3.5 / AC2). */}
+      {!isOnline ? (
+        <View
+          accessibilityRole="alert"
+          className="rounded-lg border border-text-muted bg-text-muted/10 px-3 py-2"
+        >
+          <Text className="text-sm font-montserrat text-text-muted">
+            {t('offline.readOnly')}
+          </Text>
+        </View>
+      ) : null}
+
+      {renameMutation.isError ? (
+        <ErrorBanner message={t('adventures.errors.renameFailed')} />
+      ) : null}
+
+      {/* Section « Segments » : titre + feedback + CTAs (au-dessus de la liste). */}
+      <View className="gap-3">
+        <Text className="text-lg font-montserrat-semibold text-text-primary">
+          {t('adventures.segments.title')}
+        </Text>
+
+        {parsedMessage ? (
+          <View
+            accessibilityRole="alert"
+            className="rounded-lg border border-primary bg-primary/10 px-3 py-2"
+          >
+            <Text className="text-sm font-montserrat text-primary">
+              {parsedMessage}
+            </Text>
+          </View>
+        ) : null}
+
+        {reorderSegmentsMutation.isError ? (
+          <ErrorBanner message={t('adventures.segments.errors.reorder')} />
+        ) : null}
+        {renameSegmentMutation.isError ? (
+          <ErrorBanner message={t('adventures.segments.errors.rename')} />
+        ) : null}
+        {deleteSegmentMutation.isError ? (
+          <ErrorBanner message={t('adventures.segments.errors.delete')} />
+        ) : null}
+
+        {isOnline ? (
+          <>
+            {/* Parité web : pill outline (bordure verte) + pill ghost vert. */}
+            <Button
+              variant="outline"
+              size="lg"
+              className="rounded-full !border-primary/30 px-6 active:bg-primary/10"
+              textClassName="text-primary"
+              label={t('strava.import.openButton')}
+              onPress={() => setStravaImportOpen(true)}
+            />
+            <GpxUploader
+              ref={uploaderRef}
+              adventureId={id}
+              onUploaded={() => setParsedMessage(null)}
+            />
+          </>
+        ) : null}
+      </View>
+    </View>
+  ) : null;
+
+  // Pied défilant : « Supprimer l'aventure » (rouge clair), en fin de liste.
+  const footer = data ? (
+    <View className="gap-2 pt-3">
+      {deleteMutation.isError ? (
+        <ErrorBanner message={t('adventures.errors.deleteFailed')} />
+      ) : null}
+      <Button
+        variant="ghost"
+        className="bg-destructive/10 active:bg-destructive/20"
+        textClassName="text-destructive"
+        disabled={!isOnline}
+        loading={deleteMutation.isPending}
+        label={t('adventures.delete.button')}
+        accessibilityHint={
+          !isOnline ? t('offline.actionUnavailable') : undefined
+        }
+        onPress={confirmDelete}
+      >
+        {deleteMutation.isPending ? undefined : (
+          <View className="flex-row items-center gap-2">
+            <Trash2Icon size={18} className="text-destructive" />
+            <Text className="text-sm font-montserrat-semibold text-destructive">
+              {t('adventures.delete.button')}
+            </Text>
+          </View>
+        )}
+      </Button>
+    </View>
+  ) : null;
+
+  // État de la liste de segments (loading / erreur / vide) rendu via ListEmptyComponent.
+  const listEmpty = segmentsPending ? (
+    <View className="gap-3">
+      <Skeleton className="h-24 rounded-xl" />
+      <Skeleton className="h-24 rounded-xl" />
+    </View>
+  ) : segmentsError ? (
+    <ErrorBanner message={t('adventures.segments.loadFailed')} />
+  ) : (
+    <Card>
+      <Text className="text-sm font-montserrat text-text-muted">
+        {t('adventures.segments.empty')}
+      </Text>
+    </Card>
+  );
+
+  return (
+    <View className="flex-1 bg-background-page">
       {isPending ? (
-        <View className="gap-3">
+        <View className="gap-3 px-6" style={{ paddingTop }}>
           <Skeleton className="h-8 w-2/3 rounded-lg" />
           <Skeleton className="h-20 rounded-xl" />
         </View>
       ) : isError || !data ? (
-        <ErrorBanner message={t('adventures.errors.loadFailed')} />
+        <View className="px-6" style={{ paddingTop }}>
+          <ErrorBanner message={t('adventures.errors.loadFailed')} />
+        </View>
       ) : (
-        <>
-          {/* Titre + crayon de renommage (parité web mobile : l'action « renommer »
-              est une icône à côté du titre, pas un bouton plein). Désactivée offline. */}
-          <View className="flex-row items-center gap-2">
-            <Text className="flex-1 text-2xl font-montserrat-bold text-text-primary">
-              {data.name}
-            </Text>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={!isOnline}
-              accessibilityLabel={t('adventures.card.renameA11y')}
-              accessibilityHint={
-                !isOnline ? t('offline.actionUnavailable') : undefined
-              }
-              onPress={() =>
-                setRenameTarget({ id: data.id, currentName: data.name })
-              }
-            >
-              <PencilIcon size={20} className="text-text-primary" />
-            </Button>
-          </View>
-
-          {/* Stats de l'aventure (parité web mobile) : distance totale + D+/D-,
-              valeurs SERVEUR (`totalDistanceKm`/`totalElevationGainM/LossM`),
-              jamais recalculées. D+/D- omis si la donnée est absente. */}
-          {/* Structure copiée du web (adventure-detail.tsx) : `gap-4` entre la
-              distance et le groupe dénivelé, qui réunit D+ et D- séparés par un
-              « · » (mx-0.5). Icônes 16px, texte muted. */}
-          <View className="flex-row flex-wrap items-center gap-4">
-            <View className="flex-row items-center gap-1">
-              <RouteIcon size={16} className="text-text-muted" />
-              <Text className="text-sm font-montserrat text-text-muted">
-                {t('adventures.segments.distanceKm', {
-                  value: formatKm(data.totalDistanceKm, locale),
-                })}
-              </Text>
-            </View>
-            {data.totalElevationGainM != null ||
-            data.totalElevationLossM != null ? (
-              <View className="flex-row items-center gap-1">
-                {data.totalElevationGainM != null ? (
-                  <>
-                    <TrendingUpIcon size={16} className="text-text-muted" />
-                    <Text className="text-sm font-montserrat text-text-muted">
-                      {t('adventures.segments.gainDPlus', {
-                        value: Math.round(data.totalElevationGainM),
-                      })}
-                    </Text>
-                  </>
-                ) : null}
-                {data.totalElevationGainM != null &&
-                data.totalElevationLossM != null ? (
-                  <Text className="mx-0.5 text-sm font-montserrat text-text-muted">
-                    ·
-                  </Text>
-                ) : null}
-                {data.totalElevationLossM != null ? (
-                  <>
-                    <TrendingDownIcon size={16} className="text-text-muted" />
-                    <Text className="text-sm font-montserrat text-text-muted">
-                      {t('adventures.segments.lossDMinus', {
-                        value: Math.round(data.totalElevationLossM),
-                      })}
-                    </Text>
-                  </>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-
-          {/* Lecture seule offline (MOB-3.5 / AC2) : message explicite + actions
-              réseau désactivées. La trace/POIs cachés restent consultables. */}
-          {!isOnline ? (
-            <View
-              accessibilityRole="alert"
-              className="rounded-lg border border-text-muted bg-text-muted/10 px-3 py-2"
-            >
-              <Text className="text-sm font-montserrat text-text-muted">
-                {t('offline.readOnly')}
-              </Text>
-            </View>
-          ) : null}
-
-          {renameMutation.isError ? (
-            <ErrorBanner message={t('adventures.errors.renameFailed')} />
-          ) : null}
-
-          {/* Section segments GPX (MOB-3.2). */}
-          <View className="gap-3">
-            <Text className="text-lg font-montserrat-semibold text-text-primary">
-              {t('adventures.segments.title')}
-            </Text>
-
-            {/* Notification in-app de fin de parsing (succès). */}
-            {parsedMessage ? (
-              <View
-                accessibilityRole="alert"
-                className="rounded-lg border border-primary bg-primary/10 px-3 py-2"
-              >
-                <Text className="text-sm font-montserrat text-primary">
-                  {parsedMessage}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Erreurs de mutation segment (réordre/rename/delete) — inline,
-                jamais via Alert. */}
-            {reorderSegmentsMutation.isError ? (
-              <ErrorBanner message={t('adventures.segments.errors.reorder')} />
-            ) : null}
-            {renameSegmentMutation.isError ? (
-              <ErrorBanner message={t('adventures.segments.errors.rename')} />
-            ) : null}
-            {deleteSegmentMutation.isError ? (
-              <ErrorBanner message={t('adventures.segments.errors.delete')} />
-            ) : null}
-
-            {/* CTAs sous le titre « Segments » (parité web mobile) : import Strava
-                (outline) puis ajout de segment (secondaire + icône). Masqués offline
-                — la trace cachée reste consultable mais on ne peut plus muter (AC2). */}
-            {isOnline ? (
-              <>
-                {/* Parité web (adventure-detail.tsx) : size lg = h-11 (= le web),
-                    pill rounded-full, bordure verte légère, texte vert. La hauteur
-                    vient du `size` (comme le web), PAS d'un padding/h-auto. */}
-                <Button
-                  variant="outline"
-                  size="lg"
-                  // `!border-primary/30` (important) : force le vert faible du web
-                  // par-dessus le `border-border` (gris #D4E0DA) du variant outline,
-                  // que tailwind-merge ne dédoublonne pas de façon fiable côté mobile.
-                  className="rounded-full !border-primary/30 px-6 active:bg-primary/10"
-                  textClassName="text-primary"
-                  label={t('strava.import.openButton')}
-                  onPress={() => setStravaImportOpen(true)}
-                />
-                <GpxUploader
-                  ref={uploaderRef}
-                  adventureId={id}
-                  onUploaded={() => setParsedMessage(null)}
-                />
-              </>
-            ) : null}
-
-            {segmentsPending ? (
-              <View className="gap-3">
-                <Skeleton className="h-20 rounded-xl" />
-                <Skeleton className="h-20 rounded-xl" />
-              </View>
-            ) : segmentsError ? (
-              <ErrorBanner message={t('adventures.segments.loadFailed')} />
-            ) : segments && segments.length > 0 ? (
-              <SegmentList
-                adventureId={id}
-                segments={segments}
-                onReorder={handleSegmentReorder}
-                onRename={handleSegmentRename}
-                onDelete={handleSegmentDelete}
-                onReplace={handleSegmentReplace}
-                isReordering={
-                  reorderSegmentsMutation.isPending ||
-                  deleteSegmentMutation.isPending
-                }
-              />
-            ) : (
-              <Card>
-                <Text className="text-sm font-montserrat text-text-muted">
-                  {t('adventures.segments.empty')}
-                </Text>
-              </Card>
-            )}
-          </View>
-
-          {/* Suppression de l'aventure (parité web mobile) : bouton « rouge clair »
-              (fond destructive atténué + texte/icône rouges), tout en bas de l'écran.
-              Désactivé offline. */}
-          {deleteMutation.isError ? (
-            <ErrorBanner message={t('adventures.errors.deleteFailed')} />
-          ) : null}
-          <Button
-            variant="ghost"
-            className="bg-destructive/10 active:bg-destructive/20"
-            textClassName="text-destructive"
-            disabled={!isOnline}
-            loading={deleteMutation.isPending}
-            label={t('adventures.delete.button')}
-            accessibilityHint={
-              !isOnline ? t('offline.actionUnavailable') : undefined
-            }
-            onPress={confirmDelete}
-          >
-            {deleteMutation.isPending ? undefined : (
-              <View className="flex-row items-center gap-2">
-                <Trash2Icon size={18} className="text-destructive" />
-                <Text className="text-sm font-montserrat-semibold text-destructive">
-                  {t('adventures.delete.button')}
-                </Text>
-              </View>
-            )}
-          </Button>
-        </>
+        // La liste réordonnable EST le scroller de l'écran (FlatList) : en-tête, CTAs
+        // et pied défilent avec elle (ListHeader/Footer), et le drag (appui long sur
+        // la poignée) coexiste avec le scroll sans conflit (auto-scroll géré par la lib).
+        <SegmentList
+          adventureId={id}
+          segments={segments ?? []}
+          onReorder={handleSegmentReorder}
+          onRename={handleSegmentRename}
+          onDelete={handleSegmentDelete}
+          onReplace={handleSegmentReplace}
+          isReordering={
+            reorderSegmentsMutation.isPending || deleteSegmentMutation.isPending
+          }
+          ListHeaderComponent={header}
+          ListFooterComponent={footer}
+          ListEmptyComponent={listEmpty}
+          contentContainerStyle={{
+            paddingTop,
+            paddingHorizontal: 24,
+            paddingBottom: 24,
+          }}
+        />
       )}
 
       <StravaImportSheet
@@ -460,6 +441,6 @@ export default function AdventureDetailScreen() {
           )
         }
       />
-    </ScrollView>
+    </View>
   );
 }

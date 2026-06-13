@@ -78,25 +78,39 @@ jest.mock('@/components/adventure/gpx-uploader', () => {
   return { GpxUploader };
 });
 
-// DnD : Fragment/children nus (cf. segment-list.test.tsx — gotcha NativeWind).
-jest.mock('react-native-reanimated-dnd', () => {
-  const useSortableList = ({ data }: { data: { id: string }[] }) => ({
-    positions: { value: {} },
-    dropProviderRef: { current: null },
-    contentHeight: data.length * 132,
-    getItemProps: (item: { id: string }) => ({
-      id: item.id,
-      positions: { value: {} },
-      lowerBound: { value: 0 },
-      autoScrollDirection: { value: 'none' },
-      itemsCount: data.length,
-      itemHeight: 132,
-    }),
-  });
-  const DropProvider = ({ children }: any) => children;
-  const SortableItem = ({ children }: any) => children;
-  SortableItem.Handle = ({ children }: any) => children;
-  return { useSortableList, DropProvider, SortableItem };
+// Liste réordonnable : mock sans JSX RN (gotcha NativeWind) → renvoie un tableau
+// d'éléments (header + items + footer/empty) construits par le composant testé.
+jest.mock('react-native-reorderable-list', () => {
+  const ReorderableList = ({
+    data,
+    renderItem,
+    ListHeaderComponent,
+    ListFooterComponent,
+    ListEmptyComponent,
+  }: any) => {
+    const list = data ?? [];
+    const items = list.map((item: { id: string }, index: number) =>
+      renderItem({ item, index }),
+    );
+    return [
+      ListHeaderComponent ?? null,
+      ...(list.length === 0 ? [ListEmptyComponent ?? null] : items),
+      ListFooterComponent ?? null,
+    ];
+  };
+  const useReorderableDrag = () => () => {};
+  const reorderItems = <T,>(arr: T[], from: number, to: number): T[] => {
+    const copy = arr.slice();
+    const [moved] = copy.splice(from, 1);
+    copy.splice(to, 0, moved);
+    return copy;
+  };
+  return {
+    __esModule: true,
+    default: ReorderableList,
+    useReorderableDrag,
+    reorderItems,
+  };
 });
 
 const mockPick = jest.fn();

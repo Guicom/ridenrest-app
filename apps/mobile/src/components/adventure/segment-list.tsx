@@ -1,10 +1,17 @@
-import { useCallback } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { useCallback, type ReactElement } from 'react';
 import {
-  DropProvider,
-  SortableItem,
-  useSortableList,
-} from 'react-native-reanimated-dnd';
+  Platform,
+  Pressable,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import ReorderableList, {
+  reorderItems,
+  useReorderableDrag,
+  type ReorderableListReorderEvent,
+} from 'react-native-reorderable-list';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
 import { Card } from '@/components/ui/card';
@@ -18,23 +25,23 @@ import { SegmentStatusBadge } from '@/components/adventure/segment-status-badge'
 import { formatKm } from '@/lib/format/distance';
 import { useTranslation } from '@/lib/i18n';
 
-// Liste DRAGGABLE de segments + distances (MOB-3.3 / T4, AC1 & AC4).
+// Liste RÉORDONNABLE de segments + distances (MOB-3.3 / T4, AC1 & AC4).
 //
-// - Réordre via `react-native-reanimated-dnd` (Reanimated 4 + New Arch). À la fin du
-//   drag, `SortableItem.onDrop` expose `allPositions` (map id→index) → on en extrait
-//   `orderedIds` (tri par position) et on appelle `onReorder` (→ mutation optimiste).
-// - Distances issues du SERVEUR uniquement (`cumulativeStartKm`/`distanceKm` du
-//   segment, `totalDistanceKm` de l'aventure) — JAMAIS recalculées ici. Le seul code
-//   « distance » est le formatage `formatKm` (T6). Segment non `done` → libellé
-//   « Analyse en cours… » plutôt qu'une fausse distance 0 km.
-// - Le drag reste actif quel que soit `parseStatus` (réordre indépendant du parse).
+// On utilise `react-native-reorderable-list` (basé sur FlatList, Reanimated 4 + New
+// Arch) plutôt qu'une lib de drag « conteneur » : c'est LA liste scrollable de
+// l'écran. L'en-tête (titre, stats, CTAs) et le pied (« Supprimer ») passent par
+// `ListHeaderComponent` / `ListFooterComponent` → ils DÉFILENT avec la liste (UX
+// mobile standard), et le drag fonctionne sans conflit avec le scroll : il s'active
+// par APPUI LONG sur la poignée (auto-scroll géré par la lib).
+//
+// - À la fin du drag, `onReorder` expose `{ from, to }` → `reorderItems` reconstruit
+//   l'ordre, on en extrait `orderedIds` et on appelle `onReorder` (→ mutation
+//   optimiste côté écran).
+// - Distances issues du SERVEUR uniquement (`cumulativeStartKm`/`distanceKm`/
+//   `totalDistanceKm`) — JAMAIS recalculées ici ; seul `formatKm` (T6) formate.
+//   Segment non `done` → libellé « Analyse en cours… ».
 // - Toutes les chaînes via `t()` ; actions désactivées pendant une mutation
 //   (`isReordering`) pour éviter le double-déclenchement (AC5).
-
-// Hauteur fixe d'un item : requise par la lib (calcul des positions de drag). Doit
-// rester cohérente avec la hauteur réelle rendue de la carte (nom + ligne distances
-// + boutons d'action).
-const ITEM_HEIGHT = 132;
 
 export interface SegmentListProps {
   adventureId: string;
@@ -45,13 +52,13 @@ export interface SegmentListProps {
   onReplace: (segment: AdventureSegmentResponse) => void;
   /** Mutation reorder en vol → désactive les actions (anti double-submit, AC5). */
   isReordering?: boolean;
-}
-
-/** Reconstruit `orderedIds` depuis la map `{ [id]: position }` de la lib DnD. */
-function positionsToOrderedIds(positions: Record<string, number>): string[] {
-  return Object.entries(positions)
-    .sort(([, a], [, b]) => a - b)
-    .map(([id]) => id);
+  /** En-tête défilant (titre, stats, CTAs…) rendu en tête de liste. */
+  ListHeaderComponent?: ReactElement | null;
+  /** Pied défilant (ex. « Supprimer l'aventure ») rendu en fin de liste. */
+  ListFooterComponent?: ReactElement | null;
+  /** Affiché à la place des items quand `segments` est vide (loading/erreur/vide). */
+  ListEmptyComponent?: ReactElement | null;
+  contentContainerStyle?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -80,101 +87,49 @@ export function SegmentList({
   onDelete,
   onReplace,
   isReordering,
+  ListHeaderComponent,
+  ListFooterComponent,
+  ListEmptyComponent,
+  contentContainerStyle,
 }: SegmentListProps) {
   const { i18n } = useTranslation();
   const locale = i18n.language;
 
-  // Remontage quand l'ENSEMBLE ou l'ORDRE des segments change : `useSortableList`
-  // n'initialise sa map `positions` qu'au montage (`useSharedValue`) et ne la
-  // resynchronise PAS sur changement de `data`. Sans ce `key`, un segment ajouté
-  // (ex. import Strava) n'a pas d'entrée dans la map → position 0 par défaut → il
-  // chevauche le 1er segment. Le composant `<Sortable>` faisait ce remontage en
-  // interne via `key={dataHash(data)}` ; on le reproduit ici.
-  return (
-    <DraggableSegmentList
-      key={segments.map((s) => s.id).join('|')}
-      segments={segments}
-      locale={locale}
-      isReordering={Boolean(isReordering)}
-      onReorder={onReorder}
-      onRename={onRename}
-      onDelete={onDelete}
-      onReplace={onReplace}
-    />
-  );
-}
-
-interface DraggableSegmentListProps {
-  segments: AdventureSegmentResponse[];
-  locale: string;
-  isReordering: boolean;
-  onReorder: (orderedIds: string[]) => void;
-  onRename: (segment: AdventureSegmentResponse) => void;
-  onDelete: (segment: AdventureSegmentResponse) => void;
-  onReplace: (segment: AdventureSegmentResponse) => void;
-}
-
-/**
- * Liste triable rendue dans un conteneur NON-scrollable (une `View` de hauteur
- * `contentHeight`), PAS via le composant `<Sortable>` qui embarque sa propre
- * `FlatList`/`ScrollView`. L'écran détail (`[id].tsx`) est déjà un `<ScrollView>`
- * vertical : y imbriquer une VirtualizedList déclenche l'avertissement RN
- * « VirtualizedLists should never be nested… » et écrase la hauteur. On consomme
- * donc `useSortableList` + `<DropProvider>` et on laisse le ScrollView de page gérer
- * le défilement (liste courte → auto-scroll non requis).
- */
-function DraggableSegmentList({
-  segments,
-  locale,
-  isReordering,
-  onReorder,
-  onRename,
-  onDelete,
-  onReplace,
-}: DraggableSegmentListProps) {
-  const handleDrop = useCallback(
-    (positions: Record<string, number>) => {
-      const orderedIds = positionsToOrderedIds(positions);
-      // No-op si l'ordre n'a pas changé (drop sans déplacement réel).
-      const currentIds = segments.map((s) => s.id);
-      const changed =
-        orderedIds.length === currentIds.length &&
-        orderedIds.some((id, i) => id !== currentIds[i]);
-      if (changed) onReorder(orderedIds);
+  const handleReorder = useCallback(
+    ({ from, to }: ReorderableListReorderEvent) => {
+      if (from === to) return;
+      const orderedIds = reorderItems(segments, from, to).map((s) => s.id);
+      onReorder(orderedIds);
     },
     [segments, onReorder],
   );
 
-  const { dropProviderRef, getItemProps, contentHeight } = useSortableList({
-    data: segments,
-    itemHeight: ITEM_HEIGHT,
-    itemKeyExtractor: (s) => s.id,
-  });
+  const renderItem = useCallback(
+    ({ item }: { item: AdventureSegmentResponse }) => (
+      <SegmentRow
+        segment={item}
+        locale={locale}
+        disabled={Boolean(isReordering)}
+        onRename={onRename}
+        onDelete={onDelete}
+        onReplace={onReplace}
+      />
+    ),
+    [locale, isReordering, onRename, onDelete, onReplace],
+  );
 
   return (
-    <DropProvider ref={dropProviderRef}>
-      <View style={{ height: contentHeight }}>
-        {segments.map((segment, index) => (
-          <SortableItem
-            key={segment.id}
-            {...getItemProps(segment, index)}
-            data={segment}
-            onDrop={(_id, _position, allPositions) => {
-              if (allPositions) handleDrop(allPositions);
-            }}
-          >
-            <SegmentRow
-              segment={segment}
-              locale={locale}
-              disabled={isReordering}
-              onRename={onRename}
-              onDelete={onDelete}
-              onReplace={onReplace}
-            />
-          </SortableItem>
-        ))}
-      </View>
-    </DropProvider>
+    <ReorderableList
+      data={segments}
+      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      onReorder={handleReorder}
+      ListHeaderComponent={ListHeaderComponent ?? undefined}
+      ListFooterComponent={ListFooterComponent ?? undefined}
+      ListEmptyComponent={ListEmptyComponent ?? undefined}
+      contentContainerStyle={contentContainerStyle}
+      style={{ flex: 1 }}
+    />
   );
 }
 
@@ -196,24 +151,28 @@ function SegmentRow({
   onReplace,
 }: SegmentRowProps) {
   const { t } = useTranslation();
+  // Démarre le drag (appui long sur la poignée). Le hook ne fonctionne qu'à
+  // l'intérieur d'un item rendu par `ReorderableList` (contexte requis).
+  const drag = useReorderableDrag();
   const isDone = segment.parseStatus === 'done';
 
   return (
     <Card
+      className="mb-3"
       accessibilityRole="summary"
       accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
     >
       <View className="flex-row items-center gap-2">
-        {/* Drag handle explicite (a11y). `SortableItem.Handle` capte le geste. */}
-        <SortableItem.Handle>
-          <View
-            accessibilityRole="button"
-            accessibilityLabel={t('adventures.segments.reorderA11y')}
-            className="p-1"
-          >
-            <GripVerticalIcon size={20} className="text-text-muted" />
-          </View>
-        </SortableItem.Handle>
+        {/* Poignée de drag explicite (appui long → réordonne). */}
+        <Pressable
+          onLongPress={drag}
+          delayLongPress={150}
+          accessibilityRole="button"
+          accessibilityLabel={t('adventures.segments.reorderA11y')}
+          className="p-1"
+        >
+          <GripVerticalIcon size={20} className="text-text-muted" />
+        </Pressable>
         <Text
           className="flex-1 text-base font-montserrat-semibold text-card-foreground"
           numberOfLines={1}

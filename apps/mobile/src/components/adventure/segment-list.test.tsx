@@ -9,50 +9,48 @@ import { i18n } from '@/lib/i18n';
 // cours… » pour un segment non `done`, présence du drag handle (a11y label), et
 // appel `onReorder(orderedIds)` quand le drag termine.
 //
-// ⚠️ Mock de `react-native-reanimated-dnd` SANS JSX RN dans la factory (le transform
-// NativeWind injecte une variable hors-scope interdite par jest) : les composants
-// mockés retournent leurs `children` ; on capture le dernier `onDrop` reçu pour
-// simuler la fin d'un drag (parité « simulate-drag-end » de la story web 3.3).
+// ⚠️ Mock de `react-native-reorderable-list` SANS JSX RN dans la factory (le transform
+// NativeWind injecte une variable hors-scope interdite par jest) : le mock RETOURNE un
+// tableau d'éléments DÉJÀ construits (header + items + footer/empty) — les vrais
+// composants RN viennent du `renderItem` / des props. On capture `onReorder` pour
+// simuler la fin d'un drag (équivalent « simulate-drag-end »).
 
-// Capture le `onDrop` du dernier SortableItem rendu → déclencheur de reorder testable.
-let mockLastOnDrop:
-  | ((id: string, position: number, allPositions?: Record<string, number>) => void)
-  | null = null;
+// Capture l'`onReorder` de la ReorderableList → déclencheur de reorder testable.
+let mockLastOnReorder: ((e: { from: number; to: number }) => void) | null = null;
 
-jest.mock('react-native-reanimated-dnd', () => {
-  // ⚠️ Ni JSX ni `React.createElement`/`require('react-native')` dans cette factory :
-  // le transform NativeWind réécrit ces appels et injecte `_ReactNativeCSSInterop`
-  // (variable hors-scope interdite par jest). Les composants mockés se contentent de
-  // RETOURNER leurs `children` (React rend un node nu) — les vrais composants RN
-  // viennent des `children` du composant testé. On capture le `onDrop` du dernier
-  // `SortableItem` pour simuler la fin d'un drag (parité « simulate-drag-end » web 3.3).
-
-  // `useSortableList` : hook de liste triable (conteneur non-scrollable). On renvoie
-  // des props factices + un `getItemProps` minimal — le composant testé mappe lui-même
-  // les items et rend un `<SortableItem>` par segment.
-  const useSortableList = ({ data }: { data: { id: string }[] }) => ({
-    positions: { value: {} },
-    dropProviderRef: { current: null },
-    contentHeight: data.length * 132,
-    getItemProps: (item: { id: string }) => ({
-      id: item.id,
-      positions: { value: {} },
-      lowerBound: { value: 0 },
-      autoScrollDirection: { value: 'none' },
-      itemsCount: data.length,
-      itemHeight: 132,
-    }),
-  });
-
-  const DropProvider = ({ children }: any) => children;
-
-  const SortableItem = ({ children, onDrop }: any) => {
-    if (onDrop) mockLastOnDrop = onDrop;
-    return children;
+jest.mock('react-native-reorderable-list', () => {
+  const ReorderableList = ({
+    data,
+    renderItem,
+    onReorder,
+    ListHeaderComponent,
+    ListFooterComponent,
+    ListEmptyComponent,
+  }: any) => {
+    if (onReorder) mockLastOnReorder = onReorder;
+    const list = data ?? [];
+    const items = list.map((item: { id: string }, index: number) =>
+      renderItem({ item, index }),
+    );
+    return [
+      ListHeaderComponent ?? null,
+      ...(list.length === 0 ? [ListEmptyComponent ?? null] : items),
+      ListFooterComponent ?? null,
+    ];
   };
-  SortableItem.Handle = ({ children }: any) => children;
-
-  return { useSortableList, DropProvider, SortableItem };
+  const useReorderableDrag = () => () => {};
+  const reorderItems = <T,>(arr: T[], from: number, to: number): T[] => {
+    const copy = arr.slice();
+    const [moved] = copy.splice(from, 1);
+    copy.splice(to, 0, moved);
+    return copy;
+  };
+  return {
+    __esModule: true,
+    default: ReorderableList,
+    useReorderableDrag,
+    reorderItems,
+  };
 });
 
 const t = (k: string, opts?: Record<string, unknown>) => i18n.t(k, opts);
@@ -80,7 +78,7 @@ function makeSegment(
 }
 
 beforeEach(() => {
-  mockLastOnDrop = null;
+  mockLastOnReorder = null;
 });
 
 describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
@@ -144,7 +142,7 @@ describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
     ).toBeTruthy();
   });
 
-  it('appelle onReorder(orderedIds) à la fin du drag (positions → ids triés)', async () => {
+  it('appelle onReorder(orderedIds) à la fin du drag (from/to → ids réordonnés)', async () => {
     const onReorder = jest.fn();
     await render(
       <SegmentList
@@ -153,13 +151,13 @@ describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
         segments={[makeSegment('a'), makeSegment('b'), makeSegment('c')]}
       />,
     );
-    // Simule la fin d'un drag qui place c, a, b.
-    expect(mockLastOnDrop).toBeTruthy();
-    mockLastOnDrop?.('c', 0, { c: 0, a: 1, b: 2 });
+    // Simule un drag qui déplace c (index 2) en tête (index 0) → c, a, b.
+    expect(mockLastOnReorder).toBeTruthy();
+    mockLastOnReorder?.({ from: 2, to: 0 });
     expect(onReorder).toHaveBeenCalledWith(['c', 'a', 'b']);
   });
 
-  it('n’appelle pas onReorder si l’ordre est inchangé', async () => {
+  it('n’appelle pas onReorder si l’ordre est inchangé (from === to)', async () => {
     const onReorder = jest.fn();
     await render(
       <SegmentList
@@ -168,7 +166,7 @@ describe('SegmentList (MOB-3.3 / AC1, AC4 — parité web mobile)', () => {
         segments={[makeSegment('a'), makeSegment('b')]}
       />,
     );
-    mockLastOnDrop?.('a', 0, { a: 0, b: 1 });
+    mockLastOnReorder?.({ from: 1, to: 1 });
     expect(onReorder).not.toHaveBeenCalled();
   });
 
