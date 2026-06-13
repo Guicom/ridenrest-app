@@ -321,10 +321,13 @@ export default function AdventureDetailScreen() {
                 — la trace cachée reste consultable mais on ne peut plus muter (AC2). */}
             {isOnline ? (
               <>
+                {/* Style copié à l'identique du web (adventure-detail.tsx) :
+                    pill (rounded-full), padding px-6 py-6, bordure verte légère,
+                    texte vert. `h-auto` neutralise la hauteur fixe du size → c'est
+                    le padding qui dicte la hauteur (comme le web). */}
                 <Button
                   variant="outline"
-                  size="lg"
-                  className="h-14 rounded-full"
+                  className="h-auto rounded-full border-primary/30 px-6 py-6 active:bg-primary/10"
                   textClassName="text-base text-primary"
                   label={t('strava.import.openButton')}
                   onPress={() => setStravaImportOpen(true)}

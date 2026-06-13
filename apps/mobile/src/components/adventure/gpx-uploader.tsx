@@ -125,11 +125,12 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
 
     return (
       <View className="gap-2">
+        {/* Style copié à l'identique du web (adventure-detail.tsx) : variant ghost,
+            pill (rounded-full), padding px-6 py-6, fond VERT clair (bg-primary/10),
+            texte/icône verts. `h-auto` → c'est le padding qui dicte la hauteur. */}
         <Button
-          variant="secondary"
-          size="lg"
-          // Parité web mobile : pill haute + texte/icône verts (primary).
-          className="h-14 rounded-full"
+          variant="ghost"
+          className="h-auto rounded-full bg-primary/10 px-6 py-6 active:bg-primary/20"
           textClassName="text-base text-primary"
           // Libellé (utilisé pour l'état `loading` : le spinner remplace l'icône).
           label={
