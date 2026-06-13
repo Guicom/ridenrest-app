@@ -238,8 +238,11 @@ export default function AdventureDetailScreen() {
           {/* Stats de l'aventure (parité web mobile) : distance totale + D+/D-,
               valeurs SERVEUR (`totalDistanceKm`/`totalElevationGainM/LossM`),
               jamais recalculées. D+/D- omis si la donnée est absente. */}
+          {/* Structure copiée du web (adventure-detail.tsx) : `gap-4` entre la
+              distance et le groupe dénivelé, qui réunit D+ et D- séparés par un
+              « · » (mx-0.5). Icônes 16px, texte muted. */}
           <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
-            <View className="flex-row items-center gap-1.5">
+            <View className="flex-row items-center gap-1">
               <RouteIcon size={16} className="text-text-muted" />
               <Text className="text-sm font-montserrat text-text-muted">
                 {t('adventures.segments.distanceKm', {
@@ -247,24 +250,35 @@ export default function AdventureDetailScreen() {
                 })}
               </Text>
             </View>
-            {data.totalElevationGainM != null ? (
-              <View className="flex-row items-center gap-1.5">
-                <TrendingUpIcon size={16} className="text-text-muted" />
-                <Text className="text-sm font-montserrat text-text-muted">
-                  {t('adventures.segments.gainDPlus', {
-                    value: Math.round(data.totalElevationGainM),
-                  })}
-                </Text>
-              </View>
-            ) : null}
-            {data.totalElevationLossM != null ? (
-              <View className="flex-row items-center gap-1.5">
-                <TrendingDownIcon size={16} className="text-text-muted" />
-                <Text className="text-sm font-montserrat text-text-muted">
-                  {t('adventures.segments.lossDMinus', {
-                    value: Math.round(data.totalElevationLossM),
-                  })}
-                </Text>
+            {data.totalElevationGainM != null ||
+            data.totalElevationLossM != null ? (
+              <View className="flex-row items-center gap-1">
+                {data.totalElevationGainM != null ? (
+                  <>
+                    <TrendingUpIcon size={16} className="text-text-muted" />
+                    <Text className="text-sm font-montserrat text-text-muted">
+                      {t('adventures.segments.gainDPlus', {
+                        value: Math.round(data.totalElevationGainM),
+                      })}
+                    </Text>
+                  </>
+                ) : null}
+                {data.totalElevationGainM != null &&
+                data.totalElevationLossM != null ? (
+                  <Text className="mx-0.5 text-sm font-montserrat text-text-muted">
+                    ·
+                  </Text>
+                ) : null}
+                {data.totalElevationLossM != null ? (
+                  <>
+                    <TrendingDownIcon size={16} className="text-text-muted" />
+                    <Text className="text-sm font-montserrat text-text-muted">
+                      {t('adventures.segments.lossDMinus', {
+                        value: Math.round(data.totalElevationLossM),
+                      })}
+                    </Text>
+                  </>
+                ) : null}
               </View>
             ) : null}
           </View>
