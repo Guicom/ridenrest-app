@@ -185,12 +185,23 @@
       "nameTooLong": "Name cannot exceed 100 characters."
     }
   },
+  "offline": {
+    "banner": "Offline mode",
+    "readOnly": "Offline viewing (read-only)",
+    "actionUnavailable": "Action unavailable offline",
+    "cacheCleared": "Adventure cache cleared"
+  },
   "settings": {
     "title": "Settings",
     "back": "Back",
     "integrationsSection": "Integrations",
     "accountSection": "Account",
     "dangerSection": "Danger zone",
+    "clearCache": {
+      "label": "Clear this adventure's cache",
+      "confirm": "Delete the cached track and POIs for this adventure?",
+      "done": "Cache cleared"
+    },
     "logout": {
       "button": "Log out",
       "loading": "Logging out…",

@@ -185,12 +185,23 @@
       "nameTooLong": "Le nom ne peut pas dépasser 100 caractères."
     }
   },
+  "offline": {
+    "banner": "Mode hors ligne",
+    "readOnly": "Consultation hors ligne (lecture seule)",
+    "actionUnavailable": "Action indisponible hors ligne",
+    "cacheCleared": "Cache de l'aventure vidé"
+  },
   "settings": {
     "title": "Paramètres",
     "back": "Retour",
     "integrationsSection": "Intégrations",
     "accountSection": "Compte",
     "dangerSection": "Zone de danger",
+    "clearCache": {
+      "label": "Vider le cache de cette aventure",
+      "confirm": "Supprimer la trace et les POIs cachés de cette aventure ?",
+      "done": "Cache vidé"
+    },
     "logout": {
       "button": "Se déconnecter",
       "loading": "Déconnexion…",

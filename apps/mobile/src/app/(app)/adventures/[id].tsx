@@ -18,6 +18,7 @@ import {
 } from '@/components/adventure/rename-segment-modal';
 import { SegmentList } from '@/components/adventure/segment-list';
 import { StravaImportSheet } from '@/components/adventure/strava-import-sheet';
+import { ClearAdventureCacheButton } from '@/components/shared/clear-adventure-cache-button';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
@@ -35,6 +36,7 @@ import {
   useSegments,
 } from '@/hooks/use-segments';
 import { useStravaConnection } from '@/hooks/use-strava-connection';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useTranslation } from '@/lib/i18n';
 
 // Écran détail d'aventure (MOB-3.1 squelette → MOB-3.2 segments/upload). Affiche le
@@ -44,6 +46,11 @@ export default function AdventureDetailScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  // Connectivité (MOB-3.5 / AC2) : désactive les actions réseau (renommer,
+  // supprimer, upload, import) et bascule en lecture seule offline. La trace/POIs
+  // cachés restent consultables.
+  const { isOnline } = useNetworkStatus();
 
   const { data, isPending, isError } = useAdventure(id);
   const renameMutation = useRenameAdventure();
@@ -203,11 +210,28 @@ export default function AdventureDetailScreen() {
             {data.name}
           </Text>
 
+          {/* Lecture seule offline (MOB-3.5 / AC2) : message explicite + actions
+              réseau désactivées. La trace/POIs cachés restent consultables. */}
+          {!isOnline ? (
+            <View
+              accessibilityRole="alert"
+              className="rounded-lg border border-text-muted bg-text-muted/10 px-3 py-2"
+            >
+              <Text className="text-sm font-montserrat text-text-muted">
+                {t('offline.readOnly')}
+              </Text>
+            </View>
+          ) : null}
+
           <View className="flex-row gap-2">
             <Button
               variant="outline"
               className="flex-1"
+              disabled={!isOnline}
               accessibilityLabel={t('adventures.card.renameA11y')}
+              accessibilityHint={
+                !isOnline ? t('offline.actionUnavailable') : undefined
+              }
               onPress={() =>
                 setRenameTarget({ id: data.id, currentName: data.name })
               }
@@ -222,8 +246,12 @@ export default function AdventureDetailScreen() {
             <Button
               variant="destructive"
               className="flex-1"
+              disabled={!isOnline}
               loading={deleteMutation.isPending}
               accessibilityLabel={t('adventures.card.deleteA11y')}
+              accessibilityHint={
+                !isOnline ? t('offline.actionUnavailable') : undefined
+              }
               onPress={confirmDelete}
             >
               <View className="flex-row items-center gap-2">
@@ -301,17 +329,31 @@ export default function AdventureDetailScreen() {
               </Card>
             )}
 
-            <GpxUploader
-              ref={uploaderRef}
-              adventureId={id}
-              onUploaded={() => setParsedMessage(null)}
-            />
+            {/* Actions réseau (upload / import Strava) : masquées offline — la
+                trace cachée reste consultable, mais on ne peut plus muter (AC2). */}
+            {isOnline ? (
+              <>
+                <GpxUploader
+                  ref={uploaderRef}
+                  adventureId={id}
+                  onUploaded={() => setParsedMessage(null)}
+                />
 
-            {/* Import d'itinéraires Strava (MOB-3.4) — à côté de l'uploader GPX. */}
-            <Button
-              variant="outline"
-              label={t('strava.import.openButton')}
-              onPress={() => setStravaImportOpen(true)}
+                {/* Import d'itinéraires Strava (MOB-3.4) — à côté de l'uploader GPX. */}
+                <Button
+                  variant="outline"
+                  label={t('strava.import.openButton')}
+                  onPress={() => setStravaImportOpen(true)}
+                />
+              </>
+            ) : null}
+
+            {/* Fallback manuel (MOB-3.5 / AC4) : vide le cache de CETTE aventure
+                (trace GPX des segments + POIs + météo). Disponible online comme
+                offline (purge locale, pas d'appel réseau). */}
+            <ClearAdventureCacheButton
+              adventureId={id}
+              segmentIds={(segments ?? []).map((s) => s.id)}
             />
           </View>
         </>

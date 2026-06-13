@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { StatusBanner } from '@/components/shared/status-banner';
 import { I18nextProvider, i18n } from '@/lib/i18n';
 import { QueryProvider } from '@/lib/query/query-provider';
 import { useAppStateRefetch } from '@/lib/query/use-app-state-refetch';
@@ -59,6 +60,10 @@ export default function RootLayout() {
         <QueryProvider>
           <I18nextProvider i18n={i18n}>
             <Stack screenOptions={{ headerShown: false }} />
+            {/* Bandeau « Mode hors ligne » GLOBAL (MOB-3.5) — sous I18nextProvider
+                (i18n) et au-dessus du Stack pour rester visible quel que soit
+                l'écran. Visible UNIQUEMENT offline (piloté par useNetworkStatus). */}
+            <StatusBanner />
           </I18nextProvider>
         </QueryProvider>
       </SafeAreaProvider>
