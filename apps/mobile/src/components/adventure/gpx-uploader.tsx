@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import {
   MAX_GPX_FILE_SIZE_BYTES,
   type AdventureSegmentResponse,
@@ -15,6 +15,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { UploadIcon } from '@/components/ui/icon';
 import { useUploadSegment } from '@/hooks/use-segments';
 import { useTranslation } from '@/lib/i18n';
 
@@ -125,17 +126,28 @@ export const GpxUploader = forwardRef<GpxUploaderHandle, GpxUploaderProps>(
     return (
       <View className="gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
+          // Libellé (utilisé pour l'état `loading` : le spinner remplace l'icône).
           label={
             upload.isPending
               ? t('adventures.segments.uploading')
-              : picking
-                ? t('adventures.segments.picking')
-                : t('adventures.segments.addButton')
+              : t('adventures.segments.picking')
           }
           loading={upload.isPending || picking}
           onPress={handlePress}
-        />
+        >
+          {/* Au repos : icône upload + libellé (parité web mobile « Ajouter un
+              segment »). En chargement, `children` est `undefined` → le Button
+              affiche son `ActivityIndicator` + `label`. */}
+          {upload.isPending || picking ? undefined : (
+            <View className="flex-row items-center gap-2">
+              <UploadIcon size={18} className="text-secondary-foreground" />
+              <Text className="text-sm font-montserrat-semibold text-secondary-foreground">
+                {t('adventures.segments.addButton')}
+              </Text>
+            </View>
+          )}
+        </Button>
         {validationError ? <ErrorBanner message={validationError} /> : null}
         {upload.isError && !validationError ? (
           <ErrorBanner message={t('adventures.segments.uploadError')} />

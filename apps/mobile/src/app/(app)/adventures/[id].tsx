@@ -213,9 +213,27 @@ export default function AdventureDetailScreen() {
         <ErrorBanner message={t('adventures.errors.loadFailed')} />
       ) : (
         <>
-          <Text className="text-2xl font-montserrat-bold text-text-primary">
-            {data.name}
-          </Text>
+          {/* Titre + crayon de renommage (parité web mobile : l'action « renommer »
+              est une icône à côté du titre, pas un bouton plein). Désactivée offline. */}
+          <View className="flex-row items-center gap-2">
+            <Text className="flex-1 text-2xl font-montserrat-bold text-text-primary">
+              {data.name}
+            </Text>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!isOnline}
+              accessibilityLabel={t('adventures.card.renameA11y')}
+              accessibilityHint={
+                !isOnline ? t('offline.actionUnavailable') : undefined
+              }
+              onPress={() =>
+                setRenameTarget({ id: data.id, currentName: data.name })
+              }
+            >
+              <PencilIcon size={20} className="text-text-primary" />
+            </Button>
+          </View>
 
           {/* Stats de l'aventure (parité web mobile) : distance totale + D+/D-,
               valeurs SERVEUR (`totalDistanceKm`/`totalElevationGainM/LossM`),
@@ -264,51 +282,8 @@ export default function AdventureDetailScreen() {
             </View>
           ) : null}
 
-          <View className="flex-row gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={!isOnline}
-              accessibilityLabel={t('adventures.card.renameA11y')}
-              accessibilityHint={
-                !isOnline ? t('offline.actionUnavailable') : undefined
-              }
-              onPress={() =>
-                setRenameTarget({ id: data.id, currentName: data.name })
-              }
-            >
-              <View className="flex-row items-center gap-2">
-                <PencilIcon size={18} className="text-foreground" />
-                <Text className="text-sm font-montserrat-semibold text-foreground">
-                  {t('common.rename')}
-                </Text>
-              </View>
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1"
-              disabled={!isOnline}
-              loading={deleteMutation.isPending}
-              accessibilityLabel={t('adventures.card.deleteA11y')}
-              accessibilityHint={
-                !isOnline ? t('offline.actionUnavailable') : undefined
-              }
-              onPress={confirmDelete}
-            >
-              <View className="flex-row items-center gap-2">
-                <Trash2Icon size={18} className="text-white" />
-                <Text className="text-sm font-montserrat-semibold text-white">
-                  {t('common.delete')}
-                </Text>
-              </View>
-            </Button>
-          </View>
-
           {renameMutation.isError ? (
             <ErrorBanner message={t('adventures.errors.renameFailed')} />
-          ) : null}
-          {deleteMutation.isError ? (
-            <ErrorBanner message={t('adventures.errors.deleteFailed')} />
           ) : null}
 
           {/* Section segments GPX (MOB-3.2). */}
@@ -341,6 +316,24 @@ export default function AdventureDetailScreen() {
               <ErrorBanner message={t('adventures.segments.errors.delete')} />
             ) : null}
 
+            {/* CTAs sous le titre « Segments » (parité web mobile) : import Strava
+                (outline) puis ajout de segment (secondaire + icône). Masqués offline
+                — la trace cachée reste consultable mais on ne peut plus muter (AC2). */}
+            {isOnline ? (
+              <>
+                <Button
+                  variant="outline"
+                  label={t('strava.import.openButton')}
+                  onPress={() => setStravaImportOpen(true)}
+                />
+                <GpxUploader
+                  ref={uploaderRef}
+                  adventureId={id}
+                  onUploaded={() => setParsedMessage(null)}
+                />
+              </>
+            ) : null}
+
             {segmentsPending ? (
               <View className="gap-3">
                 <Skeleton className="h-20 rounded-xl" />
@@ -368,26 +361,35 @@ export default function AdventureDetailScreen() {
                 </Text>
               </Card>
             )}
-
-            {/* Actions réseau (upload / import Strava) : masquées offline — la
-                trace cachée reste consultable, mais on ne peut plus muter (AC2). */}
-            {isOnline ? (
-              <>
-                <GpxUploader
-                  ref={uploaderRef}
-                  adventureId={id}
-                  onUploaded={() => setParsedMessage(null)}
-                />
-
-                {/* Import d'itinéraires Strava (MOB-3.4) — à côté de l'uploader GPX. */}
-                <Button
-                  variant="outline"
-                  label={t('strava.import.openButton')}
-                  onPress={() => setStravaImportOpen(true)}
-                />
-              </>
-            ) : null}
           </View>
+
+          {/* Suppression de l'aventure (parité web mobile) : bouton « rouge clair »
+              (fond destructive atténué + texte/icône rouges), tout en bas de l'écran.
+              Désactivé offline. */}
+          {deleteMutation.isError ? (
+            <ErrorBanner message={t('adventures.errors.deleteFailed')} />
+          ) : null}
+          <Button
+            variant="ghost"
+            className="bg-destructive/10 active:bg-destructive/20"
+            textClassName="text-destructive"
+            disabled={!isOnline}
+            loading={deleteMutation.isPending}
+            label={t('adventures.delete.button')}
+            accessibilityHint={
+              !isOnline ? t('offline.actionUnavailable') : undefined
+            }
+            onPress={confirmDelete}
+          >
+            {deleteMutation.isPending ? undefined : (
+              <View className="flex-row items-center gap-2">
+                <Trash2Icon size={18} className="text-destructive" />
+                <Text className="text-sm font-montserrat-semibold text-destructive">
+                  {t('adventures.delete.button')}
+                </Text>
+              </View>
+            )}
+          </Button>
         </>
       )}
 

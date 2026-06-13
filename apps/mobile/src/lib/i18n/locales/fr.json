@@ -127,6 +127,7 @@
       "submitting": "Renommage…"
     },
     "delete": {
+      "button": "Supprimer l'aventure",
       "confirmTitle": "Supprimer « {{name}} » ?",
       "confirmMessage": "Cette action est irréversible. Tous les segments et données associées seront supprimés.",
       "confirm": "Supprimer"
@@ -137,7 +138,7 @@
     "segments": {
       "title": "Segments",
       "empty": "Aucun segment pour l'instant. Ajoutez un fichier GPX pour commencer.",
-      "addButton": "Ajouter un segment GPX",
+      "addButton": "Ajouter un segment",
       "picking": "Sélection…",
       "uploading": "Envoi…",
       "status": {

@@ -127,6 +127,7 @@
       "submitting": "Renaming…"
     },
     "delete": {
+      "button": "Delete adventure",
       "confirmTitle": "Delete “{{name}}”?",
       "confirmMessage": "This action is irreversible. All associated segments and data will be deleted.",
       "confirm": "Delete"
@@ -137,7 +138,7 @@
     "segments": {
       "title": "Segments",
       "empty": "No segments yet. Add a GPX file to get started.",
-      "addButton": "Add a GPX segment",
+      "addButton": "Add a segment",
       "picking": "Selecting…",
       "uploading": "Uploading…",
       "status": {

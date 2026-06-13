@@ -11,6 +11,7 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Upload,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -45,5 +46,6 @@ export const SettingsIcon = enableClassName(Settings);
 export const Trash2Icon = enableClassName(Trash2);
 export const TrendingDownIcon = enableClassName(TrendingDown);
 export const TrendingUpIcon = enableClassName(TrendingUp);
+export const UploadIcon = enableClassName(Upload);
 
 export type { LucideIcon };
