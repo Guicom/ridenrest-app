@@ -201,6 +201,41 @@
     "tilesOffline": "Map tiles unavailable offline",
     "attributionA11y": "OpenStreetMap attribution"
   },
+  "pois": {
+    "layers": {
+      "accommodations": "Accommodations",
+      "restaurants": "Restaurants",
+      "supplies": "Supplies",
+      "bike": "Bike"
+    },
+    "category": {
+      "hotel": "Hotel",
+      "hostel": "Hostel",
+      "camp_site": "Campsite",
+      "shelter": "Shelter",
+      "guesthouse": "Guesthouse",
+      "restaurant": "Restaurant",
+      "supermarket": "Supermarket",
+      "convenience": "Convenience store",
+      "bike_shop": "Bike shop",
+      "bike_repair": "Bike repair"
+    },
+    "distanceFromTrace": "{{value}} from the route",
+    "kmMarker": "km {{value}}",
+    "sheet": {
+      "close": "Close details"
+    },
+    "detail": {
+      "loadFailedEnrichment": "Additional information unavailable"
+    },
+    "actions": {
+      "navigate": "Navigate to {{name}}",
+      "call": "Call {{name}}",
+      "copyAddress": "Copy address",
+      "addressCopied": "Address copied",
+      "officialWebsite": "Official website"
+    }
+  },
   "settings": {
     "title": "Settings",
     "back": "Back",

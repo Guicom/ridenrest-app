@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-4-2 (2026-06-14)
+
+- **`RECENTER_OFFSET_Y = 150` vs. spec web `offset: [0, 100]`** : valeur intentionnellement tunable pour la validation device (T10). Ajuster si la popin masque trop/pas assez le pin sur device réel. [`poi-popup.tsx:41`]
+- **Granularité skeleton AC4** : un seul flag `enrichmentPending` combiné Google+ville au lieu d'un skeleton par slot. AC4 satisfait au niveau global (fiche jamais bloquée entière). Affiner si le test utilisateur montre un effet de clignotement indésirable.
+- **`<Images>` style-load timing** : `<Images>` monté inconditionnellement dans `PoiLayer`, potentiellement avant que le style MapLibre soit chargé (switch de thème). MapLibre RN `<Images>` devrait gérer cela via son contexte interne — à confirmer en validation device ; si des pins invisibles apparaissent après changement de thème, ajouter un gate `styleLoaded`. [`poi-layer.tsx:181`]
+- **`dedupePois` avec POIs sans `id`** : le dedup via `seen.has(undefined)` drop silencieusement des POIs si `id` et `externalId` sont tous deux absents. `Poi.id` est non-optionnel dans le type partagé → ne peut survenir qu'avec données serveur corrompues. Pré-existant. [`use-pois.ts:63-65`]
+
 ## Deferred from: code review of MOB-3-2 (2026-06-13)
 
 - **route-id-not-hardened** — `apps/mobile/src/app/(app)/adventures/[id].tsx:35` : `id` lu via `useLocalSearchParams` n'est pas durci ; si le param manque, `useSegments(id)` reste idle (`enabled: Boolean(id)`) mais une query désactivée a `isPending: true` en TanStack v5 → skeleton segments infini, et `<GpxUploader adventureId={id} />` bâtirait un path `/adventures/undefined/segments` si pressé. Atténué : gardé par la branche parent (erreur/chargement de l'aventure) et la route garantit `id` en pratique. Follow-up = guard explicite sur `id` manquant. [Edge Case Hunter]

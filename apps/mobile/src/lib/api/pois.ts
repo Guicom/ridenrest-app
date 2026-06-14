@@ -1,0 +1,74 @@
+import { apiFetch } from '@/lib/api/api-client';
+import type { GooglePlaceDetails, Poi, PoiCategory } from '@ridenrest/shared';
+
+// Façade API typée POI (MOB-4.2 / AC2, 4, 5). Unique point d'accès HTTP aux POIs
+// d'une aventure — via `apiFetch` (Bearer JWT + 401/refresh + déballage `{ data }`),
+// jamais `fetch`/`axios` direct.
+//
+// ⚠️ Chemins SANS préfixe `/api` : `apiFetch` l'ajoute déjà (api-client.ts). Backend
+// epic 4 (web) 100 % livré — rien à recréer côté serveur.
+//
+// 🔒 RGPD (archi L795/L948) : la recherche corridor n'envoie JAMAIS de lat/lng
+// utilisateur — uniquement `segmentId` + `fromKm/toKm`. `reverseCity` utilise les
+// coords **du POI** (renvoyées par le serveur), pas la position user → conforme.
+
+export interface FindPoisParams {
+  segmentId: string;
+  fromKm: number;
+  toKm: number;
+  categories?: PoiCategory[];
+  overpassEnabled?: boolean;
+}
+
+/**
+ * GET /pois (mode corridor/planning) → POIs le long d'un segment entre `fromKm` et
+ * `toKm`. `categories` (multi) filtre par calque ; `overpassEnabled` (défaut false)
+ * complète Google Places par Overpass (opt-in). Pas de lat/lng (RGPD).
+ */
+export function findPois(params: FindPoisParams): Promise<Poi[]> {
+  const search = new URLSearchParams({
+    segmentId: params.segmentId,
+    fromKm: String(params.fromKm),
+    toKm: String(params.toKm),
+  });
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => search.append('categories', c));
+  }
+  if (params.overpassEnabled) {
+    search.set('overpassEnabled', 'true');
+  }
+  return apiFetch<Poi[]>(`/pois?${search.toString()}`);
+}
+
+/**
+ * GET /pois/google-details → enrichissement Google d'un POI (par `externalId`).
+ * Optionnel : `null` sur échec (jamais de throw — l'enrichissement ne doit pas
+ * bloquer la fiche, AC4).
+ */
+export async function getPoiGoogleDetails(
+  externalId: string,
+  segmentId: string,
+): Promise<GooglePlaceDetails | null> {
+  try {
+    return await apiFetch<GooglePlaceDetails>(
+      `/pois/google-details?externalId=${encodeURIComponent(externalId)}&segmentId=${encodeURIComponent(segmentId)}`,
+    );
+  } catch {
+    return null;
+  }
+}
+
+export interface ReverseCityResult {
+  city: string | null;
+  postcode: string | null;
+  state: string | null;
+  country: string | null;
+}
+
+/**
+ * GET /geo/reverse-city → ville/CP/région/pays depuis les coords **du POI** (pas la
+ * position user → RGPD OK). Enrichit la fiche hébergement (AC4).
+ */
+export function reverseCity(lat: number, lng: number): Promise<ReverseCityResult> {
+  return apiFetch<ReverseCityResult>(`/geo/reverse-city?lat=${lat}&lng=${lng}`);
+}

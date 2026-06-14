@@ -1,19 +1,28 @@
 import { cssInterop } from 'nativewind';
 import {
+  BedDouble,
   Bike,
+  Check,
   ChevronDown,
   ChevronLeft,
+  Copy,
+  Globe,
   GripVertical,
   Map as LucideMap,
+  Navigation,
   Pencil,
+  Phone,
   Plus,
   RefreshCw,
   Route,
   Settings,
+  ShoppingBasket,
   Trash2,
   TrendingDown,
   TrendingUp,
   Upload,
+  Utensils,
+  X,
   type LucideIcon,
 } from 'lucide-react-native';
 
@@ -37,19 +46,28 @@ function enableClassName(icon: LucideIcon): LucideIcon {
   return icon;
 }
 
+export const BedDoubleIcon = enableClassName(BedDouble);
 export const BikeIcon = enableClassName(Bike);
+export const CheckIcon = enableClassName(Check);
 export const ChevronDownIcon = enableClassName(ChevronDown);
 export const ChevronLeftIcon = enableClassName(ChevronLeft);
+export const CopyIcon = enableClassName(Copy);
+export const GlobeIcon = enableClassName(Globe);
 export const GripVerticalIcon = enableClassName(GripVertical);
 export const MapIcon = enableClassName(LucideMap);
+export const NavigationIcon = enableClassName(Navigation);
 export const PencilIcon = enableClassName(Pencil);
+export const PhoneIcon = enableClassName(Phone);
 export const PlusIcon = enableClassName(Plus);
 export const RefreshCwIcon = enableClassName(RefreshCw);
 export const RouteIcon = enableClassName(Route);
 export const SettingsIcon = enableClassName(Settings);
+export const ShoppingBasketIcon = enableClassName(ShoppingBasket);
 export const Trash2Icon = enableClassName(Trash2);
 export const TrendingDownIcon = enableClassName(TrendingDown);
 export const TrendingUpIcon = enableClassName(TrendingUp);
 export const UploadIcon = enableClassName(Upload);
+export const UtensilsIcon = enableClassName(Utensils);
+export const XIcon = enableClassName(X);
 
 export type { LucideIcon };

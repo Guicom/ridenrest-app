@@ -201,6 +201,41 @@
     "tilesOffline": "Fond de carte indisponible hors-ligne",
     "attributionA11y": "Attribution OpenStreetMap"
   },
+  "pois": {
+    "layers": {
+      "accommodations": "Hébergements",
+      "restaurants": "Restaurants",
+      "supplies": "Ravitaillement",
+      "bike": "Vélo"
+    },
+    "category": {
+      "hotel": "Hôtel",
+      "hostel": "Auberge",
+      "camp_site": "Camping",
+      "shelter": "Refuge",
+      "guesthouse": "Chambre d'hôte",
+      "restaurant": "Restauration",
+      "supermarket": "Alimentation",
+      "convenience": "Supérette",
+      "bike_shop": "Magasin de vélo",
+      "bike_repair": "Réparation vélo"
+    },
+    "distanceFromTrace": "À {{value}} de la trace",
+    "kmMarker": "km {{value}}",
+    "sheet": {
+      "close": "Fermer la fiche"
+    },
+    "detail": {
+      "loadFailedEnrichment": "Informations complémentaires indisponibles"
+    },
+    "actions": {
+      "navigate": "Naviguer vers {{name}}",
+      "call": "Appeler {{name}}",
+      "copyAddress": "Copier l'adresse",
+      "addressCopied": "Adresse copiée",
+      "officialWebsite": "Site officiel"
+    }
+  },
   "settings": {
     "title": "Paramètres",
     "back": "Retour",

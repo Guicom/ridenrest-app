@@ -23,3 +23,14 @@ jest.mock('@react-native-community/netinfo');
 // `GeoJSONSource`/`Layer`). Pour un package node_modules, le manual mock n'est pris
 // que sur `jest.mock` explicite (comme NetInfo).
 jest.mock('@maplibre/maplibre-react-native');
+
+// @gorhom/bottom-sheet (MOB-4.2) : s'appuie sur gesture-handler/reanimated (gestes
+// natifs) → mock manuel global (`__mocks__/@gorhom/bottom-sheet.js`, passe-plats +
+// ref impérative stubée). `jest.mock` explicite requis (package node_modules scopé).
+jest.mock('@gorhom/bottom-sheet');
+
+// expo-blur / expo-clipboard (MOB-4.2 fiche « liquid glass ») : modules natifs (flou de
+// fond + presse-papiers) absents hors device → mocks manuels globaux
+// (`__mocks__/expo-blur.js`, `__mocks__/expo-clipboard.js`). `jest.mock` explicite requis.
+jest.mock('expo-blur');
+jest.mock('expo-clipboard');

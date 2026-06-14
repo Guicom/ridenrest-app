@@ -1,8 +1,13 @@
+import type { MapSegmentData } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MapCanvas } from '@/components/map/map-canvas';
+import { LayerToggles } from '@/components/map/layer-toggles';
+import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
+import { PoiLayer } from '@/components/map/poi-layer';
+import { PoiPopup } from '@/components/map/poi-popup';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { ChevronLeftIcon } from '@/components/ui/icon';
@@ -10,16 +15,41 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAdventure } from '@/hooks/use-adventures';
 import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
 import { useNetworkStatus } from '@/hooks/use-network-status';
+import { usePoiLayers } from '@/hooks/use-poi-layers';
+import { usePois } from '@/hooks/use-pois';
 import { hasTrace } from '@/lib/map/maplibre-config';
 import { useTranslation } from '@/lib/i18n';
 
-// Écran carte (MOB-4.1). PREMIÈRE vue carte de l'app : affiche la trace GPX sur une
-// carte MapLibre Native (Dev Client requis) centrée auto, thème light/dark, attribution
-// OSM permanente. Les calques POI/densité/accès/météo arrivent en MOB-4.2→4.8.
+// Écran carte (MOB-4.1 + calques POI MOB-4.2). Affiche la trace GPX (MapLibre Native)
+// + les **calques POI** (toggles indépendants), les **pins/clusters** et la **fiche
+// détail** en **popin « liquid glass »** ancrée au pin (`PoiPopup`, parité web). Le
+// slider corridor + gate `searchCommitted` arrivent en MOB-4.3 : ici, déclenchement
+// **minimal** (plage par défaut 0–15 km, calque `accommodations` actif) dès trace prête.
 //
-// `MapCanvas` rend toujours le fond + l'attribution ; cet écran ne fait que router
-// les ÉTATS par-dessus (chargement scopé, erreur, vide, tuiles offline) et l'en-tête
-// (retour + nom). `id` est durci (leçon MOB-3.2) : falsy → aucune query, état neutre.
+// `MapCanvas` rend le fond + l'attribution + (via `children`) les calques POI ; cet
+// écran route les ÉTATS par-dessus (chargement, erreur, vide, tuiles offline), l'en-tête
+// et les overlays (toggles, sheet). `id` est durci (leçon MOB-3.2) : falsy → aucune query.
+
+// Plage de recherche POI par défaut (MOB-4.2). MOB-4.3 branchera le slider `fromKm/toKm`.
+const DEFAULT_FROM_KM = 0;
+const DEFAULT_TO_KM = 15;
+// Tolérance float aux jonctions de segments (1 m) — évite un POI exactement à la jonction
+// d'être attribué au mauvais segment à cause du drift flottant serveur.
+const SEGMENT_KM_EPSILON = 0.001;
+
+/** Segment d'origine d'un POI (par km le long de la trace) — pour l'enrichissement Google. */
+function findSegmentIdForKm(
+  segments: readonly MapSegmentData[],
+  km: number,
+): string | null {
+  const seg = segments.find(
+    (s) =>
+      km >= s.cumulativeStartKm - SEGMENT_KM_EPSILON &&
+      km <= s.cumulativeStartKm + s.distanceKm + SEGMENT_KM_EPSILON,
+  );
+  return seg?.id ?? segments[0]?.id ?? null;
+}
+
 export default function MapScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -32,10 +62,45 @@ export default function MapScreen() {
   const adventure = useAdventure(id);
   const map = useAdventureMap(id);
 
-  const segments = map.data?.segments ?? [];
+  const segments = useMemo(() => map.data?.segments ?? [], [map.data]);
   const traceReady = hasTrace(segments);
   const title = adventure.data?.name ?? t('map.title');
   const paddingTop = insets.top + 12;
+
+  // Modèle de calques (défaut `accommodations`) + POIs corridor (déclenchement minimal).
+  const { visibleLayers, toggleLayer } = usePoiLayers();
+  const { poisByLayer, pois } = usePois({
+    adventureId: id,
+    segments,
+    visibleLayers,
+    fromKm: DEFAULT_FROM_KM,
+    toKm: DEFAULT_TO_KM,
+    enabled: traceReady,
+  });
+
+  // POI sélectionné (lifté à la route — alimente le sheet + le recentrage caméra).
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+  const selectedPoi = useMemo(
+    () => pois.find((p) => p.id === selectedPoiId) ?? null,
+    [pois, selectedPoiId],
+  );
+  const selectedSegmentId = selectedPoi
+    ? findSegmentIdForKm(segments, selectedPoi.distAlongRouteKm)
+    : null;
+
+  const mapRef = useRef<MapCanvasHandle>(null);
+  const getCamera = useCallback(() => mapRef.current?.getCamera() ?? null, []);
+  // Accès carte (projection) : le recentrage de la fiche préserve le zoom courant.
+  const getMap = useCallback(() => mapRef.current?.getMap() ?? null, []);
+  const handleCloseSheet = useCallback(() => setSelectedPoiId(null), []);
+
+  // Désélectionne automatiquement si le POI sélectionné disparaît de `pois`
+  // (ex. calque togglé off) — évite que la popup rouvre au re-toggle.
+  useEffect(() => {
+    if (!selectedPoiId) return;
+    if (pois.some((p) => p.id === selectedPoiId)) return;
+    setSelectedPoiId(null);
+  }, [pois, selectedPoiId]);
 
   // En-tête flottant (retour + nom), pastilles `bg-card/80` lisibles sur la carte.
   const header = (
@@ -86,8 +151,37 @@ export default function MapScreen() {
 
   return (
     <View className="flex-1 bg-background-page">
-      <MapCanvas segments={segments} />
+      <MapCanvas ref={mapRef} segments={segments}>
+        {/* Calques POI + fiche détail insérés DANS le `<Map>` (MOB-4.2). La popin est
+            un `Marker` natif ancré au pin → elle suit la carte sans projection JS. */}
+        <PoiLayer
+          poisByLayer={poisByLayer}
+          visibleLayers={visibleLayers}
+          onSelectPoi={setSelectedPoiId}
+          getCamera={getCamera}
+        />
+        <PoiPopup
+          poi={selectedPoi}
+          segmentId={selectedSegmentId}
+          onClose={handleCloseSheet}
+          getCamera={getCamera}
+          getMap={getMap}
+        />
+      </MapCanvas>
       {header}
+
+      {/* Toggles de calque (overlay bas, au-dessus de l'attribution) — visibles dès
+          que la trace est prête. La popin POI est un `Marker` natif sur la carte (pas un
+          overlay RN), donc aucun conflit de z-index avec ces toggles. */}
+      {traceReady ? (
+        <View
+          pointerEvents="box-none"
+          style={{ bottom: insets.bottom + 16 }}
+          className="absolute left-0 right-0 z-10 items-center px-4"
+        >
+          <LayerToggles visibleLayers={visibleLayers} onToggle={toggleLayer} />
+        </View>
+      ) : null}
 
       {/* Tuiles indisponibles hors-ligne (AC5) — informatif, non bloquant. */}
       {!isOnline ? (
@@ -129,7 +223,7 @@ export default function MapScreen() {
         </View>
       ) : isMapParsing(map.data) ? (
         // Segment(s) en cours de parsing (polling 3 s actif) : ne PAS afficher l'état
-        // vide « ajoutez un segment GPX » — un segment existe et la trace va apparaître.
+        // vide « ajoutez un segment » — un segment existe et la trace va apparaître.
         <View
           pointerEvents="none"
           className="absolute inset-0 z-10 items-center justify-center px-8"

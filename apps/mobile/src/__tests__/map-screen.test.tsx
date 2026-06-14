@@ -14,6 +14,18 @@ import { i18n } from '@/lib/i18n';
 // (jest.setup). Couvre AC1 (titre + trace), AC4 (vide / erreur), durcissement id.
 
 jest.mock('@/lib/api/map', () => ({ getAdventureMapData: jest.fn() }));
+// Calques POI (MOB-4.2) : on mocke la façade POI pour isoler la route du réseau.
+// `findPois` résout [] → aucun pin, mais les toggles/sheet sont montés.
+jest.mock('@/lib/api/pois', () => ({
+  findPois: jest.fn().mockResolvedValue([]),
+  getPoiGoogleDetails: jest.fn().mockResolvedValue(null),
+  reverseCity: jest.fn().mockResolvedValue({
+    city: null,
+    postcode: null,
+    state: null,
+    country: null,
+  }),
+}));
 jest.mock('@/lib/api/adventures', () => ({
   getAdventure: jest.fn(),
   listAdventures: jest.fn(),

@@ -23,3 +23,16 @@ export function formatKm(km: number, locale = 'fr'): string {
     maximumFractionDigits: 1,
   }).format(value);
 }
+
+/**
+ * Formate une distance en **mètres** avec son unité : « 120 m » sous 1 km, sinon
+ * « 1,2 km » (séparateur localisé via `formatKm`). Utilisé pour la distance d'un POI
+ * à la trace (`distFromTraceM`, déjà calculée serveur — jamais recalculée ici).
+ *
+ * @example formatDistanceM(120) === '120 m' ; formatDistanceM(1240, 'fr') === '1,2 km'
+ */
+export function formatDistanceM(meters: number, locale = 'fr'): string {
+  const m = Number.isFinite(meters) ? meters : 0;
+  if (m < 1000) return `${Math.round(m)} m`;
+  return `${formatKm(m / 1000, locale)} km`;
+}
