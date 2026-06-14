@@ -10,6 +10,7 @@ import {
   buildPoiQueryKey,
   combinePoiResults,
   groupPoisByLayer,
+  resolveSegmentRanges,
   usePois,
   type UsePoisResult,
 } from '@/hooks/use-pois';
@@ -53,15 +54,17 @@ function makePoi(id: string, category: Poi['category']): Poi {
 async function mountUsePois(
   qc: QueryClient,
   visibleLayers: Set<MapLayer>,
+  opts: { enabled?: boolean; fromKm?: number; toKm?: number } = {},
 ): Promise<{ current: UsePoisResult }> {
   const ref = { current: undefined as unknown as UsePoisResult };
   function Probe() {
     ref.current = usePois({
       adventureId: 'adv-1',
-      segments: [{ id: 'seg1' }],
+      segments: [{ id: 'seg1', cumulativeStartKm: 0, distanceKm: 50 }],
       visibleLayers,
-      fromKm: 0,
-      toKm: 15,
+      fromKm: opts.fromKm ?? 0,
+      toKm: opts.toKm ?? 15,
+      enabled: opts.enabled,
     });
     return null;
   }
@@ -176,5 +179,77 @@ describe('usePois (intégration)', () => {
     // Hors-ligne : la façade réseau n'est jamais appelée (queries `enabled:false`).
     expect(mockFindPois).not.toHaveBeenCalled();
     expect(mockGetCached).toHaveBeenCalledWith('adv-1');
+  });
+});
+
+describe('resolveSegmentRanges (T3 — résolution multi-segments AC5)', () => {
+  const segments = [
+    { id: 'a', cumulativeStartKm: 0, distanceKm: 20 },
+    { id: 'b', cumulativeStartKm: 20, distanceKm: 30 },
+    { id: 'c', cumulativeStartKm: 50, distanceKm: 10 },
+  ];
+
+  it('plage contenue dans un seul segment → km locaux', () => {
+    expect(resolveSegmentRanges(segments, 5, 15)).toEqual([
+      { segmentId: 'a', fromKm: 5, toKm: 15 },
+    ]);
+  });
+
+  it('plage à cheval sur deux segments → un range local par segment', () => {
+    expect(resolveSegmentRanges(segments, 10, 35)).toEqual([
+      { segmentId: 'a', fromKm: 10, toKm: 20 },
+      { segmentId: 'b', fromKm: 0, toKm: 15 },
+    ]);
+  });
+
+  it('ignore les segments hors plage', () => {
+    expect(resolveSegmentRanges(segments, 52, 58)).toEqual([
+      { segmentId: 'c', fromKm: 2, toKm: 8 },
+    ]);
+  });
+});
+
+describe('usePois — gate searchCommitted (T3, AC1)', () => {
+  it('enabled=false → aucune requête réseau (recherche non committée)', async () => {
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    mockFindPois.mockResolvedValue([makePoi('1', 'hotel')]);
+    const qc = makeClient();
+
+    const hook = await mountUsePois(qc, new Set(['accommodations']), {
+      enabled: false,
+    });
+
+    expect(mockFindPois).not.toHaveBeenCalled();
+    expect(hook.current.pois).toEqual([]);
+    expect(hook.current.isEmpty).toBe(false);
+  });
+
+  it('enabled=true → requête lancée + pins', async () => {
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    const hotel = makePoi('1', 'hotel');
+    mockFindPois.mockResolvedValue([hotel]);
+    const qc = makeClient();
+
+    const hook = await mountUsePois(qc, new Set(['accommodations']), {
+      enabled: true,
+    });
+
+    await waitFor(() => expect(hook.current.pois).toEqual([hotel]));
+    expect(mockFindPois).toHaveBeenCalled();
+    expect(hook.current.isEmpty).toBe(false);
+  });
+
+  it('committé + 0 résultat → isEmpty vrai (AC3)', async () => {
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    mockFindPois.mockResolvedValue([]);
+    const qc = makeClient();
+
+    const hook = await mountUsePois(qc, new Set(['accommodations']), {
+      enabled: true,
+    });
+
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+    expect(hook.current.pois).toEqual([]);
+    expect(hook.current.isEmpty).toBe(true);
   });
 });

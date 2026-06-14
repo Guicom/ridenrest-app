@@ -41,6 +41,20 @@ export function renameAdventure(
   });
 }
 
+/**
+ * PATCH /adventures/:id (body `{ avgSpeedKmh }`) → aventure mise à jour. Port iso du
+ * web (carte « Vitesse moyenne »). Le serveur recalcule les ETA des étapes en cascade.
+ */
+export function updateAdventureAvgSpeedKmh(
+  id: string,
+  avgSpeedKmh: number,
+): Promise<AdventureResponse> {
+  return apiFetch<AdventureResponse>(`/adventures/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ avgSpeedKmh }),
+  });
+}
+
 /** DELETE /adventures/:id → `{ deleted: true }` (cascade serveur : segments/GPX/caches). */
 export function deleteAdventure(id: string): Promise<{ deleted: boolean }> {
   return apiFetch<{ deleted: boolean }>(`/adventures/${id}`, {

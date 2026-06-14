@@ -199,7 +199,63 @@
     "parsing": "Processing trace…",
     "loadFailed": "Unable to load the map",
     "tilesOffline": "Map tiles unavailable offline",
-    "attributionA11y": "OpenStreetMap attribution"
+    "attributionA11y": "OpenStreetMap attribution",
+    "avgSpeed": {
+      "title": "Average speed",
+      "unit": "km/h",
+      "edit": "Edit average speed"
+    },
+    "sidebar": {
+      "open": "Open panel",
+      "close": "Close panel"
+    },
+    "showOnMap": "Show on map",
+    "stages": {
+      "title": "Stages",
+      "defaultName": "Stage {{n}}",
+      "addStage": "Add a stage",
+      "cancelPlacement": "Cancel placement",
+      "placementHint": "Tap the route to place the stage end",
+      "createTitle": "Name the stage",
+      "editTitle": "Edit stage",
+      "fieldName": "Name",
+      "fieldColor": "Color",
+      "colorAuto": "Auto color",
+      "fieldDeparture": "Start date",
+      "fieldSpeed": "Speed (km/h)",
+      "fieldPause": "Pause (h)",
+      "deleteTitle": "Delete stage?",
+      "deleteBody": "Delete “{{name}}”? Following stages will be recomputed.",
+      "pauseSuffix": "(incl. {{pause}} pause)"
+    },
+    "weather": {
+      "title": "Weather",
+      "temperature": "Temperature",
+      "precipitation": "Precipitation",
+      "wind": "Wind",
+      "temperatureShort": "Temp.",
+      "precipitationShort": "Rain",
+      "windShort": "Wind",
+      "departure": "Departure date",
+      "byStage": "Dates set per stage"
+    },
+    "density": {
+      "title": "Density",
+      "idleHint": "Finds areas with few accommodations along your route.",
+      "errorHint": "Analysis failed. Try again.",
+      "staleHint": "Segments changed. Re-run to update.",
+      "calculate": "Calculate density",
+      "analyzing": "Analyzing…",
+      "legendTitle": "Accommodation density / 10 km",
+      "high": "Good availability",
+      "highDetail": "2+ accommodations / 10 km",
+      "medium": "Limited availability",
+      "mediumDetail": "1 accommodation / 10 km",
+      "critical": "Critical area",
+      "criticalDetail": "No accommodation / 10 km",
+      "categoriesTitle": "Categories to analyze",
+      "launch": "Start analysis"
+    }
   },
   "pois": {
     "layers": {
@@ -234,6 +290,31 @@
       "copyAddress": "Copy address",
       "addressCopied": "Address copied",
       "officialWebsite": "Official website"
+    },
+    "search": {
+      "range": "km {{from}} → km {{to}}",
+      "button": "Search",
+      "capHint": "{{value}} km · max 30",
+      "loading": "Searching…",
+      "noResults": "No POI in this range — widen or move the area",
+      "error": "Search failed",
+      "offline": "Search unavailable offline",
+      "fromHandleA11y": "Start bound (km)",
+      "toHandleA11y": "End bound (km)",
+      "title": "Search",
+      "from": "From:",
+      "fromStart": "Start",
+      "accommodationTitle": "Accommodation type",
+      "rangeLabel": "Search over",
+      "rangeDecrement": "Decrease range",
+      "rangeIncrement": "Increase range",
+      "positionA11y": "Search position (km)",
+      "stepBack": "Back 1 km",
+      "stepForward": "Forward 1 km",
+      "searchOn": "Search on",
+      "searchOnA11y": "Search on Booking.com or Airbnb",
+      "bookingCom": "Search on Booking.com",
+      "airbnb": "Search on Airbnb"
     }
   },
   "settings": {

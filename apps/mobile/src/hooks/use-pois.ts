@@ -4,6 +4,7 @@ import {
   LAYER_CATEGORIES,
   type GooglePlaceDetails,
   type MapLayer,
+  type MapSegmentData,
   type Poi,
   type PoiCategory,
 } from '@ridenrest/shared';
@@ -25,9 +26,11 @@ import {
 // overpassEnabled }]` (cf. CLAUDE.md — `overpassEnabled` inclus pour ne pas partager
 // le cache opt-in/opt-out). Une `useQuery` par couple (`segment` × `layer` visible).
 //
-// **Déclenchement minimal (MOB-4.2)** : `enabled` piloté par l'appelant (route) avec
-// une plage par défaut. MOB-4.3 branchera `searchCommitted` + slider `fromKm/toKm`
-// sans toucher à ce hook (le gate passe juste par `enabled`/`fromKm`/`toKm`).
+// **Gate de recherche (MOB-4.3)** : `enabled` reçoit `searchCommitted` (route) — la
+// recherche ne part QU'au clic explicite « Rechercher » (AC1). La plage adventure-
+// cumulée `[fromKm, toKm]` est résolue par segment via `resolveSegmentRanges` (AC5) :
+// une `useQuery` par (segment couvert × calque visible), avec les km **locaux** au
+// segment dans la query key (parité web `use-pois.ts`).
 //
 // **Offline (AC5)** : write-through `setCachedPois` au succès en ligne ; fallback
 // `getCachedPois` (cache N3 `/cache/pois/{adventureId}.json`) quand hors-ligne sans
@@ -54,6 +57,51 @@ export function buildPoiQueryKey(
   p: PoiQueryKeyParams,
 ): readonly ['pois', PoiQueryKeyParams] {
   return ['pois', p] as const;
+}
+
+/** Plage **locale** à un segment, résolue depuis la plage adventure-cumulée (AC5). */
+export interface SegmentRange {
+  segmentId: string;
+  /** km local au segment (≥ 0). */
+  fromKm: number;
+  /** km local au segment (≤ `distanceKm`). */
+  toKm: number;
+}
+
+/** Segment minimal requis pour la résolution (sous-ensemble de `MapSegmentData`). */
+export type ResolvableSegment = Pick<
+  MapSegmentData,
+  'id' | 'cumulativeStartKm' | 'distanceKm'
+>;
+
+/**
+ * Mappe une plage **adventure-cumulée** `[fromKm, toKm]` vers les segments qu'elle
+ * recouvre, en convertissant chaque chevauchement en km **locaux** au segment (AC5).
+ * Pur → testable hors React (T7). km arrondis à 0,1 (clés de cache stables, parité web).
+ *
+ * Un segment sans chevauchement (ou réduit à un point après clamp) est ignoré.
+ */
+export function resolveSegmentRanges(
+  segments: readonly ResolvableSegment[],
+  fromKm: number,
+  toKm: number,
+): SegmentRange[] {
+  const out: SegmentRange[] = [];
+  for (const s of segments) {
+    const segStart = s.cumulativeStartKm;
+    const segEnd = segStart + s.distanceKm;
+    // Pas de chevauchement avec [fromKm, toKm].
+    if (toKm <= segStart || fromKm >= segEnd) continue;
+    const localFrom = Math.max(0, fromKm - segStart);
+    const localTo = Math.min(s.distanceKm, toKm - segStart);
+    if (localTo <= localFrom) continue;
+    out.push({
+      segmentId: s.id,
+      fromKm: Math.round(localFrom * 10) / 10,
+      toKm: Math.round(localTo * 10) / 10,
+    });
+  }
+  return out;
 }
 
 /** Dédoublonne par `id` (POIs proches d'une frontière de segment peuvent réapparaître). */
@@ -91,22 +139,26 @@ export interface CombinedPoiResult {
   pois: Poi[];
   /** Vrai uniquement pendant un 1er chargement réseau en cours (jamais offline/idle). */
   isPending: boolean;
+  /** Vrai tant qu'une requête réseau est en vol (overlay de recherche, AC2). */
+  isFetching: boolean;
   isError: boolean;
   isSuccess: boolean;
 }
 
+type CombineInput = Pick<
+  UseQueryResult<Poi[]>,
+  'data' | 'isLoading' | 'isError' | 'isSuccess'
+> & { isFetching?: boolean };
+
 /** Agrège les résultats `useQueries` (dédoublonné). Pur → testable hors React. */
-export function combinePoiResults(
-  results: Pick<
-    UseQueryResult<Poi[]>,
-    'data' | 'isLoading' | 'isError' | 'isSuccess'
-  >[],
-): CombinedPoiResult {
+export function combinePoiResults(results: CombineInput[]): CombinedPoiResult {
   return {
     pois: dedupePois(results.flatMap((r) => r.data ?? [])),
     // `isLoading` = `isPending && isFetching` → vrai seulement si un fetch réel est
     // en vol (faux quand `enabled:false` hors-ligne → pas de skeleton infini, AC5).
     isPending: results.some((r) => r.isLoading),
+    // `isFetching` couvre aussi un refetch sur données déjà présentes → overlay AC2.
+    isFetching: results.some((r) => r.isFetching ?? false),
     isError: results.some((r) => r.isError),
     isSuccess: results.length > 0 && results.every((r) => r.isSuccess),
   };
@@ -114,18 +166,21 @@ export function combinePoiResults(
 
 export interface UsePoisParams {
   adventureId: string;
-  /** Segments de la carte (on lit uniquement `id`). */
-  segments: readonly { id: string }[];
+  /** Segments de la carte (on lit `id` + km cumulés pour la résolution AC5). */
+  segments: readonly ResolvableSegment[];
   visibleLayers: Set<MapLayer>;
+  /** Plage **adventure-cumulée** (résolue par segment via `resolveSegmentRanges`). */
   fromKm: number;
   toKm: number;
   overpassEnabled?: boolean;
-  /** Gate de déclenchement (MOB-4.3 y branchera `searchCommitted`). */
+  /** Gate de déclenchement (route → `searchCommitted`) : la requête ne part que committée. */
   enabled?: boolean;
 }
 
 export interface UsePoisResult extends CombinedPoiResult {
   poisByLayer: Record<MapLayer, Poi[]>;
+  /** Recherche committée terminée sans aucun POI → bannière « Aucun résultat » (AC3). */
+  isEmpty: boolean;
 }
 
 /**
@@ -142,22 +197,34 @@ export function usePois({
 }: UsePoisParams): UsePoisResult {
   const { isOnline } = useNetworkStatus();
 
-  // Couples (segment × calque visible), ordre stable (ALL_MAP_LAYERS).
+  // Plage cumulée → plages locales par segment couvert (AC5). km locaux dans la key.
+  const segmentRanges = useMemo(
+    () => resolveSegmentRanges(segments, fromKm, toKm),
+    [segments, fromKm, toKm],
+  );
+
+  // Couples (segment couvert × calque visible), ordre stable (ALL_MAP_LAYERS).
   const combos = useMemo(() => {
     const layers = ALL_MAP_LAYERS.filter((l) => visibleLayers.has(l));
-    return segments.flatMap((s) =>
-      layers.map((layer) => ({ segmentId: s.id, layer })),
+    return segmentRanges.flatMap((r) =>
+      layers.map((layer) => ({ ...r, layer })),
     );
-  }, [segments, visibleLayers]);
+  }, [segmentRanges, visibleLayers]);
 
   const combined = useQueries({
-    queries: combos.map(({ segmentId, layer }) => ({
-      queryKey: buildPoiQueryKey({ segmentId, fromKm, toKm, layer, overpassEnabled }),
+    queries: combos.map(({ segmentId, fromKm: localFrom, toKm: localTo, layer }) => ({
+      queryKey: buildPoiQueryKey({
+        segmentId,
+        fromKm: localFrom,
+        toKm: localTo,
+        layer,
+        overpassEnabled,
+      }),
       queryFn: () =>
         findPois({
           segmentId,
-          fromKm,
-          toKm,
+          fromKm: localFrom,
+          toKm: localTo,
           categories: [...LAYER_CATEGORIES[layer]] as PoiCategory[],
           overpassEnabled,
         }),
@@ -206,7 +273,12 @@ export function usePois({
     [pois, visibleLayers],
   );
 
-  return { ...combined, pois, poisByLayer };
+  // Bannière « Aucun résultat » (AC3) : recherche committée terminée (succès réseau)
+  // sans aucun POI. Hors-ligne (queries `enabled:false`) `isSuccess` est faux → pas de
+  // bannière (on retombe sur le message offline / le cache). Distinct d'une erreur.
+  const isEmpty = enabled && combined.isSuccess && pois.length === 0;
+
+  return { ...combined, pois, poisByLayer, isEmpty };
 }
 
 /**

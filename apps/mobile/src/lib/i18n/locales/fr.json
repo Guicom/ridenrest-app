@@ -199,7 +199,63 @@
     "parsing": "Trace en cours de traitement…",
     "loadFailed": "Impossible de charger la carte",
     "tilesOffline": "Fond de carte indisponible hors-ligne",
-    "attributionA11y": "Attribution OpenStreetMap"
+    "attributionA11y": "Attribution OpenStreetMap",
+    "avgSpeed": {
+      "title": "Vitesse moyenne",
+      "unit": "km/h",
+      "edit": "Modifier la vitesse moyenne"
+    },
+    "sidebar": {
+      "open": "Ouvrir le panneau",
+      "close": "Fermer le panneau"
+    },
+    "showOnMap": "Afficher sur la carte",
+    "stages": {
+      "title": "Étapes",
+      "defaultName": "Étape {{n}}",
+      "addStage": "Ajouter une étape",
+      "cancelPlacement": "Annuler le placement",
+      "placementHint": "Touchez la trace pour placer la fin de l’étape",
+      "createTitle": "Nommer l’étape",
+      "editTitle": "Modifier l’étape",
+      "fieldName": "Nom",
+      "fieldColor": "Couleur",
+      "colorAuto": "Couleur auto",
+      "fieldDeparture": "Date de début",
+      "fieldSpeed": "Vitesse (km/h)",
+      "fieldPause": "Pause (h)",
+      "deleteTitle": "Supprimer l’étape ?",
+      "deleteBody": "Supprimer « {{name}} » ? Les étapes suivantes seront recalculées.",
+      "pauseSuffix": "(dont {{pause}} pause)"
+    },
+    "weather": {
+      "title": "Météo",
+      "temperature": "Température",
+      "precipitation": "Précipitations",
+      "wind": "Vent",
+      "temperatureShort": "Temp.",
+      "precipitationShort": "Pluie",
+      "windShort": "Vent",
+      "departure": "Date de départ",
+      "byStage": "Dates définies par étape"
+    },
+    "density": {
+      "title": "Densité",
+      "idleHint": "Identifie les zones avec peu d’hébergements sur votre parcours.",
+      "errorHint": "L’analyse a échoué. Réessayez.",
+      "staleHint": "Les segments ont changé. Relancez pour mettre à jour.",
+      "calculate": "Calculer la densité",
+      "analyzing": "Analyse en cours…",
+      "legendTitle": "Densité hébergements / 10 km",
+      "high": "Bonne disponibilité",
+      "highDetail": "2+ hébergements / 10 km",
+      "medium": "Disponibilité limitée",
+      "mediumDetail": "1 hébergement / 10 km",
+      "critical": "Zone critique",
+      "criticalDetail": "Aucun hébergement / 10 km",
+      "categoriesTitle": "Catégories à analyser",
+      "launch": "Lancer l’analyse"
+    }
   },
   "pois": {
     "layers": {
@@ -234,6 +290,31 @@
       "copyAddress": "Copier l'adresse",
       "addressCopied": "Adresse copiée",
       "officialWebsite": "Site officiel"
+    },
+    "search": {
+      "range": "km {{from}} → km {{to}}",
+      "button": "Rechercher",
+      "capHint": "{{value}} km · max 30",
+      "loading": "Recherche en cours…",
+      "noResults": "Aucun POI dans cette plage — élargissez ou déplacez la zone",
+      "error": "Échec de la recherche",
+      "offline": "Recherche indisponible hors-ligne",
+      "fromHandleA11y": "Borne de départ (km)",
+      "toHandleA11y": "Borne de fin (km)",
+      "title": "Recherche",
+      "from": "À partir :",
+      "fromStart": "Début",
+      "accommodationTitle": "Type d'hébergement",
+      "rangeLabel": "Rechercher sur",
+      "rangeDecrement": "Diminuer la plage",
+      "rangeIncrement": "Augmenter la plage",
+      "positionA11y": "Position de recherche (km)",
+      "stepBack": "Reculer de 1 km",
+      "stepForward": "Avancer de 1 km",
+      "searchOn": "Rechercher sur",
+      "searchOnA11y": "Rechercher sur Booking.com ou Airbnb",
+      "bookingCom": "Rechercher sur Booking.com",
+      "airbnb": "Rechercher sur Airbnb"
     }
   },
   "settings": {
