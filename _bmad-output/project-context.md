@@ -1,9 +1,11 @@
 ---
 project_name: 'ridenrest-app'
 user_name: 'Guillaume'
-date: '2026-03-01'
-sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules']
-existing_patterns_found: 8
+date: '2026-06-13'
+sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'mobile_rules']
+existing_patterns_found: 9
+status: 'complete'
+optimized_for_llm: true
 ---
 
 # Project Context for AI Agents
@@ -36,6 +38,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Reverse proxy | Caddy 2 | latest | Docker sur VPS, auto Let's Encrypt, HTTPS |
 | Process manager | PM2 | latest | Gère Next.js + NestJS sur VPS, restart auto |
 | Monitoring | Uptime Kuma | latest | Docker sur VPS, alertes email/Telegram |
+| Analytics | PostHog (`@ridenrest/analytics`) | posthog-js 1.x | A remplacé Plausible (amendement 2026-06-07) — consentement RGPD + proxy anti-adblock. Plausible CE reste en infra VPS historique. |
+| Mobile | Expo SDK 56 / React Native 0.85 | voir section Mobile | App native iOS/Android, monorepo `apps/mobile` |
 
 ---
 
@@ -651,3 +655,69 @@ Popup POI (`poi-popup.tsx`) :
 - **Fermeture au clic extérieur** : `map.on('click', handleMapClick)` enregistré tant que le popup est monté. Guard `queryRenderedFeatures(e.point).some(f => f.layer.id.endsWith('-points') && !f.properties?.point_count)` — ne ferme pas si un pin individuel a été cliqué (un autre POI s'ouvre). MapLibre ne fire pas `click` sur un drag → pas de logique drag supplémentaire.
 - **Stabilité handler** : `onCloseRef` (ref mise à jour chaque render) dans le `useEffect` — évite de re-enregistrer le listener map à chaque changement d'identité de `onClose`.
 - **Recentrage automatique sur clic pin** (hooks `use-poi-layers` + `use-live-poi-layers`) : `map.easeTo({ center: coordinates, offset: [0, 100], duration: 300 })` dans `handlePoiClick` — positionne le pin 100px sous le centre du viewport, laissant la moitié supérieure pour le popup. `easeTo` programmatique ne déclenche pas la détection de pan manuel du suivi GPS live.
+
+---
+
+## Mobile App — Expo / React Native Rules
+
+> Source de vérité opérationnelle : `apps/mobile/AGENTS.md` (toolchain native).
+> Cette section résume les règles que l'agent rate le plus souvent.
+
+### Stack mobile
+
+| Layer | Techno | Version | Note |
+|---|---|---|---|
+| Runtime | Expo SDK | **56** (pinné `~56.x`) | Docs versionnées : https://docs.expo.dev/versions/v56.0.0/ |
+| RN | react-native | 0.85.3 | React 19.2.3 (aligné web) |
+| Routing | expo-router | ~56 | File-based, groupes `(app)` / `(auth)` |
+| Styling | NativeWind | 4.2.5 | Tailwind **v3** (`tailwindcss@3.4`), preset `@ridenrest/design-tokens` |
+| Carte | @maplibre/maplibre-react-native | 11.3.4 | API Camera v10/v11 — breaking changes |
+| Auth | better-auth + @better-auth/expo | **1.5.5 exact** | Tokens en `expo-secure-store` uniquement |
+| Data | TanStack Query + persist (AsyncStorage) | 5.x | Cache offline |
+| i18n | i18next + react-i18next | 26 / 17 | — |
+| Reanimated | react-native-reanimated | 4.3.1 | + react-native-worklets 0.8.3 |
+
+### Toolchain native (CRITIQUE)
+- Build iOS local exige **Xcode 26.4** (deployment target 16.4). Vérifier `xcodebuild -version` avant tout `run:ios`.
+- `expo start` = sert le bundle JS (pas de natif). `expo run:ios` / `eas build` = compile le natif.
+- **Après ajout d'un module natif** (`expo-secure-store`, `react-native-svg`, netinfo…) ou changement de plugins `app.config.ts` : `npx expo prebuild --clean -p ios` **OBLIGATOIRE** avant `run:ios`, sinon `Cannot find native module` au boot.
+- Toute icône **lucide-react-native / SVG dépend de `react-native-svg` (natif)** → pas de rendu sans rebuild du dev client (boîtes roses "Unimplemented component: RNSVG…").
+
+### Tests — JAMAIS sous `src/app/` (CRITIQUE)
+- expo-router bundle TOUT `.[tj]sx` sous `src/app` via `require.context` (regex figée, non configurable). Un `*.test.tsx` placé là casse `expo export`.
+- Tests qui **importent une route** → `src/__tests__/`. Tests logique/composants → co-localisés (`src/lib/**`, `src/components/**`).
+- Runner : Jest + jest-expo + `@testing-library/react-native`.
+- Mocks auth : mocker le wrapper `@/lib/auth/client` (pas `@better-auth/expo`). **Pas de JSX RN dans une factory `jest.mock`** (le transform NativeWind injecte une variable hors-scope interdite) → `jest.fn(() => null)`.
+
+### Auth mobile
+- `better-auth@1.5.5` + `@better-auth/expo@1.5.5` **pinnés exact, alignés sur le serveur** (`apps/web`). Ne jamais bumper sans monter le serveur (peer strict, casse les sessions web prod).
+- Tokens **toujours** en `expo-secure-store` (Keychain/Keystore) — **jamais** `AsyncStorage` (présent en dep transitive, interdit pour l'auth).
+- Guard d'auth **centralisé** dans `src/app/(app)/_layout.tsx` — un seul point, jamais par écran.
+- Deep link scheme custom `ridenrest://` → nécessite un dev build (Expo Go ne gère pas les schemes custom).
+
+### Façade API mobile (CRITIQUE)
+- L'API NestJS monte tout sous le préfixe global `/api`. `apiFetch` préfixe **déjà** (`API_BASE = ${EXPO_PUBLIC_API_URL}/api`).
+- → Les façades utilisent des chemins **propres** (`/adventures`, **PAS** `/api/adventures`). `EXPO_PUBLIC_API_URL` = hôte seul (`http://localhost:3010`).
+
+### Conventions mobile
+- Fichiers : kebab-case ; routes : `_layout.tsx`, `index.tsx`, `[id].tsx`.
+- Styling : `className="…"` NativeWind (Tailwind v3 syntaxe). Tokens via `@ridenrest/design-tokens`, jamais de couleur hardcodée.
+- Icônes : `lucide-react-native` (mobile) vs `lucide-react` (web).
+- Réordre de liste : `react-native-reorderable-list` (Reanimated 4) — pas dnd-kit (web only).
+- `.npmrc` : `node-linker=hoisted` requis (Metro ne suit pas les symlinks pnpm) — impact monorepo global, validé non-régression en MOB-1.1.
+
+---
+
+## Usage Guidelines
+
+**Pour les agents IA :**
+- Lire ce fichier avant d'implémenter du code dans ce projet.
+- Suivre TOUTES les règles à la lettre ; en cas de doute, choisir l'option la plus restrictive.
+- Travail mobile → consulter aussi `apps/mobile/AGENTS.md` (source de vérité toolchain native).
+- Mettre à jour ce fichier si un nouveau pattern durable émerge.
+
+**Pour les humains :**
+- Garder ce fichier lean et focalisé sur les besoins des agents.
+- Mettre à jour quand la stack ou les patterns changent ; revoir périodiquement pour retirer les règles devenues évidentes.
+
+Last Updated: 2026-06-13

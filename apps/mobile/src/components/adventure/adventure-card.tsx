@@ -1,4 +1,5 @@
 import type { AdventureResponse } from '@ridenrest/shared';
+import { router } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { PoweredByStrava } from '@/components/shared/powered-by-strava';
@@ -15,9 +16,9 @@ import { useTranslation } from '@/lib/i18n';
 //   - actions : « Démarrer en Live » (pleine largeur, `bg-text-primary`/blanc) puis
 //     « Planning » (`bg-surface-raised`) + « Modifier » (bordure).
 //
-// Live (carte MOB-4) et Planning (live MOB-5) ne sont pas encore construits →
-// **désactivés** (opacity-50, non tactiles). Seul « Modifier » navigue (→ détail
-// `[id]`, où vivent renommage/suppression — parité web). Le corps navigue aussi.
+// « Planning » (carte MOB-4.1) navigue désormais vers `map/[id]`. « Démarrer en
+// Live » (mode Live MOB-5) reste **désactivé** (opacity-50, non tactile). « Modifier »
+// → détail `[id]` (renommage/suppression, parité web). Le corps navigue aussi au détail.
 
 export interface AdventureCardProps {
   adventure: AdventureResponse;
@@ -103,17 +104,17 @@ export function AdventureCard({ adventure, onPress }: AdventureCardProps) {
       </View>
 
       <View className="flex-row gap-2">
-        {/* « Planning » — désactivé (carte MOB-4). */}
-        <View
+        {/* « Planning » — actif (MOB-4.1) → carte interactive de l'aventure. */}
+        <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('adventures.card.planning')}
-          accessibilityState={{ disabled: true }}
-          className="flex-1 items-center justify-center rounded-lg bg-surface-raised py-3 opacity-50"
+          className="flex-1 items-center justify-center rounded-lg bg-surface-raised py-3 active:opacity-70"
+          onPress={() => router.push(`/(app)/map/${adventure.id}`)}
         >
           <Text className="text-sm font-montserrat-semibold text-text-primary">
             {t('adventures.card.planning')}
           </Text>
-        </View>
+        </Pressable>
         {/* « Modifier » — actif → détail. */}
         <Pressable
           accessibilityRole="button"

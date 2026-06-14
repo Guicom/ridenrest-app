@@ -2,7 +2,9 @@ import { cssInterop } from 'nativewind';
 import {
   Bike,
   ChevronDown,
+  ChevronLeft,
   GripVertical,
+  Map as LucideMap,
   Pencil,
   Plus,
   RefreshCw,
@@ -37,7 +39,9 @@ function enableClassName(icon: LucideIcon): LucideIcon {
 
 export const BikeIcon = enableClassName(Bike);
 export const ChevronDownIcon = enableClassName(ChevronDown);
+export const ChevronLeftIcon = enableClassName(ChevronLeft);
 export const GripVerticalIcon = enableClassName(GripVertical);
+export const MapIcon = enableClassName(LucideMap);
 export const PencilIcon = enableClassName(Pencil);
 export const PlusIcon = enableClassName(Plus);
 export const RefreshCwIcon = enableClassName(RefreshCw);

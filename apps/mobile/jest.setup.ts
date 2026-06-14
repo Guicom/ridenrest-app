@@ -17,3 +17,9 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // Jest résout automatiquement `__mocks__/@react-native-community/netinfo.js`.
 // Sans ce mock, le module natif est `null` hors runtime (boot offline non testable).
 jest.mock('@react-native-community/netinfo');
+
+// MapLibre Native (MOB-4.1) : module natif absent hors device → mock manuel global
+// (`__mocks__/@maplibre/maplibre-react-native.js`, API v11 `Map`/`Camera`/
+// `GeoJSONSource`/`Layer`). Pour un package node_modules, le manual mock n'est pris
+// que sur `jest.mock` explicite (comme NetInfo).
+jest.mock('@maplibre/maplibre-react-native');

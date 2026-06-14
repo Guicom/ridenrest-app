@@ -190,6 +190,17 @@
     "readOnly": "Consultation hors ligne (lecture seule)",
     "actionUnavailable": "Action indisponible hors ligne"
   },
+  "map": {
+    "title": "Carte",
+    "back": "Retour",
+    "openButton": "Voir sur la carte",
+    "empty": "Aucune trace à afficher — ajoutez un segment GPX",
+    "emptyCta": "Retour au détail",
+    "parsing": "Trace en cours de traitement…",
+    "loadFailed": "Impossible de charger la carte",
+    "tilesOffline": "Fond de carte indisponible hors-ligne",
+    "attributionA11y": "Attribution OpenStreetMap"
+  },
   "settings": {
     "title": "Paramètres",
     "back": "Retour",

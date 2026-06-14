@@ -55,6 +55,12 @@ const config: ExpoConfig = {
     // (`expo-web-browser`, consommé en MOB-2.3/2.4). Config plugins requise au prebuild.
     'expo-secure-store',
     'expo-web-browser',
+    // MOB-4.1 — MapLibre Native (carte interactive). Le plugin config branche au
+    // prebuild la distribution native MapLibre (SPM iOS / Gradle Android). **Dev
+    // Client obligatoire** : MapLibre ne charge PAS dans Expo Go. Après cet ajout :
+    // `expo prebuild --clean -p ios` PUIS `expo run:ios` (cf. AGENTS.md, sinon
+    // `Cannot find native module`). v11 requiert la New Architecture (déjà activée SDK 56).
+    '@maplibre/maplibre-react-native',
   ],
   experiments: {
     typedRoutes: true,

@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import {
+  MapIcon,
   PencilIcon,
   RouteIcon,
   Trash2Icon,
@@ -293,6 +294,23 @@ export default function AdventureDetailScreen() {
           </View>
         ) : null}
       </View>
+
+      {/* CTA « Voir sur la carte » (MOB-4.1) → carte interactive de l'aventure.
+          Disponible online ET offline (la trace cachée reste consultable). */}
+      <Button
+        variant="outline"
+        size="lg"
+        className="rounded-full !border-primary/30 active:bg-primary/10"
+        textClassName="text-primary"
+        onPress={() => router.push(`/(app)/map/${data.id}`)}
+      >
+        <View className="flex-row items-center gap-2">
+          <MapIcon size={18} className="text-primary" />
+          <Text className="text-sm font-montserrat-semibold text-primary">
+            {t('map.openButton')}
+          </Text>
+        </View>
+      </Button>
 
       {/* Lecture seule offline (MOB-3.5 / AC2). */}
       {!isOnline ? (

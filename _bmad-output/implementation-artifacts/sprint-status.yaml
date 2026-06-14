@@ -34,7 +34,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-12
-last_updated: 2026-06-13  # MOB-3-5 → done après code review adversariale (3 couches) : 5 patchs appliqués (purge FS best-effort try/catch sur deleteIfExists/clearAllCache/ensureDir + .catch UI, hasCachedData guard list(), garde NaN sur dates ISO malformées, clé i18n morte offline.cacheCleared retirée FR/EN, loadSegmentGpx renvoie le texte fetché même si l'écriture cache échoue) ; 3 findings différés (purge auto GPX non câblée — décision Guillaume : arrive avec epic loader-trace ; hasCache stale ; refetch storm) ; 1 faux positif écarté (liste keyée ['adventures']). Gates mobile typecheck 0/lint 0/208 tests verts.
+last_updated: 2026-06-14  # Epic MOB-4 (Carte & Planification POI) : 8 stories créées (ready-for-dev) via bmad-create-story — MOB-4-1→4-8. Divergences epic↔backend documentées dans les stories : 4.5 (Booking+Airbnb sans ID affilié, pas Hotels.com), 4.6 (profil de routage supprimé → sélecteur de variantes + ⚠️ route nationale), 4.8 (provider réel Open-Meteo, transparent mobile). Réutilisation maximale de l'existant mobile (carte MapLibre infra 4.1, poi-cache/weather-cache squelettes, @gorhom/bottom-sheet, tokens poi-colors canon, apiFetch, use-color-scheme). Aucune modif serveur (backend epic 4/5/6/poi-access web tous livrés).
 project: ridenrest-app
 project_key: N/A
 tracking_system: file-system
@@ -351,15 +351,15 @@ development_status:
   epic-MOB-3-retrospective: optional
 
   # Epic MOB-4 : Carte & Planification POI
-  epic-MOB-4: backlog
-  MOB-4-1-maplibre-native-trace-themes-attribution: backlog
-  MOB-4-2-poi-layers-pins-clusters-detail-sheet: backlog
-  MOB-4-3-corridor-km-search: backlog
-  MOB-4-4-density-analysis-colorized-trace: backlog
-  MOB-4-5-booking-deeplinks-affiliate-tracking: backlog
-  MOB-4-6-poi-access-routing-sheet-profile: backlog
-  MOB-4-7-poi-access-polyline-autozoom-invalidation: backlog
-  MOB-4-8-planning-weather-pace-adjusted: backlog
+  epic-MOB-4: in-progress
+  MOB-4-1-maplibre-native-trace-themes-attribution: done  # 2026-06-14 — code review OK (1 decision résolue, 5 patches appliqués, 2 deferred). Gate verte post-patch (tsc 0, lint 0, map suites 21/21). ⏳ reste manuel Guillaume : rebuild natif (prebuild --clean/run:ios) + T9 validation device. | 2026-06-13 — impl T1-T8 (status review). MapLibre @maplibre/maplibre-react-native@^11.3.4 (PAS v10 : API Map/Camera/GeoJSONSource/Layer, peer deps RN0.85/React19/New Arch ; mock natif réécrit + jest.setup). lib/map/maplibre-config (OpenFreeMap vectoriel light=liberty/dark, zéro clé API — Open Questions tranchées ; computeTraceBounds via @ridenrest/gpx ; helpers GeoJSON purs), façade map.ts + use-adventure-map (polling 3000ms conditionnel, key ['adventures',id,'map']), map-canvas (trace LineString #2D6A4A w3 + fitBounds zoom-once + OsmAttribution overlay frère + forwardRef getCamera/getMap + children pour calques futurs), osm-attribution permanent, route map/[id] (id durci, header retour+nom, états vide/erreur/offline-tuiles superposés non bloquants), points d'entrée : bouton Planning carte activé + CTA « Voir sur la carte » détail (Live reste disabled MOB-5), i18n map.* FR/EN parité. 4 suites tests (config pur, hook, canvas mock natif, route). Gate verte : 230/230 tests 38 suites, tsc 0, lint 0, expo export iOS OK. ⏳ Reste manuel Guillaume : rebuild natif obligatoire (expo prebuild --clean -p ios + run:ios, sinon crash 'Cannot find native module') + T9 validation device/Dev Client (Expo Go incompatible MapLibre).
+  MOB-4-2-poi-layers-pins-clusters-detail-sheet: ready-for-dev
+  MOB-4-3-corridor-km-search: ready-for-dev
+  MOB-4-4-density-analysis-colorized-trace: ready-for-dev
+  MOB-4-5-booking-deeplinks-affiliate-tracking: ready-for-dev
+  MOB-4-6-poi-access-routing-sheet-profile: ready-for-dev
+  MOB-4-7-poi-access-polyline-autozoom-invalidation: ready-for-dev
+  MOB-4-8-planning-weather-pace-adjusted: ready-for-dev
   epic-MOB-4-retrospective: optional
 
   # Epic MOB-5 : Mode Live / Aventure ⭐

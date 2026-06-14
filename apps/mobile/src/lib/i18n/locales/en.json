@@ -190,6 +190,17 @@
     "readOnly": "Offline viewing (read-only)",
     "actionUnavailable": "Action unavailable offline"
   },
+  "map": {
+    "title": "Map",
+    "back": "Back",
+    "openButton": "View on map",
+    "empty": "No trace to display — add a GPX segment",
+    "emptyCta": "Back to details",
+    "parsing": "Processing trace…",
+    "loadFailed": "Unable to load the map",
+    "tilesOffline": "Map tiles unavailable offline",
+    "attributionA11y": "OpenStreetMap attribution"
+  },
   "settings": {
     "title": "Settings",
     "back": "Back",

@@ -1,13 +1,20 @@
 import type { AdventureResponse } from '@ridenrest/shared';
 import { render, screen, userEvent } from '@testing-library/react-native';
+import { router } from 'expo-router';
 
 import { AdventureCard } from '@/components/adventure/adventure-card';
 import { i18n } from '@/lib/i18n';
 
 // Test de composant (co-localisé — pas une route, hors `require.context`).
 // Carte iso web : rendu (nom + distance + dénivelé + date), navigation via le corps
-// ET le bouton « Modifier » (→ onPress), boutons « Live »/« Planning » désactivés
-// (MOB-4/5 non livrés). i18n réel (langue fr en test).
+// ET le bouton « Modifier » (→ onPress). « Planning » navigue vers la carte (MOB-4.1) ;
+// « Live » reste désactivé (MOB-5). i18n réel (langue fr en test).
+
+jest.mock('expo-router', () => ({
+  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
+}));
+
+const mockPush = router.push as jest.Mock;
 
 const t = (k: string) => i18n.t(k);
 
@@ -65,9 +72,15 @@ describe('AdventureCard (MOB-3.1 / AC1 — iso web)', () => {
     expect(onPress).toHaveBeenCalledWith('adv-1');
   });
 
-  it('les boutons « Live » et « Planning » sont désactivés (MOB-4/5 à venir)', async () => {
+  it('le bouton « Live » reste désactivé (mode Live MOB-5 à venir)', async () => {
     await render(<AdventureCard adventure={baseAdventure} onPress={jest.fn()} />);
     expect(screen.getByLabelText(t('adventures.card.live'))).toBeDisabled();
-    expect(screen.getByLabelText(t('adventures.card.planning'))).toBeDisabled();
+  });
+
+  it('tap sur « Planning » → navigue vers la carte (MOB-4.1)', async () => {
+    const user = userEvent.setup();
+    await render(<AdventureCard adventure={baseAdventure} onPress={jest.fn()} />);
+    await user.press(screen.getByLabelText(t('adventures.card.planning')));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/map/adv-1');
   });
 });
