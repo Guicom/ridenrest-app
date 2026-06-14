@@ -699,6 +699,18 @@ Popup POI (`poi-popup.tsx`) :
 - L'API NestJS monte tout sous le préfixe global `/api`. `apiFetch` préfixe **déjà** (`API_BASE = ${EXPO_PUBLIC_API_URL}/api`).
 - → Les façades utilisent des chemins **propres** (`/adventures`, **PAS** `/api/adventures`). `EXPO_PUBLIC_API_URL` = hôte seul (`http://localhost:3010`).
 
+### Data mobile — TanStack Query : états offline & polling (CRITIQUE)
+
+Patterns durables issus de MOB-4.1 (vues carte/data). À suivre pour MOB-4.2→4.8 et tout écran consommant `useQuery`.
+
+- **`fetchStatus: 'paused'` hors-ligne** : le QueryClient mobile utilise `networkMode: 'online'` (défaut) + `onlineManager` bridgé sur NetInfo (`use-app-state-refetch.ts`). Hors-ligne **sans donnée en cache**, une query reste `fetchStatus: 'paused'` avec `status: 'pending'` → **`isPending` est vrai indéfiniment**.
+  - ⇒ Tout overlay de chargement DOIT garder `query.isPending && query.fetchStatus !== 'paused'`. Sinon **skeleton infini** hors-ligne (bug réel corrigé en MOB-4.1).
+  - En `paused`/sans données, retomber sur l'état vide ou un message offline non bloquant — jamais le skeleton.
+- **Précédence des états (écran à polling)** : ordre obligatoire des branches de rendu : `loading (isPending && !paused) → error (isError && !data) → parsing (isXxxParsing(data)) → vide (!ready) → contenu`. Oublier la branche **parsing** affiche à tort « ajoutez un segment » pendant un parse en cours (polling actif).
+- **Polling conditionnel** : helper pur `xxxPollInterval(data)` branché sur `refetchInterval` — `3000` ms tant qu'une ressource est `pending`/`processing`, `false` sinon (arrêt auto). Parité `segmentsPollInterval` / `mapPollInterval`.
+- **Offline N1** : la trace/donnée reste affichable hors-ligne via la persistance TanStack Query (AsyncStorage, `gcTime` ≥ `maxAge` 24 h). Le fond de carte (tuiles), lui, peut être indisponible — dégradation acceptée MVP (bandeau non bloquant).
+- **Durcissement des params de route** : `const id = (rawId ?? '').trim()` avant tout usage — un `id` blanc (deep link `…/%20`) passe `!id` ET `Boolean(id)` et déclenche une requête malformée. Trimmer puis gater (`enabled: Boolean(id)`).
+
 ### Conventions mobile
 - Fichiers : kebab-case ; routes : `_layout.tsx`, `index.tsx`, `[id].tsx`.
 - Styling : `className="…"` NativeWind (Tailwind v3 syntaxe). Tokens via `@ridenrest/design-tokens`, jamais de couleur hardcodée.
@@ -720,4 +732,4 @@ Popup POI (`poi-popup.tsx`) :
 - Garder ce fichier lean et focalisé sur les besoins des agents.
 - Mettre à jour quand la stack ou les patterns changent ; revoir périodiquement pour retirer les règles devenues évidentes.
 
-Last Updated: 2026-06-13
+Last Updated: 2026-06-14
