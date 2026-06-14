@@ -5,23 +5,31 @@ import {
   Check,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CloudRain,
   Copy,
   Globe,
   GripVertical,
   Map as LucideMap,
+  Minus,
   Navigation,
   Pencil,
   Phone,
   Plus,
   RefreshCw,
   Route,
+  Search,
   Settings,
   ShoppingBasket,
+  Thermometer,
   Trash2,
   TrendingDown,
   TrendingUp,
+  Umbrella,
   Upload,
   Utensils,
+  Wind,
   X,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -51,23 +59,31 @@ export const BikeIcon = enableClassName(Bike);
 export const CheckIcon = enableClassName(Check);
 export const ChevronDownIcon = enableClassName(ChevronDown);
 export const ChevronLeftIcon = enableClassName(ChevronLeft);
+export const ChevronRightIcon = enableClassName(ChevronRight);
+export const ChevronUpIcon = enableClassName(ChevronUp);
+export const CloudRainIcon = enableClassName(CloudRain);
 export const CopyIcon = enableClassName(Copy);
 export const GlobeIcon = enableClassName(Globe);
 export const GripVerticalIcon = enableClassName(GripVertical);
 export const MapIcon = enableClassName(LucideMap);
+export const MinusIcon = enableClassName(Minus);
 export const NavigationIcon = enableClassName(Navigation);
 export const PencilIcon = enableClassName(Pencil);
 export const PhoneIcon = enableClassName(Phone);
 export const PlusIcon = enableClassName(Plus);
 export const RefreshCwIcon = enableClassName(RefreshCw);
 export const RouteIcon = enableClassName(Route);
+export const SearchIcon = enableClassName(Search);
 export const SettingsIcon = enableClassName(Settings);
 export const ShoppingBasketIcon = enableClassName(ShoppingBasket);
+export const ThermometerIcon = enableClassName(Thermometer);
 export const Trash2Icon = enableClassName(Trash2);
 export const TrendingDownIcon = enableClassName(TrendingDown);
 export const TrendingUpIcon = enableClassName(TrendingUp);
+export const UmbrellaIcon = enableClassName(Umbrella);
 export const UploadIcon = enableClassName(Upload);
 export const UtensilsIcon = enableClassName(Utensils);
+export const WindIcon = enableClassName(Wind);
 export const XIcon = enableClassName(X);
 
 export type { LucideIcon };

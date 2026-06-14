@@ -25,6 +25,15 @@ export function formatKm(km: number, locale = 'fr'): string {
 }
 
 /**
+ * Formate un entier avec séparateur de milliers localisé (`5 672` en FR). Utilisé pour
+ * la position km et le D+/D− de la carte Recherche (parité web `toLocaleString('fr')`).
+ */
+export function formatInt(value: number, locale = 'fr'): string {
+  const v = Number.isFinite(value) ? Math.round(value) : 0;
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(v);
+}
+
+/**
  * Formate une distance en **mètres** avec son unité : « 120 m » sous 1 km, sinon
  * « 1,2 km » (séparateur localisé via `formatKm`). Utilisé pour la distance d'un POI
  * à la trace (`distFromTraceM`, déjà calculée serveur — jamais recalculée ici).
