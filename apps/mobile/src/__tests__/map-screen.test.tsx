@@ -1,12 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
 import type { AdventureMapResponse, AdventureResponse } from '@ridenrest/shared';
 
 import MapScreen from '@/app/(app)/map/[id]';
 import * as adventuresApi from '@/lib/api/adventures';
 import * as mapApi from '@/lib/api/map';
+import * as poisApi from '@/lib/api/pois';
 import { i18n } from '@/lib/i18n';
+import { useMapStore } from '@/lib/stores/map.store';
 
 // ⚠️ Hors de `src/app/` À DESSEIN : importe une route (`require.context` bundlerait
 // ce test sinon — cf. AGENTS.md). On mocke les FAÇADES réseau, `expo-router`
@@ -32,6 +34,39 @@ jest.mock('@/lib/api/adventures', () => ({
   createAdventure: jest.fn(),
   renameAdventure: jest.fn(),
   deleteAdventure: jest.fn(),
+  updateAdventureAvgSpeedKmh: jest.fn(),
+}));
+// Carte Recherche : façades étapes (dropdown « À partir ») + géo (reverse-city du
+// dropdown Booking) mockées pour isoler la route du réseau.
+jest.mock('@/lib/api/stages', () => ({
+  getStages: jest.fn().mockResolvedValue([]),
+  createStage: jest.fn(),
+  updateStage: jest.fn(),
+  deleteStage: jest.fn(),
+}));
+jest.mock('@/lib/api/geo', () => ({
+  getReverseCity: jest
+    .fn()
+    .mockResolvedValue({ city: null, postcode: null, state: null, country: null }),
+}));
+// Densité (statut polling) + météo (gated weatherActive) mockées.
+jest.mock('@/lib/api/density', () => ({
+  getDensityStatus: jest.fn().mockResolvedValue({
+    densityStatus: 'idle',
+    densityProgress: 0,
+    coverageGaps: [],
+    densityCategories: [],
+    densityStale: false,
+  }),
+  triggerDensityAnalysis: jest.fn(),
+}));
+jest.mock('@/lib/api/weather', () => ({
+  getWeatherForecast: jest.fn().mockResolvedValue({
+    segmentId: 's0',
+    waypoints: [],
+    cachedAt: '',
+    expiresAt: '',
+  }),
 }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
@@ -49,6 +84,7 @@ jest.mock('@/hooks/use-color-scheme', () => ({
 const mockGetMap = mapApi.getAdventureMapData as jest.Mock;
 const mockGetAdventure = adventuresApi.getAdventure as jest.Mock;
 const mockParams = useLocalSearchParams as jest.Mock;
+const mockFindPois = poisApi.findPois as jest.Mock;
 
 function makeAdventure(name: string): AdventureResponse {
   return { id: 'adv-1', name, totalDistanceKm: 10 } as AdventureResponse;
@@ -93,8 +129,26 @@ async function renderScreen() {
   );
 }
 
+const initialStore = useMapStore.getState();
 beforeEach(() => {
   jest.clearAllMocks();
+  // Store global (Zustand) — reset entre tests (évite que searchCommitted fuite).
+  useMapStore.setState(
+    {
+      ...initialStore,
+      visibleLayers: new Set(['accommodations']),
+      activeAccommodationTypes: new Set(['hotel']),
+      fromKm: 0,
+      toKm: 15,
+      searchRangeInteracted: false,
+      searchCommitted: false,
+      selectedStageId: null,
+      weatherActive: false,
+      densityColorEnabled: false,
+      stagesVisible: true,
+    },
+    true,
+  );
 });
 
 describe('MapScreen', () => {
@@ -141,5 +195,23 @@ describe('MapScreen', () => {
 
     expect(await screen.findByText(i18n.t('map.empty'))).toBeOnTheScreen();
     expect(screen.getByText(i18n.t('map.emptyCta'))).toBeOnTheScreen();
+  });
+
+  it('gate searchCommitted : aucune recherche avant clic, lancée au clic « Rechercher » (AC1/AC2)', async () => {
+    mockParams.mockReturnValue({ id: 'adv-1' });
+    mockGetAdventure.mockResolvedValue(makeAdventure('Tour'));
+    mockGetMap.mockResolvedValue(makeMap(true));
+
+    await renderScreen();
+
+    // Trace prête : le slider est monté, mais AUCUNE recherche n'est partie (gate).
+    expect(await screen.findByTestId('trace-line')).toBeOnTheScreen();
+    expect(mockFindPois).not.toHaveBeenCalled();
+
+    // Clic explicite « Rechercher » → la recherche corridor part enfin.
+    fireEvent.press(
+      screen.getByRole('button', { name: i18n.t('pois.search.button') }),
+    );
+    await waitFor(() => expect(mockFindPois).toHaveBeenCalled());
   });
 });

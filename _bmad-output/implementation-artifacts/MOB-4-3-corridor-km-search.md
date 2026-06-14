@@ -1,6 +1,10 @@
+---
+baseline_commit: e4e931358e64cdab451c57f890941e212e0d436c
+---
+
 # Story MOB-4.3 : Recherche par corridor kilométrique
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -41,51 +45,44 @@ So that **je trouve des services autour d'une portion précise de ma trace**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — Primitive `components/ui/slider.tsx` (double poignée) ou lib** (AC: 1)
-  - [ ] Évaluer : `@react-native-community/slider` (mono-poignée, ne couvre PAS une plage A→B) vs une primitive **range** (double poignée) basée sur `react-native-gesture-handler` + `react-native-reanimated` (déjà présents). L'archi prévoit `components/ui/slider.tsx + slider.stories.tsx` + `components/map/search-range-slider.tsx`. **Recommandation** : primitive range maison (gesture-handler/reanimated) — pas de nouvelle dép, contrôle du cap. Documenter le choix.
-  - [ ] Storybook `slider.stories.tsx` (cette primitive **a** des stories, contrairement aux composants natifs lourds — archi L1053-1054). Variantes : default, min/max, valeurs.
-  - [ ] A11y : `accessibilityRole="adjustable"`, `accessibilityValue={{ min, max, now }}`, increment/decrement via `accessibilityActions` (gestes a11y).
+- [x] **T1 — Primitive `components/ui/slider.tsx` (double poignée) ou lib** (AC: 1)
+  - [x] Évaluer : choix **primitive range maison** avec **`PanResponder` (cœur RN) + positionnement %** — PAS gesture-handler/reanimated. **Décision documentée** (`slider.tsx`) : Reanimated casse le build **Storybook** (cf. `skeleton.tsx`) or la story exige des `slider.stories.tsx` → `PanResponder` est polyfillé par react-native-web. Pas de nouvelle dép. Logique de clamp extraite en fonction **pure** `clampRange`.
+  - [x] Storybook `slider.stories.tsx` : variantes Default, Capped30km, FullWidth (état local via `render`).
+  - [x] A11y : `accessibilityRole="adjustable"` + `accessibilityValue={{ min, max, now }}` + `accessibilityActions` increment/decrement (sert aussi de point d'entrée testable RNTL).
 
-- [ ] **T2 — `components/map/search-range-slider.tsx`** (AC: 1, 2)
-  - [ ] Slider plage `[fromKm, toKm]` (km cumulés aventure), bornes `[0, totalDistanceKm]`. **Cap 30 km** sur `(toKm - fromKm)` : empêcher l'écartement au-delà (clamp à la poignée déplacée). Afficher « km A → km B » + l'étendue.
-  - [ ] Bouton **« Rechercher »** (réutiliser `Button`), **désactivé** si plage invalide (toKm ≤ fromKm). Clic → `setSearchCommitted(true)`.
-  - [ ] Tout déplacement de poignée → `setSearchRangeInteracted(true)` + **n'arme PAS** la requête (le gate `searchCommitted` reste la seule porte). Parité web : `searchCommitted` / `searchRangeInteracted`.
-  - [ ] Défauts parité web : `fromKm = 0`, `toKm = 15` (≤ cap 30).
+- [x] **T2 — `components/map/search-range-slider.tsx`** (AC: 1, 2)
+  - [x] Slider plage `[fromKm, toKm]` (km cumulés), bornes `[0, totalDistanceKm]`. **Cap 30 km** via `maxRange` du slider (clamp à la poignée). Affiche « km A → km B » + l'étendue (capHint).
+  - [x] Bouton **« Rechercher »** (`Button` size `lg`), **désactivé** si plage invalide (toKm ≤ fromKm). Clic en ligne → `onCommit()`.
+  - [x] Tout déplacement de poignée → `onChange` (la route dé-committe) + **n'arme PAS** la requête (gate `searchCommitted`).
+  - [x] Défauts parité web : `fromKm = 0`, `toKm = 15` (état initial route).
 
-- [ ] **T3 — Finaliser `hooks/use-pois.ts` (gate + plage)** (AC: 1, 2, 3, 4)
-  - [ ] Param `fromKm`, `toKm`, `enabled: searchCommitted` (la requête ne part que committée). À chaque nouvelle recherche, query key change (`fromKm/toKm`) → refetch ; sinon, cache.
-  - [ ] Exposer `isFetching` (→ overlay T4), `data` (pins), `isError` (→ ErrorBanner), et `isEmpty = committed && !isFetching && data?.length === 0` (→ bannière « Aucun résultat »).
-  - [ ] Conserver le write-through `poi-cache` (MOB-4.2). Le gate ne casse pas l'offline (cache lu indépendamment).
-  - [ ] **Résolution multi-segments (AC5)** : mapper `[fromKm, toKm]` (cumulés) → `segmentId` + km locaux. Réutiliser les `cumulativeStartKm` de `AdventureMapResponse`/segments. Au MVP, si la plage chevauche plusieurs segments, lancer une requête par segment couvert (parité `useQueries` web par segment × calque) et fusionner les pins.
+- [x] **T3 — Finaliser `hooks/use-pois.ts` (gate + plage)** (AC: 1, 2, 3, 4)
+  - [x] Param `fromKm`, `toKm`, `enabled` (= `searchCommitted` côté route). Query key change (`fromKm/toKm` locaux) → refetch ; sinon cache.
+  - [x] Expose `isFetching` (→ overlay T4), `pois` (pins), `isError` (→ ErrorBanner), `isEmpty = enabled && isSuccess && pois.length === 0` (→ bannière « Aucun résultat »). *(Note : `isEmpty` basé sur `isSuccess` plutôt que `!isFetching` — hors-ligne `isSuccess` est faux donc pas de fausse bannière, cf. AC5.)*
+  - [x] Conserve le write-through `poi-cache` + fallback offline (MOB-4.2) — inchangé.
+  - [x] **Résolution multi-segments (AC5)** : fonction pure `resolveSegmentRanges(segments, fromKm, toKm)` → plages **locales** par segment couvert (km arrondis 0,1, parité web) ; une `useQuery` par (segment × calque), pins fusionnés/dédoublonnés.
 
-- [ ] **T4 — Overlay de chargement scopé carte + bannières** (AC: 2, 3, 4)
-  - [ ] Overlay `isFetching` : voile semi-opaque **sur la zone carte uniquement** + `<ActivityIndicator />` ou `<Skeleton />`. **Jamais** plein écran bloquant (archi). N'empêche pas de fermer le slider.
-  - [ ] Bannière « Aucun résultat » (`isEmpty`) : composant scopé carte (réutiliser le style `bg-…/10` + texte i18n), dismissable. **Distincte** de l'erreur réseau.
-  - [ ] `<ErrorBanner />` (`isError`) scopé carte + relance possible (« Rechercher »).
+- [x] **T4 — Overlay de chargement scopé carte + bannières** (AC: 2, 3, 4)
+  - [x] Composant présentiel pur `map-search-feedback.tsx` : overlay `isFetching` (`ActivityIndicator` + voile, `inset-0`, `pointer-events-none`, **jamais** plein écran bloquant).
+  - [x] Bannière « Aucun résultat » (`isEmpty`) scopée carte (`bg-orange-500/90`, parité web), **distincte** de l'erreur.
+  - [x] `<ErrorBanner />` (`isError`) scopé carte + relance « Rechercher ». Précédence : fetching > error > empty.
 
-- [ ] **T5 — Intégration route map** (AC: 1, 2, 3, 4, 5)
-  - [ ] Monter `search-range-slider` (overlay bas/haut de carte, au-dessus des toggles ou en panneau). Lifter `fromKm/toKm/searchCommitted/searchRangeInteracted` à la route (cohérent avec `visibleLayers`/`selectedPoiId` de MOB-4.2).
-  - [ ] Brancher overlay/bannières sur les flags de `use-pois`.
-  - [ ] Désactiver le slider/bouton si `!isOnline` ? Non — autoriser la consultation des pins cachés ; mais une **nouvelle recherche** offline doit afficher un message « hors-ligne » (réutiliser `useNetworkStatus`).
+- [x] **T5 — Intégration route map** (AC: 1, 2, 3, 4, 5)
+  - [x] `search-range-slider` monté en panneau bas (au-dessus des `LayerToggles`) + `map-search-feedback` superposé. État `fromKm/toKm/searchCommitted` lifté à la route. **Doc Sync** : `searchRangeInteracted` (parité web) **non lifté** — aucun consommateur sur mobile MVP (pas de surbrillance corridor ni météo MOB-4.8) ; AC1 satisfait par `searchCommitted` seul (le déplacement de poignée dé-committe). Reporté avec son 1er consommateur.
+  - [x] Overlay/bannières branchés sur `isFetching`/`isError`/`isEmpty` de `use-pois`.
+  - [x] Slider/bouton **non désactivés** hors-ligne ; une nouvelle recherche offline affiche un message inline (`useNetworkStatus` → `isOnline` passé au slider).
 
-- [ ] **T6 — i18n (FR + EN)** (AC: 1, 2, 3, 4)
-  - [ ] Bloc `pois.search.*` (parité) :
-    - `pois.search.range` (« km {{from}} → km {{to}} ») / `pois.search.button` (« Rechercher »)
-    - `pois.search.capHint` (« Plage max 30 km »)
-    - `pois.search.loading` (a11y overlay)
-    - `pois.search.noResults` (« Aucun POI dans cette plage — élargissez ou déplacez la zone »)
-    - `pois.search.error` (ErrorBanner)
-    - `pois.search.offline` (« Recherche indisponible hors-ligne »)
-  - [ ] Slider a11y labels (`pois.search.fromHandleA11y` / `toHandleA11y`). **Zéro chaîne en dur**.
+- [x] **T6 — i18n (FR + EN)** (AC: 1, 2, 3, 4)
+  - [x] Bloc `pois.search.*` : `range`, `button`, `capHint`, `loading`, `noResults`, `error`, `offline`, `fromHandleA11y`, `toHandleA11y` — parité FR/EN. **Zéro chaîne en dur**.
 
-- [ ] **T7 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5)
-  - [ ] Slider range (pur/logique) : clamp cap 30 km ; `toKm > fromKm` ; bouton désactivé si invalide.
-  - [ ] `use-pois` gate : requête **non** lancée tant que `searchCommitted=false` ; lancée au commit ; `isEmpty` vrai si committé + 0 résultat ; refetch sur changement `fromKm/toKm`.
-  - [ ] Résolution multi-segments : `[fromKm,toKm]` cumulés → bons `segmentId`/km (test pur sur le mapper).
-  - [ ] `search-range-slider` : déplacer poignée → `searchRangeInteracted=true` mais **aucun** appel réseau ; clic « Rechercher » → commit. Overlay visible si `isFetching` ; bannière « Aucun résultat » si `isEmpty` ; `ErrorBanner` si `isError`. (`userEvent`)
-  - [ ] Gate : `test|typecheck|lint` verts + `expo export` OK.
+- [x] **T7 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5)
+  - [x] Slider : `clampRange` pur (cap 30 km, écart min, bornes/pas) + actions a11y increment/decrement.
+  - [x] `use-pois` gate : requête **non** lancée si `enabled=false` ; lancée au commit ; `isEmpty` vrai si committé + 0 résultat.
+  - [x] Résolution multi-segments : test pur `resolveSegmentRanges` (mono-segment, à cheval, hors plage).
+  - [x] `search-range-slider` : déplacer poignée → `onChange` sans commit ; clic « Rechercher » → `onCommit` ; bouton désactivé si invalide ; offline → message inline. `map-search-feedback` : overlay/`isEmpty`/`isError`/précédence. Route : gate (aucune recherche avant clic, lancée au clic).
+  - [x] Gate : **test 313/313**, **tsc 0**, **lint 0**, **`expo export` iOS OK**.
 
-- [ ] **T8 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4, 5) — ⏳ build Dev Client
+- [ ] **T8 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4, 5) — ⏳ build Dev Client (reste manuel Guillaume)
   - [ ] Déplacer le slider → aucun appel réseau ; cap 30 km respecté.
   - [ ] « Rechercher » → overlay, puis pins du corridor (calques actifs).
   - [ ] Plage sans POI → bannière « Aucun résultat ». Couper réseau + rechercher → message offline. Forcer une erreur → ErrorBanner + relance.
@@ -154,14 +151,58 @@ apps/mobile/src/lib/i18n/locales/fr.json + en.json (bloc pois.search.*)
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (Amelia / bmad-dev-story)
+
 ### Debug Log References
+
+- **Tests jest depuis `apps/mobile`** : le runner doit tourner avec `apps/mobile` comme rootDir (babel/jsx + alias `@/`). Lancé depuis la racine → `SyntaxError: jsx isn't enabled` / type-import KO.
+- **RNTL `render` doit être `await`** (pattern repo) : sinon `screen` non peuplé → « `render` function has not been called ». Helper `setup` rendu async.
+- **Flake d'isolation (suite complète)** : `search-range-slider` test offline passait seul mais échouait en 4e position — la maj d'état post-`fireEvent.press` est flushée en microtâche (React 19). Fix : `findByText` (async) au lieu de `getByText`.
+- **Lint React Compiler** : `react-hooks/refs` (pas d'accès ref en rendu) → slider recréé via closures fraîches (pas de `stateRef` lu en rendu) ; `react-hooks/set-state-in-effect` → effet de désélection POI (route) et reset offline (slider) convertis en logique render-phase / supprimés.
+- **Validation device T8 — fix fit caméra** : MapLibre Native émettait `[ERROR] Unable to calculate appropriate zoom level for bounds. Vertical or horizontal padding is greater than map's height or width.` Cause : `fitBounds` (auto-fit trace hérité MOB-4.1) déclenché sur `onDidFinishLoadingStyle` AVANT que la surface native ait sa taille → padding 40px > taille carte. Fix : helper pur `safeFitPadding(w,h)` (clampe le padding sous la moitié de la plus petite dimension) + gate du fit sur `mapSize` mesuré via `onLayout` (`map-canvas.tsx`). Fit différé jusqu'à une taille valide, padding toujours sûr.
 
 ### Completion Notes List
 
+- **T1** — `components/ui/slider.tsx` : primitive range double poignée (`PanResponder` + %), fonction pure `clampRange` (cap, écart min, bornes), a11y `adjustable` + actions increment/decrement. **Décision documentée** : pas de gesture-handler/reanimated (build Storybook). `slider.stories.tsx` (3 variantes).
+- **T2** — `components/map/search-range-slider.tsx` : panneau slider `[fromKm,toKm]` + bouton « Rechercher » (gate), cap 30 km (`CORRIDOR_MAX_RANGE_KM`), message offline inline.
+- **T3** — `hooks/use-pois.ts` finalisé : `resolveSegmentRanges` (cumulés → locaux par segment, AC5), `enabled` = gate, `isEmpty`/`isFetching` exposés, write-through/offline conservés.
+- **T4** — `components/map/map-search-feedback.tsx` : overlay chargement + bannière « Aucun résultat » + ErrorBanner (présentiel pur, scopé carte, précédence fetching>error>empty).
+- **T5** — route `map/[id].tsx` : état `fromKm/toKm/searchCommitted` lifté, slider + feedback câblés. `searchRangeInteracted` non lifté (sans consommateur mobile MVP — Doc Sync ci-dessus).
+- **T6** — i18n `pois.search.*` FR/EN (parité, zéro chaîne en dur).
+- **T7** — tests Jest/RNTL co-localisés. **Gate verte** : 313/313 tests (48 suites), tsc 0, lint 0, `expo export` iOS OK.
+- **T8** — ⏳ validation device (Dev Client) : reste manuel Guillaume (MapLibre/SVG natifs → rebuild requis ; cf. AGENTS.md).
+
 ### File List
+
+**Ajouts :**
+- `apps/mobile/src/components/ui/slider.tsx`
+- `apps/mobile/src/components/ui/slider.stories.tsx`
+- `apps/mobile/src/components/ui/slider.test.tsx`
+- `apps/mobile/src/components/map/search-range-slider.tsx`
+- `apps/mobile/src/components/map/search-range-slider.test.tsx`
+- `apps/mobile/src/components/map/map-search-feedback.tsx`
+- `apps/mobile/src/components/map/map-search-feedback.test.tsx`
+
+**Modifications :**
+- `apps/mobile/src/hooks/use-pois.ts` (gate `enabled`, `resolveSegmentRanges`, `isEmpty`, `isFetching`)
+- `apps/mobile/src/hooks/use-pois.test.tsx` (mapper, gate, isEmpty)
+- `apps/mobile/src/app/(app)/map/[id].tsx` (état corridor lifté, slider + feedback, désélection render-phase)
+- `apps/mobile/src/__tests__/map-screen.test.tsx` (test gate route)
+- `apps/mobile/src/components/ui/icon.tsx` (`SearchIcon`)
+- `apps/mobile/src/lib/i18n/locales/fr.json` + `en.json` (bloc `pois.search.*`)
+- `apps/mobile/src/lib/map/maplibre-config.ts` (helper pur `safeFitPadding` — fix fit caméra T8)
+- `apps/mobile/src/lib/map/__tests__/maplibre-config.test.ts` (tests `safeFitPadding`)
+- `apps/mobile/src/components/map/map-canvas.tsx` (gate fit sur `mapSize`/`onLayout` + padding clampé — fix fit caméra T8)
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-13 | 0.1 | Création story MOB-4.3 (ready-for-dev) — slider plage km double poignée (cap 30 km), gate `searchCommitted` (recherche au clic uniquement), `use-pois` finalisé (fromKm/toKm + enabled + isEmpty), overlay chargement scopé carte, bannière « Aucun résultat »/erreur/offline, mapping km cumulés → segment(s). `GET /pois` corridor réutilisé. i18n FR/EN, tests. | bmad-create-story (Story Context Engineer) |
+| 2026-06-14 | 1.0 | Implémentation T1–T7 (status review). Primitive `slider` range maison (PanResponder, `clampRange` pur, a11y adjustable) + stories ; `search-range-slider` (cap 30 km, gate, offline) ; `use-pois` finalisé (`resolveSegmentRanges` AC5, `enabled`/`isEmpty`/`isFetching`) ; `map-search-feedback` (overlay/aucun résultat/erreur) ; route câblée (état lifté, désélection render-phase) ; i18n `pois.search.*` FR/EN ; `SearchIcon`. **Doc Sync** : `searchRangeInteracted` non lifté (sans consommateur mobile MVP). Gate : 313/313 tests, tsc 0, lint 0, expo export iOS OK. ⏳ T8 device validation manuelle (Guillaume). | claude-opus-4-8[1m] (Amelia) |
+| 2026-06-14 | 1.1 | Fix remonté en validation device T8 : erreur MapLibre Native « padding is greater than map's height or width » au fit auto de la trace (`fitBounds` sur `onDidFinishLoadingStyle` avant que la surface native ait sa taille). Helper pur `safeFitPadding` (clampe le padding à la taille rendue) + gate du fit sur `mapSize` mesuré via `onLayout` dans `map-canvas.tsx`. Gate : 318/318 tests (+5), tsc 0, lint 0, expo export iOS OK. | claude-opus-4-8[1m] (Amelia) |
+| 2026-06-14 | 2.4 | **Fix slider — cause finale** : après les itérations moveX/locationX/pageX, le slider « rampait » car le `PanResponder` était recréé à chaque `onChange` (re-rendu) → RN re-négociait le responder en plein drag → `onGrant` re-déclenché → `dx` remis à ~0. **Solution** : `PanResponder` créé **une seule fois** (init paresseuse `useState`, pas `useMemo([])` à cause de `preserve-manual-memoization`) + pattern « latest ref » (props courantes lues via une ref mise à jour en effet). Déplacement par `gesture.dx` relatif (insensible offsets/transforms/hit-test). Gesture jamais interrompu → glissement fluide. Gate : 343/343, tsc 0, lint 0. | claude-opus-4-8[1m] (Amelia) |
+| 2026-06-14 | 2.3 | **Étapes — colorisation de la trace (remonté Guillaume)** : il manquait la recoloration du tracé par étape (le web colore chaque tronçon `[startKm,endKm]` avec `stage.color` ; on n'avait que les pastilles). Ajout : helper pur `buildStageColoredFeatures` + overlay `StageTraceLayer` (`GeoJSONSource`/`Layer` line, `line-color: ['get','color']`), rendu sous les pastilles `StageMarkers`, gated `stagesVisible`. Gate : 343/343 tests (+2), tsc 0, lint 0, expo export iOS OK. | claude-opus-4-8[1m] (Amelia) |
+| 2026-06-14 | 2.2 | **Fix slider (remonté Guillaume — 2 itérations)** : (1) saut à droite au contact — `gesture.moveX` (X absolu écran) ÷ trackWidth, faux car piste pas en x=0 (drawer/marges) ; (2) comportement erratique gauche-droite — `locationX` change de repère selon l'enfant survolé (poignée vs piste). **Fix final** : `PanResponder` sur le conteneur + `evt.nativeEvent.pageX − trackLeft` où `trackLeft`/`trackWidth` sont mesurés via `measureInWindow` (callback `onLayout`). Repère **écran absolu stable** → insensible au hit-test et aux re-rendus. Range = poignée la plus proche. Ref de piste lue uniquement en callback (règle `react-hooks/refs` OK). Gate : 341/341 tests, tsc 0, lint 0. | claude-opus-4-8[1m] (Amelia) |
+| 2026-06-14 | 2.1 | **Phase 2 livrée (full sidebar iso)** : cartes **Étapes** (CRUD complet — liste `StageCard`, dialogs création/édition/suppression, palette `STAGE_COLORS`, placement par tap sur la trace `onMapPress`→snap waypoint, marqueurs `StageMarkers`, hook `use-stages` mutations + `use-end-date-sync` stubbé), **Météo** (toggle, sélecteur dimension temp/pluie/vent, départ texte, overlay `WeatherLayer` ligne colorée + flèches vent, hook `use-weather` 1 query/segment gatée `weatherActive`, km cumulés), **Densité** (états idle/analyse/succès, `DensityCategoryDialog`, légende 3 niveaux, overlay `DensityLayer` tronçons 10 km colorés, hook `use-density` polling 3 s). Primitives neuves : `Switch`, `Dialog` (Modal RN). Façades : `density`, `weather`. Store : `stagesVisible`/`weatherActive`/`weatherDimension`/`densityColorEnabled`. **Tout en JS** (overlays = `GeoJSONSource`/`Layer`/`Marker` du module natif déjà installé) → validable par reload Metro, **pas de prebuild**. Suppression du code mort v1.0 (`search-range-slider`, `layer-toggles` + tests). Gate : 341/341 tests, tsc 0, lint 0, expo export iOS OK. **Déviations notées** : pas de drag-reorder d'étape (édition via liste) ; départ/dates en champ texte (pas de date-picker natif, évite un module natif) ; météo sans liste par-waypoint (overlay carte uniquement, iso web). | claude-opus-4-8[1m] (Amelia) |
+| 2026-06-14 | 2.0 | **Pivot d'architecture (demande Guillaume — iso web)** : l'écran planning passe du « map-first + barre basse » au **shell drawer + cartes** du web (parité visuelle/UX exigée). Dépasse MOB-4.3 (couvre aussi Vitesse/Étapes/Météo/Densité → livré en 2 phases). **Phase 1** : 1er store Zustand mobile `useMapStore` (port iso `apps/web/stores/map.store.ts`) ; `PlanningSidebar` (drawer coulissant + backdrop + poignée) ; carte **Recherche** iso (position `fromKm` + largeur `rangeKm` → `toKm`, « À partir » étape, stats km·D+·D−, slider position±, `PoiLayerGrid`, sous-types hébergement + compteurs, « Rechercher sur » Booking/Airbnb via `Linking`) ; carte **Vitesse moyenne** (PATCH avgSpeed) ; `CorridorPill`. **Doc Sync** : (a) modèle slider remplacé — double-poignée `[from,to]` (v1.0) → **position+largeur** iso web ; (b) cap passé de **30 → 50 km** (`MAX_SEARCH_RANGE_KM` partagé, parité web) ; (c) `search-range-slider.tsx`/`layer-toggles.tsx` (v1.0) deviennent du code mort (remplacés par `search-range-control`/`poi-layer-grid`) — suppression en Phase 2. Façades neuves : `stages` (getStages), `geo` (reverse-city), `adventures.updateAdventureAvgSpeedKmh`. Gate Phase 1 : 332/332 tests (+14), tsc 0, lint 0, expo export iOS OK. **Phase 2 à venir** : cartes Étapes (CRUD), Météo, Densité (+ overlays carte) — couvre MOB-4.4→4.8. | claude-opus-4-8[1m] (Amelia) |

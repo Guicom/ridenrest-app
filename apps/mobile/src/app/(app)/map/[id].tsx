@@ -1,43 +1,47 @@
-import type { MapSegmentData } from '@ridenrest/shared';
+import type { MapLayer, MapSegmentData, MapWaypoint, Poi } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LayerToggles } from '@/components/map/layer-toggles';
+import { AvgSpeedCard } from '@/components/map/avg-speed-card';
+import { CorridorPill } from '@/components/map/corridor-pill';
+import { DensityLayer } from '@/components/map/density-layer';
 import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
+import { MapSearchFeedback } from '@/components/map/map-search-feedback';
+import { PlanningSidebar } from '@/components/map/planning-sidebar';
 import { PoiLayer } from '@/components/map/poi-layer';
 import { PoiPopup } from '@/components/map/poi-popup';
+import { SearchRangeControl } from '@/components/map/search-range-control';
+import { SidebarDensitySection } from '@/components/map/sidebar-density-section';
+import { SidebarStagesSection } from '@/components/map/sidebar-stages-section';
+import { SidebarWeatherSection } from '@/components/map/sidebar-weather-section';
+import { StageMarkers } from '@/components/map/stage-markers';
+import { StageTraceLayer } from '@/components/map/stage-trace-layer';
+import { WeatherLayer } from '@/components/map/weather-layer';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { ChevronLeftIcon } from '@/components/ui/icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdventure } from '@/hooks/use-adventures';
 import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
+import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
+import { useDensity } from '@/hooks/use-density';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { usePoiLayers } from '@/hooks/use-poi-layers';
 import { usePois } from '@/hooks/use-pois';
+import { useStages } from '@/hooks/use-stages';
+import { useWeather } from '@/hooks/use-weather';
 import { hasTrace } from '@/lib/map/maplibre-config';
+import { useMapStore } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
 
-// Écran carte (MOB-4.1 + calques POI MOB-4.2). Affiche la trace GPX (MapLibre Native)
-// + les **calques POI** (toggles indépendants), les **pins/clusters** et la **fiche
-// détail** en **popin « liquid glass »** ancrée au pin (`PoiPopup`, parité web). Le
-// slider corridor + gate `searchCommitted` arrivent en MOB-4.3 : ici, déclenchement
-// **minimal** (plage par défaut 0–15 km, calque `accommodations` actif) dès trace prête.
-//
-// `MapCanvas` rend le fond + l'attribution + (via `children`) les calques POI ; cet
-// écran route les ÉTATS par-dessus (chargement, erreur, vide, tuiles offline), l'en-tête
-// et les overlays (toggles, sheet). `id` est durci (leçon MOB-3.2) : falsy → aucune query.
+// Écran carte mode **planning** (MOB-4.x, iso web). Carte plein écran + **drawer**
+// (`PlanningSidebar`) avec les 5 cartes : Vitesse, Recherche, Étapes, Météo, Densité.
+// État planning dans `useMapStore` (Zustand). Overlays carte : POI, marqueurs d'étapes,
+// densité, météo. RGPD : seuls segmentId + km cumulés partent à l'API (jamais de GPS).
 
-// Plage de recherche POI par défaut (MOB-4.2). MOB-4.3 branchera le slider `fromKm/toKm`.
-const DEFAULT_FROM_KM = 0;
-const DEFAULT_TO_KM = 15;
-// Tolérance float aux jonctions de segments (1 m) — évite un POI exactement à la jonction
-// d'être attribué au mauvais segment à cause du drift flottant serveur.
 const SEGMENT_KM_EPSILON = 0.001;
 
-/** Segment d'origine d'un POI (par km le long de la trace) — pour l'enrichissement Google. */
 function findSegmentIdForKm(
   segments: readonly MapSegmentData[],
   km: number,
@@ -50,39 +54,119 @@ function findSegmentIdForKm(
   return seg?.id ?? segments[0]?.id ?? null;
 }
 
+/** km cumulé du waypoint le plus proche d'un point tapé (snap au tracé). */
+function nearestKm(
+  waypoints: readonly MapWaypoint[],
+  lng: number,
+  lat: number,
+): number | null {
+  let best: MapWaypoint | null = null;
+  let bestD = Infinity;
+  for (const wp of waypoints) {
+    const d = (wp.lng - lng) ** 2 + (wp.lat - lat) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = wp;
+    }
+  }
+  return best?.distKm ?? null;
+}
+
+/** « 2026-06-15 07:30 » → ISO, sinon null. */
+function parseDeparture(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed.replace(' ', 'T'));
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export default function MapScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  // `id` durci (leçon MOB-3.2) + trim : un id blanc (`" "`, deep link `map/%20`)
-  // passerait `!id` et `Boolean(id)` → on le normalise pour qu'il retombe falsy.
   const { id: rawId } = useLocalSearchParams<{ id: string }>();
   const id = (rawId ?? '').trim();
   const { isOnline } = useNetworkStatus();
 
   const adventure = useAdventure(id);
   const map = useAdventureMap(id);
+  const stagesApi = useStages(id);
 
   const segments = useMemo(() => map.data?.segments ?? [], [map.data]);
+  const stages = stagesApi.stages;
   const traceReady = hasTrace(segments);
+  const totalDistanceKm = map.data?.totalDistanceKm ?? 0;
+  const avgSpeedKmh = adventure.data?.avgSpeedKmh ?? 0;
   const title = adventure.data?.name ?? t('map.title');
   const paddingTop = insets.top + 12;
+  const waypoints = useAdventureWaypoints(segments);
+  const allSegmentsParsed =
+    segments.length > 0 && segments.every((s) => s.parseStatus === 'done');
 
-  // Modèle de calques (défaut `accommodations`) + POIs corridor (déclenchement minimal).
-  const { visibleLayers, toggleLayer } = usePoiLayers();
-  const { poisByLayer, pois } = usePois({
+  // État planning (store Zustand, parité web)
+  const visibleLayers = useMapStore((s) => s.visibleLayers);
+  const fromKm = useMapStore((s) => s.fromKm);
+  const toKm = useMapStore((s) => s.toKm);
+  const searchCommitted = useMapStore((s) => s.searchCommitted);
+  const searchRangeInteracted = useMapStore((s) => s.searchRangeInteracted);
+  const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes);
+  const stagesVisible = useMapStore((s) => s.stagesVisible);
+  const setStagesVisible = useMapStore((s) => s.setStagesVisible);
+  const weatherActive = useMapStore((s) => s.weatherActive);
+  const weatherDimension = useMapStore((s) => s.weatherDimension);
+  const densityColorEnabled = useMapStore((s) => s.densityColorEnabled);
+
+  const { poisByLayer, isFetching, isError, isEmpty } = usePois({
     adventureId: id,
     segments,
     visibleLayers,
-    fromKm: DEFAULT_FROM_KM,
-    toKm: DEFAULT_TO_KM,
-    enabled: traceReady,
+    fromKm,
+    toKm,
+    enabled: traceReady && searchCommitted,
   });
 
-  // POI sélectionné (lifté à la route — alimente le sheet + le recentrage caméra).
+  // Densité (statut + coverage gaps pour l'overlay)
+  const density = useDensity(id);
+
+  // Météo : heure de départ globale (texte) → ISO ; départs par étape prioritaires.
+  const [departureInput, setDepartureInput] = useState('');
+  const stageDeparturesJson = useMemo(() => {
+    const withDep = stages.filter((s) => s.departureTime != null);
+    if (withDep.length === 0) return null;
+    return JSON.stringify(
+      withDep.map((s) => ({
+        startKm: s.startKm,
+        endKm: s.endKm,
+        departureTime: s.departureTime,
+      })),
+    );
+  }, [stages]);
+  const { weatherPoints } = useWeather({
+    segments,
+    weatherActive,
+    departureTime: parseDeparture(departureInput),
+    speedKmh: avgSpeedKmh || undefined,
+    stageDepartures: stageDeparturesJson,
+  });
+
+  // Affichage carte : hébergements filtrés par sous-type actif (compteurs = liste complète).
+  const displayPoisByLayer = useMemo<Record<MapLayer, Poi[]>>(
+    () => ({
+      ...poisByLayer,
+      accommodations: poisByLayer.accommodations.filter((p) =>
+        activeAccommodationTypes.has(p.category),
+      ),
+    }),
+    [poisByLayer, activeAccommodationTypes],
+  );
+  const displayPois = useMemo(
+    () => Object.values(displayPoisByLayer).flat(),
+    [displayPoisByLayer],
+  );
+
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const selectedPoi = useMemo(
-    () => pois.find((p) => p.id === selectedPoiId) ?? null,
-    [pois, selectedPoiId],
+    () => displayPois.find((p) => p.id === selectedPoiId) ?? null,
+    [displayPois, selectedPoiId],
   );
   const selectedSegmentId = selectedPoi
     ? findSegmentIdForKm(segments, selectedPoi.distAlongRouteKm)
@@ -90,19 +174,36 @@ export default function MapScreen() {
 
   const mapRef = useRef<MapCanvasHandle>(null);
   const getCamera = useCallback(() => mapRef.current?.getCamera() ?? null, []);
-  // Accès carte (projection) : le recentrage de la fiche préserve le zoom courant.
   const getMap = useCallback(() => mapRef.current?.getMap() ?? null, []);
   const handleCloseSheet = useCallback(() => setSelectedPoiId(null), []);
 
-  // Désélectionne automatiquement si le POI sélectionné disparaît de `pois`
-  // (ex. calque togglé off) — évite que la popup rouvre au re-toggle.
-  useEffect(() => {
-    if (!selectedPoiId) return;
-    if (pois.some((p) => p.id === selectedPoiId)) return;
+  if (selectedPoiId !== null && !displayPois.some((p) => p.id === selectedPoiId)) {
     setSelectedPoiId(null);
-  }, [pois, selectedPoiId]);
+  }
 
-  // En-tête flottant (retour + nom), pastilles `bg-card/80` lisibles sur la carte.
+  // Drawer + placement d'étape (tap trace). Fermé par défaut (parité web mobile).
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stageClickMode, setStageClickMode] = useState(false);
+  const [pendingEndKm, setPendingEndKm] = useState<number | null>(null);
+
+  useEffect(() => {
+    const unsub = useMapStore.subscribe((state, prev) => {
+      if (state.searchCommitted && !prev.searchCommitted) setSidebarOpen(false);
+    });
+    return unsub;
+  }, []);
+
+  const handleMapPress = useCallback(
+    (lngLat: [number, number]) => {
+      if (!stageClickMode) return;
+      const km = nearestKm(waypoints, lngLat[0], lngLat[1]);
+      if (km == null) return;
+      setPendingEndKm(km);
+      setSidebarOpen(true);
+    },
+    [stageClickMode, waypoints],
+  );
+
   const header = (
     <View
       pointerEvents="box-none"
@@ -131,8 +232,6 @@ export default function MapScreen() {
     </View>
   );
 
-  // Edge : `id` falsy → hooks désactivés (pas d'appel `/adventures/undefined/map`),
-  // état neutre sans carte (évite un skeleton infini).
   if (!id) {
     return (
       <View className="flex-1 bg-background-page">
@@ -151,11 +250,34 @@ export default function MapScreen() {
 
   return (
     <View className="flex-1 bg-background-page">
-      <MapCanvas ref={mapRef} segments={segments}>
-        {/* Calques POI + fiche détail insérés DANS le `<Map>` (MOB-4.2). La popin est
-            un `Marker` natif ancré au pin → elle suit la carte sans projection JS. */}
+      <MapCanvas
+        ref={mapRef}
+        segments={segments}
+        onMapPress={stageClickMode ? handleMapPress : undefined}
+      >
+        <DensityLayer
+          segments={segments}
+          coverageGaps={density.coverageGaps}
+          enabled={densityColorEnabled && density.densityStatus === 'success'}
+        />
+        <WeatherLayer
+          waypoints={waypoints}
+          weatherPoints={weatherPoints}
+          dimension={weatherDimension}
+          enabled={weatherActive}
+        />
+        <StageTraceLayer
+          waypoints={waypoints}
+          stages={stages}
+          visible={stagesVisible}
+        />
+        <StageMarkers
+          stages={stages}
+          waypoints={waypoints}
+          visible={stagesVisible}
+        />
         <PoiLayer
-          poisByLayer={poisByLayer}
+          poisByLayer={displayPoisByLayer}
           visibleLayers={visibleLayers}
           onSelectPoi={setSelectedPoiId}
           getCamera={getCamera}
@@ -170,20 +292,84 @@ export default function MapScreen() {
       </MapCanvas>
       {header}
 
-      {/* Toggles de calque (overlay bas, au-dessus de l'attribution) — visibles dès
-          que la trace est prête. La popin POI est un `Marker` natif sur la carte (pas un
-          overlay RN), donc aucun conflit de z-index avec ces toggles. */}
       {traceReady ? (
+        <MapSearchFeedback
+          isFetching={isFetching}
+          isError={isError}
+          isEmpty={isEmpty}
+          onRetry={() => useMapStore.getState().setSearchCommitted(true)}
+        />
+      ) : null}
+
+      {traceReady && searchRangeInteracted ? (
         <View
-          pointerEvents="box-none"
+          pointerEvents="none"
           style={{ bottom: insets.bottom + 16 }}
-          className="absolute left-0 right-0 z-10 items-center px-4"
+          className="absolute left-0 right-0 z-20 items-center"
         >
-          <LayerToggles visibleLayers={visibleLayers} onToggle={toggleLayer} />
+          <CorridorPill fromKm={fromKm} toKm={toKm} />
         </View>
       ) : null}
 
-      {/* Tuiles indisponibles hors-ligne (AC5) — informatif, non bloquant. */}
+      {stageClickMode ? (
+        <View
+          pointerEvents="none"
+          style={{ top: insets.top + 60 }}
+          className="absolute left-0 right-0 z-20 items-center"
+        >
+          <View className="rounded-full bg-primary/90 px-4 py-2">
+            <Text className="text-sm font-montserrat-semibold text-white">
+              {t('map.stages.placementHint')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {traceReady ? (
+        <PlanningSidebar open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <AvgSpeedCard
+            adventureId={id}
+            avgSpeedKmh={avgSpeedKmh}
+            isOnline={isOnline}
+          />
+          <SearchRangeControl
+            totalDistanceKm={totalDistanceKm}
+            waypoints={waypoints}
+            isPoisPending={isFetching}
+            accommodationPois={poisByLayer.accommodations}
+            stages={stages}
+            isOnline={isOnline}
+          />
+          <SidebarStagesSection
+            stages={stages}
+            defaultSpeedKmh={avgSpeedKmh}
+            stagesVisible={stagesVisible}
+            onStagesVisibilityChange={setStagesVisible}
+            isClickModeActive={stageClickMode}
+            onEnterClickMode={() => {
+              setStageClickMode(true);
+              setSidebarOpen(false);
+            }}
+            onExitClickMode={() => setStageClickMode(false)}
+            pendingEndKm={pendingEndKm}
+            onPendingHandled={() => setPendingEndKm(null)}
+            onCreate={stagesApi.createStage}
+            onUpdate={stagesApi.updateStage}
+            onDelete={stagesApi.deleteStage}
+            isOnline={isOnline}
+          />
+          <SidebarWeatherSection
+            departureTime={departureInput}
+            onDepartureChange={setDepartureInput}
+            stagesHaveDepartures={stageDeparturesJson !== null}
+          />
+          <SidebarDensitySection
+            adventureId={id}
+            allSegmentsParsed={allSegmentsParsed}
+          />
+        </PlanningSidebar>
+      ) : null}
+
       {!isOnline ? (
         <View
           pointerEvents="none"
@@ -201,12 +387,6 @@ export default function MapScreen() {
         </View>
       ) : null}
 
-      {/* États carte superposés et centrés (scopés, jamais plein écran bloquant).
-          Le fond de carte + l'attribution restent visibles dessous (AC4).
-          `fetchStatus !== 'paused'` : hors-ligne sans cache, la query reste `paused`
-          (networkMode `online`) avec `status: 'pending'` → sans ce garde, le skeleton
-          tournerait à l'infini (AC5). En `paused`/sans données on retombe sur l'état
-          vide (+ bandeau tuiles offline). */}
       {map.isPending && map.fetchStatus !== 'paused' ? (
         <View
           pointerEvents="none"
@@ -222,8 +402,6 @@ export default function MapScreen() {
           <ErrorBanner message={t('map.loadFailed')} />
         </View>
       ) : isMapParsing(map.data) ? (
-        // Segment(s) en cours de parsing (polling 3 s actif) : ne PAS afficher l'état
-        // vide « ajoutez un segment » — un segment existe et la trace va apparaître.
         <View
           pointerEvents="none"
           className="absolute inset-0 z-10 items-center justify-center px-8"

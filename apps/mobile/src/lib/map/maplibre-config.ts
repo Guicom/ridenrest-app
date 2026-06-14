@@ -15,6 +15,27 @@ export const FIT_PADDING = 40;
 /** Durée d'animation caméra (ms) du fit auto. */
 export const CAMERA_ANIMATION_MS = 500;
 
+/**
+ * Padding (px) sûr pour `fitBounds`, clampé à la taille rendue de la carte.
+ * MapLibre Native émet une erreur au fit (« Unable to calculate appropriate zoom
+ * level for bounds. Vertical or horizontal padding is greater than map's height or
+ * width. ») quand `2×padding ≥ min(width, height)` — typiquement quand la surface
+ * native n'a pas encore sa taille finale au moment du fit. On borne le padding à un
+ * peu moins de la moitié de la plus petite dimension, et on renvoie `0` tant que la
+ * carte n'est pas mesurée (`width`/`height` ≤ 0) → l'appelant doit alors différer le fit.
+ */
+export function safeFitPadding(
+  width: number,
+  height: number,
+  desired: number = FIT_PADDING,
+): number {
+  const minDim = Math.min(width, height);
+  if (minDim <= 0) return 0;
+  // 1px de sécurité sous la moitié pour garantir `2×padding < dimension`.
+  const max = Math.max(0, Math.floor(minDim / 2) - 1);
+  return Math.min(desired, max);
+}
+
 // Styles de tuiles : **OpenFreeMap** vectoriel (parité web `lib/map-styles.ts`) —
 // zéro clé API, attribution OSM suffisante (décision MOB-4.1, Open Question 1). Light
 // = « liberty » (défaut web), Dark = « dark ». Pas d'`EXPO_PUBLIC_*` requis (raster

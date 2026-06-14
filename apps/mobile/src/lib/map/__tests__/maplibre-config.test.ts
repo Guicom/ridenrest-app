@@ -4,8 +4,10 @@ import {
   buildTraceFeatureCollection,
   collectTraceWaypoints,
   computeTraceBounds,
+  FIT_PADDING,
   getMapStyle,
   hasTrace,
+  safeFitPadding,
   TRACE_COLOR,
 } from '@/lib/map/maplibre-config';
 
@@ -117,6 +119,41 @@ describe('collectTraceWaypoints', () => {
       { lat: 45, lng: 5 },
       { lat: 46, lng: 6 },
     ]);
+  });
+});
+
+describe('safeFitPadding (fit caméra robuste)', () => {
+  it('renvoie le padding désiré quand la carte est assez grande', () => {
+    expect(safeFitPadding(400, 800)).toBe(FIT_PADDING);
+  });
+
+  it('renvoie 0 si la carte n’est pas encore mesurée (0×0)', () => {
+    expect(safeFitPadding(0, 0)).toBe(0);
+    expect(safeFitPadding(400, 0)).toBe(0);
+  });
+
+  it('clampe le padding sous la moitié de la plus petite dimension', () => {
+    // min(w,h) = 50 → max = floor(50/2) - 1 = 24 < FIT_PADDING (40).
+    const padding = safeFitPadding(300, 50);
+    expect(padding).toBe(24);
+    expect(2 * padding).toBeLessThan(50);
+  });
+
+  it('garantit 2×padding < min(w,h) sur des tailles dégénérées', () => {
+    for (const [w, h] of [
+      [1, 1],
+      [2, 2],
+      [3, 80],
+      [81, 4],
+    ]) {
+      const padding = safeFitPadding(w, h);
+      expect(padding).toBeGreaterThanOrEqual(0);
+      expect(2 * padding).toBeLessThan(Math.min(w, h));
+    }
+  });
+
+  it('respecte un padding désiré custom', () => {
+    expect(safeFitPadding(1000, 1000, 10)).toBe(10);
   });
 });
 
