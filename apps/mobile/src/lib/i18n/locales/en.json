@@ -347,6 +347,11 @@
       "deleting": "Deleting…",
       "cancel": "Cancel",
       "error": "Deletion failed. Your account is intact."
+    },
+    "overpass": {
+      "section": "Points of interest search",
+      "title": "Extended search (Overpass)",
+      "description": "More complete results — especially campsites and shelters — but slower searches."
     }
   },
   "strava": {

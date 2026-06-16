@@ -13,3 +13,13 @@ export interface ProfileResponse {
 export function getProfile(): Promise<ProfileResponse> {
   return apiFetch<ProfileResponse>('/profile');
 }
+
+/** PATCH /profile (body `{ overpassEnabled }`) → profil mis à jour. */
+export function updateOverpassEnabled(
+  overpassEnabled: boolean,
+): Promise<ProfileResponse> {
+  return apiFetch<ProfileResponse>('/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({ overpassEnabled }),
+  });
+}

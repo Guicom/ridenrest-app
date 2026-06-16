@@ -347,6 +347,11 @@
       "deleting": "Suppression…",
       "cancel": "Annuler",
       "error": "La suppression a échoué. Votre compte est intact."
+    },
+    "overpass": {
+      "section": "Recherche de points d’intérêt",
+      "title": "Recherche étendue (Overpass)",
+      "description": "Résultats plus complets — notamment campings et refuges — mais recherches plus lentes."
     }
   },
   "strava": {
