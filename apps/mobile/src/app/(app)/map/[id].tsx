@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvgSpeedCard } from '@/components/map/avg-speed-card';
+import { CorridorHighlightLayer } from '@/components/map/corridor-highlight-layer';
 import { CorridorPill } from '@/components/map/corridor-pill';
 import { DensityLayer } from '@/components/map/density-layer';
 import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
@@ -29,6 +30,7 @@ import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
 import { useDensity } from '@/hooks/use-density';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { usePois } from '@/hooks/use-pois';
+import { useProfile } from '@/hooks/use-profile';
 import { useStages } from '@/hooks/use-stages';
 import { useWeather } from '@/hooks/use-weather';
 import { hasTrace } from '@/lib/map/maplibre-config';
@@ -115,12 +117,18 @@ export default function MapScreen() {
   const weatherDimension = useMapStore((s) => s.weatherDimension);
   const densityColorEnabled = useMapStore((s) => s.densityColorEnabled);
 
+  // Flag Overpass opt-in (profil) — parité web : sans lui, la recherche tournait
+  // toujours en `overpassEnabled=false` → 0 résultat hors cache Google.
+  const { data: profile } = useProfile();
+  const overpassEnabled = profile?.overpassEnabled ?? false;
+
   const { poisByLayer, isFetching, isError, isEmpty } = usePois({
     adventureId: id,
     segments,
     visibleLayers,
     fromKm,
     toKm,
+    overpassEnabled,
     enabled: traceReady && searchCommitted,
   });
 
@@ -270,6 +278,12 @@ export default function MapScreen() {
           waypoints={waypoints}
           stages={stages}
           visible={stagesVisible}
+        />
+        <CorridorHighlightLayer
+          waypoints={waypoints}
+          fromKm={fromKm}
+          toKm={toKm}
+          visible={searchRangeInteracted}
         />
         <StageMarkers
           stages={stages}

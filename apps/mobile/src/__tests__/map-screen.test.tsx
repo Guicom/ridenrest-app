@@ -68,6 +68,9 @@ jest.mock('@/lib/api/weather', () => ({
     expiresAt: '',
   }),
 }));
+jest.mock('@/lib/api/profile', () => ({
+  getProfile: jest.fn().mockResolvedValue({ overpassEnabled: false, tier: 'free' }),
+}));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
   useLocalSearchParams: jest.fn(),
