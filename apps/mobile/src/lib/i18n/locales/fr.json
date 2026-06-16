@@ -254,7 +254,10 @@
       "critical": "Zone critique",
       "criticalDetail": "Aucun hébergement / 10 km",
       "categoriesTitle": "Catégories à analyser",
-      "launch": "Lancer l’analyse"
+      "launch": "Lancer l’analyse",
+      "inProgress": "Analyse déjà en cours",
+      "offline": "Analyse indisponible hors-ligne",
+      "triggerFailed": "Échec du lancement. Réessayez."
     }
   },
   "pois": {

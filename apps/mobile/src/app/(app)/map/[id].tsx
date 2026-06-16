@@ -411,6 +411,7 @@ export default function MapScreen() {
           <SidebarDensitySection
             adventureId={id}
             allSegmentsParsed={allSegmentsParsed}
+            isOnline={isOnline}
           />
         </PlanningSidebar>
       ) : null}

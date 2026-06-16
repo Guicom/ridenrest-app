@@ -1,6 +1,10 @@
+---
+baseline_commit: 26059dea0e8e855356437a0cd86a62487db7b9a3
+---
+
 # Story MOB-4.4 : Analyse de densité & trace colorisée
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -41,54 +45,54 @@ So that **j'identifie d'un coup d'œil les zones à risque d'hébergement**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — Façade `lib/api/density.ts`** (AC: 1, 2, 4)
-  - [ ] `triggerDensity(adventureId, categories): Promise<{ message: string }>` → `apiFetch('/density/analyze', { method: 'POST', body: { adventureId, categories } })`. **Pas de job id** — `adventureId` est la clé de polling.
-  - [ ] `getDensityStatus(adventureId): Promise<DensityStatusResponse>` → `apiFetch('/density/${adventureId}/status')`.
-  - [ ] Types **`DensityStatusResponse` / `DensityStatus` / `CoverageGapSummary` / `DENSITY_ACCOMMODATION_CATEGORIES`** importés racine de `@ridenrest/shared` (jamais redéfinis).
+- [x] **T1 — Façade `lib/api/density.ts`** (AC: 1, 2, 4)
+  - [x] `triggerDensity(adventureId, categories): Promise<{ message: string }>` → `apiFetch('/density/analyze', { method: 'POST', body: { adventureId, categories } })`. **Pas de job id** — `adventureId` est la clé de polling.
+  - [x] `getDensityStatus(adventureId): Promise<DensityStatusResponse>` → `apiFetch('/density/${adventureId}/status')`.
+  - [x] Types **`DensityStatusResponse` / `DensityStatus` / `CoverageGapSummary` / `DENSITY_ACCOMMODATION_CATEGORIES`** importés racine de `@ridenrest/shared` (jamais redéfinis).
 
-- [ ] **T2 — Hook `hooks/use-density.ts`** (AC: 1, 2, 4)
-  - [ ] `useDensityStatus(adventureId)` → `useQuery({ queryKey: ['density', adventureId], queryFn: getDensityStatus, refetchInterval: q => ['pending','processing'].includes(q.state.data?.densityStatus) ? 3000 : false })`. Parité web. (Réutiliser la forme du helper polling.)
-  - [ ] `useTriggerDensity(adventureId)` → `useMutation({ mutationFn: triggerDensity, onSuccess: invalidate ['density', adventureId] })`. Gérer **409** (déjà en cours) → message dédié (ne pas traiter comme une erreur fatale ; mapper le code).
-  - [ ] Exposer : `status` (`idle|pending|processing|success|error`), `progress`, `coverageGaps`, `stale`, `isPending` (trigger), flags message 409.
+- [x] **T2 — Hook `hooks/use-density.ts`** (AC: 1, 2, 4)
+  - [x] `useDensityStatus(adventureId)` → `useQuery({ queryKey: ['density', adventureId], queryFn: getDensityStatus, refetchInterval: q => ['pending','processing'].includes(q.state.data?.densityStatus) ? 3000 : false })`. Parité web. (Réutiliser la forme du helper polling.)
+  - [x] `useTriggerDensity(adventureId)` → `useMutation({ mutationFn: triggerDensity, onSuccess: invalidate ['density', adventureId] })`. Gérer **409** (déjà en cours) → message dédié (ne pas traiter comme une erreur fatale ; mapper le code).
+  - [x] Exposer : `status` (`idle|pending|processing|success|error`), `progress`, `coverageGaps`, `stale`, `isPending` (trigger), flags message 409.
 
-- [ ] **T3 — Colorisation de la trace `lib/map/density-layer.ts`** (AC: 2)
-  - [ ] Porter `buildDensityColoredFeatures(segments, coverageGaps)` (web) : découpe chaque segment en **tronçons de 10 km**, associe chaque tronçon à un gap (epsilon `< 0.01 km`), défaut `'none'` (vert) si pas de gap. Renvoie un `FeatureCollection` de `LineString` avec `properties.severity` (`'critical'|'medium'|'none'`).
-  - [ ] **Couleurs** (mirror, **ne pas redéfinir**) : `critical = #dc2626` (rouge), `medium = #d97706` (orange), `none = #16a34a` (vert) — utiliser les tokens densité (`density-low/medium/high` du design-tokens, ou les constantes web `DENSITY_COLORS`). Couleur appliquée via expression MapLibre `match`/`get` sur `severity` (ou inline par feature).
-  - [ ] Réutiliser les waypoints + `cumulativeStartKm` de `AdventureMapResponse`.
+- [x] **T3 — Colorisation de la trace `lib/map/density-layer.ts`** (AC: 2)
+  - [x] Porter `buildDensityColoredFeatures(segments, coverageGaps)` (web) : découpe chaque segment en **tronçons de 10 km**, associe chaque tronçon à un gap (epsilon `< 0.01 km`), défaut `'none'` (vert) si pas de gap. Renvoie un `FeatureCollection` de `LineString` avec `properties.severity` (`'critical'|'medium'|'none'`).
+  - [x] **Couleurs** (mirror, **ne pas redéfinir**) : `critical = #dc2626` (rouge), `medium = #d97706` (orange), `none = #16a34a` (vert) — utiliser les tokens densité (`density-low/medium/high` du design-tokens, ou les constantes web `DENSITY_COLORS`). Couleur appliquée via expression MapLibre `match`/`get` sur `severity` (ou inline par feature).
+  - [x] Réutiliser les waypoints + `cumulativeStartKm` de `AdventureMapResponse`.
 
-- [ ] **T4 — `components/map/density-overlay.tsx`** (AC: 2, 3)
-  - [ ] `ShapeSource` + `LineLayer` rendant le `FeatureCollection` colorisé **au-dessus** de la trace uniforme (ou en remplacement quand `densityColorEnabled`). Largeur ≥ trace pour bien couvrir.
-  - [ ] Toggle `densityColorEnabled` (état route map) : ON → trace colorisée ; OFF → trace uniforme `#2D6A4A` (MOB-4.1). Ne rendre la colorisation que si `densityStatus==='success' && coverageGaps`.
-  - [ ] Pas de stories (composant natif). [archi L1049]
+- [x] **T4 — `components/map/density-overlay.tsx`** (AC: 2, 3)
+  - [x] `ShapeSource` + `LineLayer` rendant le `FeatureCollection` colorisé **au-dessus** de la trace uniforme (ou en remplacement quand `densityColorEnabled`). Largeur ≥ trace pour bien couvrir.
+  - [x] Toggle `densityColorEnabled` (état route map) : ON → trace colorisée ; OFF → trace uniforme `#2D6A4A` (MOB-4.1). Ne rendre la colorisation que si `densityStatus==='success' && coverageGaps`.
+  - [x] Pas de stories (composant natif). [archi L1049]
 
-- [ ] **T5 — Légende `components/map/density-legend.tsx`** (AC: 3)
-  - [ ] 3 lignes : pastille couleur (**inline**) + **libellé texte explicite** :
+- [x] **T5 — Légende `components/map/density-legend.tsx`** (AC: 3)
+  - [x] 3 lignes : pastille couleur (**inline**) + **libellé texte explicite** :
     - vert : « Bonne disponibilité — 2+ hébergements / 10 km »
     - orange : « Disponibilité limitée — 1 hébergement / 10 km »
     - rouge : « Zone critique — aucun hébergement / 10 km »
-  - [ ] **A11y daltonisme** : le sens passe par le **texte** (pas que la couleur). `accessibilityRole` adéquat, contraste light/dark. Légende repliable/accessible depuis la carte.
+  - [x] **A11y daltonisme** : le sens passe par le **texte** (pas que la couleur). `accessibilityRole` adéquat, contraste light/dark. Légende repliable/accessible depuis la carte.
 
-- [ ] **T6 — Déclenchement (sélection catégories) + intégration route map** (AC: 1, 2, 3, 4, 5)
-  - [ ] Panneau/section densité : sélection des **catégories d'hébergement** (`DENSITY_ACCOMMODATION_CATEGORIES`, ≥ 1 requise) + bouton « Analyser la densité » (`Button loading` pendant trigger). Réutiliser un sélecteur multi (chips/toggles, cf. `layer-toggles` style).
-  - [ ] Brancher `use-density` : progression (indicateur scopé), message 409, ErrorBanner (error), indicateur stale + relance.
-  - [ ] Toggle « Trace colorisée » (densityColorEnabled) visible quand `success`.
-  - [ ] **Offline (AC5)** : trigger désactivé `!isOnline` (message) ; dernière colorisation en cache reste affichée (le statut `['density', id]` est en query persist N1 si whitelisté — sinon, accepter que la colorisation se recharge en ligne).
+- [x] **T6 — Déclenchement (sélection catégories) + intégration route map** (AC: 1, 2, 3, 4, 5)
+  - [x] Panneau/section densité : sélection des **catégories d'hébergement** (`DENSITY_ACCOMMODATION_CATEGORIES`, ≥ 1 requise) + bouton « Analyser la densité » (`Button loading` pendant trigger). Réutiliser un sélecteur multi (chips/toggles, cf. `layer-toggles` style).
+  - [x] Brancher `use-density` : progression (indicateur scopé), message 409, ErrorBanner (error), indicateur stale + relance.
+  - [x] Toggle « Trace colorisée » (densityColorEnabled) visible quand `success`.
+  - [x] **Offline (AC5)** : trigger désactivé `!isOnline` (message) ; dernière colorisation en cache reste affichée (le statut `['density', id]` est en query persist N1 si whitelisté — sinon, accepter que la colorisation se recharge en ligne).
 
-- [ ] **T7 — i18n (FR + EN)** (AC: 1, 2, 3, 4, 5)
-  - [ ] Bloc `density.*` (parité) :
+- [x] **T7 — i18n (FR + EN)** (AC: 1, 2, 3, 4, 5)
+  - [x] Bloc `density.*` (parité) :
     - `density.analyzeButton` / `density.analyzing` (« Analyse… {{progress}}% ») / `density.inProgress` (409)
     - `density.colorToggle` (« Trace colorisée »)
     - `density.legend.high` / `.medium` / `.low` (libellés ci-dessus)
     - `density.categoryLabel.*` (catégories hébergement)
     - `density.error` / `density.stale` (« Résultats périmés — relancer ») / `density.offline`
-  - [ ] **Zéro chaîne en dur**.
+  - [x] **Zéro chaîne en dur**.
 
-- [ ] **T8 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4)
-  - [ ] `use-density` : `refetchInterval` 3000 si `pending`/`processing`, `false` sinon ; 409 mappé en message (pas erreur fatale) ; query keys.
-  - [ ] `density-layer` (pur) : `buildDensityColoredFeatures` — tronçons 10 km, severity correcte (0→critical, 1→medium, ≥2→none), epsilon matching, défaut none.
-  - [ ] `density-legend` : 3 libellés texte présents (a11y), couleurs inline.
-  - [ ] Déclenchement : sélection ≥1 catégorie requise ; bouton désactivé offline ; toggle colorisation ON/OFF.
-  - [ ] Gate : `test|typecheck|lint` verts + `expo export` OK.
+- [x] **T8 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4)
+  - [x] `use-density` : `refetchInterval` 3000 si `pending`/`processing`, `false` sinon ; 409 mappé en message (pas erreur fatale) ; query keys.
+  - [x] `density-layer` (pur) : `buildDensityColoredFeatures` — tronçons 10 km, severity correcte (0→critical, 1→medium, ≥2→none), epsilon matching, défaut none.
+  - [x] `density-legend` : 3 libellés texte présents (a11y), couleurs inline.
+  - [x] Déclenchement : sélection ≥1 catégorie requise ; bouton désactivé offline ; toggle colorisation ON/OFF.
+  - [x] Gate : `test|typecheck|lint` verts + `expo export` OK.
 
 - [ ] **T9 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4, 5) — ⏳ build Dev Client
   - [ ] Sélectionner catégories + Analyser → progression, puis trace colorisée vert/orange/rouge cohérente. 2ᵉ déclenchement immédiat → message « déjà en cours ».
@@ -171,14 +175,50 @@ apps/mobile/src/lib/i18n/locales/fr.json + en.json (bloc density.*)
 
 ### Agent Model Used
 
+claude-opus-4-8[1m] (bmad-dev-story)
+
 ### Debug Log References
+
+- Gate post-implémentation : `tsc --noEmit` 0 erreur · `eslint` 0 erreur/warning (fichiers touchés) · `jest` **354/354** (58 suites) · `expo export --platform ios` OK.
+- Régression évitée : importer `ApiError` depuis `api-client` dans `use-density` chargeait transitivement `@/lib/auth/client` (@better-auth/expo, non transformable Jest) → cassait `map-screen.test.tsx` (qui mocke les façades mais pas l'auth). **Fix** : détection 409 **structurelle** (`errorStatus(err)` lit le champ public `status`) au lieu de `instanceof ApiError` → le hook reste hors de la stack auth native.
+- Défaut pré-existant corrigé : `use-density.test.ts` (commit pivot MOB-4.3) ne *loadait pas* — il importe `use-density` → façade `@/lib/api/density` → `api-client` → auth (@better-auth/expo). La suite échouait silencieusement (ses 2 tests `densityPollInterval` non comptés dans le « 349 » du pivot). **Fix** : mock de la façade `@/lib/api/density` dans le test (rompt la chaîne auth, comme `map-screen.test.tsx`). La suite charge désormais (+2 tests).
 
 ### Completion Notes List
 
+**⚠️ Contexte clé — story livrée à ~90 % par le PIVOT MOB-4.3 (2026-06-14).** Le pivot « écran planning iso web » (cf. sprint-status MOB-4-3) avait déjà construit la densité. Cette session a **vérifié l'existant contre les AC** puis **comblé les écarts réels** (AC1/409, AC5/offline), sans churn de renommage.
+
+Écarts AC comblés cette session :
+- **AC1 — 409 « Analyse déjà en cours »** : `use-density` expose désormais `isTriggerConflict` (409) et `isTriggerError` (échec hors 409), mappés depuis `mutation.error` ; `trigger` neutralise le rejet (`.catch`) → l'appelant (dialog) n'a plus de throw non géré. `SidebarDensitySection` affiche un message dédié **non bloquant** (parité toast web `err.status === 409 → 'Analyse déjà en cours'`).
+- **AC5 — offline** : `SidebarDensitySection` reçoit `isOnline` ; CTA désactivé hors-ligne + message `map.density.offline` (pattern `pois.search.offline`). La dernière colorisation reste affichable via le cache TanStack Query (persist N1).
+- **i18n** : ajout `map.density.inProgress` / `offline` / `triggerFailed` (FR + EN).
+- **Tests** : +3 cas dans `sidebar-density-section.test.tsx` (offline → CTA disabled + message ; 409 → message non bloquant ; échec trigger → message). Suites densité : 10/10.
+
+**Divergences nom-de-fichier vs. story (assumées — implémentation pivot conservée, pas de renommage pour éviter le churn / code mort) :**
+- T1 : façade nommée `triggerDensityAnalysis` (pas `triggerDensity`).
+- T3 : colorisation pure dans `lib/map/density-features.ts` (pas `density-layer.ts`). Couleurs canon `{ high:#16a34a, medium:#d97706, critical:#dc2626 }`.
+- T4 : overlay dans `components/map/density-layer.tsx` (pas `density-overlay.tsx`) ; `GeoJSONSource` + `Layer` (API maplibre-react-native v11, pas `ShapeSource`/`LineLayer`).
+- T5 : légende **inline** (`LegendItem` dans `sidebar-density-section.tsx`), pas un fichier `density-legend.tsx` séparé. A11y daltonisme OK (libellé texte + détail, pas que la couleur).
+- T7 : namespace i18n `map.density.*` (pas `density.*`).
+- AC4 : état `error`/`stale` rendu via **hint texte inline + CTA Réessayer** (parité web `sidebar-density-section`, qui n'utilise pas `<ErrorBanner>` non plus) — `Alert.alert` jamais utilisé, relance possible. L'`<ErrorBanner>` de la route reste pour l'échec de chargement carte.
+
+**T9 (validation device Dev Client)** : non cochée — nécessite un build Dev Client (Guillaume). Tout est en JS (overlay = module MapLibre natif déjà installé) → validable au reload Metro, **pas de prebuild requis**.
+
 ### File List
+
+Modifiés (cette session) :
+- `apps/mobile/src/hooks/use-density.ts` — flags 409/erreur (`isTriggerConflict`/`isTriggerError`), `errorStatus()` structurel, `trigger` non-throwing.
+- `apps/mobile/src/hooks/use-density.test.ts` — mock façade `@/lib/api/density` (corrige la suite pré-existante qui ne loadait pas → +2 tests `densityPollInterval`).
+- `apps/mobile/src/components/map/sidebar-density-section.tsx` — prop `isOnline`, gate offline CTA + message, messages 409/échec trigger.
+- `apps/mobile/src/components/map/sidebar-density-section.test.tsx` — +3 tests (offline, 409, échec) + mock `@/lib/auth/client`.
+- `apps/mobile/src/app/(app)/map/[id].tsx` — passe `isOnline` à `SidebarDensitySection`.
+- `apps/mobile/src/lib/i18n/locales/fr.json` + `en.json` — `map.density.inProgress` / `offline` / `triggerFailed`.
+
+Pré-existants (livrés par le pivot MOB-4.3, vérifiés conformes aux AC) :
+- `apps/mobile/src/lib/api/density.ts` (T1), `apps/mobile/src/lib/map/density-features.ts` (+test) (T3), `apps/mobile/src/components/map/density-layer.tsx` (T4), `apps/mobile/src/components/map/density-category-dialog.tsx` + légende inline dans `sidebar-density-section.tsx` (T5).
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-13 | 0.1 | Création story MOB-4.4 (ready-for-dev) — trigger densité (`POST /density/analyze` 202 + sélection catégories + 409), polling `GET /density/:id/status` (3s), colorisation trace par tronçon 10 km (vert ≥2 / orange 1 / rouge 0) via `density-layer` (couleurs canon mirror), toggle densityColorEnabled, légende textuelle accessible daltonisme, états erreur/stale/offline. i18n FR/EN, tests. | bmad-create-story (Story Context Engineer) |
+| 2026-06-16 | 1.0 | Implémentation (status review). Story livrée à ~90 % par le pivot MOB-4.3 ; cette session comble les écarts AC : **AC1** mapping 409 → message « Analyse déjà en cours » non bloquant (`isTriggerConflict`/`isTriggerError` dans `use-density`, détection structurelle de `status`), **AC5** gate offline du trigger + message (`SidebarDensitySection` reçoit `isOnline`), i18n `map.density.inProgress/offline/triggerFailed` (FR+EN), +3 tests. Divergences nom-de-fichier vs. story documentées (impl pivot conservée). Corrige aussi un défaut pré-existant : `use-density.test.ts` ne loadait pas (chaîne auth) → mock façade ajouté (+2 tests). Gate : tsc 0 · lint 0 · jest 354/354 (58 suites) · expo export iOS OK. ⏳ Reste T9 validation device (Guillaume, pas de prebuild requis — tout JS). | bmad-dev-story (claude-opus-4-8) |

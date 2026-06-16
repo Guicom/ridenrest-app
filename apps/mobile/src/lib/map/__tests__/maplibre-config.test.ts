@@ -8,6 +8,7 @@ import {
   FIT_PADDING,
   getMapStyle,
   hasTrace,
+  isValidLngLat,
   safeFitPadding,
   TRACE_COLOR,
 } from '@/lib/map/maplibre-config';
@@ -137,6 +138,49 @@ describe('buildTraceFeatureCollection (ordre GeoJSON [lng, lat])', () => {
     ]);
     expect(fc.features).toHaveLength(0);
   });
+
+  // Régression crash natif SIGABRT (2026-06-16) : une coordonnée non finie (point GPX
+  // corrompu) faisait throw `mapbox::geojson` côté MapLibre Native → abort de l'app.
+  // Web (GL JS) tolérait. On filtre les points invalides AVANT de bâtir la LineString.
+  it('filtre les coordonnées non finies (null/NaN) au niveau du point', () => {
+    const fc = buildTraceFeatureCollection([
+      makeSegment('a', [
+        { lat: 45, lng: 5, distKm: 0 },
+        { lat: NaN, lng: 6, distKm: 1 }, // point corrompu → exclu
+        { lat: 47, lng: null as unknown as number, distKm: 2 }, // lng null → exclu
+        { lat: 48, lng: 8, distKm: 3 },
+      ]),
+    ]);
+    expect(fc.features).toHaveLength(1);
+    // Seuls les 2 points valides subsistent.
+    expect(fc.features[0].geometry.coordinates).toEqual([
+      [5, 45],
+      [8, 48],
+    ]);
+  });
+
+  it('exclut un segment qui retombe à < 2 points valides après filtrage', () => {
+    const fc = buildTraceFeatureCollection([
+      makeSegment('a', [
+        { lat: 45, lng: 5, distKm: 0 },
+        { lat: NaN, lng: NaN, distKm: 1 },
+      ]),
+    ]);
+    expect(fc.features).toHaveLength(0);
+  });
+});
+
+describe('isValidLngLat (garde anti-crash GeoJSON natif)', () => {
+  it('vrai uniquement pour deux nombres finis', () => {
+    expect(isValidLngLat(5, 45)).toBe(true);
+    expect(isValidLngLat(0, 0)).toBe(true);
+  });
+  it('faux pour null/undefined/NaN/Infinity', () => {
+    expect(isValidLngLat(null, 45)).toBe(false);
+    expect(isValidLngLat(5, undefined)).toBe(false);
+    expect(isValidLngLat(NaN, 45)).toBe(false);
+    expect(isValidLngLat(5, Infinity)).toBe(false);
+  });
 });
 
 describe('collectTraceWaypoints', () => {
@@ -149,6 +193,17 @@ describe('collectTraceWaypoints', () => {
       { lat: 45, lng: 5 },
       { lat: 46, lng: 6 },
     ]);
+  });
+
+  it('écarte les waypoints à coordonnées non finies (anti-crash bbox/natif)', () => {
+    const wp = collectTraceWaypoints([
+      makeSegment('a', [
+        { lat: 45, lng: 5, distKm: 0 },
+        { lat: NaN, lng: 6, distKm: 1 },
+        { lat: 46, lng: undefined as unknown as number, distKm: 2 },
+      ]),
+    ]);
+    expect(wp).toEqual([{ lat: 45, lng: 5 }]);
   });
 });
 

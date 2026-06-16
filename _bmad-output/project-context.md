@@ -712,6 +712,25 @@ Patterns durables issus de MOB-4.1 (vues carte/data). À suivre pour MOB-4.2→4
 - **Offline N1** : la trace/donnée reste affichable hors-ligne via la persistance TanStack Query (AsyncStorage, `gcTime` ≥ `maxAge` 24 h). Le fond de carte (tuiles), lui, peut être indisponible — dégradation acceptée MVP (bandeau non bloquant).
 - **Durcissement des params de route** : `const id = (rawId ?? '').trim()` avant tout usage — un `id` blanc (deep link `…/%20`) passe `!id` ET `Boolean(id)` et déclenche une requête malformée. Trimmer puis gater (`enabled: Boolean(id)`).
 
+### Carte MapLibre Native — GeoJSON à coordonnées finies OBLIGATOIRE (CRITIQUE)
+
+MapLibre **Native** parse la GeoJSON via `mapbox::geojson` (C++) qui **lève une exception
+C++ non rattrapée → `SIGABRT` (crash dur de l'app)** dès qu'une coordonnée est non
+numérique (`null`/`NaN`/`±Infinity`) — **un seul point GPX corrompu suffit**. MapLibre GL
+**JS** (web) tolère et ignore silencieusement → symptôme classique « **ok sur le web,
+crash sur iOS** » à l'ouverture de *certaines* aventures. Signature du crash report iOS :
+`__cxa_throw` → `MapLibre` → `-[MLRNGeoJSONSource setShape:]` → `std::terminate` → `abort`.
+
+- **Toute** coordonnée passée à un `<GeoJSONSource>` ou `<Marker lngLat>` DOIT être filtrée
+  par `isValidLngLat(lng, lat)` (`src/lib/map/maplibre-config.ts`) AVANT de bâtir la feature.
+- Filtrer **au niveau du point** (pas seulement « segment ≥ 2 waypoints »), puis re-vérifier
+  `coords.length >= 2` (une LineString peut retomber sous 2 points valides après filtrage).
+- Points de filtrage en place : `buildTraceFeatureCollection`, `collectTraceWaypoints`,
+  `useAdventureWaypoints` (alimente étapes/météo/corridor/marqueurs), `buildDensityColoredFeatures`,
+  `buildPoiFeatureCollection`. Tout nouveau builder GeoJSON doit suivre la même garde.
+- Diagnostic : les crash reports natifs iOS sont dans `~/Library/Logs/DiagnosticReports/*.ips`
+  (header + body JSON ; `faultingThread` → frames). (Régression réelle 2026-06-16.)
+
 ### Conventions mobile
 - Fichiers : kebab-case ; routes : `_layout.tsx`, `index.tsx`, `[id].tsx`.
 - Styling : `className="…"` NativeWind (Tailwind v3 syntaxe). Tokens via `@ridenrest/design-tokens`, jamais de couleur hardcodée.
@@ -733,4 +752,4 @@ Patterns durables issus de MOB-4.1 (vues carte/data). À suivre pour MOB-4.2→4
 - Garder ce fichier lean et focalisé sur les besoins des agents.
 - Mettre à jour quand la stack ou les patterns changent ; revoir périodiquement pour retirer les règles devenues évidentes.
 
-Last Updated: 2026-06-14
+Last Updated: 2026-06-16

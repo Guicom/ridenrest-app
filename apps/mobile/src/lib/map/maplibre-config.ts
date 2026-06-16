@@ -48,9 +48,25 @@ export function getMapStyle(colorScheme: 'light' | 'dark'): string {
   return colorScheme === 'dark' ? STYLE_URL_DARK : STYLE_URL_LIGHT;
 }
 
-/** Vrai si au moins un segment porte une trace exploitable (≥ 2 waypoints). */
+/**
+ * Vrai si `lng`/`lat` sont des nombres **finis** (ni `null`/`undefined`, ni `NaN`,
+ * ni `±Infinity`). CRITIQUE : MapLibre **Native** parse la GeoJSON via `mapbox::geojson`
+ * (C++) qui **lève une exception C++ non rattrapée → SIGABRT** sur une coordonnée non
+ * numérique (un point GPX corrompu suffit à faire crasher l'app entière). MapLibre GL JS
+ * (web) tolère et ignore silencieusement — d'où « ok sur le web, crash sur iOS ».
+ * Toute coordonnée passée à un `<GeoJSONSource>` DOIT d'abord passer ce filtre.
+ */
+export function isValidLngLat(lng: unknown, lat: unknown): lng is number {
+  return Number.isFinite(lng) && Number.isFinite(lat);
+}
+
+/** Vrai si au moins un segment porte une trace exploitable (≥ 2 waypoints valides). */
 export function hasTrace(segments: readonly MapSegmentData[] | undefined): boolean {
-  return !!segments?.some((s) => !!s.waypoints && s.waypoints.length >= 2);
+  return !!segments?.some(
+    (s) =>
+      !!s.waypoints &&
+      s.waypoints.filter((w) => isValidLngLat(w.lng, w.lat)).length >= 2,
+  );
 }
 
 /**
@@ -62,6 +78,7 @@ export function collectTraceWaypoints(
 ): { lat: number; lng: number }[] {
   return segments
     .flatMap((s) => s.waypoints ?? [])
+    .filter((w) => isValidLngLat(w.lng, w.lat))
     .map((w) => ({ lat: w.lat, lng: w.lng }));
 }
 
@@ -105,14 +122,21 @@ export function buildTraceFeatureCollection(
   return {
     type: 'FeatureCollection',
     features: segments
-      .filter((s) => !!s.waypoints && s.waypoints.length >= 2)
+      // Coordonnées **filtrées au point** (pas seulement par segment) : une seule
+      // coordonnée non finie dans la LineString fait throw `mapbox::geojson` côté
+      // natif → SIGABRT. On ne garde que les segments à ≥ 2 points VALIDES.
       .map((segment, idx) => ({
+        segment,
+        idx,
+        coordinates: (segment.waypoints ?? [])
+          .filter((w) => isValidLngLat(w.lng, w.lat))
+          .map((w) => [w.lng, w.lat] as [number, number]),
+      }))
+      .filter(({ coordinates }) => coordinates.length >= 2)
+      .map(({ segment, idx, coordinates }) => ({
         type: 'Feature' as const,
         properties: { segmentId: segment.id, segmentIndex: idx },
-        geometry: {
-          type: 'LineString' as const,
-          coordinates: segment.waypoints!.map((w) => [w.lng, w.lat]),
-        },
+        geometry: { type: 'LineString' as const, coordinates },
       })),
   };
 }

@@ -254,7 +254,10 @@
       "critical": "Critical area",
       "criticalDetail": "No accommodation / 10 km",
       "categoriesTitle": "Categories to analyze",
-      "launch": "Start analysis"
+      "launch": "Start analysis",
+      "inProgress": "Analysis already in progress",
+      "offline": "Density analysis unavailable offline",
+      "triggerFailed": "Couldn't start the analysis. Try again."
     }
   },
   "pois": {

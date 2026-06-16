@@ -46,11 +46,14 @@ function LegendItem({
 export interface SidebarDensitySectionProps {
   adventureId: string;
   allSegmentsParsed: boolean;
+  /** Hors-ligne : le déclenchement d'une nouvelle analyse est désactivé (AC5). */
+  isOnline: boolean;
 }
 
 export function SidebarDensitySection({
   adventureId,
   allSegmentsParsed,
+  isOnline,
 }: SidebarDensitySectionProps) {
   const { t } = useTranslation();
   // Replié par défaut (seul « Recherche » est ouvert au départ).
@@ -64,6 +67,8 @@ export function SidebarDensitySection({
     densityProgress,
     densityStale,
     isTriggering,
+    isTriggerConflict,
+    isTriggerError,
     trigger,
   } = useDensity(adventureId);
 
@@ -109,8 +114,8 @@ export function SidebarDensitySection({
               </Text>
               <Button
                 size="lg"
-                disabled={!allSegmentsParsed || isTriggering}
-                onPress={() => setDialogOpen(true)}
+                disabled={!isOnline || !allSegmentsParsed || isTriggering}
+                onPress={isOnline ? () => setDialogOpen(true) : undefined}
                 label={
                   densityStatus === 'error'
                     ? t('common.retry')
@@ -118,7 +123,25 @@ export function SidebarDensitySection({
                 }
                 testID="density-cta-btn"
               />
+              {!isOnline ? (
+                <Text className="text-xs font-montserrat text-text-muted">
+                  {t('map.density.offline')}
+                </Text>
+              ) : null}
             </>
+          ) : null}
+
+          {/* 409 — analyse déjà en cours : message dédié non bloquant (AC1). */}
+          {isTriggerConflict ? (
+            <Text className="text-xs font-montserrat text-text-muted">
+              {t('map.density.inProgress')}
+            </Text>
+          ) : null}
+          {/* Échec du lancement (hors 409) : message non bloquant + relance via le CTA. */}
+          {isTriggerError ? (
+            <Text className="text-xs font-montserrat text-destructive">
+              {t('map.density.triggerFailed')}
+            </Text>
           ) : null}
 
           {isAnalyzing ? (

@@ -1,5 +1,7 @@
 import type { CoverageGapSummary, MapSegmentData } from '@ridenrest/shared';
 
+import { isValidLngLat } from '@/lib/map/maplibre-config';
+
 // Construction des features de colorisation densité — port iso de
 // `buildDensityColoredFeatures` (web map-canvas). La trace est découpée en tronçons de
 // 10 km ; chaque tronçon prend la couleur de son `coverageGap` (sinon « high » = vert).
@@ -27,7 +29,10 @@ export function buildDensityColoredFeatures(
     for (let fromKm = 0; fromKm < totalKm; fromKm += CHUNK_KM) {
       const toKm = Math.min(fromKm + CHUNK_KM, totalKm);
       const chunk = segment.waypoints.filter(
-        (wp) => wp.distKm >= fromKm && wp.distKm <= toKm,
+        (wp) =>
+          wp.distKm >= fromKm &&
+          wp.distKm <= toKm &&
+          isValidLngLat(wp.lng, wp.lat),
       );
       if (chunk.length < 2) continue;
 

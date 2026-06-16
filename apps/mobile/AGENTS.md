@@ -2,6 +2,22 @@
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing any code.
 
+## MapLibre Native : GeoJSON à coordonnées finies OBLIGATOIRE (CRITIQUE)
+
+MapLibre **Native** parse la GeoJSON via `mapbox::geojson` (C++) qui **lève une
+exception C++ non rattrapée → `SIGABRT` (crash dur de l'app)** dès qu'une coordonnée
+est non numérique (`null`/`NaN`/`±Infinity`) — un seul point GPX corrompu suffit.
+MapLibre GL **JS** (web) tolère et ignore silencieusement → symptôme classique
+« ok sur le web, **crash sur iOS** » à l'ouverture de *certaines* aventures
+(signature : `__cxa_throw` → `MapLibre` → `-[MLRNGeoJSONSource setShape:]`).
+
+→ **Toute** coordonnée passée à un `<GeoJSONSource>` ou `<Marker lngLat>` DOIT être
+filtrée par `isValidLngLat(lng, lat)` (`src/lib/map/maplibre-config.ts`) AVANT de
+bâtir la feature. Filtrer **au niveau du point** (pas seulement « segment ≥ 2 wp »),
+puis re-vérifier `coords.length >= 2`. Points de filtrage : `buildTraceFeatureCollection`,
+`collectTraceWaypoints`, `useAdventureWaypoints` (alimente étapes/météo/corridor/marqueurs),
+`buildDensityColoredFeatures`, `buildPoiFeatureCollection`. (Régression réelle 2026-06-16.)
+
 ## Toolchain de build natif (CRITIQUE)
 
 **Expo SDK 56 exige Xcode 26.4** (et iOS deployment target **16.4**) pour compiler le

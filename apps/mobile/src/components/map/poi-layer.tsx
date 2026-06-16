@@ -10,6 +10,7 @@ import { POI_CLUSTER_COLOR, type MapLayer, type Poi } from '@ridenrest/shared';
 import { useMemo, useRef } from 'react';
 
 import { ALL_MAP_LAYERS } from '@/hooks/use-poi-layers';
+import { isValidLngLat } from '@/lib/map/maplibre-config';
 import {
   buildCategoryIconExpression,
   PIN_IMAGE_SOURCES,
@@ -42,16 +43,20 @@ export function buildPoiFeatureCollection(
 ): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: 'FeatureCollection',
-    features: pois.map((poi) => ({
-      type: 'Feature' as const,
-      properties: {
-        id: poi.id,
-        externalId: poi.externalId,
-        category: poi.category,
-        name: poi.name,
-      },
-      geometry: { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
-    })),
+    // Filtre les POIs à coordonnées non finies : MapLibre Native throw (SIGABRT) sur une
+    // coordonnée non numérique dans un `<GeoJSONSource>`. Cf. `isValidLngLat`.
+    features: pois
+      .filter((poi) => isValidLngLat(poi.lng, poi.lat))
+      .map((poi) => ({
+        type: 'Feature' as const,
+        properties: {
+          id: poi.id,
+          externalId: poi.externalId,
+          category: poi.category,
+          name: poi.name,
+        },
+        geometry: { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
+      })),
   };
 }
 
