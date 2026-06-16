@@ -4,6 +4,7 @@ import {
   Layer,
   Map,
   type CameraRef,
+  type LngLatBounds,
   type MapRef,
 } from '@maplibre/maplibre-react-native';
 import type { MapSegmentData } from '@ridenrest/shared';
@@ -46,6 +47,12 @@ export interface MapCanvasHandle {
   getCamera: () => CameraRef | null;
   /** Instance carte (projection/requête) — null tant que non montée. */
   getMap: () => MapRef | null;
+  /**
+   * Fit caméra sur un bbox arbitraire (zoom corridor après recherche, parité web
+   * `fitToCorridorRange`). No-op si `bounds` est `null` ou si la carte n'est pas
+   * encore mesurée (le padding clampé serait nul → fit invalide).
+   */
+  fitToBounds: (bounds: LngLatBounds | null) => void;
 }
 
 export interface MapCanvasProps {
@@ -101,8 +108,17 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
       () => ({
         getCamera: () => cameraRef.current,
         getMap: () => mapRef.current,
+        fitToBounds: (bounds: LngLatBounds | null) => {
+          if (!bounds) return;
+          if (mapSize.width <= 0 || mapSize.height <= 0) return;
+          const padding = safeFitPadding(mapSize.width, mapSize.height);
+          cameraRef.current?.fitBounds(bounds, {
+            padding: { top: padding, right: padding, bottom: padding, left: padding },
+            duration: CAMERA_ANIMATION_MS,
+          });
+        },
       }),
-      [],
+      [mapSize.width, mapSize.height],
     );
 
     const trace = useMemo(

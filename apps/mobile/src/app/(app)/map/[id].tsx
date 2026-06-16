@@ -33,7 +33,12 @@ import { usePois } from '@/hooks/use-pois';
 import { useProfile } from '@/hooks/use-profile';
 import { useStages } from '@/hooks/use-stages';
 import { useWeather } from '@/hooks/use-weather';
-import { hasTrace } from '@/lib/map/maplibre-config';
+import {
+  collectTraceWaypoints,
+  computeCorridorBounds,
+  computeTraceBounds,
+  hasTrace,
+} from '@/lib/map/maplibre-config';
 import { useMapStore } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
 
@@ -200,6 +205,20 @@ export default function MapScreen() {
     });
     return unsub;
   }, []);
+
+  // Zoom auto sur le corridor après une recherche committée (parité web
+  // `fitToCorridorRange`) : on détecte la transition `isFetching` true→false. Fallback
+  // sur la trace entière si la plage [fromKm, toKm] contient moins de 2 waypoints.
+  const prevFetchingRef = useRef(isFetching);
+  useEffect(() => {
+    if (searchCommitted && prevFetchingRef.current && !isFetching) {
+      const bounds =
+        computeCorridorBounds(waypoints, fromKm, toKm) ??
+        computeTraceBounds(collectTraceWaypoints(segments));
+      mapRef.current?.fitToBounds(bounds);
+    }
+    prevFetchingRef.current = isFetching;
+  }, [isFetching, searchCommitted, waypoints, fromKm, toKm, segments]);
 
   const handleMapPress = useCallback(
     (lngLat: [number, number]) => {

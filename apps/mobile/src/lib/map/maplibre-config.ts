@@ -80,6 +80,21 @@ export function computeTraceBounds(
 }
 
 /**
+ * Bbox des waypoints (km **cumulés**) dans `[fromKm, toKm]` — pour le zoom corridor
+ * après recherche (parité web `fitToCorridorRange`). `null` si moins de 2 points dans
+ * la plage → l'appelant retombe alors sur la trace entière (`computeTraceBounds`).
+ */
+export function computeCorridorBounds(
+  waypoints: readonly { lat: number; lng: number; distKm: number }[],
+  fromKm: number,
+  toKm: number,
+): LngLatBounds | null {
+  const inRange = waypoints.filter((w) => w.distKm >= fromKm && w.distKm <= toKm);
+  if (inRange.length < 2) return null;
+  return computeTraceBounds(inRange);
+}
+
+/**
  * Construit la `FeatureCollection` GeoJSON de la trace : une `LineString` par
  * segment ayant ≥ 2 waypoints (parité web `buildGeoJsonFeatures`). Coordonnées en
  * **ordre GeoJSON `[lng, lat]`** (jamais `[lat, lng]`).

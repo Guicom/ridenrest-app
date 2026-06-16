@@ -3,6 +3,7 @@ import type { MapSegmentData } from '@ridenrest/shared';
 import {
   buildTraceFeatureCollection,
   collectTraceWaypoints,
+  computeCorridorBounds,
   computeTraceBounds,
   FIT_PADDING,
   getMapStyle,
@@ -81,6 +82,35 @@ describe('computeTraceBounds', () => {
     // Le buffer élargit la bbox au-delà des points bruts.
     expect(west).toBeLessThan(5);
     expect(east).toBeGreaterThan(6);
+  });
+});
+
+describe('computeCorridorBounds (zoom corridor après recherche)', () => {
+  const wps = [
+    { lat: 45.0, lng: 5.0, distKm: 0 },
+    { lat: 45.1, lng: 5.1, distKm: 10 },
+    { lat: 45.2, lng: 5.2, distKm: 20 },
+    { lat: 45.3, lng: 5.3, distKm: 30 },
+    { lat: 45.4, lng: 5.4, distKm: 40 },
+  ];
+
+  it('renvoie un bbox restreint aux waypoints dans [fromKm, toKm]', () => {
+    const bounds = computeCorridorBounds(wps, 10, 20);
+    expect(bounds).not.toBeNull();
+    const [west, south, east, north] = bounds!;
+    // Seuls les points distKm 10 et 20 (lng 5.1..5.2, lat 45.1..45.2) + buffer.
+    expect(west).toBeLessThan(5.1);
+    expect(east).toBeGreaterThan(5.2);
+    expect(south).toBeLessThan(45.1);
+    expect(north).toBeGreaterThan(45.2);
+    // La plage exclut les extrémités (lng 5.0 / 5.4) — bbox plus serré que la trace entière.
+    expect(west).toBeGreaterThan(computeTraceBounds(wps)![0]);
+  });
+
+  it('renvoie null si moins de 2 waypoints dans la plage (→ fallback trace)', () => {
+    expect(computeCorridorBounds(wps, 12, 18)).toBeNull(); // aucun point
+    expect(computeCorridorBounds(wps, 20, 25)).toBeNull(); // un seul point (distKm 20)
+    expect(computeCorridorBounds([], 0, 100)).toBeNull();
   });
 });
 

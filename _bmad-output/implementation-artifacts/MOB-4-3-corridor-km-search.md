@@ -171,6 +171,10 @@ claude-opus-4-8[1m] (Amelia / bmad-dev-story)
 - **T6** — i18n `pois.search.*` FR/EN (parité, zéro chaîne en dur).
 - **T7** — tests Jest/RNTL co-localisés. **Gate verte** : 313/313 tests (48 suites), tsc 0, lint 0, `expo export` iOS OK.
 - **T8** — ⏳ validation device (Dev Client) : reste manuel Guillaume (MapLibre/SVG natifs → rebuild requis ; cf. AGENTS.md).
+- **Post-device (2026-06-16, remonté Guillaume)** — deux correctifs de parité issus du test device :
+  - **Zoom corridor après recherche** (parité web `fitToCorridorRange`, absent en mobile) : helper pur `computeCorridorBounds(waypoints, fromKm, toKm)` (+ fallback trace entière), méthode impérative `MapCanvasHandle.fitToBounds()` (padding clampé `safeFitPadding`), effet route détectant la transition `isFetching` true→false sous `searchCommitted` → fit caméra sur le corridor. Tests `computeCorridorBounds` ajoutés.
+  - **z-index corridor** : la surbrillance bleue masquait clusters/gouttes POI (le calque se montait tardivement au commit → empilé au sommet). Fix déterministe : `<Layer afterId="trace-line">` → ancré juste au-dessus de la trace de base, donc toujours **sous** les calques POI.
+  - ⚠️ **Dépendance backend hors-périmètre (cross-ref, PAS dans le scope MOB-4.3)** : les résultats POI ne s'affichaient pas (web ET mobile) à cause d'un bug serveur — le cache `accommodations_cache` ne se régénérait jamais après expiration du TTL (gardes de dédup `googlePoiExistsInSegment`/`hasNearbyPoi` ignoraient l'expiry). Corrigé dans `apps/api/src/pois/pois.repository.ts` (les deux gardes filtrent désormais `expires_at >= now()` → self-heal via l'upsert qui rafraîchit `expires_at`). **Commit séparé**, revu indépendamment (bugfix backend epic 4, pas MOB-4.3). Vérif manuelle : requêtes DB confirmant des segments à `live=0` malgré des centaines de POIs Google expirés. Note : le repository n'a pas de test unitaire (gap pré-existant à l'échelle du projet — aucun mock drizzle).
 
 ### File List
 
@@ -190,14 +194,20 @@ claude-opus-4-8[1m] (Amelia / bmad-dev-story)
 - `apps/mobile/src/__tests__/map-screen.test.tsx` (test gate route)
 - `apps/mobile/src/components/ui/icon.tsx` (`SearchIcon`)
 - `apps/mobile/src/lib/i18n/locales/fr.json` + `en.json` (bloc `pois.search.*`)
-- `apps/mobile/src/lib/map/maplibre-config.ts` (helper pur `safeFitPadding` — fix fit caméra T8)
-- `apps/mobile/src/lib/map/__tests__/maplibre-config.test.ts` (tests `safeFitPadding`)
-- `apps/mobile/src/components/map/map-canvas.tsx` (gate fit sur `mapSize`/`onLayout` + padding clampé — fix fit caméra T8)
+- `apps/mobile/src/lib/map/maplibre-config.ts` (helper pur `safeFitPadding` — fix fit caméra T8 ; + `computeCorridorBounds` — zoom corridor post-recherche)
+- `apps/mobile/src/lib/map/__tests__/maplibre-config.test.ts` (tests `safeFitPadding` + `computeCorridorBounds`)
+- `apps/mobile/src/components/map/map-canvas.tsx` (gate fit sur `mapSize`/`onLayout` + padding clampé — fix fit caméra T8 ; + `MapCanvasHandle.fitToBounds` — zoom corridor)
+- `apps/mobile/src/components/map/corridor-highlight-layer.tsx` (`afterId="trace-line"` — fix z-index corridor sous les POI)
+- `apps/mobile/src/app/(app)/map/[id].tsx` (état corridor lifté, slider + feedback ; + effet auto-zoom corridor sur transition `isFetching`)
+
+**Hors-périmètre MOB-4.3 (cross-ref, commit + review séparés) :**
+- `apps/api/src/pois/pois.repository.ts` — bugfix backend epic 4 : gardes de dédup POI filtrées sur `expires_at >= now()` (self-heal du cache après expiration TTL). Sans test (gap repository pré-existant projet-wide).
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
+| 2026-06-16 | 2.5 | **Correctifs post-device (remonté Guillaume)** : (1) **zoom corridor après recherche** (parité web `fitToCorridorRange`, manquait en mobile) — helper pur `computeCorridorBounds` + fallback trace, `MapCanvasHandle.fitToBounds`, effet transition `isFetching` true→false sous `searchCommitted` ; (2) **z-index corridor** — surbrillance bleue masquait clusters/gouttes POI (calque monté tardivement → sommet) → `<Layer afterId="trace-line">` (ancré sous les POI). **Cross-ref hors-périmètre** : les POI ne s'affichaient pas (web+mobile) à cause d'un bug serveur de cache (`pois.repository.ts` — gardes de dédup ignoraient l'expiry → cache jamais régénéré post-TTL) ; corrigé en **commit backend séparé** (epic 4), revu indépendamment. Gate mobile : 349/349 tests (+2), tsc 0, lint 0, eslint 0. | claude-opus-4-8[1m] (Amelia) |
 | 2026-06-13 | 0.1 | Création story MOB-4.3 (ready-for-dev) — slider plage km double poignée (cap 30 km), gate `searchCommitted` (recherche au clic uniquement), `use-pois` finalisé (fromKm/toKm + enabled + isEmpty), overlay chargement scopé carte, bannière « Aucun résultat »/erreur/offline, mapping km cumulés → segment(s). `GET /pois` corridor réutilisé. i18n FR/EN, tests. | bmad-create-story (Story Context Engineer) |
 | 2026-06-14 | 1.0 | Implémentation T1–T7 (status review). Primitive `slider` range maison (PanResponder, `clampRange` pur, a11y adjustable) + stories ; `search-range-slider` (cap 30 km, gate, offline) ; `use-pois` finalisé (`resolveSegmentRanges` AC5, `enabled`/`isEmpty`/`isFetching`) ; `map-search-feedback` (overlay/aucun résultat/erreur) ; route câblée (état lifté, désélection render-phase) ; i18n `pois.search.*` FR/EN ; `SearchIcon`. **Doc Sync** : `searchRangeInteracted` non lifté (sans consommateur mobile MVP). Gate : 313/313 tests, tsc 0, lint 0, expo export iOS OK. ⏳ T8 device validation manuelle (Guillaume). | claude-opus-4-8[1m] (Amelia) |
 | 2026-06-14 | 1.1 | Fix remonté en validation device T8 : erreur MapLibre Native « padding is greater than map's height or width » au fit auto de la trace (`fitBounds` sur `onDidFinishLoadingStyle` avant que la surface native ait sa taille). Helper pur `safeFitPadding` (clampe le padding à la taille rendue) + gate du fit sur `mapSize` mesuré via `onLayout` dans `map-canvas.tsx`. Gate : 318/318 tests (+5), tsc 0, lint 0, expo export iOS OK. | claude-opus-4-8[1m] (Amelia) |

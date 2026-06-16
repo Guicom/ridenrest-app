@@ -38,6 +38,11 @@ export function CorridorHighlightLayer({
       <Layer
         id="corridor-highlight"
         type="line"
+        // Ancré juste AU-DESSUS de la trace de base (`trace-line`, cf. map-canvas) →
+        // reste SOUS les calques POI (clusters/pins), montés au sommet. Sans cet ancrage,
+        // le corridor se monte tardivement (au commit de recherche) et s'empile au-dessus
+        // des POIs → la ligne bleue masquait clusters et gouttes (z-index bug).
+        afterId="trace-line"
         layout={{ 'line-cap': 'round', 'line-join': 'round' }}
         paint={{
           'line-color': CORRIDOR_COLOR,
