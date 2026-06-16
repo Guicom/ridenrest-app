@@ -141,10 +141,11 @@ export class PoisRepository {
   async hasNearbyPoi(lat: number, lng: number, radiusM: number, segmentId: string): Promise<boolean> {
     // Dedup only against LIVE POIs — an expired neighbour must not suppress the
     // insertion of a fresh POI (else the area stays empty after the TTL lapses).
+    const now = new Date()
     const result = await db.execute(sql`
       SELECT 1 FROM accommodations_cache
       WHERE segment_id = ${segmentId}
-        AND expires_at >= now()
+        AND expires_at >= ${now}
         AND ST_DWithin(
           ST_SetSRID(ST_MakePoint(accommodations_cache.lng, accommodations_cache.lat), 4326)::geography,
           ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
@@ -249,7 +250,8 @@ export class PoisRepository {
       })
   }
 
-  /** Find POI name and coordinates by externalId + segmentId for Google Details lookup. */
+  /** Find POI name and coordinates by externalId + segmentId for Google Details lookup.
+   * No expiry filter — used for geo coordinates only; lat/lng are stable across TTL boundaries. */
   async findByExternalId(
     externalId: string,
     segmentId: string,
