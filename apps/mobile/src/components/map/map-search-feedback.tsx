@@ -1,7 +1,9 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
+import { XIcon } from '@/components/ui/icon';
 import { useTranslation } from '@/lib/i18n';
 
 // Retours de recherche corridor (MOB-4.3 / T4, AC2-4). Composant **présentiel pur**
@@ -9,7 +11,7 @@ import { useTranslation } from '@/lib/i18n';
 // (jamais plein écran bloquant, jamais `Alert.alert`).
 //
 // Précédence : `isFetching` (overlay) → `isError` (ErrorBanner + relance) →
-// `isEmpty` (bannière « Aucun résultat »). Un seul retour visible à la fois.
+// `isEmpty` (bannière « Aucun résultat », dismissable AC3).
 
 export interface MapSearchFeedbackProps {
   /** Requête réseau en vol → overlay de chargement. */
@@ -29,6 +31,12 @@ export function MapSearchFeedback({
   onRetry,
 }: MapSearchFeedbackProps) {
   const { t } = useTranslation();
+  const [dismissed, setDismissed] = useState(false);
+  const [lastIsEmpty, setLastIsEmpty] = useState(isEmpty);
+  if (isEmpty !== lastIsEmpty) {
+    setLastIsEmpty(isEmpty);
+    if (isEmpty) setDismissed(false);
+  }
 
   // Overlay de chargement scopé carte — voile léger + indicateur, non bloquant.
   if (isFetching) {
@@ -73,21 +81,29 @@ export function MapSearchFeedback({
     );
   }
 
-  // « Aucun résultat » — bannière scopée carte, distincte d'une erreur (AC3).
-  if (isEmpty) {
+  // « Aucun résultat » — bannière scopée carte, distincte d'une erreur, dismissable (AC3).
+  if (isEmpty && !dismissed) {
     return (
       <View
-        pointerEvents="none"
+        pointerEvents="box-none"
         style={{ bottom: 96 }}
         className="absolute left-4 right-4 z-30 items-center"
       >
         <View
           accessibilityRole="alert"
-          className="rounded-lg bg-orange-500/90 px-4 py-2"
+          className="flex-row items-center gap-2 rounded-lg bg-orange-500/90 px-4 py-2"
         >
-          <Text className="text-center text-sm font-montserrat text-white">
+          <Text className="flex-1 text-center text-sm font-montserrat text-white">
             {t('pois.search.noResults')}
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('pois.search.dismissNoResults')}
+            onPress={() => setDismissed(true)}
+            hitSlop={8}
+          >
+            <XIcon size={16} className="text-white" />
+          </Pressable>
         </View>
       </View>
     );

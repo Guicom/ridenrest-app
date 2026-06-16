@@ -520,7 +520,8 @@ Both `fitToTrace()` functions accept an optional `animate = false` parameter —
 In `map-view.tsx`, a `useEffect` detects the `isPending: true → false` transition (via `prevIsPendingRef`) while `searchCommitted === true`, then calls `mapRef.current?.fitToCorridorRange(mapFromKm, mapToKm, readySegments)`.
 
 - `readySegments` is wrapped in `useMemo` (not computed inline) to avoid spurious re-renders
-- `prevIsPendingRef` MUST be reset to `false` in the effect cleanup (React Strict Mode safety)
+- `prevIsPendingRef` is reset to `false` in the effect cleanup (React Strict Mode safety) — **ON WEB ONLY**, where the effect deps are limited to `[isPending, searchCommitted]`, so the cleanup runs only on unmount / those two transitions.
+- ⚠️ **Do NOT copy the cleanup-reset to an effect whose deps include frequently-changing values** (e.g. the mobile auto-zoom in `map/[id].tsx` depends on `[isFetching, searchCommitted, waypoints, fromKm, toKm, segments]`). There, React runs the cleanup **before every re-execution**, resetting `prev` to `false` right before the `true→false` transition check → the zoom never fires. On mobile the transition-detection ref is updated at the **end of the effect body** with **no cleanup reset**. (Regression introduced 2026-06-16 by a code review mechanically applying this web pattern; reverted.)
 - The auto-zoom fires **once per search commit**, not on re-renders
 
 #### MapSearchOverlay — Loading indicator

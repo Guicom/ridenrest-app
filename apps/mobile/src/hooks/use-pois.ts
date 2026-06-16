@@ -276,7 +276,7 @@ export function usePois({
   // Bannière « Aucun résultat » (AC3) : recherche committée terminée (succès réseau)
   // sans aucun POI. Hors-ligne (queries `enabled:false`) `isSuccess` est faux → pas de
   // bannière (on retombe sur le message offline / le cache). Distinct d'une erreur.
-  const isEmpty = enabled && combined.isSuccess && pois.length === 0;
+  const isEmpty = Boolean(enabled && combined.isSuccess && pois.length === 0);
 
   return { ...combined, pois, poisByLayer, isEmpty };
 }

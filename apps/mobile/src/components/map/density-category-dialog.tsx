@@ -34,6 +34,12 @@ export function DensityCategoryDialog({
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(DENSITY_ACCOMMODATION_CATEGORIES),
   );
+  const [lastOpen, setLastOpen] = useState(open);
+  if (open && !lastOpen) {
+    setLastOpen(true);
+    setSelected(new Set(DENSITY_ACCOMMODATION_CATEGORIES));
+  }
+  if (!open && lastOpen) setLastOpen(false);
 
   const toggle = (type: string) =>
     setSelected((prev) => {

@@ -294,9 +294,10 @@
     "search": {
       "range": "km {{from}} → km {{to}}",
       "button": "Rechercher",
-      "capHint": "{{value}} km · max 30",
+      "capHint": "{{value}} km · max 50",
       "loading": "Recherche en cours…",
       "noResults": "Aucun POI dans cette plage — élargissez ou déplacez la zone",
+      "dismissNoResults": "Fermer",
       "error": "Échec de la recherche",
       "offline": "Recherche indisponible hors-ligne",
       "fromHandleA11y": "Borne de départ (km)",

@@ -206,6 +206,14 @@ export default function MapScreen() {
     return unsub;
   }, []);
 
+  // Reset du store corridor au démontage — évite l'auto-search lors d'une re-navigation
+  // vers une autre aventure (AC1 : recherche uniquement au clic explicite).
+  useEffect(() => {
+    return () => {
+      useMapStore.setState({ searchCommitted: false, searchRangeInteracted: false, fromKm: 0, toKm: 15 });
+    };
+  }, []);
+
   // Zoom auto sur le corridor après une recherche committée (parité web
   // `fitToCorridorRange`) : on détecte la transition `isFetching` true→false. Fallback
   // sur la trace entière si la plage [fromKm, toKm] contient moins de 2 waypoints.
@@ -218,6 +226,10 @@ export default function MapScreen() {
       mapRef.current?.fitToBounds(bounds);
     }
     prevFetchingRef.current = isFetching;
+    // ⚠️ PAS de cleanup `prevFetchingRef.current = false` ici : l'effet dépend de
+    // `waypoints/fromKm/toKm/segments`, donc se ré-exécute souvent. Un reset en cleanup
+    // tournerait AVANT chaque ré-exécution → `prev` serait remis à false juste avant la
+    // détection de transition → le zoom ne partirait jamais (régression code review).
   }, [isFetching, searchCommitted, waypoints, fromKm, toKm, segments]);
 
   const handleMapPress = useCallback(

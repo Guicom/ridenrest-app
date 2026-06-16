@@ -1,5 +1,18 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-4-3-corridor-km-search (2026-06-16)
+
+- **`RangeSlider` PanResponder recréé mid-drag via `useMemo`** : même bug que `Slider` v2.4 (fix documenté changelog) — `useMemo([low, high, …])` recrée le responder en cours de geste. Dormant : RangeSlider non utilisé en UX live (remplacé par Slider+stepper). À corriger avant toute réutilisation via `useState(() => PanResponder.create(…))` + latest-ref pattern. [apps/mobile/src/components/ui/slider.tsx]
+- **Auto-zoom null no-op silencieux** : quand `computeCorridorBounds` ET `computeTraceBounds` retournent tous deux `null`, `fitToBounds(null)` est appelé sans feedback utilisateur. Cas extrême (trace vide ou segment 0 waypoints). [apps/mobile/src/app/(app)/map/[id].tsx:~215]
+- **`PlanningSidebar` animation dégradée sur rotation** : `Animated.Value` initialisé avec la largeur du montage initial ; rotation en état fermé → position off-screen légèrement décalée. Cosmétique. [apps/mobile/src/components/map/planning-sidebar.tsx:~1960]
+- **`useWeather` stale closure** : `readySegments[idx]` dans le callback `combine` peut référencer le mauvais segment pendant la transition segment pending→ready. Race fringe, impact 1-2 frames max. [apps/mobile/src/hooks/use-weather.ts:~5667]
+- **`hasNearbyPoi` timezone SQL** : raw `sql` tag utilise `new Date()` (JS UTC) ; cohérent si colonne `timestamptz`, risque latent si `timestamp` sans TZ. [apps/api/src/pois/pois.repository.ts:~217]
+- **`StageDialog` speed null quand égal au défaut** : si l'utilisateur saisit exactement `defaultSpeedKmh`, valeur envoyée comme `null`. Parité web intentionnelle, mais contre-intuitif. [apps/mobile/src/components/map/stage-dialog.tsx:~3729]
+- **`Slider` latest ref useLayoutEffect** : `useEffect` sans dépendances pour la latest ref est asynchrone (après paint) → fenêtre théorique de stale ref. `useLayoutEffect` éliminerait ce risque. [apps/mobile/src/components/ui/slider.tsx:~5898]
+- **Clés i18n `fromHandleA11y`/`toHandleA11y` mortes** : définies pour `RangeSlider` (non utilisé en UX), non consommées par `SearchRangeControl`. À supprimer ou réutiliser si `RangeSlider` revient. [fr.json, en.json]
+- **Dédup multi-segments boundary POIs** : `dedupePois` via `poi.id ?? poi.externalId` — deux queries sur segments adjacents peuvent éjecter un POI de frontière avec le même `externalId`. Parité web, fréquence légèrement accrue avec `resolveSegmentRanges`. [apps/mobile/src/hooks/use-pois.ts:~112]
+- **`computeCorridorBounds` segment dégénéré** : 1 seul waypoint dans la plage → `null`, fallback trace complète. Comportement acceptable, même classe que `computeTraceBounds` déjà différé en MOB-4.1. [apps/mobile/src/lib/map/maplibre-config.ts]
+
 ## Deferred from: code review of MOB-4-2 (2026-06-14)
 
 - **`RECENTER_OFFSET_Y = 150` vs. spec web `offset: [0, 100]`** : valeur intentionnellement tunable pour la validation device (T10). Ajuster si la popin masque trop/pas assez le pin sur device réel. [`poi-popup.tsx:41`]

@@ -193,6 +193,13 @@ export function SearchRangeControl({
   const [rangeKm, setRangeKm] = useState(() => toKm - fromKm);
   const [rangeInput, setRangeInput] = useState(() => String(toKm - fromKm));
 
+  // Sync rangeKm si le store est modifié externalement (render-phase derived state).
+  const storeRange = toKm - fromKm;
+  if (storeRange > 0 && storeRange !== rangeKm) {
+    setRangeKm(storeRange);
+    setRangeInput(String(storeRange));
+  }
+
   const selectedStage = useMemo(
     () =>
       selectedStageId && stages
@@ -264,7 +271,7 @@ export function SearchRangeControl({
       ? Math.round(totalDistanceKm - stageEndKm)
       : Math.round(totalDistanceKm);
 
-  const searchDisabled = isOnline && (fromKm >= toKm || totalDistanceKm === 0);
+  const searchDisabled = fromKm >= toKm || totalDistanceKm === 0;
 
   return (
     <Card>

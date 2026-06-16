@@ -294,9 +294,10 @@
     "search": {
       "range": "km {{from}} → km {{to}}",
       "button": "Search",
-      "capHint": "{{value}} km · max 30",
+      "capHint": "{{value}} km · max 50",
       "loading": "Searching…",
       "noResults": "No POI in this range — widen or move the area",
+      "dismissNoResults": "Dismiss",
       "error": "Search failed",
       "offline": "Search unavailable offline",
       "fromHandleA11y": "Start bound (km)",

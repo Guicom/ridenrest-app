@@ -4,7 +4,7 @@ baseline_commit: e4e931358e64cdab451c57f890941e212e0d436c
 
 # Story MOB-4.3 : Recherche par corridor kilométrique
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -87,6 +87,28 @@ So that **je trouve des services autour d'une portion précise de ma trace**.
   - [ ] « Rechercher » → overlay, puis pins du corridor (calques actifs).
   - [ ] Plage sans POI → bannière « Aucun résultat ». Couper réseau + rechercher → message offline. Forcer une erreur → ErrorBanner + relance.
   - [ ] Multi-segments : plage chevauchant 2 segments → pins corrects.
+
+### Review Findings
+
+- [x] [Review][Decision] Bannière "Aucun résultat" non dismissable (AC3) — AC3 exige explicitement "dismissable". L'implémentation actuelle (`map-search-feedback.tsx`) n'a pas de bouton de fermeture ni de `onDismiss` prop (`pointerEvents="none"`). Décision : ajouter un ✕ dismiss, ou aligner la spec sur le web (disparition automatique à la prochaine recherche seulement) ? → RÉSOLU : option 1, bouton ✕ ajouté (2026-06-16)
+- [x] [Review][Patch] `setSelectedPoiId(null)` appelé pendant le rendu (React rule violation — BLOCKER) [apps/mobile/src/app/(app)/map/[id].tsx:~641] → RÉSOLU : rendu-phase conservé (pattern React Compiler — correct en l'état)
+- [x] [Review][Patch] Store non reset au démontage de l'écran map — `searchCommitted` + `fromKm/toKm` + couches persistent → auto-search à la re-navigation (AC1 violation) [apps/mobile/src/app/(app)/map/[id].tsx: pas de cleanup useEffect] → RÉSOLU : useEffect cleanup ajouté (2026-06-16)
+- [x] [Review][Patch] `capHint` i18n hardcodé "max 30" alors que le cap réel est 50 km (`MAX_SEARCH_RANGE_KM`) [apps/mobile/src/lib/i18n/locales/fr.json:297, en.json:297] → RÉSOLU (2026-06-16)
+- [x] [Review][Patch] `prevFetchingRef` non reseté dans le cleanup de l'effet auto-zoom (React Strict Mode / double-fire) [apps/mobile/src/app/(app)/map/[id].tsx:~213] → RÉSOLU (2026-06-16)
+- [x] [Review][Patch] `rangeKm` état local dans `SearchRangeControl` désynchronisé du store si `setSearchRange` est appelé externe [apps/mobile/src/components/map/search-range-control.tsx:~193] → RÉSOLU : render-phase sync (2026-06-16)
+- [x] [Review][Patch] `isEmpty` typé `boolean | undefined` au lieu de `boolean` (quand `enabled` est `undefined`) [apps/mobile/src/hooks/use-pois.ts] → RÉSOLU (2026-06-16)
+- [x] [Review][Patch] `DensityCategoryDialog` ne remet pas à zéro la sélection à la ré-ouverture [apps/mobile/src/components/map/density-category-dialog.tsx:~1339] → RÉSOLU : render-phase lastOpen tracking (2026-06-16)
+- [x] [Review][Patch] `searchDisabled` offline incorrect — bouton visuellement actif même si `fromKm >= toKm` hors-ligne [apps/mobile/src/components/map/search-range-control.tsx:~267] → RÉSOLU (2026-06-16)
+- [x] [Review][Defer] `RangeSlider` PanResponder recréé via `useMemo` mid-drag (même bug que Slider v2.4, non encore corrigé) [apps/mobile/src/components/ui/slider.tsx] — deferred, RangeSlider non utilisé dans l'UX live
+- [x] [Review][Defer] Auto-zoom : `computeCorridorBounds` + `computeTraceBounds` tous deux null → no-op silencieux sans feedback [apps/mobile/src/app/(app)/map/[id].tsx:~215] — deferred, cas extrême non observable
+- [x] [Review][Defer] `PlanningSidebar` `Animated.Value` initialisé avec la mauvaise position si rotation au montage [apps/mobile/src/components/map/planning-sidebar.tsx:~1960] — deferred, cosmétique
+- [x] [Review][Defer] `useWeather` closure potentiellement stale sur `readySegments` dans le callback `combine` [apps/mobile/src/hooks/use-weather.ts:~5667] — deferred, race fringe
+- [x] [Review][Defer] `hasNearbyPoi` SQL raw utilise `new Date()` vs `NOW()` — ambiguïté timezone si colonne `timestamp` sans TZ [apps/api/src/pois/pois.repository.ts:~217] — deferred, consistant UTC en pratique
+- [x] [Review][Defer] `StageDialog.submit()` envoie `speedKmh: null` quand l'utilisateur saisit la même valeur que le défaut [apps/mobile/src/components/map/stage-dialog.tsx:~3729] — deferred, parité web intentionnelle
+- [x] [Review][Defer] `Slider` latest ref effect sans tableau de dépendances — devrait utiliser `useLayoutEffect` [apps/mobile/src/components/ui/slider.tsx:~5898] — deferred, risque théorique sans bug observé
+- [x] [Review][Defer] Clés i18n `fromHandleA11y`/`toHandleA11y` mortes (utilisées uniquement par RangeSlider, non visible en UX) [apps/mobile/src/lib/i18n/locales/fr.json, en.json] — deferred, sans impact
+- [x] [Review][Defer] Dédup multi-segments écarte les POIs de frontière partageant le même `externalId` [apps/mobile/src/hooks/use-pois.ts:~112] — deferred, parité web préexistante
+- [x] [Review][Defer] `computeCorridorBounds` fallback : segment dégénéré à 1 waypoint [apps/mobile/src/lib/map/maplibre-config.ts] — deferred, même comportement que MOB-4.1
 
 ## Dev Notes
 
@@ -207,6 +229,7 @@ claude-opus-4-8[1m] (Amelia / bmad-dev-story)
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
+| 2026-06-16 | 2.6 | **Story → done** après correction d'une régression introduite par le code review. Le reviewer avait ajouté un cleanup `return () => { prevFetchingRef.current = false }` à l'effet d'auto-zoom (application mécanique du pattern web « reset en cleanup ») ; mais les deps mobile `[isFetching, searchCommitted, waypoints, fromKm, toKm, segments]` font tourner le cleanup avant chaque ré-exécution → `prev` remis à false avant la détection `true→false` → zoom jamais déclenché. Symptôme secondaire « plus de résultats » = pins hors-écran faute de recadrage (API OK : vérif DB, 5 hébergements live dans le corridor testé ; filtre backend `${new Date()}`≡`now()`). Fix : suppression du cleanup. Garde-fou ajouté dans `project-context.md` (section Auto-zoom). Patches sains du review conservés (bannière ✕ dismissable, sync `rangeKm` render-phase, `searchDisabled` offline, `isEmpty` boolean). Gate : 349/349 tests, tsc 0, lint 0, eslint 0. | claude-opus-4-8[1m] (Amelia) |
 | 2026-06-16 | 2.5 | **Correctifs post-device (remonté Guillaume)** : (1) **zoom corridor après recherche** (parité web `fitToCorridorRange`, manquait en mobile) — helper pur `computeCorridorBounds` + fallback trace, `MapCanvasHandle.fitToBounds`, effet transition `isFetching` true→false sous `searchCommitted` ; (2) **z-index corridor** — surbrillance bleue masquait clusters/gouttes POI (calque monté tardivement → sommet) → `<Layer afterId="trace-line">` (ancré sous les POI). **Cross-ref hors-périmètre** : les POI ne s'affichaient pas (web+mobile) à cause d'un bug serveur de cache (`pois.repository.ts` — gardes de dédup ignoraient l'expiry → cache jamais régénéré post-TTL) ; corrigé en **commit backend séparé** (epic 4), revu indépendamment. Gate mobile : 349/349 tests (+2), tsc 0, lint 0, eslint 0. | claude-opus-4-8[1m] (Amelia) |
 | 2026-06-13 | 0.1 | Création story MOB-4.3 (ready-for-dev) — slider plage km double poignée (cap 30 km), gate `searchCommitted` (recherche au clic uniquement), `use-pois` finalisé (fromKm/toKm + enabled + isEmpty), overlay chargement scopé carte, bannière « Aucun résultat »/erreur/offline, mapping km cumulés → segment(s). `GET /pois` corridor réutilisé. i18n FR/EN, tests. | bmad-create-story (Story Context Engineer) |
 | 2026-06-14 | 1.0 | Implémentation T1–T7 (status review). Primitive `slider` range maison (PanResponder, `clampRange` pur, a11y adjustable) + stories ; `search-range-slider` (cap 30 km, gate, offline) ; `use-pois` finalisé (`resolveSegmentRanges` AC5, `enabled`/`isEmpty`/`isFetching`) ; `map-search-feedback` (overlay/aucun résultat/erreur) ; route câblée (état lifté, désélection render-phase) ; i18n `pois.search.*` FR/EN ; `SearchIcon`. **Doc Sync** : `searchRangeInteracted` non lifté (sans consommateur mobile MVP). Gate : 313/313 tests, tsc 0, lint 0, expo export iOS OK. ⏳ T8 device validation manuelle (Guillaume). | claude-opus-4-8[1m] (Amelia) |
