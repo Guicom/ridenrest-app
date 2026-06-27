@@ -215,3 +215,46 @@ ne contient que l'**hôte** (`http://localhost:3010`, sans chemin). Oublier ce p
 La **roue dentée** visible en haut à droite des captures du **simulateur iOS** est un
 **overlay système du simulateur**, pas un composant de l'app Ride'n'Rest. Ne jamais
 l'interpréter comme un bouton Settings, un bug de layout ou un élément d'UI.
+
+## Android : build local + test (émulateur) — validé 2026-06-27
+
+Premier build Android du projet (jusque-là iOS only). **Le Play Store n'est PAS requis**
+pour tester en local (uniquement pour publier).
+
+**Toolchain** (Homebrew, pas Android Studio) :
+- SDK : `/opt/homebrew/share/android-commandlinetools` (cask `android-commandlinetools`).
+  Exporter `ANDROID_HOME`/`ANDROID_SDK_ROOT` dessus (non exporté par défaut dans le shell).
+- **JDK 17 obligatoire** (`brew install openjdk@17`) → `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`.
+  Gradle/AGP **refuse** un JDK trop récent (26).
+- Composants : `sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.1.12297006" "cmake;3.22.1"`
+  (`newArchEnabled=true` + Hermes → compilation NDK des modules natifs : reanimated,
+  worklets, maplibre… 1er build long). Accepter les licences (`sdkmanager --licenses`).
+- AVD existant : `ridenrest_pixel` (`emulator @ridenrest_pixel`).
+- Prebuild : `npx expo prebuild -p android` (génère `android/`, **non commité** comme `ios/`).
+- Build : `npx expo run:android` (PAS `--device <serial>` — passe un **nom** d'AVD ou rien ;
+  auto-détecte l'émulateur booté).
+
+**Réseau émulateur (CRITIQUE)** : `localhost` = l'émulateur, pas l'hôte.
+`adb reverse tcp:8081 tcp:8081` (Metro) **+ `tcp:3010` (API) + `tcp:3011` (auth)** —
+sinon login « Connexion impossible. Vérifiez votre réseau ».
+
+**Cleartext** : OK en debug (config réseau RN autorise localhost). Pas de blocage observé.
+
+**`INSTALL_FAILED_UPDATE_INCOMPATIBLE`** : un `app.ridenrest` d'une signature différente
+était déjà installé → `adb uninstall app.ridenrest` puis réinstaller.
+
+**Disque** : le build NDK consomme plusieurs Go. Surveiller l'espace ; `Xcode DerivedData`
+(`~/Library/Developer/Xcode/DerivedData`, cache pur) est récupérable (~9 Go). ⚠️ disque
+plein → **OrbStack redémarre** → Postgres/Redis remontent mais les serveurs node
+`pnpm dev` (API 3010 / web 3011) **tombent** et ne sont pas relancés (symptôme : auth KO).
+
+**Tests Maestro Android** — voir `.maestro/README.md` §Android. Points durs :
+- Build debug = **dev-launcher Expo** au lancement (sélection du serveur Metro) → étape
+  manuelle, ou build `--variant release` (bundle embarqué, sans Metro) pour s'en passer.
+- 2 devices up (iOS sim + émulateur) → `maestro --device emulator-5554 test …`.
+- Locale en-US par défaut → app en anglais. Pour FR : `adb root && adb shell setprop persist.sys.locale fr-FR && adb reboot`.
+- **Bounds `[0,0][0,0]` (RN Fabric)** : un `Pressable` en position absolue + transform
+  (chevron drawer) a des bounds nulles dans l'arbre a11y → Maestro ne le trouve NI par
+  `id` NI par label (alors que `adb shell uiautomator dump` le voit) → le taper par
+  **coordonnée**. `testID` ne surface PAS en `resource-id` sur cette archi → cibler par
+  **label** sur Android, pas par id.

@@ -1,0 +1,29 @@
+appId: app.ridenrest
+---
+# MOB-4.8 météo — variante ANDROID. Pré-requis : app chargée (passé le dev-launcher
+# Expo → choisir le serveur Metro), connectée (user e2e via email/mot de passe), sur
+# l'écran carte planning. Voir ../README.md §Android.
+#
+# ⚠️ Différence Android : le chevron du drawer (`drawer-toggle`) a des bounds
+# [0,0][0,0] dans l'arbre a11y (RN nouvelle archi / Fabric : Pressable en
+# position absolue + transform) → Maestro ne peut PAS le cibler par id/label →
+# on le tape par COORDONNÉE (gauche=ouvrir ~3%, droite=fermer ~89%, vertical 50%).
+# Le reste du panneau (labels) est ciblable normalement.
+- tapOn:
+    point: "3%,50%"          # ouvre le drawer (chevron au bord gauche, panneau fermé)
+- tapOn: "Météo"
+- tapOn: "Afficher sur la carte"
+- tapOn:
+    point: "89%,50%"         # ferme (chevron au bord droit, panneau ouvert)
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: screenshots/android-weather-temp   # AC1 : ligne colorée
+
+- tapOn:
+    point: "3%,50%"
+- tapOn: "Vent"
+- tapOn:
+    point: "89%,50%"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: screenshots/android-weather-wind   # AC5 : flèches vent (icon-image)

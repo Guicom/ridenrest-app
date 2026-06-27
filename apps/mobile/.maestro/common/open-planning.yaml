@@ -1,0 +1,10 @@
+appId: app.ridenrest
+---
+# Sous-flow réutilisable : lance l'app (session secure-store préservée) et ouvre le
+# mode Planning de la 1re aventure de la liste. NE PAS clearState (garde la session).
+# Pré-requis : avoir été connecté une fois manuellement sur le simulateur.
+- launchApp
+- tapOn: "Planning"
+- extendedWaitUntil:
+    visible: "Ouvrir le panneau"
+    timeout: 25000

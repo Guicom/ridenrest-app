@@ -92,6 +92,7 @@ export function PlanningSidebar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={open ? t('map.sidebar.close') : t('map.sidebar.open')}
+          testID="drawer-toggle"
           onPress={() => onOpenChange(!open)}
           style={{
             position: 'absolute',

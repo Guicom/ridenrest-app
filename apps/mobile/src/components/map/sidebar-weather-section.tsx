@@ -53,6 +53,7 @@ export function SidebarWeatherSection({
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded }}
+        testID="weather-section-header"
         onPress={() => setExpanded((v) => !v)}
         className="flex-row items-center justify-between"
       >
@@ -93,6 +94,7 @@ export function SidebarWeatherSection({
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   accessibilityLabel={t(`map.weather.${key}`)}
+                  testID={`weather-dim-${id}`}
                   onPress={() => setWeatherDimension(id)}
                   className={
                     active

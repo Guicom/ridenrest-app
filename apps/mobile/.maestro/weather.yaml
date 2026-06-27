@@ -1,0 +1,29 @@
+appId: app.ridenrest
+---
+# MOB-4.8 — météo planifiée. Asserts déterministes (toggle, dimensions, pas de crash)
+# + screenshots pour la revue visuelle (ligne colorée AC1, flèches vent AC5) par l'agent.
+# Le contenu du canvas MapLibre (GL natif) n'est PAS introspectable → screenshots.
+- runFlow: common/open-planning.yaml
+
+# Activer la météo (dimension Température par défaut)
+- tapOn: "Ouvrir le panneau"
+- tapOn: "Météo"
+- assertVisible: "Afficher sur la carte"
+- tapOn:
+    id: "weather-toggle"
+# Fermer via le chevron (≈89%,50%) — le label "Fermer le panneau" est ambigu
+# (backdrop plein écran). TODO : un testID sur le chevron fiabiliserait ce tap.
+- tapOn:
+    point: 89%,50%
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: screenshots/weather-temp-line   # AC1 : ligne colorée sur la trace
+
+# Dimension Vent → flèches (AC5)
+- tapOn: "Ouvrir le panneau"
+- tapOn: "Vent"
+- tapOn:
+    point: 89%,50%
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: screenshots/weather-wind        # AC5 : flèches orientées + proportionnelles

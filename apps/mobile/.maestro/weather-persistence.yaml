@@ -1,0 +1,29 @@
+appId: app.ridenrest
+---
+# MOB-4.8 / T2 — la date de départ saisie est persistée (AsyncStorage) et ré-hydratée
+# après un redémarrage de l'app.
+- runFlow: common/open-planning.yaml
+- tapOn: "Ouvrir le panneau"
+- tapOn: "Météo"
+- scrollUntilVisible:
+    element:
+      text: "AAAA-MM-JJ HH:MM"
+    direction: DOWN
+- tapOn: "AAAA-MM-JJ HH:MM"
+- inputText: "2026-06-29 07:30"
+- hideKeyboard
+
+# Redémarrage → la valeur doit revenir
+- launchApp
+- tapOn: "Planning"
+- extendedWaitUntil:
+    visible: "Ouvrir le panneau"
+    timeout: 25000
+- tapOn: "Ouvrir le panneau"
+- tapOn: "Météo"
+- scrollUntilVisible:
+    element:
+      text: "2026-06-29 07:30"
+    direction: DOWN
+    timeout: 8000
+- assertVisible: "2026-06-29 07:30"

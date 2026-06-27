@@ -88,7 +88,8 @@
     "build-storybook": "storybook build",
     "lint": "expo lint",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:device": "bash scripts/device-test.sh"
   },
   "private": true
 }
