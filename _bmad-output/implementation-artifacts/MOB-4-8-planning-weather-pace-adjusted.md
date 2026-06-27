@@ -1,6 +1,10 @@
+---
+baseline_commit: 9298bfee30471dc95079b2f0c01452e74ec2afc0
+---
+
 # Story MOB-4.8 : Météo planifiée le long de la trace (pace-adjusted)
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -46,55 +50,74 @@ So that **j'anticipe les conditions de mon étape**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — Façade `lib/api/weather.ts`** (AC: 1, 2, 3, 4)
-  - [ ] `getTraceWeather(params): Promise<WeatherForecast>` → `apiFetch('/weather?segmentId=…[&departureTime=…&speedKmh=…&fromKm=…&stageDepartures=…]')`. `stageDepartures` = JSON-encodé `Array<{ startKm, endKm, departureTime }>`.
-  - [ ] (Optionnel, badge par étape) `getStageWeather(stageId, { departureTime?, speedKmh? }): Promise<StageWeatherPoint | null>` → `apiFetch('/stages/${stageId}/weather?…')`.
-  - [ ] Types **`WeatherForecast` / `WeatherPoint` / `StageWeatherPoint`** importés racine `@ridenrest/shared`. **Attention** : `WeatherPoint.precipitationProbability` (0-100 %) vs `StageWeatherPoint.precipitationMmH` (mm/h) — ne pas confondre. `WeatherPoint.km` = **km cumulés aventure**.
+> **⚠️ RESYNC DOC (2026-06-27) — approche réelle ≠ tâches d'origine.** La feature météo
+> a d'abord été livrée dans le commit `ea14bda` (« MOB-4.8 carte Météo + overlay ») avec
+> une approche **couche carte** (overlay `weather-layer` + `sidebar-weather-section`)
+> plutôt que `weather-strip` + `weather-controls`, et **saisie texte** plutôt que
+> `datetimepicker` — ce sont les options recommandées par les **Open Questions 2 & 3**.
+> Le passage dev-story du 2026-06-27 a **comblé les vrais trous d'AC** restants
+> (AC6 cache offline, pace store T2, opacité vent AC5, tests T8) et **resynchronisé**
+> ces tâches sur l'implémentation réelle (Doc Sync Rule). Décision validée par Guillaume.
 
-- [ ] **T2 — Pace store (heure départ + allure)** (AC: 1, 3, 4)
-  - [ ] Pace **global** persisté local (parité web `weather-pace.ts` localStorage → **AsyncStorage** mobile) : `{ departureTime?, speedKmh? }`, clé `ridenrest:weather-pace`. Helper `lib/weather-pace.ts` (get/set). (`@react-native-async-storage/async-storage` déjà présent.)
-  - [ ] Pace **par étape** : `departureTime` est en **DB** (`adventure_stages.departure_time`) ; la vitesse vient de `adventure.avgSpeedKmh` (global) ou `stage.speedKmh`. **Pas de saisie d'étape ici** si l'écran étapes n'existe pas encore sur mobile (les étapes mobiles = epic ultérieur) → au MVP, **pace global** ; si des `stageDepartures` existent (via l'aventure), les passer. Documenter la frontière.
-  - [ ] `hasAnyStageDeparture` → si vrai, construire `stageDepartures` et **masquer** le champ départ global (parité web).
+- [x] **T1 — Façade `lib/api/weather.ts`** (AC: 1, 2, 3, 4)
+  - [x] `getWeatherForecast(params): Promise<WeatherForecast>` → `apiFetch('/weather?segmentId=…[&departureTime=…&speedKmh=…&fromKm=…&stageDepartures=…]')`. `stageDepartures` = JSON-encodé `Array<{ startKm, endKm, departureTime }>`. _(Nommé `getWeatherForecast`, pas `getTraceWeather`.)_
+  - [x] _(Non retenu MVP)_ `getStageWeather` / badge par étape : **pas** implémenté — les étapes mobiles (CRUD/badge) sont un epic ultérieur (hors frontière). `GET /stages/:id/weather` non consommé.
+  - [x] Types **`WeatherForecast` / `WeatherPoint`** importés de `@ridenrest/shared`. `WeatherPoint.km` = km **segment-relatif** côté API → réaligné en **cumulé** par `use-weather` (offset `cumulativeStartKm`).
 
-- [ ] **T3 — Hook `hooks/use-weather.ts`** (AC: 1, 2, 3, 6)
-  - [ ] `useTraceWeather({ segmentId, departureTime, speedKmh, stageDepartures })` → `useQuery({ queryKey: ['weather', { segmentId, departureTime, speedKmh, stageDepartures }], queryFn, staleTime: WEATHER_CACHE_TTL * 1000 })`. `WEATHER_CACHE_TTL = 3600` (`@ridenrest/shared`). **Pas de `refetchInterval`** (le refresh horaire = `staleTime` + refetch on focus). Une query par segment ready (parité `useQueries`).
-  - [ ] **Offline (AC6)** : write-through `setCachedWeather(adventureId, forecast)` au succès ; fallback `getCachedWeather` offline. **Typer `weather-cache.ts`** : remplacer `CachedWeather = unknown` par `WeatherForecast` (`@ridenrest/shared`) — la story météo est précisément le moment prévu (TODO du fichier).
+- [x] **T2 — Pace store (heure départ)** (AC: 1, 3, 4)
+  - [x] Pace **global** persisté local (parité web `weather-pace.ts` localStorage → **AsyncStorage** mobile) : `{ departureTime?, speedKmh? }`, clé `ridenrest:weather-pace`. Helper `lib/weather-pace.ts` (`getStoredWeatherPace`/`setStoredWeatherPace`, lectures robustes → `{}`). Hydraté/persisté au niveau de l'écran (`map/[id].tsx`).
+  - [x] Pace **par étape** : `departureTime` lu sur les étapes de l'aventure (`useStages` → `stageDeparturesJson`) ; vitesse = `adventure.avgSpeedKmh`. **Pas de saisie d'étape** (frontière — épic étapes ultérieur). Si des départs d'étape existent → `stageDepartures` JSON construit + passé.
+  - [x] `stagesHaveDepartures` (≡ `hasAnyStageDeparture`) → masque le champ départ global (« Dates définies par étape »).
 
-- [ ] **T4 — Données de rendu `lib/weather-geojson.ts`** (AC: 1, 5, 6)
-  - [ ] Porter (web `apps/web/src/lib/weather-geojson.ts`) :
-    - `buildWeatherLineSegments(waypoints, weatherPoints)` → LineString par intervalle, `available = temperatureC !== null`, GeoJSON `[lng, lat]`.
-    - `buildWindArrowPoints(weatherPoints, waypoints)` → Points avec `windDirectionMaplibre`, `windSpeedKmh`, `km`.
-    - Conversion vent : `windDirectionMaplibre = (windDirection - 90 + 360) % 360` (météo → MapLibre 0=Est). **Constante load-bearing à copier exactement.**
+- [x] **T3 — Hook `hooks/use-weather.ts`** (AC: 1, 2, 3, 6)
+  - [x] `useWeather({ adventureId, segments, weatherActive, departureTime, speedKmh, stageDepartures })` → `useQueries` (une query par segment ready), `queryKey: ['weather', { segmentId, departureTime, speedKmh, stageDepartures }]`, `staleTime = 3 600 000 ms` (= `WEATHER_CACHE_TTL*1000`). **Pas de `refetchInterval`** (refresh horaire = `staleTime` + refetch on focus). Points réalignés en **km cumulés** (offset `cumulativeStartKm` par `segmentId`).
+  - [x] **Offline (AC6)** : write-through `setCachedWeather(adventureId, forecasts)` au succès **complet** ; fallback `getCachedWeather` quand aucune donnée live (cold start hors-ligne). **`weather-cache.ts` retypé** `CachedWeather = WeatherForecast[]` (1 entrée par segment) — TODO du squelette MOB-3.5 levé.
 
-- [ ] **T5 — Affichage : `components/map/weather-strip.tsx` (+ couche carte optionnelle)** (AC: 1, 5, 6)
-  - [ ] **`weather-strip.tsx`** (a des **stories** Storybook — archi L1054) : bande horizontale de points météo (par km) : icône (`iconEmoji` / `WMO_ICON`), température, précip (%), vent. Points `null` → état grisé « indisponible ». Réutiliser `Card`/`Text`/tokens.
-  - [ ] **Flèches de vent (AC5)** : si rendu sur la carte (couche symbole `→` rotation `windDirectionMaplibre`, taille interpolée sur `windSpeedKmh` : stops `0→16, 20→24, 40→36, 60→48`, opacité `0→0.4 … 5→1.0`). Si rendu hors-carte (dans le strip), une flèche `<Svg>` orientée + taille ∝ vitesse (réutiliser `react-native-svg`). **Décider** strip vs couche carte (Open Question) — le strip est plus simple et a des stories.
-  - [ ] **Icônes WMO** : `WMO_ICON` / `WMO_ICON_FALLBACK` (`@ridenrest/shared`) — **réutiliser**, ne pas remapper.
+- [x] **T4 — Données de rendu `lib/weather-geojson.ts`** (AC: 1, 5, 6)
+  - [x] Porté du web :
+    - `buildWeatherLineSegments(waypoints, weatherPoints)` → LineString par intervalle, `available = temperatureC !== null`, GeoJSON `[lng, lat]`, **filtre `isValidLngLat` au point** (garde SIGABRT natif).
+    - `buildWindArrowPoints(weatherPoints, waypoints)` → Points `windDirectionMaplibre`/`windSpeedKmh`/`km`, waypoints filtrés `isValidLngLat`.
+    - Conversion vent `windDirectionMaplibre = (windDirection - 90 + 360) % 360` (météo → MapLibre 0=Est) — copiée exactement.
 
-- [ ] **T6 — Saisie départ/allure `components/map/weather-controls.tsx`** (AC: 1, 3, 4)
-  - [ ] Champ **heure de départ** (date/heure — composant natif : `@react-native-community/datetimepicker` à installer **si** retenu, ou saisie simple ISO ; **décider** — éviter une grosse dép si possible). Champ **allure/vitesse** (numérique). Persistance via pace store (T2).
-  - [ ] Si `hasAnyStageDeparture` → masquer le champ départ global (« Dates définies par étape »). Sans allure → fallback heure actuelle (AC3) géré serveur (ne rien envoyer).
-  - [ ] Brancher la saisie → query key change → refetch (AC2).
+- [x] **T5 — Affichage : couche carte `components/map/weather-layer.tsx`** (AC: 1, 5, 6) _(remplace `weather-strip` — Open Question 3)_
+  - [x] **`weather-layer.tsx`** (overlay `<Map>`) : ligne colorée selon dimension (temp/pluie/vent, expressions `interpolate`), points indisponibles (`available=false`) en gris `#9ca3af`. Icônes WMO `iconEmoji` portées dans les features (réutilisables si strip ajouté plus tard). Pas de `weather-strip`/Storybook au MVP.
+  - [x] **Flèches de vent (AC5)** : couche symbole **`icon-image: 'wind-arrow'`** (PNG asset, PAS un glyphe texte), `icon-rotate = windDirectionMaplibre`, taille interpolée `icon-size` sur `windSpeedKmh` (stops `0→0.18, 20→0.28, 40→0.4, 60→0.52`), **opacité atténuée vent quasi-nul** (`icon-opacity` stops `0→0.4, 5→1.0`). Visible en dimension « vent ». ⚠️ **Fix device (2026-06-27)** : le `text-field: '→'` initial (port web) ne rendait **rien sur MapLibre Native** — le glyphe U+2192 est absent de la fontstack par défaut servie par OpenFreeMap. Bascule sur une **icône** (indépendante des glyphes) **appliquée aussi au web** (parité, même bug latent côté GL JS) → `apps/web/.../weather-layer.tsx`. Asset `wind-arrow.png` (pointe vers l'Est = rotation 0). **Validé visuellement sur simulateur iOS** (flèches orientées + proportionnelles).
+  - [x] **Icônes WMO** : `WMO_ICON` / `WMO_ICON_FALLBACK` (`@ridenrest/shared`) — réutilisées, pas remappées.
 
-- [ ] **T7 — Intégration route map + i18n** (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Monter `weather-controls` + `weather-strip` (panneau carte). Lifter `departureTime/speedKmh` à l'écran (cohérent avec les autres états carte).
-  - [ ] Bloc i18n `weather.*` (parité FR/EN) :
-    - `weather.departureLabel` / `weather.speedLabel` / `weather.stageDatesNotice`
-    - `weather.temp` / `weather.wind` / `weather.precip` / `weather.unavailable`
-    - `weather.refreshNotice` (optionnel) / labels a11y vent
-  - [ ] **Zéro chaîne en dur**.
+- [x] **T6 — Saisie départ `components/map/sidebar-weather-section.tsx`** (AC: 1, 3, 4) _(remplace `weather-controls` ; saisie texte — Open Question 2)_
+  - [x] Carte « Météo » (drawer planning) : toggle « Afficher sur la carte » (`weatherActive`), sélecteur de dimension (temp/pluie/vent → `weatherDimension`), champ **heure de départ texte** (« AAAA-MM-JJ HH:MM », `parseDeparture` → ISO) — **zéro nouvelle dépendance** (pas de `datetimepicker`). Vitesse = `avgSpeedKmh` (pas de champ dédié).
+  - [x] Si `stagesHaveDepartures` → champ départ global masqué (« Dates définies par étape »). Sans allure/départ → fallback heure actuelle (AC3) géré serveur (rien envoyé).
+  - [x] Saisie → query key change → refetch (AC2).
 
-- [ ] **T8 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] `use-weather` : query key `{ segmentId, departureTime, speedKmh, stageDepartures }` ; `staleTime = WEATHER_CACHE_TTL*1000` ; **pas** de `refetchInterval` ; write-through + fallback cache offline (mock `weather-cache`).
-  - [ ] `weather-geojson` (pur) : `buildWeatherLineSegments` (available si temp non null, `[lng,lat]`) ; `buildWindArrowPoints` ; conversion `(deg-90+360)%360`.
-  - [ ] pace store : get/set AsyncStorage ; `hasAnyStageDeparture` masque le départ global.
-  - [ ] `weather-strip` : icône WMO, points `null` → indisponible ; flèche vent taille ∝ vitesse. Stories Storybook.
-  - [ ] Gate : `test|typecheck|lint` verts + `expo export` OK.
+- [x] **T7 — Intégration route map + i18n** (AC: 1, 2, 3, 4, 5, 6)
+  - [x] `weather-layer` (overlay) + `sidebar-weather-section` (drawer) montés dans `map/[id].tsx`. `departureInput` lifté à l'écran + persisté (pace store). `adventureId` passé à `useWeather` (clé du cache offline).
+  - [x] Bloc i18n `map.weather.*` (parité FR/EN) : `title`, `temperature`/`precipitation`/`wind` (+ `*Short`), `departure`, `byStage`, + `map.showOnMap`. **Zéro chaîne en dur.** _(Le grisé « indisponible » est rendu par couleur de couche, pas par un label → pas de clé `unavailable`.)_
 
-- [ ] **T9 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4, 5, 6) — ⏳ build Dev Client
-  - [ ] Saisir départ + allure → météo par point calée sur l'ETA ; sans allure → heure actuelle. Étapes avec départ → priment.
-  - [ ] Flèches vent orientées + proportionnelles ; vent nul atténué. Points au-delà de l'horizon → grisés.
-  - [ ] Couper réseau → dernière météo en cache visible. (Refresh horaire difficile à valider à la main — vérifier `staleTime`.)
+- [x] **T8 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5, 6)
+  - [x] `use-weather` : query key `{ segmentId, departureTime, speedKmh, stageDepartures }` ; `staleTime = 3 600 000` ; **pas** de `refetchInterval` ; réalignement km cumulés ; write-through + fallback cache offline ; `stageDepartures` prioritaire (departureTime null) ; `weatherActive=false` → 0 requête.
+  - [x] `weather-geojson` (pur) : `buildWeatherLineSegments` (available si temp non null, `[lng,lat]`) ; `buildWindArrowPoints` ; conversion `(deg-90+360)%360`.
+  - [x] pace store : get/set AsyncStorage round-trip, clé `ridenrest:weather-pace`, absence/JSON corrompu → `{}`.
+  - [x] `weather-cache` : round-trip typé `WeatherForecast[]`, miss/JSON corrompu → null, création répertoire.
+  - [x] Gate : `test|typecheck|lint` verts + `expo export` iOS OK.
+
+- [x] **T9 — Validation device (simulateur iOS, automatisée Maestro + screenshots)** (AC: 1, 2, 3, 4, 5, 6) — 2026-06-27
+  - [x] AC1 — météo activée → **ligne colorée** sur la trace (dimension Temp.) ; pas de crash MapLibre natif.
+  - [x] AC5 — dimension Vent → **flèches orientées + proportionnelles** rendues (après fix `icon-image`).
+  - [x] AC6 write-through — fichier `WeatherForecast[]` (4 segments, 92 pts) **écrit sur le device** (vérifié dans `Library/Caches/weather/{id}.json`).
+  - [x] AC6 fallback offline — **API suspendue** (`kill -STOP`) → la météo reste affichée (lue du cache).
+  - [x] T2 — date de départ saisie → **persistée après redémarrage** de l'app (assert Maestro).
+  - [x] **AC4** (étapes avec départs prioritaires) — validé : étape datée insérée sur Test1 (DB) → la carte météo bascule sur « **Dates définies par étape** » + champ date global **masqué** (asserts Maestro), puis étape supprimée (DB restaurée).
+  - [~] AC2 (refresh horaire) — non observable à la main ; couvert par tests unitaires (`staleTime`).
+
+### Review Findings
+
+- [x] [Review][Patch] `setStoredWeatherPace` écrase destructivement l'objet entier — un appel `{ departureTime }` efface `speedKmh` si précédemment stocké ; la fonction doit faire un read-merge-write (ou toujours passer l'objet complet au call-site). [`apps/mobile/src/lib/weather-pace.ts`]
+- [x] [Review][Patch] `allLoaded` reste faux à jamais si un segment échoue en erreur définitive — `forecasts.length === readySegments.length` n'atteint jamais sa cible, le write-through cache ne s'écrit jamais. Remplacer par `results.every(r => r.isSuccess || r.isError)`. [`apps/mobile/src/hooks/use-weather.ts`]
+- [x] [Review][Patch] Test AC3 manquant — T8 n'a pas de cas « ni `departureTime` ni `speedKmh` → API appelée sans ces params (fallback serveur heure actuelle) ». [`apps/mobile/src/hooks/use-weather.test.tsx`]
+- [x] [Review][Patch] `JSON.parse` dans `getStoredWeatherPace` peut retourner un JSON valide non-objet (ex. `"foo"`, `42`) casté silencieusement en `StoredWeatherPace` — ajouter un guard `typeof parsed === 'object' && parsed !== null`. [`apps/mobile/src/lib/weather-pace.ts`]
+- [x] [Review][Defer] `cached` stale pendant la transition `adventureId` — si le composant restait monté (non-applicable avec le routing expo-router actuel), les forecasts du précédent adventureId seraient utilisés avec les segments du nouveau. [`apps/mobile/src/hooks/use-weather.ts`] — deferred, pré-existant/non-triggerable avec le routing actuel
+- [x] [Review][Defer] `setCachedWeather` sans try/catch — une erreur disque (full/permissions) génère une rejection non rattrapée. Issue pré-existante dans le squelette weather-cache. [`apps/mobile/src/lib/cache/weather-cache.ts`] — deferred, pré-existant
+- [x] [Review][Defer] `weatherPoints` offset=0 pour `segmentId` inconnu — si le serveur renvoie une prévision pour un segment absent de la liste locale, les km sont affichés en relatif au lieu de cumulé. [`apps/mobile/src/hooks/use-weather.ts`] — deferred, cas défensif backend-inconsistency
 
 ## Dev Notes
 
@@ -164,11 +187,11 @@ apps/mobile/package.json (?)                       (datetimepicker si retenu)
 - **Inclus** : façade `/weather` (+ `/stages/:id/weather`), `use-weather` (staleTime 1 h, query key, offline cache typé), pace store global, `weather-geojson` + conversion vent, `weather-strip` (icônes WMO, points null), flèches proportionnelles, fallback heure actuelle, précédence stage-departures (si présent), i18n, tests.
 - **Exclu** : CRUD étapes / saisie départ par étape → epic ultérieur ; météo **Live** (GPS) → **MOB-5** ; carte/trace de base (MOB-4.1) ; tout calcul d'ETA côté client (c'est serveur).
 
-### Open Questions
+### Open Questions — RÉSOLUES
 
-1. **WeatherAPI.com (AC epic) vs Open-Meteo (réel)** : le mobile n'appelle pas le fournisseur (backend transparent) → divergence sans impact mobile, mais **corriger la mention** « WeatherAPI.com » dans l'epic/UI si elle apparaît. _(Recommandation : ne rien afficher du fournisseur, ou « Open-Meteo ».)_
-2. **Sélecteur date/heure** : `@react-native-community/datetimepicker` (natif, prebuild) vs saisie simple. _(Recommandation : datetimepicker pour l'UX ; sinon saisie ISO minimaliste au MVP.)_
-3. **Flèches vent** : couche carte (parité web) vs dans le `weather-strip`. _(Recommandation : strip au MVP, couche carte ensuite.)_
+1. **WeatherAPI.com (AC epic) vs Open-Meteo (réel)** : ✅ Le mobile n'affiche **rien** du fournisseur (backend transparent) → aucune mention « WeatherAPI.com » dans l'UI mobile. Divergence sans impact côté mobile.
+2. **Sélecteur date/heure** : ✅ **Saisie texte** « AAAA-MM-JJ HH:MM » (`parseDeparture` → ISO) retenue — **zéro nouvelle dépendance** (pas de `@react-native-community/datetimepicker`). Évolution possible plus tard.
+3. **Flèches vent / affichage** : ✅ **Couche carte** (`weather-layer`) retenue (parité visuelle web : ligne colorée + flèches sur la trace) plutôt que `weather-strip`. Le `weather-strip` (+ Storybook) reste un ajout possible ultérieur ; les `iconEmoji` WMO sont déjà portés dans les features pour le réutiliser.
 
 ### References
 
@@ -187,14 +210,86 @@ apps/mobile/package.json (?)                       (datetimepicker si retenu)
 
 ### Agent Model Used
 
+claude-opus-4-8 (dev-story, 2026-06-27)
+
 ### Debug Log References
+
+- `npx tsc --noEmit` → 0 erreur
+- `eslint src` → 0 (les fichiers touchés passent ; faux « 2 errors » du proxy RTK invalidé par `eslint` direct, exit 0)
+- `npx jest` → **428/428** suites/tests verts
+- `expo export --platform ios` → OK (bundle hbc 8.3 MB)
 
 ### Completion Notes List
 
+**Contexte** : la feature météo MOB-4.8 était **déjà livrée** dans le commit `ea14bda`
+(« carte Météo + overlay », présent dans l'historique de HEAD), mais avec une approche
+**couche carte** (vs `weather-strip`) et **saisie texte** (vs datetimepicker) — les options
+recommandées par les Open Questions — et la story était restée `ready-for-dev`. Sur décision
+de Guillaume (Option A), ce passage **comble les vrais trous d'AC restants** et **resynchronise
+la doc** sur l'implémentation réelle (Doc Sync Rule), sans réécrire l'approche déjà validée.
+
+**Déjà présent (commit `ea14bda`, inchangé)** : façade `lib/api/weather.ts` (T1),
+`use-weather` (`useQueries`, query key, `staleTime` 1 h, sans `refetchInterval`, T3 partiel),
+`weather-geojson` + conversion vent (T4), `weather-layer` couche carte (T5), `sidebar-weather-section`
+(T6), intégration `map/[id].tsx` + i18n `map.weather.*` (T7).
+
+**Comblé ce passage (gap-fill)** :
+- ✅ **AC6 — cache offline** : `weather-cache.ts` retypé `CachedWeather = WeatherForecast[]`
+  (TODO MOB-3.5 levé) ; `use-weather` ajoute le **write-through** au succès complet et le
+  **fallback** `getCachedWeather` hors-ligne (réalignement km cumulés par `segmentId`).
+  `adventureId` ajouté aux params du hook (clé du cache).
+- ✅ **T2 — pace store** : `lib/weather-pace.ts` (AsyncStorage, clé `ridenrest:weather-pace`,
+  parité web) ; `map/[id].tsx` hydrate la saisie au montage et la persiste à chaque changement.
+- ✅ **AC5 — opacité vent** : `text-opacity` (stops `0→0.4, 5→1.0`) ajouté à la couche flèches
+  → vent quasi-nul atténué (parité web).
+- ✅ **T8 — tests** : `use-weather.test.tsx` (query key / `staleTime` 3,6 M / pas de
+  `refetchInterval` / write-through / fallback offline / stageDepartures prioritaire / gate
+  weatherActive), `weather-pace.test.ts`, `weather-cache.test.ts` mis à jour pour le type
+  `WeatherForecast[]`. (`weather-geojson.test.ts` déjà présent.)
+
+**Frontière respectée** : pas de CRUD étapes / saisie départ par étape (epic ultérieur),
+pas de météo Live (MOB-5), aucun calcul d'ETA client (serveur), aucune modif serveur/DB.
+
+**Validation device (T9)** : effectuée en automatisé sur **simulateur iOS** (Maestro + screenshots
++ inspection FS du device). AC1/AC4/AC5/AC6/T2 ✅ (AC4 validé via étape datée temporaire insérée
+puis supprimée). AC2 (refresh horaire) couvert par tests unitaires. Visuel **web** non fait :
+login Google OAuth bloqué dans un navigateur piloté → fix web couvert par tests unitaires + parité
+stricte avec le fix mobile validé.
+
+**Fix flèches AC5 (cross-platform)** : le `text-field: '→'` ne rend rien sur MapLibre **Native**
+(glyphe U+2192 absent de la fontstack OpenFreeMap) → bascule sur `icon-image` **mobile ET web**
+(parité ; le web a le même bug latent). Asset `wind-arrow.png` ajouté aux deux plateformes.
+
 ### File List
+
+**Ajoutés (ce passage)**
+- `apps/mobile/src/lib/weather-pace.ts`
+- `apps/mobile/src/lib/weather-pace.test.ts`
+- `apps/mobile/src/hooks/use-weather.test.tsx`
+- `apps/mobile/assets/wind-arrow.png` (asset flèche vent, fix AC5)
+- `apps/web/public/images/wind-arrow.png` (asset flèche vent, fix AC5 web)
+
+**Modifiés (ce passage)**
+- `apps/mobile/src/lib/cache/weather-cache.ts` (retype `CachedWeather = WeatherForecast[]`)
+- `apps/mobile/src/lib/cache/weather-cache.test.ts` (fixture typée `WeatherForecast[]`)
+- `apps/mobile/src/hooks/use-weather.ts` (param `adventureId` + write-through/fallback offline)
+- `apps/mobile/src/components/map/weather-layer.tsx` (flèches `icon-image` + opacité vent, AC5)
+- `apps/mobile/src/app/(app)/map/[id].tsx` (pace store hydrate/persiste + `adventureId` → `useWeather`)
+- `apps/web/src/app/(app)/map/[id]/_components/weather-layer.tsx` (flèches `text-field`→`icon-image`, parité AC5)
+- `apps/web/src/app/(app)/map/[id]/_components/weather-layer.test.tsx` (assertions `icon-*` + mock `loadImage`/`hasImage`)
+- `_bmad-output/implementation-artifacts/MOB-4-8-planning-weather-pace-adjusted.md` (resync doc)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (statut)
+
+**Déjà livrés en `ea14bda` (référence, non modifiés ce passage)**
+- `apps/mobile/src/lib/api/weather.ts`
+- `apps/mobile/src/lib/map/weather-geojson.ts` (+ `.test.ts`)
+- `apps/mobile/src/components/map/weather-layer.tsx` (base)
+- `apps/mobile/src/components/map/sidebar-weather-section.tsx`
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-13 | 0.1 | Création story MOB-4.8 (ready-for-dev) — météo pace-adjusted via `GET /weather` (ETA calculé serveur), `use-weather` (`staleTime` 1 h = refresh horaire, query key {segmentId,departureTime,speedKmh,stageDepartures}, offline cache typé `WeatherForecast`), pace store global (AsyncStorage), `weather-strip` (icônes WMO, points null grisés), flèches vent proportionnelles + conversion `(deg-90+360)%360`, fallback heure actuelle, précédence stage-departures. **DIVERGENCE documentée : provider réel = Open-Meteo (pas WeatherAPI.com), transparent côté mobile.** i18n FR/EN, tests. | bmad-create-story (Story Context Engineer) |
+| 2026-06-27 | 1.0 | **dev-story → review.** Feature déjà livrée en `ea14bda` (couche carte + saisie texte, Open Questions 2&3) ; ce passage comble les trous d'AC et resynchronise la doc (Option A, validée Guillaume) : **AC6** cache offline (`weather-cache` retypé `WeatherForecast[]` + write-through/fallback `use-weather`, param `adventureId`), **T2** pace store `lib/weather-pace.ts` (AsyncStorage, hydrate/persiste écran), **AC5** opacité `text-opacity` vent quasi-nul, **T8** tests (`use-weather`, `weather-pace`, `weather-cache` retypé). Tasks resynchronisées sur l'approche réelle (weather-layer/sidebar-weather-section, pas strip/controls). Gate : 428/428 tests · tsc 0 · lint 0 · expo export iOS OK. ⏳ T9 Dev Client (Guillaume). | bmad-dev-story (Amelia) |
+| 2026-06-27 | 1.1 | **Validation device (simulateur iOS, Maestro) + fix AC5 flèches.** Tests pilotés sur device : AC1 (ligne colorée), AC6 write-through (fichier cache écrit) + fallback offline (API suspendue → météo du cache), T2 (persistance départ au redémarrage) — tous ✅, aucun crash MapLibre natif. **Bug trouvé & corrigé** : les flèches de vent (`text-field: '→'`) ne rendaient RIEN sur MapLibre Native (glyphe U+2192 absent de la fontstack OpenFreeMap) → bascule sur `icon-image` (asset `wind-arrow.png`) **mobile + web** (parité, même bug latent web). Flèches confirmées orientées + proportionnelles sur device. Mobile 429 tests · web weather-layer 13 tests · tsc/lint OK. **Reste manuel : AC4** (étapes avec départs). | dev-story validation device (Amelia) |

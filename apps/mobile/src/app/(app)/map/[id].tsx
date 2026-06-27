@@ -51,6 +51,10 @@ import {
   hasTrace,
 } from '@/lib/map/maplibre-config';
 import { useMapStore } from '@/lib/stores/map.store';
+import {
+  getStoredWeatherPace,
+  setStoredWeatherPace,
+} from '@/lib/weather-pace';
 import { useTranslation } from '@/lib/i18n';
 
 // Écran carte mode **planning** (MOB-4.x, iso web). Carte plein écran + **drawer**
@@ -152,7 +156,22 @@ export default function MapScreen() {
   const density = useDensity(id);
 
   // Météo : heure de départ globale (texte) → ISO ; départs par étape prioritaires.
+  // Persistance pace store (MOB-4.8 / T2) : on hydrate la saisie depuis AsyncStorage
+  // au montage et on la ré-écrit à chaque changement (parité web `weather-pace`).
   const [departureInput, setDepartureInput] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    void getStoredWeatherPace().then((pace) => {
+      if (!cancelled && pace.departureTime) setDepartureInput(pace.departureTime);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const handleDepartureChange = useCallback((value: string) => {
+    setDepartureInput(value);
+    void setStoredWeatherPace({ departureTime: value });
+  }, []);
   const stageDeparturesJson = useMemo(() => {
     const withDep = stages.filter((s) => s.departureTime != null);
     if (withDep.length === 0) return null;
@@ -165,6 +184,7 @@ export default function MapScreen() {
     );
   }, [stages]);
   const { weatherPoints } = useWeather({
+    adventureId: id,
     segments,
     weatherActive,
     departureTime: parseDeparture(departureInput),
@@ -524,7 +544,7 @@ export default function MapScreen() {
           />
           <SidebarWeatherSection
             departureTime={departureInput}
-            onDepartureChange={setDepartureInput}
+            onDepartureChange={handleDepartureChange}
             stagesHaveDepartures={stageDeparturesJson !== null}
           />
           <SidebarDensitySection

@@ -1,13 +1,20 @@
-import { GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
+import { GeoJSONSource, Images, Layer } from '@maplibre/maplibre-react-native';
 import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 import type { MapWaypoint, WeatherPoint } from '@ridenrest/shared';
 import { useMemo } from 'react';
+import type { ImageRequireSource } from 'react-native';
 
 import {
   buildWeatherLineSegments,
   buildWindArrowPoints,
 } from '@/lib/map/weather-geojson';
 import type { WeatherDimension } from '@/lib/stores/map.store';
+
+// Flèche de vent comme image carte (clé MapLibre `wind-arrow`) — `require` statique
+// du PNG bundlé (parité pattern `PIN_IMAGE_SOURCES`). L'asset pointe vers l'Est.
+const WIND_ARROW_IMAGES: Record<string, ImageRequireSource> = {
+  'wind-arrow': require('../../../assets/wind-arrow.png'),
+};
 
 // Overlay météo — enfant du `<Map>` (via `MapCanvas`). Ligne colorée selon la dimension
 // (temp/pluie/vent) + flèches de vent (visibles en dimension « vent »). Port iso de
@@ -101,34 +108,50 @@ export function WeatherLayer({
           }}
         />
       </GeoJSONSource>
+      {/* Flèche enregistrée comme IMAGE (pas un glyphe texte) : sur MapLibre **Native**,
+          un `text-field: '→'` ne rend RIEN — le glyphe U+2192 est absent de la fontstack
+          par défaut servie par OpenFreeMap (validé sur device). On bascule donc sur
+          `icon-image` (indépendant des glyphes), approche unifiée web↔mobile. L'asset
+          pointe vers l'Est → `icon-rotate = windDirectionMaplibre` préserve la conversion
+          `(deg-90+360)%360`. */}
+      <Images images={WIND_ARROW_IMAGES} />
       <GeoJSONSource id="weather-wind-arrows" data={arrows}>
         <Layer
           id="weather-wind-arrows-layer"
           type="symbol"
           layout={{
-            'text-field': '→',
-            'text-size': [
+            'icon-image': 'wind-arrow',
+            // Taille ∝ vitesse (AC5). Source PNG 128px → facteur ≈ pxCible/128
+            // (≈ 23/36/51/67 px sur les paliers calme→tempête).
+            'icon-size': [
               'interpolate',
               ['linear'],
               ['coalesce', ['get', 'windSpeedKmh'], 0],
               0,
-              16,
+              0.18,
               20,
-              24,
+              0.28,
               40,
-              36,
+              0.4,
               60,
-              48,
+              0.52,
             ],
-            'text-rotate': ['coalesce', ['get', 'windDirectionMaplibre'], 0],
-            'text-rotation-alignment': 'map',
-            'text-allow-overlap': true,
+            'icon-rotate': ['coalesce', ['get', 'windDirectionMaplibre'], 0],
+            'icon-rotation-alignment': 'map',
+            'icon-allow-overlap': true,
             visibility: dimension === 'wind' ? 'visible' : 'none',
           }}
           paint={{
-            'text-color': '#1e40af',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1,
+            // Vent quasi-nul atténué (AC5) : opacité 0.4 à 0 km/h → pleine dès ~5 km/h.
+            'icon-opacity': [
+              'interpolate',
+              ['linear'],
+              ['coalesce', ['get', 'windSpeedKmh'], 0],
+              0,
+              0.4,
+              5,
+              1,
+            ],
           }}
         />
       </GeoJSONSource>

@@ -1,3 +1,4 @@
+import type { WeatherForecast } from '@ridenrest/shared';
 import * as ExpoFs from 'expo-file-system';
 
 import { WEATHER_DIR } from './cache-manager';
@@ -9,13 +10,32 @@ const mockFs = ExpoFs as unknown as {
   __resetFs: () => void;
 };
 
-const WEATHER = { tempC: 18, waypoints: [{ km: 0, rain: false }] };
+// Payload typé `WeatherForecast[]` depuis MOB-4.8 (1 entrée par segment d'aventure).
+const WEATHER: WeatherForecast[] = [
+  {
+    segmentId: 's1',
+    cachedAt: '2026-06-15T08:00:00.000Z',
+    expiresAt: '2026-06-15T09:00:00.000Z',
+    waypoints: [
+      {
+        km: 0,
+        forecastAt: '2026-06-15T08:00:00.000Z',
+        temperatureC: 18,
+        precipitationProbability: 10,
+        windSpeedKmh: 20,
+        windDirection: 90,
+        weatherCode: 0,
+        iconEmoji: '☀️',
+      },
+    ],
+  },
+];
 
 beforeEach(() => {
   mockFs.__resetFs();
 });
 
-describe('weather-cache (MOB-3.5 / N3 — squelette, alimenté MOB-5/6)', () => {
+describe('weather-cache (N3 — typé WeatherForecast[], branché carte MOB-4.8)', () => {
   it('write → read round-trip', async () => {
     await setCachedWeather('a1', WEATHER);
     expect(await getCachedWeather('a1')).toEqual(WEATHER);

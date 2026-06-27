@@ -1,15 +1,17 @@
 import { File } from 'expo-file-system';
+import type { WeatherForecast } from '@ridenrest/shared';
 
 import { ensureDir, WEATHER_DIR } from './cache-manager';
 
-// Cache N3 — météo par aventure (MOB-3.5 / archi §Data Architecture). **SQUELETTE** :
-// API stable + tests read/write/miss, NON branché à un écran. Alimenté en MOB-5/6
-// (météo par waypoint). Sérialisation JSON : `/cache/weather/{adventureId}.json`.
+// Cache N3 — météo par aventure (MOB-3.5 / archi §Data Architecture). Branché à la
+// carte planning en MOB-4.8 : write-through au succès de `use-weather`, fallback
+// offline. Sérialisation JSON : `/cache/weather/{adventureId}.json`.
 //
-// Le type météo réel arrivera avec MOB-5/6 (packages/shared). En attendant on type
-// le payload `unknown` (sérialisé/désérialisé en JSON) pour ne pas figer un contrat.
-// TODO MOB-5/6 : typer via `packages/shared` (ex. `AdventureWeather`).
-export type CachedWeather = unknown;
+// Une aventure porte 1..N segments (MAX_SEGMENTS_FREE) → on cache **le tableau** des
+// prévisions par segment (`WeatherForecast[]`). Le hook réaligne ensuite chaque point
+// en km cumulés via le `cumulativeStartKm` du segment correspondant. (Type figé en
+// MOB-4.8 — c'était le TODO du squelette MOB-3.5.)
+export type CachedWeather = WeatherForecast[];
 
 function weatherFile(adventureId: string): File {
   return new File(`${WEATHER_DIR}/${adventureId}.json`);
