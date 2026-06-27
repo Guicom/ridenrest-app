@@ -5,10 +5,16 @@ import { LAYER_CATEGORIES, type Poi } from '@ridenrest/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 
+import type { UserTier } from '@ridenrest/analytics';
+
+import { BookingLinks } from '@/components/shared/booking-links';
 import { PoiCard } from '@/components/shared/poi-card';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useNetworkStatus } from '@/hooks/use-network-status';
+import { useProfile } from '@/hooks/use-profile';
 import { usePoiGoogleDetails, useReverseCity } from '@/hooks/use-pois';
+import { useSession } from '@/lib/auth/client';
+import { extractCityFromOsmRawData } from '@/lib/external-links';
 
 // Fiche détail POI en **popin « liquid glass »** (MOB-4.2 / AC3, 4, 5 — refonte parité web
 // `poi-popup.tsx`). Remplace l'ancien bottom sheet `@gorhom/bottom-sheet` (divergence
@@ -79,6 +85,13 @@ export function PoiPopup({
   const { city, isPending: cityPending } = useReverseCity(
     enrichEnabled && isAccommodation && poi ? { lat: poi.lat, lng: poi.lng } : null,
   );
+
+  // Tier pour l'analytics `booking_click` (MOB-4.5 / T4) — dérivé de la session, parité
+  // web (`search-on-dropdown.tsx`). `'anonymous'` si non connecté ; `'free'` par défaut si
+  // le profil n'expose pas encore de tier (MVP mobile). RGPD : aucune PII dans la prop.
+  const { data: session } = useSession();
+  const { data: profile } = useProfile(Boolean(session) && isAccommodation);
+  const userTier: UserTier = session ? (profile?.tier ?? 'free') : 'anonymous';
 
   const addressLine = details?.formattedAddress ?? null;
   const phone = details?.phone ?? null;
@@ -181,6 +194,12 @@ export function PoiPopup({
   // Hooks ci-dessus appelés inconditionnellement (règles des hooks) → return après.
   if (!poi) return null;
 
+  // Ville pour les liens Booking (MOB-4.5 / T2) — ordre de résolution parité web
+  // (`poi-popup.tsx:162-166`) : reverseCity (Geoapify) > Google locality > OSM > null.
+  // Réutilise les hooks d'enrichissement MOB-4.2 (aucun appel supplémentaire).
+  const bookingCity =
+    (city || null) ?? (details?.locality || null) ?? extractCityFromOsmRawData(poi.rawData).city;
+
   // Teinte verre theme-aware (parité web `--popup-glass`) + liseré spéculaire clair.
   const glassTint = isDark ? 'rgba(24,24,27,0.45)' : 'rgba(255,255,255,0.35)';
   const borderColor = isDark
@@ -230,7 +249,12 @@ export function PoiPopup({
             onCall={handleCall}
             onCopyAddress={handleCopyAddress}
             onOpenWebsite={handleOpenWebsite}
-          />
+          >
+            {/* Slot booking (MOB-4.5) — hébergements uniquement (gate parité web). */}
+            {isAccommodation ? (
+              <BookingLinks key={poi.id} poi={poi} city={bookingCity} userTier={userTier} />
+            ) : null}
+          </PoiCard>
         </BlurView>
         {/* Triangle pointeur vers le pin (teinte verre, coïncide avec la carte). */}
         <View

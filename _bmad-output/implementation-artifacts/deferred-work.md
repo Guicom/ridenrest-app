@@ -1,5 +1,28 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-4-5-booking-deeplinks-affiliate-tracking (2026-06-27, round 2)
+
+- **Dropdown sans tap-outside-to-close** — appuyer dans la fiche mais hors de la dropdown (hors pin) ne la ferme pas ; `setOpen(false)` ne se déclenche qu'au re-press du CTA ou au tap d'une entrée. Acceptable MVP ; à confirmer lors de T7 (validation device). [`apps/mobile/src/components/shared/booking-links.tsx`]
+
+## Deferred from: code review of MOB-4-5-booking-deeplinks-affiliate-tracking (2026-06-16)
+
+- **`CloudRainIcon` câblé sur `Copy`** — `icon.tsx` exporte `CloudRainIcon = enableClassName(Copy)` au lieu de `CloudRain`. Toute icône météo affiche une icône presse-papiers. Bug pré-existant, non introduit par MOB-4.5. [`apps/mobile/src/components/ui/icon.tsx`]
+- **Race double-pression sur lien booking** — `handlePress` sans garde in-flight ; deux taps rapides lancent deux `Linking.openURL` en parallèle (bénin iOS, deux onglets possibles Android). Defer MVP — ajouter un `pendingRef` si constaté en validation device T7. [`apps/mobile/src/components/shared/booking-links.tsx`]
+- **`setOpenFailed` setState après démontage** — la closure `.then` garde une ref sur `setOpenFailed` ; si l'utilisateur ferme le popup pendant que `openURL` est en vol, la mise à jour d'état est appelée sur un composant démonté. No-op safe React 19 / RN 0.85. [`apps/mobile/src/components/shared/booking-links.tsx`]
+- **`poi.lat/lng` NaN dans URL builders** — si un POI reçoit des coordonnées non finies, `buildAirbnbSearchUrl` produit `ne_lat=NaN`. Validé en amont par `isValidLngLat` (garde GeoJSON MOB-4.4) ; aucun POI corrompu ne devrait atteindre `BookingLinks`. [`apps/mobile/src/components/shared/booking-links.tsx`]
+- **Dropdown `position:absolute` potentiellement clippée `overflow:hidden` iOS** — le menu de réservation est positionné `absolute` au-dessus du CTA ; si `PoiCard` ou `BlurView` a `overflow:hidden` (border-radius iOS), le menu sera clippé. Approche validée par Guillaume en revue v1.2 ; à confirmer en validation device T7. [`apps/mobile/src/components/shared/booking-links.tsx`]
+- **Pas de test offline explicite pour AC5** — le comportement hors-ligne est couvert by design (`openURL` toujours tenté, tracking try/catch no-op), mais aucun test ne simule explicitement l'absence de réseau. [`apps/mobile/src/components/shared/booking-links.test.tsx`]
+- **Double rendu `useProfile` pendant hydratation session** — entre la résolution de `session` (truthy) et le retour de `useProfile`, `userTier` vaut `'free'` par défaut. Analytics potentiellement incorrectes sur un tap très rapide post-login. Documenté spec T4, acceptable MVP. [`apps/mobile/src/components/map/poi-popup.tsx`]
+
+## Deferred from: code review of MOB-4-4-density-analysis-colorized-trace (2026-06-16)
+
+- **Divergences clés i18n spec vs impl** : `map.density.stale` → `staleHint`, `map.density.analyzeButton` → `calculate` dans les locales. Divergences pré-existantes du pivot MOB-4.3, non documentées dans T7.
+- **Tests hook-level 409/error dans use-density.test.ts** : T8 exige des tests sur `use-density` pour les cas 409 et erreur non-fatale ; couverts en pratique au niveau composant (`sidebar-density-section.test.tsx`), mais pas directement sur le hook.
+- **Epsilon-matching test manquant dans density-features** : `EPSILON_KM = 0.01` utilisé dans `buildDensityColoredFeatures` mais aucun test de frontière sub-epsilon. Pré-existant MOB-4.3.
+- **Stale branch non testée dans sidebar-density-section** : `densityStatus === 'success'` + `densityStale: true` → hint stale + CTA Réessayer. Code présent, aucun test.
+- **Offline cache read path non testé** : AC5 exige que la dernière colorisation reste affichable hors-ligne via TanStack Query persist. Non testable unitairement.
+- **Edge case slider km si GPX commence par des points corrompus** : Si les N premiers waypoints sont invalides (filtrés), le premier waypoint valide peut avoir `distKm > 0` → corridor `[0, X km]` retourne vide. Dégradation gracieuse, cas hypothétique.
+
 ## Deferred from: code review of MOB-4-3-corridor-km-search (2026-06-16)
 
 - **`RangeSlider` PanResponder recréé mid-drag via `useMemo`** : même bug que `Slider` v2.4 (fix documenté changelog) — `useMemo([low, high, …])` recrée le responder en cours de geste. Dormant : RangeSlider non utilisé en UX live (remplacé par Slider+stepper). À corriger avant toute réutilisation via `useState(() => PanResponder.create(…))` + latest-ref pattern. [apps/mobile/src/components/ui/slider.tsx]

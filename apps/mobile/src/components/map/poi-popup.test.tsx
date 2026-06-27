@@ -4,6 +4,8 @@ import { setStringAsync } from 'expo-clipboard';
 import type { CameraRef, MapRef } from '@maplibre/maplibre-react-native';
 import type { GooglePlaceDetails, Poi } from '@ridenrest/shared';
 
+import { trackBookingClick } from '@ridenrest/analytics';
+
 import { PoiPopup } from '@/components/map/poi-popup';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { usePoiGoogleDetails, useReverseCity } from '@/hooks/use-pois';
@@ -22,6 +24,18 @@ jest.mock('@/hooks/use-color-scheme', () => ({
 jest.mock('@/hooks/use-pois', () => ({
   usePoiGoogleDetails: jest.fn(),
   useReverseCity: jest.fn(),
+}));
+// Session/profil → tier de l'analytics booking (MOB-4.5). Mockés pour éviter
+// QueryClient/Better Auth réels dans ce test de composant.
+jest.mock('@/lib/auth/client', () => ({
+  useSession: jest.fn(() => ({ data: { user: { id: 'u1' } } })),
+}));
+jest.mock('@/hooks/use-profile', () => ({
+  useProfile: jest.fn(() => ({ data: { overpassEnabled: false, tier: 'free' } })),
+}));
+// Analytics no-op safe — on vérifie l'émission au press du lien booking.
+jest.mock('@ridenrest/analytics', () => ({
+  trackBookingClick: jest.fn(),
 }));
 
 const mockGoogle = usePoiGoogleDetails as jest.Mock;
@@ -229,5 +243,71 @@ describe('PoiPopup', () => {
     expect(screen.getByText('Hôtel du Col')).toBeOnTheScreen();
     // Enrichissement gaté : Google appelé avec externalId null (query disabled).
     expect(mockGoogle).toHaveBeenCalledWith(null, null);
+  });
+
+  it('hébergement → CTA booking présent ; entrées dans la dropdown (MOB-4.5 / AC1)', async () => {
+    const { getCamera } = makeCamera();
+    await render(
+      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+    );
+    // CTA unique « Rechercher sur » (parité web) — entrées masquées avant ouverture.
+    expect(screen.getByText('Rechercher sur')).toBeOnTheScreen();
+    expect(screen.queryByText('Booking.com')).toBeNull();
+    // Ouverture de la dropdown → Booking + Airbnb (re-render différé).
+    fireEvent.press(screen.getByLabelText('Rechercher sur Booking.com ou Airbnb'));
+    expect(await screen.findByText('Booking.com')).toBeOnTheScreen();
+    expect(screen.getByText('Airbnb')).toBeOnTheScreen();
+  });
+
+  it('restaurant → AUCUN CTA booking (gate accommodations) (MOB-4.5 / AC1)', async () => {
+    mockReverse.mockReturnValue({
+      city: null,
+      postcode: null,
+      state: null,
+      country: null,
+      isPending: false,
+    });
+    const { getCamera } = makeCamera();
+    await render(
+      <PoiPopup poi={makePoi({ category: 'restaurant' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+    );
+    expect(screen.queryByText('Rechercher sur')).toBeNull();
+  });
+
+  it('press Booking → trackBookingClick (poi_type=catégorie, page=map, tier) (MOB-4.5 / AC3)', async () => {
+    const { getCamera } = makeCamera();
+    await render(
+      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+    );
+    fireEvent.press(screen.getByLabelText('Rechercher sur Booking.com ou Airbnb'));
+    fireEvent.press(
+      await screen.findByLabelText('Rechercher sur Booking.com'),
+    );
+    expect(trackBookingClick).toHaveBeenCalledWith({
+      source: 'booking.com',
+      poi_type: 'hotel',
+      page: 'map',
+      user_tier: 'free',
+    });
+    // Ville résolue via reverseCity (Chamonix) → URL ville (parité ordre web).
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      expect.stringContaining('ss=Chamonix'),
+    );
+  });
+
+  it('session null → userTier \'anonymous\' (AC3, chemin non connecté)', async () => {
+    const { useSession: mockUseSession } = jest.requireMock('@/lib/auth/client') as {
+      useSession: jest.Mock;
+    };
+    mockUseSession.mockReturnValueOnce({ data: null });
+    const { getCamera } = makeCamera();
+    await render(
+      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+    );
+    fireEvent.press(screen.getByLabelText('Rechercher sur Booking.com ou Airbnb'));
+    fireEvent.press(await screen.findByLabelText('Rechercher sur Booking.com'));
+    expect(trackBookingClick).toHaveBeenCalledWith(
+      expect.objectContaining({ user_tier: 'anonymous' }),
+    );
   });
 });

@@ -71,6 +71,17 @@ jest.mock('@/lib/api/weather', () => ({
 jest.mock('@/lib/api/profile', () => ({
   getProfile: jest.fn().mockResolvedValue({ overpassEnabled: false, tier: 'free' }),
 }));
+// poi-popup.tsx importe useSession (MOB-4.5) → @better-auth/expo/client est ESM-only,
+// non transformable par jest-expo sans ce mock.
+jest.mock('@/lib/auth/client', () => ({
+  useSession: jest.fn(() => ({ data: null })),
+}));
+jest.mock('@/hooks/use-profile', () => ({
+  useProfile: jest.fn(() => ({ data: null })),
+}));
+jest.mock('@ridenrest/analytics', () => ({
+  trackBookingClick: jest.fn(),
+}));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
   useLocalSearchParams: jest.fn(),

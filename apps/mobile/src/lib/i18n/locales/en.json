@@ -287,6 +287,15 @@
     "detail": {
       "loadFailedEnrichment": "Additional information unavailable"
     },
+    "booking": {
+      "searchOn": "Search on",
+      "triggerA11y": "Search on Booking.com or Airbnb",
+      "bookingCom": "Booking.com",
+      "airbnb": "Airbnb",
+      "openFailed": "Couldn't open the link",
+      "bookingA11y": "Search on Booking.com",
+      "airbnbA11y": "Search on Airbnb"
+    },
     "actions": {
       "navigate": "Navigate to {{name}}",
       "call": "Call {{name}}",

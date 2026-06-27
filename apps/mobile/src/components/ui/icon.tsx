@@ -9,6 +9,7 @@ import {
   ChevronUp,
   CloudRain,
   Copy,
+  ExternalLink,
   Globe,
   GripVertical,
   Map as LucideMap,
@@ -63,6 +64,7 @@ export const ChevronRightIcon = enableClassName(ChevronRight);
 export const ChevronUpIcon = enableClassName(ChevronUp);
 export const CloudRainIcon = enableClassName(CloudRain);
 export const CopyIcon = enableClassName(Copy);
+export const ExternalLinkIcon = enableClassName(ExternalLink);
 export const GlobeIcon = enableClassName(Globe);
 export const GripVerticalIcon = enableClassName(GripVertical);
 export const MapIcon = enableClassName(LucideMap);
