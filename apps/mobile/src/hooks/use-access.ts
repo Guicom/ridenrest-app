@@ -24,6 +24,9 @@ export interface UseAccessResult {
   fetchStatus: FetchStatus;
 }
 
+/** Préfixe de query key partagé avec `use-segments.ts` pour l'invalidation ciblée (MOB-4.7 / T4). */
+export const ACCESS_QUERY_PREFIX = ['poi-access'] as const;
+
 export function useAccess(poiId: string, origin: AccessOrigin): UseAccessResult {
   const { data, isLoading, isError, fetchStatus } = useQuery({
     queryKey: ['poi-access', poiId, origin],

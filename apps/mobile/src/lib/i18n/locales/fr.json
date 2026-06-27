@@ -312,7 +312,9 @@
       "mainRoadWarning": "Route nationale",
       "variants": "Itinéraires",
       "variantGroupA11y": "Choix de l'itinéraire d'accès",
-      "variantA11y": "Itinéraire {{index}} : {{distance}}, {{eta}}"
+      "variantA11y": "Itinéraire {{index}} : {{distance}}, {{eta}}",
+      "polylineA11y": "Itinéraire d'accès tracé sur la carte",
+      "ghostVariantA11y": "Variante d'accès alternative — toucher pour la sélectionner"
     },
     "actions": {
       "navigate": "Naviguer vers {{name}}",

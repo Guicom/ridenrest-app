@@ -1,4 +1,11 @@
-import type { MapLayer, MapSegmentData, MapWaypoint, Poi } from '@ridenrest/shared';
+import type {
+  AccessVariant,
+  MapLayer,
+  MapSegmentData,
+  MapWaypoint,
+  Poi,
+} from '@ridenrest/shared';
+import { LAYER_CATEGORIES } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -12,6 +19,7 @@ import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
 import { MapSearchFeedback } from '@/components/map/map-search-feedback';
 import { PlanningSidebar } from '@/components/map/planning-sidebar';
 import { PoiLayer } from '@/components/map/poi-layer';
+import { AccessMapLayer } from '@/components/poi-access/access-map-layer';
 import { PoiPopup } from '@/components/map/poi-popup';
 import { SearchRangeControl } from '@/components/map/search-range-control';
 import { SidebarDensitySection } from '@/components/map/sidebar-density-section';
@@ -24,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { ChevronLeftIcon } from '@/components/ui/icon';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAccess } from '@/hooks/use-access';
 import { useAdventure } from '@/hooks/use-adventures';
 import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
@@ -33,6 +42,8 @@ import { usePois } from '@/hooks/use-pois';
 import { useProfile } from '@/hooks/use-profile';
 import { useStages } from '@/hooks/use-stages';
 import { useWeather } from '@/hooks/use-weather';
+import { computeAccessBounds } from '@/lib/map/access-features';
+import { DEFAULT_ACCESS_ORIGIN } from '@/lib/api/poi-access';
 import {
   collectTraceWaypoints,
   computeCorridorBounds,
@@ -185,6 +196,22 @@ export default function MapScreen() {
     ? findSegmentIdForKm(segments, selectedPoi.distAlongRouteKm)
     : null;
 
+  // Itinéraire d'accès du POI hébergement sélectionné (MOB-4.7). On lit la **même**
+  // query `useAccess` que la fiche (`AccessMetrics`, key `['poi-access', poiId, origin]`)
+  // → dédup TanStack, **un seul fetch** partagé fiche↔carte. Désactivée hors hébergement
+  // et fiche fermée (`poiId === ''` → query off) → la polyline disparaît (unicité AC2).
+  const selectedIsAccommodation = selectedPoi
+    ? LAYER_CATEGORIES.accommodations.includes(selectedPoi.category)
+    : false;
+  const access = useAccess(
+    selectedIsAccommodation ? (selectedPoiId ?? '') : '',
+    DEFAULT_ACCESS_ORIGIN,
+  );
+  const accessVariants = useMemo<AccessVariant[] | null>(
+    () => (traceReady && access.data?.status === 'ok' ? access.data.variants : null),
+    [traceReady, access.data],
+  );
+
   const mapRef = useRef<MapCanvasHandle>(null);
   const getCamera = useCallback(() => mapRef.current?.getCamera() ?? null, []);
   const getMap = useCallback(() => mapRef.current?.getMap() ?? null, []);
@@ -291,6 +318,23 @@ export default function MapScreen() {
     // détection de transition → le zoom ne partirait jamais (régression code review).
   }, [isFetching, searchCommitted, waypoints, fromKm, toKm, segments]);
 
+  // Auto-zoom sur le bbox englobant TOUTES les variantes d'accès — **une seule fois par
+  // jeu de variantes distinct** (AC1, parité web `lastZoomedRef`). La référence
+  // `accessVariants` est stable par entrée de cache (un POI donné) → ne change qu'au
+  // switch de POI → re-zoom pertinent. Changer de variante (chips) NE re-zoome PAS
+  // (deps = `[accessVariants]` seul).
+  const lastZoomedAccessRef = useRef<AccessVariant[] | null>(null);
+  useEffect(() => {
+    if (!accessVariants || accessVariants.length === 0) {
+      lastZoomedAccessRef.current = null;
+      return;
+    }
+    if (lastZoomedAccessRef.current === accessVariants) return;
+    lastZoomedAccessRef.current = accessVariants;
+    const bounds = computeAccessBounds(accessVariants);
+    if (bounds) mapRef.current?.fitToBounds(bounds);
+  }, [accessVariants]);
+
   const handleMapPress = useCallback(
     (lngLat: [number, number]) => {
       if (!stageClickMode) return;
@@ -381,6 +425,14 @@ export default function MapScreen() {
           stages={stages}
           waypoints={waypoints}
           visible={stagesVisible}
+        />
+        {/* Polyline d'accès AVANT les pins → pins au-dessus. Ancrée `afterId="trace-line"`
+            (au-dessus de la trace, sous les pins). Variante sélectionnée partagée avec
+            les chips de la fiche (`selectedVariantIndex`) ; tap fantôme → sélection. */}
+        <AccessMapLayer
+          variants={accessVariants}
+          selectedIndex={selectedVariantIndex}
+          onSelect={setSelectedVariantIndex}
         />
         <PoiLayer
           poisByLayer={displayPoisByLayer}

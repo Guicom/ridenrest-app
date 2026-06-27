@@ -248,3 +248,66 @@ describe('useSegments parse transitions (AC4)', () => {
     );
   });
 });
+
+describe('invalidation des accès POI sur changement de trace (MOB-4.7 / T4, AC4)', () => {
+  const ACCESS_KEY = ['poi-access'];
+
+  it('upload invalide `[poi-access]` (ciblé, segment ajouté → trace modifiée)', async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
+    mockUpload.mockResolvedValue(makeSegment('new', 1));
+
+    const hook = await mountHook(() => useUploadSegment('adv-1'), qc);
+    await act(async () => {
+      hook.current.mutate({
+        file: { uri: 'file:///t.gpx', name: 't.gpx', type: 'application/gpx+xml' },
+      });
+    });
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ACCESS_KEY });
+  });
+
+  it('suppression invalide `[poi-access]` (segment retiré → trace modifiée)', async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
+    mockDelete.mockResolvedValue(undefined);
+
+    const hook = await mountHook(() => useDeleteSegment('adv-1'), qc);
+    await act(async () => {
+      hook.current.mutate('seg-1');
+    });
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ACCESS_KEY });
+  });
+
+  it('réordre invalide `[poi-access]` (trace fusionnée réordonnée)', async () => {
+    const qc = makeClient();
+    qc.setQueryData(SEG_KEY, [makeSegment('a', 0), makeSegment('b', 1)]);
+    const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
+    mockReorder.mockResolvedValue([makeSegment('b', 0), makeSegment('a', 1)]);
+
+    const hook = await mountHook(() => useReorderSegments('adv-1'), qc);
+    await act(async () => {
+      hook.current.mutate(['b', 'a']);
+    });
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ACCESS_KEY });
+  });
+
+  it('rename N’invalide PAS `[poi-access]` (le nom ne change pas la géométrie)', async () => {
+    const qc = makeClient();
+    const invalidateSpy = jest.spyOn(qc, 'invalidateQueries');
+    mockRename.mockResolvedValue(makeSegment('a', 0, 'Renommé'));
+
+    const hook = await mountHook(() => useRenameSegment('adv-1'), qc);
+    await act(async () => {
+      hook.current.mutate({ segmentId: 'a', name: 'Renommé' });
+    });
+    await waitFor(() => expect(hook.current.isSuccess).toBe(true));
+
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ACCESS_KEY });
+  });
+});

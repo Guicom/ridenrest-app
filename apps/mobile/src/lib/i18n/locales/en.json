@@ -312,7 +312,9 @@
       "mainRoadWarning": "Main road",
       "variants": "Routes",
       "variantGroupA11y": "Choose the access route",
-      "variantA11y": "Route {{index}}: {{distance}}, {{eta}}"
+      "variantA11y": "Route {{index}}: {{distance}}, {{eta}}",
+      "polylineA11y": "Access route drawn on the map",
+      "ghostVariantA11y": "Alternative access route — tap to select it"
     },
     "actions": {
       "navigate": "Navigate to {{name}}",

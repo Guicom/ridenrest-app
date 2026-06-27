@@ -14,6 +14,7 @@ import {
   uploadSegment,
   type RnFile,
 } from '@/lib/api/segments';
+import { ACCESS_QUERY_PREFIX } from '@/hooks/use-access';
 
 // Query key STRICTE partagée par toute la feature segments (MOB-3.2 + 3.3). Une
 // SEULE clé — réutilisée par `useSegments` (lecture/polling) et les mutations
@@ -157,6 +158,8 @@ export function useUploadSegment(adventureId: string) {
         queryKey: segmentsKey(adventureId),
       });
       qc.invalidateQueries({ queryKey: ['adventures', adventureId] });
+      // Trace modifiée (segment ajouté) → accès POI périmés (MOB-4.7 / T4, AC4).
+      qc.invalidateQueries({ queryKey: ACCESS_QUERY_PREFIX });
     },
   });
 }
@@ -203,6 +206,8 @@ export function useReorderSegments(adventureId: string) {
     onSettled: () => {
       // Resynchronise sur le serveur (cumuls/total recalculés côté API).
       qc.invalidateQueries({ queryKey: key });
+      // Trace fusionnée réordonnée → accès POI périmés (MOB-4.7 / T4, AC4).
+      qc.invalidateQueries({ queryKey: ACCESS_QUERY_PREFIX });
     },
   });
 }
@@ -234,6 +239,8 @@ export function useDeleteSegment(adventureId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: segmentsKey(adventureId) });
       qc.invalidateQueries({ queryKey: ['adventures', adventureId] });
+      // Trace modifiée (segment supprimé) → accès POI périmés (MOB-4.7 / T4, AC4).
+      qc.invalidateQueries({ queryKey: ACCESS_QUERY_PREFIX });
     },
   });
 }

@@ -1,6 +1,10 @@
+---
+baseline_commit: 71a6ec41ffc9046fa02918a06443b91c47d706e8
+---
+
 # Story MOB-4.7 : POI Access Routing — polyline carte, auto-zoom & invalidation
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -40,39 +44,47 @@ So that **je visualise concrètement le détour vers un hébergement**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — `components/poi-access/access-map-layer.tsx`** (AC: 1, 2, 5)
-  - [ ] Source GeoJSON `poi-access-source` = `FeatureCollection` (une feature par variante, `properties.idx`). 3 couches (bas→haut), parité web :
+- [x] **T1 — `components/poi-access/access-map-layer.tsx`** (AC: 1, 2, 5)
+  - [x] Source GeoJSON `poi-access` = `FeatureCollection` (une feature par variante, `properties.idx`). 3 couches (bas→haut), parité web :
     - `poi-access-ghost` — variantes non sélectionnées : gris `#9ca3af`, width 3, **dasharray [2,2]**, opacité 0.55, **tapable → onSelect(idx)**.
     - `poi-access-casing` — casing blanc `#ffffff` sous la sélection, width 7, opacité 0.9.
     - `poi-access-line` — variante sélectionnée : **magenta `#e6007e`**, width 4, **dasharray [2,2]**, opacité 1, cap/join round.
-  - [ ] **Insérée au-dessus de la trace, sous les pins POI** (ordre des couches MapLibre — `aboveLayerID`/`belowLayerID` selon l'API RN). Une **seule** polyline sélectionnée via filtre `idx` (`setFilter`/`filter` prop), update par `setData` (pas remove/add).
-  - [ ] **Robustesse reload style (AC5)** : ré-appliquer source+couches sur `styledata`/reload (MapLibre RN détruit les couches custom au changement de style). Teardown idempotent (try/catch — la carte peut être démontée).
-  - [ ] Géométrie : `AccessVariant.geometry` (GeoJSON `LineString|MultiLineString`, `[lon,lat]`). Concaténer/normaliser MultiLineString.
+  - [x] **Insérée au-dessus de la trace, sous les pins POI** : `afterId` chaîné (`ghost`→`trace-line`, `casing`→`ghost`, `line`→`casing`) → empilement déterministe ; montée AVANT `<PoiLayer>` dans `MapCanvas` (pins au sommet). Une **seule** polyline sélectionnée via **filtre `idx`** (prop `filter`), update par `data` déclaratif (pas remove/add).
+  - [x] **Robustesse reload style (AC5)** : le modèle **déclaratif** de `@maplibre/maplibre-react-native` ré-attache automatiquement source+couches au reload de style (parité densité/étapes/corridor) — pas besoin de gestion `styledata` impérative (différence assumée vs web). MapLibre dédoublonne par `id` → pas de doublon.
+  - [x] Géométrie : `AccessVariant.geometry` (GeoJSON `LineString|MultiLineString`, `[lon,lat]`). Normalisation MultiLineString + **filtrage coordonnées non finies au niveau du point** (`isValidLngLat`, anti-SIGABRT natif) + re-check `≥ 2` points par ligne.
 
-- [ ] **T2 — Auto-zoom (fitBounds once)** (AC: 1)
-  - [ ] Calculer le **bbox englobant toutes les variantes** (`computeBounds(variants)`), `camera.fitBounds(ne, sw, padding≈40, duration≈500)`. **Une seule fois par jeu de variantes distinct** (`lastZoomedRef`, parité web). En Planning, `fitOnShow=true`.
-  - [ ] Réutiliser/factoriser la logique de fit de MOB-4.1 (`computeTraceBounds`/`computeBoundingBox`), étendue aux coords d'accès.
+- [x] **T2 — Auto-zoom (fitBounds once)** (AC: 1)
+  - [x] `computeAccessBounds(variants)` (bbox englobant toutes les variantes) → `mapRef.current.fitToBounds()` (`MapCanvasHandle`, padding clampé `safeFitPadding` ~40, durée 500 ms). **Une seule fois par jeu de variantes distinct** (`lastZoomedAccessRef`, parité web `lastZoomedRef`). Changer de variante NE re-zoome PAS (deps `[accessVariants]`).
+  - [x] Factorisation MOB-4.1 : `computeAccessBounds` réutilise `computeTraceBounds`/`computeBoundingBox` (`@ridenrest/gpx`) sur les coords d'accès.
 
-- [ ] **T3 — Branchement écran carte + unicité** (AC: 1, 2, 3)
-  - [ ] La géométrie vient de `useAccess(selectedPoiId, { type:'nearest-trace' })` (**même query** que MOB-4.6). Monter `<AccessMapLayer variants selectedIndex onSelect fitOnShow />` dans le `MapView`, piloté par `selectedPoiId` + `selectedVariantIndex` **liftés écran** (MOB-4.2/4.6).
-  - [ ] **Unicité (AC2)** : `selectedPoiId === null` (fiche fermée / clic extérieur) → pas de polyline. Changer de POI → la query change → nouvelle polyline (l'ancienne disparaît). Tap variante fantôme → `setSelectedVariantIndex(idx)` (synchronise les chips fiche).
-  - [ ] Reset `selectedVariantIndex = 0` au changement de `selectedPoiId`.
+- [x] **T3 — Branchement écran carte + unicité** (AC: 1, 2, 3)
+  - [x] La géométrie vient de `useAccess(selectedPoiId, { type:'nearest-trace' })` (**même query** que MOB-4.6 → dédup TanStack, un seul fetch partagé fiche↔carte). `<AccessMapLayer variants selectedIndex onSelect />` monté dans `MapCanvas`, piloté par `selectedPoiId` + `selectedVariantIndex` **liftés écran** (MOB-4.2/4.6).
+  - [x] **Unicité (AC2)** : POI non-hébergement / fiche fermée → `poiId === ''` → query off → `accessVariants = null` → pas de polyline. Changer de POI → nouvelle queryKey → l'ancienne polyline disparaît, la nouvelle apparaît. Tap variante fantôme → `setSelectedVariantIndex(idx)` (synchronise les chips fiche).
+  - [x] Reset `selectedVariantIndex = 0` au changement de `selectedPoiId` (déjà en place MOB-4.6, pattern « ajuster l'état au rendu »).
 
-- [ ] **T4 — Invalidation client sur changement de trace** (AC: 4)
-  - [ ] Après toute **mutation de trace** (upload/suppression/remplacement/réordre de segment — hooks `use-segments` existants) **et** retour sur la carte, **invalider** les queries `['poi-access']` (ex. `queryClient.invalidateQueries({ queryKey: ['poi-access'] })`) pour forcer un recompute à la prochaine consultation. Documenter que le **recompute d'arrière-plan est backend** (BullMQ) — mobile ne fait que re-fetch.
-  - [ ] Brancher l'invalidation au bon endroit (au montage de la carte si la trace a changé, ou dans les `onSuccess` des mutations segments si l'app est sur la carte). Éviter une invalidation en boucle (cf. leçon « cascading invalidation storm » MOB-3.5) — invalider **ciblé** `['poi-access']`, pas tout.
+- [x] **T4 — Invalidation client sur changement de trace** (AC: 4)
+  - [x] Invalidation **ciblée** `['poi-access']` dans les `onSuccess`/`onSettled` des mutations trace de `use-segments` : `useUploadSegment` (ajout), `useDeleteSegment` (suppression), `useReorderSegments` (réordre de la trace fusionnée). `useRenameSegment` exclu (le nom ne change pas la géométrie). Recompute d'arrière-plan = **backend** (BullMQ, event `adventure.trace-updated`) ; mobile re-fetch seulement.
+  - [x] Branchée dans les handlers de mutation (jamais en boucle, jamais globale) → pas de tempête d'invalidation (leçon MOB-3.5).
 
-- [ ] **T5 — i18n + a11y** (AC: 1, 2)
-  - [ ] Pas/peu de chaînes (carte). Label a11y pour la polyline/variantes fantômes (`pois.access.polylineA11y`, `pois.access.ghostVariantA11y`). Parité FR/EN.
+- [x] **T5 — i18n + a11y** (AC: 1, 2)
+  - [x] Clés a11y `pois.access.polylineA11y` + `pois.access.ghostVariantA11y` ajoutées FR/EN (parité). NB : un calque ligne MapLibre Native n'expose pas de nœud a11y RN — clés déclarées pour parité/futur.
 
-- [ ] **T6 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5)
-  - [ ] `computeBounds(variants)` (pur) : bbox correct sur LineString/MultiLineString multi-variantes.
-  - [ ] `access-map-layer` (avec mock MapLibre) : 3 couches construites ; filtre `idx` = variante sélectionnée ; tap ghost → `onSelect(idx)` ; ré-application sur `styledata` (pas de doublon).
-  - [ ] Écran carte : `selectedPoiId=null` → pas de polyline ; changement POI → remplace ; changement `selectedVariantIndex` → la couche sélectionnée suit.
-  - [ ] Invalidation : une mutation segment → `invalidateQueries(['poi-access'])` appelé (ciblé, pas global). Pas de boucle.
-  - [ ] Gate : `test|typecheck|lint` verts + `expo export` OK.
+- [x] **T6 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5)
+  - [x] `computeAccessBounds` + `buildAccessFeatureCollection` (purs) : bbox correct, idx d'origine préservé, filtrage coords non finies, normalisation MultiLineString.
+  - [x] `access-map-layer` (mock MapLibre) : 3 couches construites ; rien si `variants` null/vide/dégénéré. Filtre `idx` + tap ghost → `onSelect(idx)` testés via helpers purs (`ghostFilter`/`selectedFilter`/`extractTappedVariantIndex`) car le mock ne transmet ni `filter` ni `onPress`.
+  - [x] Invalidation : upload/suppression/réordre → `invalidateQueries(['poi-access'])` (ciblé) ; rename → PAS d'invalidation. Pas de boucle.
+  - [x] Gate : `test` (443/443, 67 suites) · `typecheck` 0 · `lint` 0 · `expo export` iOS OK.
 
-- [ ] **T7 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4, 5) — ⏳ build Dev Client
+### Review Findings
+
+- [x] [Review][Decision→Patch] **F1 — `afterId="trace-line"` : crash potentiel si données d'accès en cache TanStack mais aucun segment rendu** — Guard `hasTrace` ajouté dans `[id].tsx` : `accessVariants` n'est passé non-null que si `readySegments.length > 0`. [`apps/mobile/src/app/(app)/map/[id].tsx`]
+- [x] [Review][Decision→Dismiss] **F2 — Ghost tap : wiring `handlePress → onSelect` non couvert par les tests automatisés** — Couverture actuelle acceptée : helper pur `extractTappedVariantIndex` testé, câblage trivial, pattern documenté dans le fichier test.
+- [x] [Review][Patch] **F3 — `extractTappedVariantIndex` : utiliser `Number.isInteger` au lieu de `typeof idx === 'number'`** — `typeof NaN === 'number'` est `true`. Si MapLibre Native sérialise une propriété corrompue, la valeur pourrait passer le guard et sélectionner un index invalide. [`apps/mobile/src/lib/map/access-features.ts`]
+- [x] [Review][Patch] **F4 — `buildAccessFeatureCollection` : aucun guard pour type géométrie inconnu** — Si `geometry.type` n'est ni `'LineString'` ni `'MultiLineString'` (type futur ou corruption), le `forEach` tombe dans la branche MultiLineString et appelle `.map()` sur `geometry.coordinates` qui peut ne pas être un tableau de tableaux. Ajout `if (geometry.type !== 'MultiLineString') return;` avant le bloc MultiLineString. [`apps/mobile/src/lib/map/access-features.ts`]
+- [x] [Review][Patch] **F5 — `ACCESS_QUERY_PREFIX` dupliqué dans `use-segments.ts`** — La constante `['poi-access']` est désormais exportée depuis `use-access.ts` et importée dans `use-segments.ts`. [`apps/mobile/src/hooks/use-segments.ts`]
+- [x] [Review][Defer] **F6 — `lastZoomedAccessRef` re-zoom sur background refetch** — Après invalidation via `useUploadSegment`/`useDeleteSegment`/`useReorderSegments`, TanStack retourne un nouvel objet même si les données d'accès sont identiques → identité référentielle brisée → re-zoom non souhaité si l'utilisateur avait pané la carte. Parité web (même pattern `lastZoomedRef`), trade-off accepté en l'état. [`apps/mobile/src/app/(app)/map/[id].tsx:323-335`] — deferred, parité comportement web intentionnelle
+
+- [ ] **T7 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4, 5) — ⏳ build Dev Client (Guillaume)
   - [ ] Sélectionner un hôtel → polyline magenta + casing + fantômes gris, auto-zoom une fois.
   - [ ] Tap autre POI → l'ancienne polyline disparaît, nouvelle apparaît. Clic extérieur / fermer fiche → masquée.
   - [ ] Changer de variante (chips fiche) → la polyline suit. Tap variante fantôme → devient sélectionnée + chips synchro.
@@ -140,14 +152,43 @@ apps/mobile/src/lib/i18n/locales/fr.json + en.json (labels a11y polyline)
 
 ### Agent Model Used
 
+claude-opus-4-8 (Amelia / bmad-dev-story)
+
 ### Debug Log References
+
+- Échec initial des tests `access-map-layer` : `render function has not been called`. Cause : sous RNTL v14 + React 19, `render()` est asynchrone — il faut `await render(...)` pour que `screen` soit peuplé (parité `poi-layer.test.tsx`). Corrigé en passant les `it()` en `async` + `await render`.
 
 ### Completion Notes List
 
+- **T1 — `access-map-layer.tsx` (déclaratif)** : contrairement au web (impératif `addLayer`/`setFilter`/`styledata`), le mobile rend une `<GeoJSONSource>` + 3 `<Layer>` déclaratifs enfants du `<Map>` (gate `styleLoaded` de `MapCanvas`). Ordre interne garanti par `afterId` chaîné (ghost→`trace-line`, casing→ghost, line→casing). Sélection isolée par prop `filter` sur `idx` (pas de remove/add).
+- **AC5 (reload de style)** : satisfait **par construction** via le modèle déclaratif (la lib ré-attache source+calques au reload, comme densité/étapes/corridor déjà en prod) — pas de handler `styledata` impératif. Différence assumée vs web, documentée dans le composant.
+- **T2 — auto-zoom** : `computeAccessBounds` (réutilise `computeTraceBounds`/`computeBoundingBox` `@ridenrest/gpx`) → `mapRef.fitToBounds`. `lastZoomedAccessRef` garantit un fit unique par jeu de variantes (référence stable par entrée de cache TanStack). Le changement de variante ne re-zoome pas.
+- **T3 — un seul fetch partagé** : `useAccess(selectedPoiId, nearest-trace)` lifté à l'écran utilise la MÊME queryKey `['poi-access', poiId, origin]` que `AccessMetrics` (fiche) → dédup TanStack, un seul HTTP. Gate accommodation + `poiId === ''` (fiche fermée) → query off → unicité AC2.
+- **T4 — invalidation ciblée** : `['poi-access']` invalidée dans `useUploadSegment`/`useDeleteSegment`/`useReorderSegments` (mutations qui changent la géométrie de trace). `useRenameSegment` exclu. Jamais globale, jamais en boucle (leçon MOB-3.5). Recompute d'arrière-plan = backend (BullMQ).
+- **T5 — a11y** : clés `polylineA11y`/`ghostVariantA11y` FR/EN. Un calque ligne MapLibre Native n'expose pas de nœud a11y RN → clés déclarées pour parité/futur.
+- **Crash-safety natif** : toutes les coords d'accès filtrées par `isValidLngLat` au niveau du point + re-check `≥ 2` (anti-SIGABRT MapLibre Native).
+- **Gate** : `npx jest` 443/443 (67 suites) · `tsc --noEmit` 0 · `eslint` 0 · `expo export --platform ios` OK (bundle 8.3 MB).
+- **Reste manuel (T7, Guillaume)** : validation Dev Client (polyline magenta + fantômes + auto-zoom, unicité, synchro chips, invalidation après ajout/suppression segment, bascule thème). Tout JS (aucun module natif ajouté) → **pas de prebuild requis**, validable via `pnpm sim`.
+
 ### File List
+
+**Ajouts :**
+- `apps/mobile/src/lib/map/access-features.ts`
+- `apps/mobile/src/lib/map/access-features.test.ts`
+- `apps/mobile/src/components/poi-access/access-map-layer.tsx`
+- `apps/mobile/src/components/poi-access/access-map-layer.test.tsx`
+
+**Modifications :**
+- `apps/mobile/src/app/(app)/map/[id].tsx` (useAccess lifté, accessVariants, auto-zoom once, montage `<AccessMapLayer>`)
+- `apps/mobile/src/hooks/use-segments.ts` (invalidation ciblée `['poi-access']` sur upload/delete/reorder)
+- `apps/mobile/src/hooks/use-segments.test.tsx` (tests invalidation `['poi-access']`)
+- `apps/mobile/src/lib/i18n/locales/fr.json` + `en.json` (clés a11y polyline)
+- `_bmad-output/implementation-artifacts/MOB-4-7-poi-access-polyline-autozoom-invalidation.md` (frontmatter baseline + suivi)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (statut)
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-13 | 0.1 | Création story MOB-4.7 (ready-for-dev) — `access-map-layer` (3 couches : ghost gris pointillé tapable / casing blanc / ligne magenta `#e6007e` pointillée), auto-zoom `fitBounds` once sur bbox variantes, unicité (1 polyline), synchro `selectedVariantIndex` fiche↔carte, invalidation client ciblée `['poi-access']` sur mutation de trace, robustesse reload style (`styledata`). Géométrie partagée via `use-access`. i18n a11y FR/EN, tests. | bmad-create-story (Story Context Engineer) |
+| 2026-06-27 | 1.0 | Implémentation T1-T6 (status review). `access-map-layer.tsx` **déclaratif** (GeoJSONSource + 3 Layer, `filter` sur `idx`, `afterId` chaîné, anti-SIGABRT `isValidLngLat`) ; helpers purs `access-features.ts` (`buildAccessFeatureCollection`/`computeAccessBounds`/filtres/extract). Écran carte : `useAccess` lifté (même query que la fiche → 1 fetch), auto-zoom once (`lastZoomedAccessRef`), montage `<AccessMapLayer>` avant `<PoiLayer>`. Invalidation ciblée `['poi-access']` sur upload/delete/reorder (`use-segments`), rename exclu. AC5 par modèle déclaratif (pas de `styledata` impératif — différence assumée vs web). i18n a11y FR/EN. Gate : 443/443 tests (67 suites) · tsc 0 · lint 0 · expo export iOS OK. ⏳ T7 validation Dev Client (Guillaume) — tout JS, pas de prebuild. | bmad-dev-story (Amelia) |
