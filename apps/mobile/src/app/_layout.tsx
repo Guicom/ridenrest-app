@@ -1,5 +1,12 @@
 import '../global.css';
 
+// MOB-5.2 — enregistre la tâche de localisation background AU SCOPE MODULE, avant toute
+// navigation. `expo-task-manager` peut ré-invoquer la tâche après un cold-start de l'OS
+// (app relancée pour livrer des positions écran éteint) → le handler DOIT exister dès le
+// chargement du root. Import à effet de bord uniquement (le `defineTask` s'exécute à
+// l'import). RGPD : la tâche écrit la position dans `useLiveStore`, jamais de POST serveur.
+import '@/lib/live/location-task';
+
 import {
   Montserrat_400Regular,
   Montserrat_500Medium,

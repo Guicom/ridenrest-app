@@ -70,18 +70,34 @@ const config: ExpoConfig = {
     // `expo prebuild --clean -p ios` PUIS `expo run:ios` (cf. AGENTS.md, sinon
     // `Cannot find native module`). v11 requiert la New Architecture (déjà activée SDK 56).
     '@maplibre/maplibre-react-native',
-    // MOB-5.1 — Géolocalisation Live FOREGROUND uniquement. Le plugin injecte au
-    // prebuild `NSLocationWhenInUseUsageDescription` (iOS « Lorsque l'app est active »)
-    // + `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` (Android). La rationale (FR) est
-    // affichée par l'OS au prompt runtime (FR-MOB-015 / NFR-013). ⚠️ Background
-    // (`isIosBackgroundLocationEnabled`/`UIBackgroundModes`/foreground service Android) =
-    // MOB-5.2 — NE PAS activer ici. Module natif neuf → `expo prebuild --clean -p ios`
-    // OBLIGATOIRE avant `run:ios`/`pnpm sim` (sinon « Cannot find native module »).
+    // MOB-5.1 (foreground) → MOB-5.2 (background écran-éteint). Le plugin injecte au
+    // prebuild les permissions de localisation :
+    //   - iOS : `NSLocationWhenInUseUsageDescription` (« Lorsque l'app est active ») +
+    //     `NSLocationAlwaysAndWhenInUseUsageDescription` (« Toujours », escalade MOB-5.2)
+    //     via `locationAlwaysAndWhenInUsePermission` ; `isIosBackgroundLocationEnabled:true`
+    //     ajoute `UIBackgroundModes:['location']` (suivi GPS écran-éteint, support
+    //     `expo-task-manager` qui n'a PAS de plugin propre).
+    //   - Android : `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` (foreground) +
+    //     `ACCESS_BACKGROUND_LOCATION` (`isAndroidBackgroundLocationEnabled:true`) +
+    //     `FOREGROUND_SERVICE`/`FOREGROUND_SERVICE_LOCATION`
+    //     (`isAndroidForegroundServiceEnabled:true`, requis Android 14+ pour la
+    //     notification persistante du suivi en arrière-plan).
+    // La rationale (FR) est affichée par l'OS au prompt runtime (FR-MOB-015 / NFR-013).
+    // RGPD (NFR-012) : la position reste sur le device — la tâche background n'écrit que
+    // dans `useLiveStore`, aucun POST GPS serveur, même écran éteint.
+    // ⚠️ Module natif neuf (`expo-task-manager`) + nouvelles clés Info.plist/Manifest →
+    // `expo prebuild --clean -p ios` OBLIGATOIRE avant `run:ios`/`pnpm sim`
+    // (sinon « Cannot find native module » / permissions Always absentes).
     [
       'expo-location',
       {
         locationWhenInUsePermission:
           'Ride’n’Rest utilise votre position pour vous situer sur votre trace pendant que vous roulez. Votre position reste sur votre appareil et n’est jamais envoyée à nos serveurs.',
+        locationAlwaysAndWhenInUsePermission:
+          'Ride’n’Rest suit votre position même écran éteint pour continuer à calculer les points d’intérêt à venir pendant que vous roulez. Votre position reste sur votre appareil et n’est jamais envoyée à nos serveurs.',
+        isIosBackgroundLocationEnabled: true,
+        isAndroidBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
       },
     ],
   ],

@@ -22,6 +22,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const mockRequestForeground =
   Location.requestForegroundPermissionsAsync as jest.Mock;
 const mockWatchPosition = Location.watchPositionAsync as jest.Mock;
+// MOB-5.2 — escalade background « Always » + démarrage/arrêt du suivi par tâche.
+const mockRequestBackground =
+  Location.requestBackgroundPermissionsAsync as jest.Mock;
+const mockStartUpdates = Location.startLocationUpdatesAsync as jest.Mock;
+const mockStopUpdates = Location.stopLocationUpdatesAsync as jest.Mock;
+const mockHasStarted = Location.hasStartedLocationUpdatesAsync as jest.Mock;
 
 const WAYPOINTS: MapWaypoint[] = [
   { lat: 45, lng: 5, distKm: 0 },
@@ -52,6 +58,11 @@ beforeEach(async () => {
   // Défauts : permission accordée + watch qui retourne une subscription (cb piloté au test).
   mockRequestForeground.mockResolvedValue({ status: 'granted' });
   mockWatchPosition.mockResolvedValue({ remove: jest.fn() });
+  // MOB-5.2 — défauts background : « Always » accordé, suivi non encore démarré.
+  mockRequestBackground.mockResolvedValue({ status: 'granted' });
+  mockStartUpdates.mockResolvedValue(undefined);
+  mockStopUpdates.mockResolvedValue(undefined);
+  mockHasStarted.mockResolvedValue(false);
 });
 
 describe('useLiveMode', () => {
@@ -163,5 +174,71 @@ describe('useLiveMode', () => {
     expect(await screen.findByText('denied')).toBeTruthy();
     expect(mockWatchPosition).not.toHaveBeenCalled();
     expect(useLiveStore.getState().isLiveModeActive).toBe(false);
+  });
+
+  describe('escalade background (MOB-5.2)', () => {
+    it('« Always » accordé → startLocationUpdatesAsync (suivi écran-éteint, AC2)', async () => {
+      await render(<Probe />);
+      await screen.findByText('needsConsent');
+      fireEvent.press(screen.getByLabelText('grant'));
+
+      await waitFor(() => expect(mockRequestBackground).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(mockStartUpdates).toHaveBeenCalledWith(
+          'live-location-task',
+          expect.objectContaining({ foregroundService: expect.any(Object) }),
+        ),
+      );
+    });
+
+    it('« Always » refusé → pas de start background, foreground intact (dégradation AC6)', async () => {
+      mockRequestBackground.mockResolvedValue({ status: 'denied' });
+      let capturedCb:
+        | ((loc: { coords: { latitude: number; longitude: number } }) => void)
+        | null = null;
+      mockWatchPosition.mockImplementation(async (_opts, cb) => {
+        capturedCb = cb;
+        return { remove: jest.fn() };
+      });
+
+      await render(<Probe />);
+      await screen.findByText('needsConsent');
+      fireEvent.press(screen.getByLabelText('grant'));
+
+      await waitFor(() => expect(mockRequestBackground).toHaveBeenCalled());
+      // Le foreground reste pleinement fonctionnel : une position l'active toujours.
+      await waitFor(() => expect(capturedCb).not.toBeNull());
+      await act(async () => {
+        capturedCb!({ coords: { latitude: 45, longitude: 5 } });
+      });
+      expect(await screen.findByText('active')).toBeTruthy();
+      expect(mockStartUpdates).not.toHaveBeenCalled();
+    });
+
+    it('suivi déjà démarré → pas de double start (idempotence)', async () => {
+      mockHasStarted.mockResolvedValue(true);
+      await render(<Probe />);
+      await screen.findByText('needsConsent');
+      fireEvent.press(screen.getByLabelText('grant'));
+
+      await waitFor(() => expect(mockHasStarted).toHaveBeenCalled());
+      expect(mockStartUpdates).not.toHaveBeenCalled();
+    });
+
+    it('unmount → stopLocationUpdatesAsync si suivi actif (pas de tâche fantôme, AC5)', async () => {
+      mockHasStarted.mockResolvedValue(true);
+      const view = await render(<Probe />);
+      await screen.findByText('needsConsent');
+      fireEvent.press(screen.getByLabelText('grant'));
+      await waitFor(() => expect(mockRequestBackground).toHaveBeenCalled());
+
+      await act(async () => {
+        view.unmount();
+      });
+
+      await waitFor(() =>
+        expect(mockStopUpdates).toHaveBeenCalledWith('live-location-task'),
+      );
+    });
   });
 });

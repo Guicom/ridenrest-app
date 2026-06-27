@@ -309,7 +309,7 @@ ridenrest-app/
 **Décisions différées (post-MVP) :**
 
 - Biometric Auth (`expo-local-authentication`)
-- Background geolocation (permission `Always` iOS)
+- ~~Background geolocation (permission `Always` iOS)~~ → **LIVRÉ en MOB-5.2** (l'epic l'exige : FR-MOB-011, NFR-MOB-PERF-03). `expo-task-manager` + `startLocationUpdatesAsync` + foreground service Android + `Always` iOS. Voir §Native Capabilities.
 - Push notifications (réintroduire si pertinent post-MVP)
 - Live Activities iOS (`expo-widgets`)
 - 1-tap Google natif (`@react-native-google-signin`) — si l'UX gêne
@@ -417,10 +417,10 @@ Cette logique se base uniquement sur les champs `start_date` et `end_date` exist
 
 | Décision | Choix | Lib | Rationale |
 |---|---|---|---|
-| Geolocation Live (foreground) | Foreground + screen-on | `expo-location` (`watchPositionAsync`) + `expo-keep-awake` | Permission `When in use`, simplifie sortie store, l'écran sur le guidon reste allumé |
-| Background geolocation | ❌ skip MVP | — | Ajout post-MVP si demande users (long brevets sans toucher au tel) |
-| Push notifications | ❌ skip MVP | — | Cohérent avec absence geoloc background — pas d'usage clair sans suivi continu |
-| App lifecycle | React Native `AppState` API | — | Pause/reprise polling TanStack Query, déclencheur purge cache offline |
+| Geolocation Live (foreground) | Foreground + screen-on | `expo-location` (`watchPositionAsync`) + `expo-keep-awake` | Permission `When in use`, simplifie sortie store, l'écran sur le guidon reste allumé (MOB-5.1) |
+| Background geolocation | ✅ **LIVRÉ MOB-5.2** | `expo-location` (`startLocationUpdatesAsync`) + `expo-task-manager` | Live efficace écran éteint (FR-MOB-011, NFR-MOB-PERF-03). Permission `Always` iOS (`UIBackgroundModes:['location']`) + **foreground service Android** (notification persistante, requis 14+). Tâche au scope module (`location-task.ts`) importée dans `_layout`. **RGPD : écrit `useLiveStore`, aucun POST GPS.** Dégradation gracieuse si `Always` refusé (foreground continue). Leviers batterie : `distanceInterval:50`, `BestForNavigation`, `pausesUpdatesAutomatically`, pause polling `AppState` — cible ≤ 10 %/h à figer post-beta. |
+| Push notifications | ❌ skip MVP | — | Différé (epic MOB-6) — pas requis par le Live background |
+| App lifecycle | React Native `AppState` API | — | Pause/reprise polling TanStack Query (`focusManager`, MOB-5.2 — GPS natif background indépendant), déclencheur purge cache offline |
 | Permissions runtime | géoloc + accès fichiers | `expo-location`, `expo-document-picker` | Prompts iOS/Android avec rationale clair |
 
 ---
@@ -467,9 +467,10 @@ Cette logique se base uniquement sur les champs `start_date` et `end_date` exist
    - Pins SVG + clusters portés depuis web
 
 5. **Live Mode**
-   - `expo-location` foreground + `expo-keep-awake`
+   - `expo-location` foreground (MOB-5.1) **+ background écran-éteint (MOB-5.2)** : `expo-task-manager` + `startLocationUpdatesAsync` + foreground service Android + permission `Always` iOS ; caméra auto-follow + offset look-ahead + dot GPS
+   - `expo-keep-awake`
    - Géoloc + filtrage POIs prochains km
-   - Réutilise endpoints NestJS (RGPD : position GPS jamais transmise au serveur, filtrage client-side ou bbox anonymisée)
+   - Réutilise endpoints NestJS (RGPD : position GPS jamais transmise au serveur — même en background —, filtrage client-side ou bbox anonymisée)
 
 6. **Météo + cache offline**
    - Réutilise endpoint météo

@@ -41,3 +41,8 @@ jest.mock('expo-clipboard');
 // surchargent `watchPositionAsync`/`requestForegroundPermissionsAsync` au cas par cas.
 jest.mock('expo-location');
 jest.mock('expo-keep-awake');
+
+// expo-task-manager (MOB-5.2 — tâche de localisation background) : module natif absent
+// hors device → mock manuel global (`__mocks__/expo-task-manager.js`, `defineTask` capture
+// le handler pour les tests `location-task`). `jest.mock` explicite requis.
+jest.mock('expo-task-manager');

@@ -6,6 +6,7 @@ import {
   type CameraRef,
   type LngLatBounds,
   type MapRef,
+  type ViewStateChangeEvent,
 } from '@maplibre/maplibre-react-native';
 import type { MapSegmentData } from '@ridenrest/shared';
 import {
@@ -17,7 +18,11 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import {
+  View,
+  type LayoutChangeEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import { OsmAttribution } from '@/components/shared/osm-attribution';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -27,10 +32,13 @@ import {
   collectTraceWaypoints,
   computeTraceBounds,
   getMapStyle,
+  lookAheadPadding,
+  routeBearingAtPosition,
   safeFitPadding,
   TRACE_COLOR,
   TRACE_WIDTH,
 } from '@/lib/map/maplibre-config';
+import { useLiveStore } from '@/lib/stores/live.store';
 
 // Canvas carte MapLibre Native (MOB-4.1 / AC1-3). Rend le fond de carte (style
 // light/dark via `useColorScheme`), la **trace GPX** (LineString `#2D6A4A` w3), le
@@ -53,6 +61,17 @@ export interface MapCanvasHandle {
    * encore mesurée (le padding clampé serait nul → fit invalide).
    */
   fitToBounds: (bounds: LngLatBounds | null) => void;
+  /**
+   * Re-cadre sur toute la trace (bouton « recentrer zoom », parité web `resetZoom`). Met
+   * le suivi GPS en pause (`gpsTrackingActive=false`) quand une position est active, sinon
+   * le prochain fix easeTo-erait aussitôt vers le GPS.
+   */
+  resetZoom: () => void;
+  /**
+   * Recentre la caméra sur la position GPS courante et **réactive** le suivi auto
+   * (`gpsTrackingActive=true`) — bouton « recentrer » (AC5). No-op sans position GPS.
+   */
+  centerOnGps: () => void;
 }
 
 export interface MapCanvasProps {
@@ -106,6 +125,32 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
     // (parité web `lastZoomedRef`) et évite un re-fit au changement de thème.
     const lastFitRef = useRef<string | null>(null);
 
+    // ── Suivi GPS auto (MOB-5.2 / AC5) ───────────────────────────────────────────
+    // Lecture **réactive** de la position + du flag de suivi depuis `useLiveStore`. En
+    // mode Planning, `currentPosition` est toujours `null` → l'effet de suivi ci-dessous
+    // est un no-op (zéro impact sur la carte de recherche). Le `gpsTrackingActive`
+    // passe `false` au pan manuel et est réactivé par `centerOnGps()`.
+    const currentPosition = useLiveStore((s) => s.currentPosition);
+    const gpsTrackingActive = useLiveStore((s) => s.gpsTrackingActive);
+    // Premier fix : on zoome (`flyTo`, zoom 14) ; les suivants suivent doucement (`easeTo`).
+    const hasInitialZoomedRef = useRef(false);
+    // Waypoints `{lat,lng}` pour le cap de la trace (offset look-ahead) — `km` inutile ici.
+    const bearingWaypoints = useMemo(
+      () => collectTraceWaypoints(segments),
+      [segments],
+    );
+
+    const trace = useMemo(
+      () => buildTraceFeatureCollection(segments),
+      [segments],
+    );
+    const bounds = useMemo(
+      () => computeTraceBounds(bearingWaypoints),
+      [bearingWaypoints],
+    );
+    const hasTrace = trace.features.length > 0;
+    const boundsKey = bounds ? bounds.join(',') : null;
+
     const handleLayout = (e: LayoutChangeEvent) => {
       const { width, height } = e.nativeEvent.layout;
       setMapSize((prev) =>
@@ -129,20 +174,40 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
             duration: CAMERA_ANIMATION_MS,
           });
         },
+        resetZoom: () => {
+          if (!bounds) return;
+          if (mapSize.width <= 0 || mapSize.height <= 0) return;
+          // Pause du suivi GPS (s'il y a une position) — sinon le prochain fix re-centre
+          // 0,4 s plus tard et annule le re-cadrage (bug web 16-26).
+          if (useLiveStore.getState().currentPosition) {
+            useLiveStore.getState().setGpsTrackingActive(false);
+          }
+          const padding = safeFitPadding(mapSize.width, mapSize.height);
+          cameraRef.current?.fitBounds(bounds, {
+            padding: { top: padding, right: padding, bottom: padding, left: padding },
+            duration: CAMERA_ANIMATION_MS,
+          });
+        },
+        centerOnGps: () => {
+          const pos = useLiveStore.getState().currentPosition;
+          const cam = cameraRef.current;
+          if (!pos || !cam) return;
+          // Réactive le suivi auto (AC5) avant de voler vers le GPS.
+          useLiveStore.getState().setGpsTrackingActive(true);
+          const bearing =
+            bearingWaypoints.length >= 2
+              ? routeBearingAtPosition(bearingWaypoints, pos)
+              : 0;
+          cam.flyTo({
+            center: [pos.lng, pos.lat],
+            zoom: 14,
+            padding: lookAheadPadding(bearing),
+            duration: 800,
+          });
+        },
       }),
-      [mapSize.width, mapSize.height],
+      [mapSize.width, mapSize.height, bounds, bearingWaypoints],
     );
-
-    const trace = useMemo(
-      () => buildTraceFeatureCollection(segments),
-      [segments],
-    );
-    const bounds = useMemo(
-      () => computeTraceBounds(collectTraceWaypoints(segments)),
-      [segments],
-    );
-    const hasTrace = trace.features.length > 0;
-    const boundsKey = bounds ? bounds.join(',') : null;
 
     // Fit auto (FR-026) : une fois le style chargé, la carte MESURÉE, ET à chaque
     // nouveau bbox. Le gate sur `mapSize` évite le fit avant le 1er layout natif
@@ -161,6 +226,68 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
       });
     }, [styleLoaded, bounds, boundsKey, mapSize.width, mapSize.height]);
 
+    // Suivi GPS auto (MOB-5.2 / AC5). No-op en Planning (`currentPosition` null). Premier
+    // fix → `flyTo` zoom 14 ; fixes suivants → `easeTo` doux, tant que l'utilisateur n'a pas
+    // pané (`gpsTrackingActive`). L'offset look-ahead place le GPS hors centre (voir devant)
+    // via le `padding` de `setCamera` (MapLibre Native n'a pas d'offset pixel comme le web).
+    // Quand la position retombe à `null` (GPS perdu / sortie Live), on réarme le 1er fix.
+    useEffect(() => {
+      if (!styleLoaded) return;
+      if (mapSize.width <= 0 || mapSize.height <= 0) return;
+      if (!currentPosition) {
+        hasInitialZoomedRef.current = false;
+        return;
+      }
+      if (!gpsTrackingActive) return;
+      const cam = cameraRef.current;
+      if (!cam) return;
+      const bearing =
+        bearingWaypoints.length >= 2
+          ? routeBearingAtPosition(bearingWaypoints, currentPosition)
+          : 0;
+      const padding = lookAheadPadding(bearing);
+      if (!hasInitialZoomedRef.current) {
+        hasInitialZoomedRef.current = true;
+        cam.flyTo({
+          center: [currentPosition.lng, currentPosition.lat],
+          zoom: 14,
+          padding,
+          duration: 1000,
+        });
+      } else {
+        // Suivi : on ne passe PAS de `zoom` (préserve le niveau choisi par l'utilisateur).
+        cam.easeTo({
+          center: [currentPosition.lng, currentPosition.lat],
+          padding,
+          duration: 400,
+        });
+      }
+    }, [
+      currentPosition,
+      gpsTrackingActive,
+      styleLoaded,
+      mapSize.width,
+      mapSize.height,
+      bearingWaypoints,
+    ]);
+
+    // Pan/zoom manuel → pause du suivi auto (AC5). MapLibre Native expose
+    // `nativeEvent.userInteraction` : on ne coupe le suivi QUE sur un geste utilisateur (les
+    // `flyTo`/`easeTo` programmatiques ont `userInteraction=false`). Gardé par
+    // `currentPosition` pour ne jamais muter le store en mode Planning.
+    const handleRegionIsChanging = (
+      event: NativeSyntheticEvent<ViewStateChangeEvent>,
+    ) => {
+      if (
+        event.nativeEvent?.userInteraction &&
+        useLiveStore.getState().currentPosition &&
+        useLiveStore.getState().gpsTrackingActive
+      ) {
+        useLiveStore.getState().setGpsTrackingActive(false);
+      }
+      onRegionIsChanging?.();
+    };
+
     return (
       <View className="flex-1" onLayout={handleLayout}>
         <Map
@@ -172,7 +299,7 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
           attributionPosition={{ bottom: 8, right: 8 }}
           compass={false}
           onDidFinishLoadingStyle={() => setStyleLoaded(true)}
-          onRegionIsChanging={onRegionIsChanging}
+          onRegionIsChanging={handleRegionIsChanging}
           onRegionDidChange={onRegionDidChange}
           onPress={
             onMapPress

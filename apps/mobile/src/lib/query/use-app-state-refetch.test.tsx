@@ -1,7 +1,7 @@
 import * as NetInfo from '@react-native-community/netinfo';
-import { onlineManager } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { focusManager, onlineManager } from '@tanstack/react-query';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus, Text } from 'react-native';
 
 import { queryClient } from './query-client';
 import { useAppStateRefetch } from './use-app-state-refetch';
@@ -63,5 +63,34 @@ describe('useAppStateRefetch — listener enrichi (MOB-3.5 / AC3-4)', () => {
     });
 
     invalidateSpy.mockRestore();
+  });
+
+  it('background → setFocused(false), active → true (pause/reprise polling MOB-5.2 / AC3) — listener unique', async () => {
+    const focusSpy = jest.spyOn(focusManager, 'setFocused');
+    let handler: ((s: AppStateStatus) => void) | null = null;
+    const addSpy = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_event, cb) => {
+        handler = cb as (s: AppStateStatus) => void;
+        return { remove: jest.fn() };
+      });
+
+    await render(<Probe />);
+    await screen.findByText('mounted');
+
+    // Un SEUL listener AppState (règle projet : jamais de second listener).
+    expect(addSpy).toHaveBeenCalledTimes(1);
+    expect(handler).not.toBeNull();
+
+    // Background → polling/refetch en pause (GPS natif background indépendant, continue).
+    act(() => handler!('background'));
+    expect(focusSpy).toHaveBeenLastCalledWith(false);
+
+    // Retour foreground → reprise du polling.
+    act(() => handler!('active'));
+    expect(focusSpy).toHaveBeenLastCalledWith(true);
+
+    addSpy.mockRestore();
+    focusSpy.mockRestore();
   });
 });

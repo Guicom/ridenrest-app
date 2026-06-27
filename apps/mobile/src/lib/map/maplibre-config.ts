@@ -111,6 +111,62 @@ export function computeCorridorBounds(
   return computeTraceBounds(inRange);
 }
 
+/** Look-ahead caméra (px) appliqué via le padding pour décaler le point GPS hors centre. */
+export const LOOK_AHEAD_PX = 120;
+
+/**
+ * Cap (radians, 0 = nord, sens horaire) de la trace au waypoint le plus proche de
+ * `position`. Port **pur** du web `live-map-canvas.tsx:routeBearingAtPosition`. Utilise la
+ * **géométrie de la trace** (pas le mouvement GPS) → fonctionne à l'arrêt. `0` si moins de
+ * 2 waypoints. La distance est comparée au carré (monotone) → pas de `sqrt` inutile.
+ */
+export function routeBearingAtPosition(
+  waypoints: readonly { lat: number; lng: number }[],
+  position: { lat: number; lng: number },
+): number {
+  if (waypoints.length < 2) return 0;
+  let nearestIdx = 0;
+  let minDist = Infinity;
+  for (let i = 0; i < waypoints.length; i++) {
+    const dLat = waypoints[i]!.lat - position.lat;
+    const dLng = waypoints[i]!.lng - position.lng;
+    const dist = dLat * dLat + dLng * dLng;
+    if (dist < minDist) {
+      minDist = dist;
+      nearestIdx = i;
+    }
+  }
+  const fromIdx = Math.min(nearestIdx, waypoints.length - 2);
+  const from = waypoints[fromIdx]!;
+  const to = waypoints[fromIdx + 1]!;
+  return Math.atan2(to.lng - from.lng, to.lat - from.lat);
+}
+
+/**
+ * Padding caméra (px) qui place le point GPS **à l'opposé du cap** → on voit la trace
+ * « devant » soi (offset look-ahead, AC5). MapLibre **Native** n'a pas d'`offset` pixel
+ * comme le web (`flyTo({ offset })`) ; on décale le centre apparent via le `padding` de
+ * `setCamera`. Sémantique MapLibre : un `paddingTop` élevé pousse le centre vers le BAS de
+ * l'écran. Donc cap nord (ahead = haut) → `paddingTop` → GPS bas → on voit devant.
+ * Cap est → ahead à droite → `paddingRight` → centre à gauche → GPS à gauche.
+ * `cos(bearing)` = composante nord, `sin(bearing)` = composante est.
+ */
+export function lookAheadPadding(
+  bearingRad: number,
+  lookaheadPx: number = LOOK_AHEAD_PX,
+): { top: number; right: number; bottom: number; left: number } {
+  const north = Math.cos(bearingRad) * lookaheadPx;
+  const east = Math.sin(bearingRad) * lookaheadPx;
+  // Forme `ViewPadding` MapLibre RN (`{ top, right, bottom, left }`) — passée directement à
+  // `flyTo`/`easeTo({ padding })`.
+  return {
+    top: Math.max(0, north),
+    bottom: Math.max(0, -north),
+    right: Math.max(0, east),
+    left: Math.max(0, -east),
+  };
+}
+
 /**
  * Construit la `FeatureCollection` GeoJSON de la trace : une `LineString` par
  * segment ayant ≥ 2 waypoints (parité web `buildGeoJsonFeatures`). Coordonnées en

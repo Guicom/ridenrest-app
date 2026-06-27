@@ -204,6 +204,13 @@
       "title": "Location access denied",
       "body": "Allow location access in Settings to use Live mode.",
       "openSettings": "Open Settings"
+    },
+    "recenter": "Recenter",
+    "gpsAcquiring": "Acquiring GPS signal…",
+    "bg": {
+      "notificationTitle": "Live mode active",
+      "notificationBody": "Ride’n’Rest is tracking your position while you ride.",
+      "permissionDeniedNotice": "Background tracking is off. Live stays active while the screen is on."
     }
   },
   "map": {

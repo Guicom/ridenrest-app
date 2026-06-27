@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GeolocationConsent } from '@/components/live/geolocation-consent';
-import { MapCanvas } from '@/components/map/map-canvas';
+import { LiveGpsLayer } from '@/components/map/live-gps-layer';
+import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
-import { ChevronLeftIcon } from '@/components/ui/icon';
+import { ChevronLeftIcon, NavigationIcon } from '@/components/ui/icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAdventure } from '@/hooks/use-adventures';
 import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
@@ -45,13 +46,24 @@ export default function LiveScreen() {
   const title = adventure.data?.name ?? t('map.title');
   const paddingTop = insets.top + 12;
 
-  const { needsConsent, permissionDenied, grantConsent, openSettings, isLiveModeActive } =
-    useLiveMode(waypoints);
+  const {
+    needsConsent,
+    permissionDenied,
+    backgroundDenied,
+    isAcquiring,
+    grantConsent,
+    openSettings,
+    isLiveModeActive,
+  } = useLiveMode(waypoints);
 
   // Refus du consentement in-app : on ferme le dialog et on affiche le message AC1
   // (la géoloc est nécessaire) avec une action pour re-tenter. Le mode Live n'est PAS activé.
   const [refused, setRefused] = useState(false);
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute);
+  const currentPosition = useLiveStore((s) => s.currentPosition);
+
+  // Ref impérative de la caméra (MOB-5.2) — bouton « recentrer » → `centerOnGps()`.
+  const mapRef = useRef<MapCanvasHandle>(null);
 
   const header = (
     <View
@@ -99,8 +111,69 @@ export default function LiveScreen() {
 
   return (
     <View className="flex-1 bg-background-page">
-      <MapCanvas segments={segments} />
+      <MapCanvas ref={mapRef} segments={segments}>
+        {/* Point GPS (dot + halo) à la position courante (MOB-5.2 / AC5). Enfant de
+            MapCanvas → rendu seulement après `styleLoaded` (gate anti-SIGABRT). */}
+        <LiveGpsLayer />
+      </MapCanvas>
       {header}
+
+      {/* Bouton « recentrer » (AC5) : recentre sur le GPS + réactive l'auto-follow.
+          Visible dès qu'une position est connue. */}
+      {isLiveModeActive && currentPosition ? (
+        <View
+          pointerEvents="box-none"
+          style={{ top: insets.top + 64 }}
+          className="absolute right-4 z-20"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="bg-card/80"
+            accessibilityLabel={t('live.recenter')}
+            onPress={() => mapRef.current?.centerOnGps()}
+          >
+            <NavigationIcon size={22} className="text-primary" />
+          </Button>
+        </View>
+      ) : null}
+
+      {/* Indicateur « acquisition GPS… » : watch démarré, pas encore de 1er fix (NFR-007). */}
+      {isAcquiring ? (
+        <View
+          pointerEvents="none"
+          style={{ bottom: insets.bottom + 16 }}
+          className="absolute left-0 right-0 z-20 items-center"
+        >
+          <View
+            accessibilityRole="text"
+            className="rounded-full bg-card/90 px-4 py-2"
+          >
+            <Text className="text-sm font-montserrat text-text-secondary">
+              {t('live.gpsAcquiring')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Dégradation gracieuse background (AC6) : « Always » refusé → avis NON bloquant,
+          le Live foreground continue. */}
+      {backgroundDenied && isLiveModeActive ? (
+        <View
+          pointerEvents="none"
+          style={{ top: insets.top + 64 }}
+          className="absolute left-4 right-16 z-10"
+        >
+          <View
+            accessibilityRole="alert"
+            className="rounded-lg border border-text-muted bg-text-muted/10 px-3 py-2"
+          >
+            <Text className="text-center text-xs font-montserrat text-text-muted">
+              {t('live.bg.permissionDeniedNotice')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {/* Repère minimal du PK courant (matérialise la projection AC3 ; dot/caméra = 5.2). */}
       {isLiveModeActive && currentKmOnRoute != null ? (

@@ -10,9 +10,16 @@ import { deriveIsOnline } from '@/hooks/use-network-status';
 import { queryClient } from './query-client';
 
 // Listener de cycle de vie **unique** et centralisé (MOB-2.1 / AC3 — archi §Lifecycle),
-// enrichi en MOB-3.5. Monté une seule fois au root (`_layout.tsx`). INTERDICTION
-// formelle d'ajouter un second listener `AppState` ou un second abonnement NetInfo
-// global (la lecture UI passe par `useNetworkStatus`, qui ne duplique pas le refetch).
+// enrichi en MOB-3.5 puis MOB-5.2. Monté une seule fois au root (`_layout.tsx`).
+// INTERDICTION formelle d'ajouter un second listener `AppState` ou un second abonnement
+// NetInfo global (la lecture UI passe par `useNetworkStatus`, qui ne duplique pas le refetch).
+//
+// MOB-5.2 (AC3) — pause/reprise du polling en background : `focusManager.setFocused(false)`
+// hors `active` met en pause **tout** refetch et **tout** polling `refetchInterval`
+// (TanStack `refetchIntervalInBackground` est `false` par défaut) → POI/météo Live ne
+// pollent plus écran éteint (économie réseau/batterie). Le **GPS natif background**
+// (`startLocationUpdatesAsync`) est INDÉPENDANT d'`onlineManager`/`focusManager` (ce n'est
+// pas une query) → il continue, hors-ligne y compris, et reste RGPD-safe (rien transmis).
 //
 // Au retour foreground :
 //   - marque TanStack Query « focused » → refetch des queries `stale`

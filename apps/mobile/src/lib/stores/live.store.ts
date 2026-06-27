@@ -57,7 +57,7 @@ export const useLiveStore = create<LiveState>((set) => ({
 
   activateLiveMode: () => set({ isLiveModeActive: true }),
   deactivateLiveMode: () =>
-    set({ isLiveModeActive: false, currentPosition: null, currentKmOnRoute: null }),
+    set({ isLiveModeActive: false, currentPosition: null, currentKmOnRoute: null, gpsTrackingActive: true }),
 
   setGeolocationConsent: (consented) => set({ geolocationConsented: consented }),
 

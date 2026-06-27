@@ -79,8 +79,8 @@ module.exports = {
   Map: MapMock,
   Camera: passthroughWithRef('Camera', [
     'fitBounds',
-    'flyTo',
-    'easeTo',
+    'flyTo', // MOB-5.2 — 1er fix GPS (zoom) + bouton recentrer
+    'easeTo', // MOB-5.2 — suivi GPS doux
     'jumpTo',
     'zoomTo',
     'setStop',

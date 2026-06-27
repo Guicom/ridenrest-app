@@ -204,6 +204,13 @@
       "title": "Accès à la position refusé",
       "body": "Autorisez l’accès à votre position dans les Réglages pour utiliser le mode Live.",
       "openSettings": "Ouvrir les Réglages"
+    },
+    "recenter": "Recentrer",
+    "gpsAcquiring": "Acquisition du signal GPS…",
+    "bg": {
+      "notificationTitle": "Mode Live actif",
+      "notificationBody": "Ride’n’Rest suit votre position pendant que vous roulez.",
+      "permissionDeniedNotice": "Suivi en arrière-plan désactivé. Le Live reste actif écran allumé."
     }
   },
   "map": {
