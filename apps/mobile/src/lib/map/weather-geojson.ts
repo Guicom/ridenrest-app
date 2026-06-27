@@ -44,12 +44,15 @@ export function buildWindArrowPoints(
   waypoints: readonly MapWaypoint[],
 ): GeoJSON.FeatureCollection<GeoJSON.Point> {
   const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
-  if (waypoints.length === 0) return { type: 'FeatureCollection', features };
+  // Ne considérer que des waypoints à coords finies (cf. AGENTS.md) — sinon le point
+  // « flèche vent » le plus proche pourrait porter une coordonnée non finie → SIGABRT.
+  const validWaypoints = waypoints.filter((w) => isValidLngLat(w.lng, w.lat));
+  if (validWaypoints.length === 0) return { type: 'FeatureCollection', features };
 
   for (const wp of weatherPoints) {
-    let nearest = waypoints[0]!;
+    let nearest = validWaypoints[0]!;
     let minDiff = Math.abs(nearest.distKm - wp.km);
-    for (const cand of waypoints) {
+    for (const cand of validWaypoints) {
       const diff = Math.abs(cand.distKm - wp.km);
       if (diff < minDiff) {
         minDiff = diff;

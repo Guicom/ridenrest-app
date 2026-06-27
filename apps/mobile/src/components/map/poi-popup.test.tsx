@@ -37,6 +37,11 @@ jest.mock('@/hooks/use-profile', () => ({
 jest.mock('@ridenrest/analytics', () => ({
   trackBookingClick: jest.fn(),
 }));
+// Bloc accès (MOB-4.6) stubbé : ce test ne wrappe pas de QueryClientProvider et
+// `AccessMetrics` (via `useAccess`/`useQuery`) en exige un. Couvert par ses propres tests.
+jest.mock('@/components/poi-access/access-metrics', () => ({
+  AccessMetrics: jest.fn(() => null),
+}));
 
 const mockGoogle = usePoiGoogleDetails as jest.Mock;
 const mockReverse = useReverseCity as jest.Mock;
@@ -113,11 +118,14 @@ beforeEach(() => {
   jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
 });
 
+// Position écran projetée du pin (MOB-4.2 refonte overlay) — requise pour afficher la fiche.
+const POPUP_ANCHOR = { x: 200, y: 400 };
+
 describe('PoiPopup', () => {
   it('poi null → ne rend rien', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={null} segmentId={null} onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={null} segmentId={null} onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     expect(screen.queryByText('Hôtel du Col')).toBeNull();
   });
@@ -125,32 +133,31 @@ describe('PoiPopup', () => {
   it('poi sélectionné → fiche affichée (nom + catégorie)', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     expect(screen.getByText('Hôtel du Col')).toBeOnTheScreen();
     expect(screen.getByText('Hôtel')).toBeOnTheScreen();
   });
 
-  it('Marker id constant (anti « id cannot be changed » MapLibre)', async () => {
+  it('overlay rendu quand `anchor` fourni ; masqué quand `anchor` null', async () => {
     const { getCamera } = makeCamera();
-    // Le mock Marker dérive son testID de `props.id` → on vérifie l'id constant.
-    await render(
-      <PoiPopup
-        poi={makePoi({ id: 'autre-poi' })}
-        segmentId="s0"
-        onClose={jest.fn()}
-        getCamera={getCamera}
-      />,
+    // Overlay RN absolu (plus de `<Marker>` bitmap) → rendu seulement si la projection
+    // du pin est dispo (`anchor` non null). `anchor` null = projection pas prête → masqué.
+    const { rerender } = await render(
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
-    // id NON dérivé de poi.id (sinon ce serait 'poi-popup-autre-poi' → frozen-id crash).
     expect(screen.getByTestId('poi-popup')).toBeOnTheScreen();
-    expect(screen.queryByTestId('poi-popup-autre-poi')).toBeNull();
+
+    await rerender(
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={null} />,
+    );
+    expect(screen.queryByTestId('poi-popup')).toBeNull();
   });
 
   it('recentrage caméra à l’ouverture (easeTo sur le POI, repli sans getMap)', async () => {
     const { easeTo, getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     await waitFor(() => expect(easeTo).toHaveBeenCalled());
     // Repli (pas de getMap) : centre = POI, et SURTOUT pas de `padding` (cause du zoom-out).
@@ -166,7 +173,7 @@ describe('PoiPopup', () => {
         poi={makePoi()}
         segmentId="s0"
         onClose={jest.fn()}
-        getCamera={getCamera}
+        getCamera={getCamera} anchor={POPUP_ANCHOR}
         getMap={getMap}
       />,
     );
@@ -183,7 +190,7 @@ describe('PoiPopup', () => {
   it('Naviguer → ouvre l’itinéraire Maps (lat,lng)', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText('Naviguer vers Hôtel du Col'));
     expect(Linking.openURL).toHaveBeenCalledWith(
@@ -194,7 +201,7 @@ describe('PoiPopup', () => {
   it('Téléphone → compose tel:', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText('Appeler Hôtel du Col'));
     expect(Linking.openURL).toHaveBeenCalledWith('tel:+33450000000');
@@ -203,7 +210,7 @@ describe('PoiPopup', () => {
   it('Copier l’adresse → presse-papiers', async () => {
     const { getCamera } = makeCamera();
     const { unmount } = await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText("Copier l'adresse"));
     expect(setStringAsync).toHaveBeenCalledWith('12 rue du Mont, Chamonix');
@@ -217,7 +224,7 @@ describe('PoiPopup', () => {
   it('Site officiel → ouvre le site web', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText('Site officiel'));
     expect(Linking.openURL).toHaveBeenCalledWith('https://hotel.example');
@@ -227,7 +234,7 @@ describe('PoiPopup', () => {
     const onClose = jest.fn();
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={onClose} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={onClose} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText('Fermer la fiche'));
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -237,7 +244,7 @@ describe('PoiPopup', () => {
     mockNetwork.mockReturnValue({ isOnline: false });
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi()} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     // Fiche de base toujours visible (offline, jamais bloquée).
     expect(screen.getByText('Hôtel du Col')).toBeOnTheScreen();
@@ -248,7 +255,7 @@ describe('PoiPopup', () => {
   it('hébergement → CTA booking présent ; entrées dans la dropdown (MOB-4.5 / AC1)', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     // CTA unique « Rechercher sur » (parité web) — entrées masquées avant ouverture.
     expect(screen.getByText('Rechercher sur')).toBeOnTheScreen();
@@ -269,7 +276,7 @@ describe('PoiPopup', () => {
     });
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi({ category: 'restaurant' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi({ category: 'restaurant' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     expect(screen.queryByText('Rechercher sur')).toBeNull();
   });
@@ -277,7 +284,7 @@ describe('PoiPopup', () => {
   it('press Booking → trackBookingClick (poi_type=catégorie, page=map, tier) (MOB-4.5 / AC3)', async () => {
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText('Rechercher sur Booking.com ou Airbnb'));
     fireEvent.press(
@@ -302,7 +309,7 @@ describe('PoiPopup', () => {
     mockUseSession.mockReturnValueOnce({ data: null });
     const { getCamera } = makeCamera();
     await render(
-      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} />,
+      <PoiPopup poi={makePoi({ category: 'hotel' })} segmentId="s0" onClose={jest.fn()} getCamera={getCamera} anchor={POPUP_ANCHOR} />,
     );
     fireEvent.press(screen.getByLabelText('Rechercher sur Booking.com ou Airbnb'));
     fireEvent.press(await screen.findByLabelText('Rechercher sur Booking.com'));

@@ -194,6 +194,65 @@ export default function MapScreen() {
     setSelectedPoiId(null);
   }
 
+  // Variante d'accès sélectionnée (MOB-4.6 / T5) — **liftée ici** car MOB-4.7 la
+  // réutilisera pour tracer la polyline d'accès (sibling de la fiche). Reset à 0 au
+  // changement de POI via le pattern « ajuster l'état au rendu » (React docs), pas un
+  // effet (cohérent avec `poi-popup.tsx`).
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [variantForPoiId, setVariantForPoiId] = useState(selectedPoiId);
+  // Position écran (px) du popup POI. Le popup n'est plus un `<Marker>` (bitmap
+  // non-interactif sur iOS → taps avalés/aléatoires) mais un **overlay RN absolu**
+  // (`poi-popup.tsx`) : on projette ici le pin via `getMap().project()` et on le fait
+  // suivre au pan/zoom (events `onRegionIsChanging/DidChange` de `MapCanvas`). Le guard
+  // in-flight évite l'empilement d'appels async pendant un pan rapide.
+  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(null);
+  const projectingRef = useRef(false);
+
+  // Reset au changement de POI (pattern « ajuster l'état au rendu » React, pas un effet) :
+  // variante → 0, et position projetée → null (fiche masquée jusqu'à re-projection du
+  // nouveau pin → pas de flash à l'ancienne position).
+  if (variantForPoiId !== selectedPoiId) {
+    setVariantForPoiId(selectedPoiId);
+    setSelectedVariantIndex(0);
+    setPopupAnchor(null);
+  }
+
+  const reprojectPopup = useCallback(async () => {
+    const map = getMap();
+    if (!map?.project || !selectedPoi) return; // anchor effacé au rendu (cf. reset POI) — pas
+    // de setState synchrone ici (règle react-hooks/set-state-in-effect) ; on ne POSE qu'une
+    // position valide, et toujours **après** l'await `project` (donc de façon asynchrone).
+    if (projectingRef.current) return;
+    projectingRef.current = true;
+    try {
+      const px = await map.project([selectedPoi.lng, selectedPoi.lat]);
+      setPopupAnchor({ x: px[0], y: px[1] });
+    } catch {
+      // Projection indisponible (style pas prêt) → on garde la dernière position connue.
+    } finally {
+      projectingRef.current = false;
+    }
+  }, [getMap, selectedPoi]);
+
+  // Re-projette à l'ouverture / au changement de POI sélectionné. Le `setPopupAnchor` vit
+  // dans le callback `.then` (asynchrone) — pas d'appel synchrone dans le corps de l'effet
+  // (règle react-hooks/set-state-in-effect). `cancelled` ignore une projection résolue après
+  // un changement de POI/démontage.
+  useEffect(() => {
+    const map = getMap();
+    if (!map?.project || !selectedPoi) return;
+    let cancelled = false;
+    void map
+      .project([selectedPoi.lng, selectedPoi.lat])
+      .then((px) => {
+        if (!cancelled) setPopupAnchor({ x: px[0], y: px[1] });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [getMap, selectedPoi]);
+
   // Drawer + placement d'étape (tap trace). Fermé par défaut (parité web mobile).
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stageClickMode, setStageClickMode] = useState(false);
@@ -293,6 +352,8 @@ export default function MapScreen() {
         ref={mapRef}
         segments={segments}
         onMapPress={stageClickMode ? handleMapPress : undefined}
+        onRegionIsChanging={reprojectPopup}
+        onRegionDidChange={reprojectPopup}
       >
         <DensityLayer
           segments={segments}
@@ -327,14 +388,20 @@ export default function MapScreen() {
           onSelectPoi={setSelectedPoiId}
           getCamera={getCamera}
         />
-        <PoiPopup
-          poi={selectedPoi}
-          segmentId={selectedSegmentId}
-          onClose={handleCloseSheet}
-          getCamera={getCamera}
-          getMap={getMap}
-        />
       </MapCanvas>
+      {/* Popup POI = overlay RN absolu AU-DESSUS de la carte (PAS enfant du `<Map>`) :
+          tactile fiable sur iOS (cf. poi-popup.tsx). Positionné via `popupAnchor` (projection
+          du pin), il suit la carte au pan/zoom. Rendu avant `header` → la barre reste au-dessus. */}
+      <PoiPopup
+        poi={selectedPoi}
+        anchor={popupAnchor}
+        segmentId={selectedSegmentId}
+        onClose={handleCloseSheet}
+        getCamera={getCamera}
+        getMap={getMap}
+        selectedVariantIndex={selectedVariantIndex}
+        onSelectVariant={setSelectedVariantIndex}
+      />
       {header}
 
       {traceReady ? (

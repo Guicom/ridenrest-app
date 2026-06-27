@@ -43,16 +43,40 @@ const passthroughWithRef = (name, methods) => {
   return Comp;
 };
 
+// `Map` : comme `passthroughWithRef`, mais **simule le chargement du style** en appelant
+// `onDidFinishLoadingStyle` au montage. Sans ça, `styleLoaded` resterait `false` côté
+// `MapCanvas` (qui ne monte les `<GeoJSONSource>` qu'après le style chargé — fix anti-SIGABRT
+// 2026-06-27) → la trace/les calques ne seraient jamais rendus en test.
+const MAP_METHODS = [
+  'getCenter',
+  'getZoom',
+  'getBounds',
+  'getViewState',
+  'queryRenderedFeatures',
+  'showAttribution',
+  'project',
+  'unproject',
+];
+const MapMock = React.forwardRef((props, ref) => {
+  React.useImperativeHandle(ref, () => {
+    const handle = {};
+    for (const m of MAP_METHODS) handle[m] = jest.fn();
+    return handle;
+  }, []);
+  React.useEffect(() => {
+    props.onDidFinishLoadingStyle?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return React.createElement(
+    View,
+    { testID: props.testID ?? props.id ?? 'Map' },
+    props.children ?? null,
+  );
+});
+MapMock.displayName = 'Map';
+
 module.exports = {
   __esModule: true,
-  Map: passthroughWithRef('Map', [
-    'getCenter',
-    'getZoom',
-    'getBounds',
-    'getViewState',
-    'queryRenderedFeatures',
-    'showAttribution',
-  ]),
+  Map: MapMock,
   Camera: passthroughWithRef('Camera', [
     'fitBounds',
     'flyTo',

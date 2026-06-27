@@ -21,6 +21,15 @@ const config: ExpoConfig = {
     icon: './assets/expo.icon',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // ATS : autorise le HTTP cleartext vers `localhost`/`*.local` (API NestJS
+      // `http://localhost:3010` + Better Auth `:3011`) en build **Release autonome**
+      // (cf. `scripts/sim-build.sh`). Sans cette exception, iOS bloque le cleartext en
+      // Release → l'app se lance mais TOUS les appels API échouent. Inoffensif en prod
+      // (api.ridenrest.app est en HTTPS) : `NSAllowsLocalNetworking` ne relâche QUE le
+      // réseau local, pas les chargements arbitraires. (Découvert MOB-4.6, 2026-06-27.)
+      NSAppTransportSecurity: {
+        NSAllowsLocalNetworking: true,
+      },
     },
   },
   android: {

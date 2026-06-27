@@ -1,14 +1,16 @@
-import { Marker, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
+import { type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
 import { BlurView } from 'expo-blur';
 import * as Clipboard from 'expo-clipboard';
 import { LAYER_CATEGORIES, type Poi } from '@ridenrest/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Linking, View, type LayoutChangeEvent } from 'react-native';
 
 import type { UserTier } from '@ridenrest/analytics';
 
 import { BookingLinks } from '@/components/shared/booking-links';
+import { AccessMetrics } from '@/components/poi-access/access-metrics';
 import { PoiCard } from '@/components/shared/poi-card';
+import { DEFAULT_ACCESS_ORIGIN } from '@/lib/api/poi-access';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useProfile } from '@/hooks/use-profile';
@@ -21,9 +23,14 @@ import { extractCityFromOsmRawData } from '@/lib/external-links';
 // validée par Guillaume le 2026-06-14 : rendu identique au web responsive, fond verre
 // dépoli flottant ancré au pin, et non un tiroir blanc plein).
 //
-// Ancrage : `<Marker lngLat anchor="bottom" offset={[0,-gap]}>` (enfant du `<Map>`) → la
-// fiche suit le pin **nativement** (pas de projection JS : `getPointInView` n'existe pas
-// dans cette build MapLibre Native v11). Triangle pointeur sous la carte (vers le pin).
+// Ancrage : **overlay RN absolu** (PAS un `<Marker>`). ⚠️ Sur iOS, le `Marker` de
+// `@maplibre/maplibre-react-native` passe par `ViewAnnotation`/`MLNPointAnnotation` qui rend
+// les enfants **sur un bitmap non-interactif** (cf. source lib) → les boutons (variantes,
+// booking, actions) ne reçoivent pas les taps de façon fiable et l'image ne se redessine pas
+// au changement d'état (bug réel 2026-06-27). On rend donc la fiche comme une View RN
+// **absolue** au-dessus de la carte, positionnée via `anchor` = `getMap().project([lng,lat])`
+// (calculé par l'écran carte, qui la fait suivre le pin au pan/zoom). Tactile 100 % fiable.
+// Triangle pointeur sous la fiche (vers le pin).
 //
 // Verre : `BlurView` (expo-blur, flou de fond natif) + tuile translucide + liseré clair +
 // ombre portée. Contenu net par-dessus (PoiCard). Thème via `useColorScheme`.
@@ -52,6 +59,12 @@ const COPY_FEEDBACK_MS = 2000;
 
 export interface PoiPopupProps {
   poi: Poi | null;
+  /**
+   * Position écran (px) du pin, projetée par l'écran carte (`getMap().project([lng,lat])`)
+   * et re-projetée au pan/zoom. `null` tant que la projection n'est pas dispo → fiche masquée.
+   * Origine = coin haut-gauche de la carte (= racine plein écran) → coords absolues directes.
+   */
+  anchor: { x: number; y: number } | null;
   /** Segment d'origine (requis pour l'enrichissement Google par `externalId`). */
   segmentId: string | null;
   onClose: () => void;
@@ -59,14 +72,24 @@ export interface PoiPopupProps {
   getCamera: () => CameraRef | null;
   /** Accès carte (projection) — recentrage à zoom préservé. Optionnel : repli sinon. */
   getMap?: () => MapRef | null;
+  /**
+   * Variante d'accès sélectionnée (MOB-4.6 / T5-T6) — état **lifté à l'écran carte**
+   * (`map/[id].tsx`) pour être partagé avec la polyline d'accès (MOB-4.7). Reset à 0
+   * au changement de POI côté écran. Absent → la fiche affiche la meilleure variante.
+   */
+  selectedVariantIndex?: number;
+  onSelectVariant?: (index: number) => void;
 }
 
 export function PoiPopup({
   poi,
+  anchor,
   segmentId,
   onClose,
   getCamera,
   getMap,
+  selectedVariantIndex,
+  onSelectVariant,
 }: PoiPopupProps) {
   const { isOnline } = useNetworkStatus();
   const { colorScheme } = useColorScheme();
@@ -96,6 +119,11 @@ export function PoiPopup({
   const addressLine = details?.formattedAddress ?? null;
   const phone = details?.phone ?? null;
   const website = details?.website ?? null;
+
+  // Hauteur mesurée de la fiche (px) — pour ancrer son BAS (pointe du triangle) au pin :
+  // `top = anchor.y - hauteur - gap`. Tant que non mesurée (0), la fiche est rendue invisible
+  // (opacity 0) pour éviter un flash à la mauvaise position.
+  const [cardHeight, setCardHeight] = useState(0);
 
   // Feedback copie (réinitialisé à chaque changement de POI).
   const [addressCopied, setAddressCopied] = useState(false);
@@ -192,7 +220,8 @@ export function PoiPopup({
   }, [addressLine, clearCopyTimeout]);
 
   // Hooks ci-dessus appelés inconditionnellement (règles des hooks) → return après.
-  if (!poi) return null;
+  // `anchor` null = projection pas encore dispo (style pas chargé / hors écran) → masqué.
+  if (!poi || !anchor) return null;
 
   // Ville pour les liens Booking (MOB-4.5 / T2) — ordre de résolution parité web
   // (`poi-popup.tsx:162-166`) : reverseCity (Geoapify) > Google locality > OSM > null.
@@ -208,68 +237,89 @@ export function PoiPopup({
   const triangleColor = glassTint;
 
   return (
-    <Marker
-      // ⚠️ `id` CONSTANT (jamais dérivé de `poi.id`) : le `Marker` MapLibre **gèle** son
-      // `id` au montage (`useFrozenId`) → le changer (sélection d'un autre POI sur le même
-      // Marker monté) jette « `id` cannot be changed ». Il n'y a qu'une popin à la fois, et
-      // `lngLat` (non gelé) se met à jour → la fiche se repositionne sur le nouveau pin.
-      id="poi-popup"
-      lngLat={[poi.lng, poi.lat]}
-      anchor="bottom"
-      offset={[0, -POPUP_PIN_GAP]}
+    // Overlay RN absolu (coords écran = projection du pin). `box-none` : les taps HORS de la
+    // fiche traversent vers la carte ; les Pressables de la fiche, eux, reçoivent les taps
+    // normalement (vraies vues RN → tactile fiable, contrairement au bitmap d'un Marker iOS).
+    <View
+      testID="poi-popup"
+      pointerEvents="box-none"
+      onLayout={(e: LayoutChangeEvent) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0 && h !== cardHeight) setCardHeight(h);
+      }}
+      style={{
+        position: 'absolute',
+        width: POPUP_WIDTH,
+        left: anchor.x - POPUP_WIDTH / 2,
+        // Bas du bloc (pointe du triangle) ancré `POPUP_PIN_GAP` px au-dessus du pin.
+        top: anchor.y - cardHeight - POPUP_PIN_GAP,
+        // Masqué tant que la hauteur n'est pas mesurée (évite un flash mal placé).
+        opacity: cardHeight > 0 ? 1 : 0,
+      }}
+      className="items-center"
     >
-      <View style={{ width: POPUP_WIDTH }} className="items-center">
-        <BlurView
-          intensity={50}
-          tint="systemChromeMaterial"
-          style={{
-            width: '100%',
-            borderRadius: 20,
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor,
-            backgroundColor: glassTint,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.22,
-            shadowRadius: 24,
-            elevation: 12,
-          }}
+      <BlurView
+        intensity={50}
+        tint="systemChromeMaterial"
+        style={{
+          width: '100%',
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor,
+          backgroundColor: glassTint,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 12 },
+          shadowOpacity: 0.22,
+          shadowRadius: 24,
+          elevation: 12,
+        }}
+      >
+        <PoiCard
+          poi={poi}
+          city={city}
+          addressLine={addressLine}
+          phone={phone}
+          website={website}
+          enrichmentPending={enrichEnabled && (googlePending || cityPending)}
+          addressCopied={addressCopied}
+          onClose={onClose}
+          onNavigate={handleNavigate}
+          onCall={handleCall}
+          onCopyAddress={handleCopyAddress}
+          onOpenWebsite={handleOpenWebsite}
         >
-          <PoiCard
-            poi={poi}
-            city={city}
-            addressLine={addressLine}
-            phone={phone}
-            website={website}
-            enrichmentPending={enrichEnabled && (googlePending || cityPending)}
-            addressCopied={addressCopied}
-            onClose={onClose}
-            onNavigate={handleNavigate}
-            onCall={handleCall}
-            onCopyAddress={handleCopyAddress}
-            onOpenWebsite={handleOpenWebsite}
-          >
-            {/* Slot booking (MOB-4.5) — hébergements uniquement (gate parité web). */}
-            {isAccommodation ? (
+          {/* Slots hébergement uniquement (gate parité web) : accès (MOB-4.6) puis
+              réservation (MOB-4.5). `key={poi.id}` réinitialise l'état interne au
+              changement de POI. */}
+          {isAccommodation ? (
+            <>
+              <AccessMetrics
+                key={poi.id}
+                poiId={poi.id}
+                origin={DEFAULT_ACCESS_ORIGIN}
+                category={poi.category}
+                selectedVariantIndex={selectedVariantIndex}
+                onSelectVariant={onSelectVariant}
+              />
               <BookingLinks key={poi.id} poi={poi} city={bookingCity} userTier={userTier} />
-            ) : null}
-          </PoiCard>
-        </BlurView>
-        {/* Triangle pointeur vers le pin (teinte verre, coïncide avec la carte). */}
-        <View
-          style={{
-            width: 0,
-            height: 0,
-            borderLeftWidth: 8,
-            borderRightWidth: 8,
-            borderTopWidth: 9,
-            borderLeftColor: 'transparent',
-            borderRightColor: 'transparent',
-            borderTopColor: triangleColor,
-          }}
-        />
-      </View>
-    </Marker>
+            </>
+          ) : null}
+        </PoiCard>
+      </BlurView>
+      {/* Triangle pointeur vers le pin (teinte verre, coïncide avec la carte). */}
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          borderLeftWidth: 8,
+          borderRightWidth: 8,
+          borderTopWidth: 9,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderTopColor: triangleColor,
+        }}
+      />
+    </View>
   );
 }

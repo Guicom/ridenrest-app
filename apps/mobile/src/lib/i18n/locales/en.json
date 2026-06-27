@@ -296,6 +296,24 @@
       "bookingA11y": "Search on Booking.com",
       "airbnbA11y": "Search on Airbnb"
     },
+    "access": {
+      "label": {
+        "hotel": "Route to the hotel",
+        "hostel": "Route to the hostel",
+        "camp_site": "Route to the campsite",
+        "shelter": "Route to the shelter",
+        "guesthouse": "Route to the guesthouse",
+        "fallback": "Access route"
+      },
+      "fallbackBadge": "≈ approximate",
+      "fallbackHint": "BRouter unavailable — straight-line distance",
+      "unavailable": "Access route unavailable",
+      "offline": "Access route unavailable offline",
+      "mainRoadWarning": "Main road",
+      "variants": "Routes",
+      "variantGroupA11y": "Choose the access route",
+      "variantA11y": "Route {{index}}: {{distance}}, {{eta}}"
+    },
     "actions": {
       "navigate": "Navigate to {{name}}",
       "call": "Call {{name}}",

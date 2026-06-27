@@ -27,6 +27,7 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  TriangleAlert,
   Umbrella,
   Upload,
   Utensils,
@@ -82,6 +83,7 @@ export const ThermometerIcon = enableClassName(Thermometer);
 export const Trash2Icon = enableClassName(Trash2);
 export const TrendingDownIcon = enableClassName(TrendingDown);
 export const TrendingUpIcon = enableClassName(TrendingUp);
+export const TriangleAlertIcon = enableClassName(TriangleAlert);
 export const UmbrellaIcon = enableClassName(Umbrella);
 export const UploadIcon = enableClassName(Upload);
 export const UtensilsIcon = enableClassName(Utensils);

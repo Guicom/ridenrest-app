@@ -683,6 +683,7 @@ Popup POI (`poi-popup.tsx`) :
 - `expo start` = sert le bundle JS (pas de natif). `expo run:ios` / `eas build` = compile le natif.
 - **Après ajout d'un module natif** (`expo-secure-store`, `react-native-svg`, netinfo…) ou changement de plugins `app.config.ts` : `npx expo prebuild --clean -p ios` **OBLIGATOIRE** avant `run:ios`, sinon `Cannot find native module` au boot.
 - Toute icône **lucide-react-native / SVG dépend de `react-native-svg` (natif)** → pas de rendu sans rebuild du dev client (boîtes roses "Unimplemented component: RNSVG…").
+- **Tester en local = `pnpm sim` (build standalone, le flux STABLE).** Produit un build Release avec bundle JS embarqué → app autonome, **zéro Metro** (donc zéro « Cannot find native module » / « Could not connect to development server »). L'agent lance `pnpm sim` en fin de dev ; l'humain rouvre juste l'app. Prérequis : backend local up + ATS localhost (déjà dans `app.config.ts`). Détails + flux alternatif Fast Refresh : `apps/mobile/AGENTS.md` §« Tester l'app sur simulateur ». (Validé 2026-06-27.)
 
 ### Tests — JAMAIS sous `src/app/` (CRITIQUE)
 - expo-router bundle TOUT `.[tj]sx` sous `src/app` via `require.context` (regex figée, non configurable). Un `*.test.tsx` placé là casse `expo export`.
@@ -752,4 +753,4 @@ crash sur iOS** » à l'ouverture de *certaines* aventures. Signature du crash r
 - Garder ce fichier lean et focalisé sur les besoins des agents.
 - Mettre à jour quand la stack ou les patterns changent ; revoir périodiquement pour retirer les règles devenues évidentes.
 
-Last Updated: 2026-06-16
+Last Updated: 2026-06-27

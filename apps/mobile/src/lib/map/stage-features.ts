@@ -1,8 +1,12 @@
 import type { AdventureStageResponse, MapWaypoint } from '@ridenrest/shared';
 
+import { isValidLngLat } from '@/lib/map/maplibre-config';
+
 // Colorisation de la trace **par étape** — port iso du web (chaque étape recolore le
 // tronçon `[startKm, endKm]` de la trace avec `stage.color`). PUR → testable.
 // `waypoints` sont en km **cumulés** (cf. `useAdventureWaypoints`).
+//
+// ⚠️ Filtre `isValidLngLat` au point (cf. AGENTS.md) — une coord non finie → SIGABRT natif.
 
 export function buildStageColoredFeatures(
   waypoints: readonly MapWaypoint[],
@@ -11,7 +15,7 @@ export function buildStageColoredFeatures(
   const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
   for (const stage of stages) {
     const coords = waypoints
-      .filter((w) => w.distKm >= stage.startKm && w.distKm <= stage.endKm)
+      .filter((w) => w.distKm >= stage.startKm && w.distKm <= stage.endKm && isValidLngLat(w.lng, w.lat))
       .map((w) => [w.lng, w.lat] as [number, number]);
     if (coords.length < 2) continue;
     features.push({

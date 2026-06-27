@@ -82,6 +82,7 @@
     "build": "expo export",
     "android": "expo run:android",
     "ios": "expo run:ios",
+    "sim": "bash scripts/sim-build.sh",
     "web": "expo start --web",
     "storybook": "storybook dev -p 7007",
     "build-storybook": "storybook build",

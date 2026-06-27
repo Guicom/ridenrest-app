@@ -16,7 +16,54 @@ filtrée par `isValidLngLat(lng, lat)` (`src/lib/map/maplibre-config.ts`) AVANT 
 bâtir la feature. Filtrer **au niveau du point** (pas seulement « segment ≥ 2 wp »),
 puis re-vérifier `coords.length >= 2`. Points de filtrage : `buildTraceFeatureCollection`,
 `collectTraceWaypoints`, `useAdventureWaypoints` (alimente étapes/météo/corridor/marqueurs),
-`buildDensityColoredFeatures`, `buildPoiFeatureCollection`. (Régression réelle 2026-06-16.)
+`buildDensityColoredFeatures`, `buildPoiFeatureCollection`, `buildCorridorFeature`,
+`buildStageColoredFeatures`, `buildWindArrowPoints`. (Régression réelle 2026-06-16.)
+
+### Ne JAMAIS monter une `<GeoJSONSource>` avant que le style soit chargé (CRITIQUE)
+
+Même cause racine (`-[MLRNGeoJSONSource setShape:]` → `mbgl` → `__cxa_throw` → SIGABRT),
+**autre déclencheur** : appeler `setShape` **pendant le chargement du style** plante,
+indépendamment de la validité des coordonnées.
+
+- Le cas se déclenche surtout quand la `data` d'une source est disponible **synchrone**
+  au 1er rendu — typiquement **cache TanStack chaud** : on ouvre une aventure déjà
+  visitée → la source se monte avec sa donnée **avant** `onDidFinishLoadingStyle`.
+- À froid (fetch async, donnée arrivant **après** le style) le bug ne se voit pas →
+  symptôme « **crash intermittent à l'ouverture du planning** » (et pas en deep-link à froid).
+- ⇒ Dans `map-canvas.tsx`, **trace + `children` (tous les calques GeoJSON) ne sont rendus
+  que lorsque `styleLoaded === true`** (`onDidFinishLoadingStyle`). Tout nouveau calque
+  carte doit rester enfant de ce gate. (Crash réel + fix 2026-06-27, diagnostiqué via
+  `simctl launch --console-pty` — le `what()` C++ n'est ni dans le `.ips` ni dans le
+  `log show` unifié ; il faut capturer **stderr du process**.)
+
+## Contenu interactif sur la carte : JAMAIS dans un `<Marker>` sur iOS (CRITIQUE)
+
+Sur **iOS**, le `Marker` de `@maplibre/maplibre-react-native` est implémenté via
+`ViewAnnotation` → `MLNPointAnnotation`, qui **rend ses enfants sur un BITMAP** (cf. source
+lib : *« child views are rendered onto a bitmap »*, *« To rerender the image … call
+refresh »*). Conséquences pour tout contenu **interactif** dans un `<Marker>` :
+
+- Les `Pressable`/boutons ne reçoivent **pas** les taps de façon fiable (taps avalés /
+  « ça marche une fois sur trois »).
+- L'image **ne se redessine pas** quand l'état React change → un bouton sélectionné « ne
+  change pas d'état » tant que le marker n'est pas re-rendu pour une autre raison.
+
+→ **Toute fiche/contrôle interactif au-dessus de la carte = overlay RN absolu**, PAS un
+`<Marker>`. Pattern (cf. `poi-popup.tsx` + `map/[id].tsx`, refonte 2026-06-27) :
+
+1. Rendre la fiche comme une `<View pointerEvents="box-none" style={{ position:'absolute', … }}>`
+   **sœur** de la carte (pas enfant du `<Map>`).
+2. Calculer sa position en projetant la coordonnée : `await getMap().project([lng, lat])`
+   → pixels écran (origine = coin haut-gauche de la carte plein écran).
+3. La faire **suivre** la carte via les events `onRegionIsChanging` / `onRegionDidChange`
+   de `<MapCanvas>` (re-projection ; guard in-flight pour ne pas empiler les appels async).
+4. Ancrer le bas de la fiche au pin : `top = anchor.y - hauteurMesurée - gap` (mesure via
+   `onLayout`, `opacity:0` tant que non mesurée pour éviter un flash).
+
+`<Marker>` reste OK pour du **non-interactif** (ex. marqueurs d'étape `stage-markers.tsx`).
+Note : `setState` issu de la projection (asynchrone) doit vivre dans le callback `.then`
+d'un effet (ou un handler d'event), jamais en synchrone dans le corps d'un `useEffect`
+(règle `react-hooks/set-state-in-effect`).
 
 ## Toolchain de build natif (CRITIQUE)
 
@@ -46,6 +93,47 @@ de build **locale** n'est jamais sollicitée — un Xcode local périmé passe i
 révèle qu'au premier `expo run:ios`. Pour tester un **deep link à scheme custom**
 (`ridenrest://`), un dev build est obligatoire (Expo Go ne gère pas les schemes custom) :
 soit `expo run:ios` (local, Xcode 26.4), soit un build EAS dev-client installé sur le simulateur.
+
+## Tester l'app sur simulateur — LE FLUX STABLE : `pnpm sim` (build standalone)
+
+> **C'est la méthode par défaut pour tester en local. Validée le 2026-06-27.**
+> Avant ça, on perdait un temps fou sur des erreurs récurrentes (« Cannot find native
+> module », « Could not connect to development server », cache Metro). **Cause racine :**
+> le couple **dev-client (Debug) + Metro** est fragile, et `expo-dev-client` est une
+> dépendance → tout build se branche par défaut sur Metro.
+
+**La solution : un build Release avec le bundle JS EMBARQUÉ → l'app est autonome, ZÉRO
+Metro, donc zéro écran rouge possible.** Le JS est compilé avec le natif → toujours synchro.
+
+```bash
+cd apps/mobile && pnpm sim            # build + install + lance en standalone sur le simu booté
+cd apps/mobile && pnpm sim "iPhone 17 Pro"   # cibler un device (nom ou UDID)
+```
+
+`pnpm sim` (= `scripts/sim-build.sh`) fait : `expo run:ios --configuration Release
+--no-bundler`, **puis relance l'app via `simctl launch`** (car `expo run:ios` ouvre sinon
+l'app via le deep-link dev-client → Metro ; on force le chargement du bundle embarqué).
+
+**Répartition des rôles** : l'agent (Claude) lance `pnpm sim` **en fin de dev quand
+c'est utile** ; l'humain n'a plus qu'à **rouvrir « Ride'n'Rest »** sur le simu pour tester.
+Aucun terminal/serveur à garder ouvert.
+
+**Prérequis réseau** : le backend local doit tourner (`docker compose up -d` à la racine +
+API NestJS :3010 + Better Auth :3011). L'ATS localhost est autorisée via
+`app.config.ts` → `ios.infoPlist.NSAppTransportSecurity.NSAllowsLocalNetworking = true`
+(sinon iOS bloque le HTTP cleartext en Release → l'app s'ouvre mais les appels API
+échouent). ⚠️ La phase Xcode « [Expo Dev Launcher] Strip Local Network Keys for Release »
+ne retire QUE les clés *privacy* du réseau local, **pas** l'ATS — vérifié, la clé survit.
+
+**Coût** : 1re compilation longue (Release), incrémentale ensuite (~1-2 min, surtout le
+bundle Hermes). Tradeoff assumé : **stabilité > Fast Refresh** pour le cycle « je teste ».
+
+### Flux alternatif (rapide mais fragile) — Fast Refresh
+
+Pour de l'itération JS très rapide pendant un co-dev actif, le dev-client + Metro reste
+possible (`expo start` → `i`, Fast Refresh ~1 s). **Mais** il exige un dev-client **à jour**
+(rebuild natif si un module natif/plugin a changé) et un Metro vivant. En cas de moindre
+doute / erreur, **retomber sur `pnpm sim`** (déterministe). Ne pas y passer des heures.
 
 ## Runtime simulateur iOS (gotcha)
 

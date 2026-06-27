@@ -61,6 +61,15 @@ export interface MapCanvasProps {
   children?: ReactNode;
   /** Tap sur la carte (placement d'étape) → coordonnées `[lng, lat]`. */
   onMapPress?: (lngLat: [number, number]) => void;
+  /**
+   * Mouvement de carte **en cours** (pan/zoom continu) — pour repositionner un overlay RN
+   * projeté (ex. le popup POI, MOB-4.2 refonte). Le popup n'est PAS un `<Marker>` (bitmap
+   * non-interactif sur iOS) mais une View RN absolue projetée via `getMap().project()` ; il
+   * doit donc suivre le pin à chaque frame de mouvement.
+   */
+  onRegionIsChanging?: () => void;
+  /** Fin de mouvement de carte — snap final de la position de l'overlay. */
+  onRegionDidChange?: () => void;
 }
 
 /** Extrait `[lng, lat]` d'un évènement de press carte (formes variables selon la build). */
@@ -82,7 +91,10 @@ function extractPressCoords(event: unknown): [number, number] | null {
 }
 
 export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
-  function MapCanvas({ segments, children, onMapPress }, ref) {
+  function MapCanvas(
+    { segments, children, onMapPress, onRegionIsChanging, onRegionDidChange },
+    ref,
+  ) {
     const { colorScheme } = useColorScheme();
     const cameraRef = useRef<CameraRef>(null);
     const mapRef = useRef<MapRef>(null);
@@ -160,6 +172,8 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
           attributionPosition={{ bottom: 8, right: 8 }}
           compass={false}
           onDidFinishLoadingStyle={() => setStyleLoaded(true)}
+          onRegionIsChanging={onRegionIsChanging}
+          onRegionDidChange={onRegionDidChange}
           onPress={
             onMapPress
               ? (event: unknown) => {
@@ -170,21 +184,34 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
           }
         >
           <Camera ref={cameraRef} />
-          {hasTrace ? (
-            <GeoJSONSource id="trace" data={trace}>
-              <Layer
-                id="trace-line"
-                type="line"
-                paint={{
-                  'line-color': TRACE_COLOR,
-                  'line-width': TRACE_WIDTH,
-                  'line-opacity': 0.9,
-                }}
-                layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-              />
-            </GeoJSONSource>
+          {/* ⚠️ CRITIQUE — ne monter AUCUNE `<GeoJSONSource>` (trace + calques enfants)
+              avant `onDidFinishLoadingStyle`. Un `setShape` exécuté pendant le chargement
+              du style provoque une exception C++ non rattrapée dans MapLibre Native
+              (`-[MLRNGeoJSONSource setShape:]` → `mbgl` → `__cxa_throw` → SIGABRT). Le cas
+              se déclenche surtout quand la `data` est disponible **synchrone** au 1er rendu
+              (cache TanStack chaud : on ouvre une aventure déjà visitée) → la source se
+              monte avec sa donnée avant que le style soit prêt. À froid (fetch async après
+              le style) le bug ne se voyait pas → crash « intermittent » à l'ouverture du
+              planning. Gater sur `styleLoaded` sérialise tout après le style. (2026-06-27) */}
+          {styleLoaded ? (
+            <>
+              {hasTrace ? (
+                <GeoJSONSource id="trace" data={trace}>
+                  <Layer
+                    id="trace-line"
+                    type="line"
+                    paint={{
+                      'line-color': TRACE_COLOR,
+                      'line-width': TRACE_WIDTH,
+                      'line-opacity': 0.9,
+                    }}
+                    layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+                  />
+                </GeoJSONSource>
+              ) : null}
+              {children}
+            </>
           ) : null}
-          {children}
         </Map>
         {/* Attribution OSM permanente — overlay frère, toujours visible (AC3). */}
         <OsmAttribution />

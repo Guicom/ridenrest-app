@@ -296,6 +296,24 @@
       "bookingA11y": "Rechercher sur Booking.com",
       "airbnbA11y": "Rechercher sur Airbnb"
     },
+    "access": {
+      "label": {
+        "hotel": "Itinéraire vers l'hôtel",
+        "hostel": "Itinéraire vers l'auberge",
+        "camp_site": "Itinéraire vers le camping",
+        "shelter": "Itinéraire vers le refuge",
+        "guesthouse": "Itinéraire vers la chambre d'hôte",
+        "fallback": "Itinéraire d'accès"
+      },
+      "fallbackBadge": "≈ approximatif",
+      "fallbackHint": "BRouter indisponible — distance à vol d'oiseau",
+      "unavailable": "Itinéraire d'accès indisponible",
+      "offline": "Itinéraire d'accès indisponible hors-ligne",
+      "mainRoadWarning": "Route nationale",
+      "variants": "Itinéraires",
+      "variantGroupA11y": "Choix de l'itinéraire d'accès",
+      "variantA11y": "Itinéraire {{index}} : {{distance}}, {{eta}}"
+    },
     "actions": {
       "navigate": "Naviguer vers {{name}}",
       "call": "Appeler {{name}}",
