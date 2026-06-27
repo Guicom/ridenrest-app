@@ -190,6 +190,22 @@
     "readOnly": "Consultation hors ligne (lecture seule)",
     "actionUnavailable": "Action indisponible hors ligne"
   },
+  "live": {
+    "start": "Démarrer en Live",
+    "consent": {
+      "title": "Activer la géolocalisation",
+      "body": "Le mode Live vous situe en temps réel sur votre trace pendant que vous roulez.",
+      "rgpd": "Votre position est utilisée uniquement sur votre appareil. Aucune coordonnée n’est envoyée ni stockée sur nos serveurs.",
+      "accept": "Activer",
+      "refuse": "Refuser"
+    },
+    "refusedNotice": "La géolocalisation est nécessaire pour le mode Live. Activez-la pour démarrer.",
+    "permissionDenied": {
+      "title": "Accès à la position refusé",
+      "body": "Autorisez l’accès à votre position dans les Réglages pour utiliser le mode Live.",
+      "openSettings": "Ouvrir les Réglages"
+    }
+  },
   "map": {
     "title": "Carte",
     "back": "Retour",

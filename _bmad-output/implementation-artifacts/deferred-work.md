@@ -333,3 +333,8 @@
 
 ## Deferred from: code review of MOB-4-7-poi-access-polyline-autozoom-invalidation (2026-06-27)
 - **`lastZoomedAccessRef` re-zoom sur background refetch** : après invalidation via useUploadSegment/useDeleteSegment/useReorderSegments, TanStack retourne un nouvel objet même si les données d'accès sont identiques → identité référentielle brisée → re-zoom non souhaité si l'utilisateur avait pané. Parité comportement web (même pattern `lastZoomedRef`), trade-off accepté. `apps/mobile/src/app/(app)/map/[id].tsx:323-335`.
+
+## Deferred from: code review of MOB-5-1-live-activation-consent-permissions (2026-06-27)
+
+- **RGPD Art. 7 — révocation du consentement** : une fois le consentement géolocalisation accordé (flag `ridenrest:geoloc-consent` en AsyncStorage), l'utilisateur n'a aucun moyen dans l'app de le retirer. Art. 7 RGPD exige le retrait à tout moment. À implémenter dans une story Settings (toggle dans les préférences → `setConsent(false)` + `deactivateLiveMode()`). `apps/mobile/src/lib/live/consent-storage.ts`
+- **Pas de retry automatique après retour des Réglages** : si la permission foreground est refusée (panel `permissionDenied` affiché), que l'utilisateur ouvre les Réglages iOS/Android et l'active, l'écran Live ne relance pas automatiquement le GPS à son retour (pas d'`AppState` listener). L'utilisateur doit naviguer hors de l'écran et re-taper « Démarrer en Live ». Gestion AppState + `startWatching()` au foreground = MOB-5.2 (background GPS). `apps/mobile/src/hooks/use-live-mode.ts`, `apps/mobile/src/app/(app)/live/[id].tsx`

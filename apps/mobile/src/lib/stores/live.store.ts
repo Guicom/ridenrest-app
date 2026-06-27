@@ -1,0 +1,73 @@
+import { create } from 'zustand';
+
+// Store client du mode **Live** (mobile) — port **verbatim** de `apps/web/src/stores/
+// live.store.ts` (flat, parité 1:1). Convention projet : client state = Zustand,
+// `use{Domain}Store`, fichier `stores/{domain}.store.ts`, structure plate, actions à
+// verbes impératifs (cf. `map.store.ts`).
+//
+// ⚠️ RGPD (NFR-012 / NFR-LP-001) : `currentPosition` est en **mémoire client
+// uniquement** — JAMAIS persisté, sérialisé ni envoyé à l'API. Ne PAS ajouter ce store
+// au persister TanStack/AsyncStorage. `deactivateLiveMode()` nulle position + km au
+// démontage de l'écran Live (pas de suivi fantôme, AC5).
+//
+// MOB-5.1 (FONDATION) câble : `isLiveModeActive`, `geolocationConsented`,
+// `currentPosition`, `currentKmOnRoute`, `gpsTrackingActive`. Les champs
+// `speedKmh`/`targetAheadKm`/`searchRadiusKm`/`weatherDepartureTime`/`stageLayerActive`
+// sont portés tels quels pour la parité web mais ne sont câblés qu'aux stories
+// suivantes (5.3 POI / 5.4 panneau / 5.5 profil / 5.6 météo).
+
+interface LiveState {
+  isLiveModeActive: boolean;
+  geolocationConsented: boolean;
+  // GPS — client-side only, never serialized or sent to API
+  currentPosition: { lat: number; lng: number } | null;
+  currentKmOnRoute: number | null;
+  speedKmh: number; // User-configured pace
+  targetAheadKm: number; // How far ahead to show POIs in live mode
+  searchRadiusKm: number; // Radius for POI search around GPS position
+  weatherDepartureTime: string | null; // ISO 8601 — user-set departure overrides auto-compute
+  stageLayerActive: boolean;
+  gpsTrackingActive: boolean; // false = user panned, auto-follow paused until centerOnGps()
+
+  // Actions
+  activateLiveMode: () => void;
+  deactivateLiveMode: () => void;
+  setGeolocationConsent: (consented: boolean) => void;
+  updateGpsPosition: (position: { lat: number; lng: number }) => void;
+  setCurrentKm: (km: number) => void;
+  setSpeedKmh: (speed: number) => void;
+  setTargetAheadKm: (km: number) => void;
+  setSearchRadius: (km: number) => void;
+  setWeatherDepartureTime: (time: string | null) => void;
+  setStageLayerActive: (active: boolean) => void;
+  setGpsTrackingActive: (active: boolean) => void;
+}
+
+export const useLiveStore = create<LiveState>((set) => ({
+  isLiveModeActive: false,
+  geolocationConsented: false,
+  currentPosition: null,
+  currentKmOnRoute: null,
+  speedKmh: 15, // Default cycling pace
+  targetAheadKm: 30, // Default look-ahead distance
+  searchRadiusKm: 5,
+  weatherDepartureTime: null,
+  stageLayerActive: false,
+  gpsTrackingActive: true,
+
+  activateLiveMode: () => set({ isLiveModeActive: true }),
+  deactivateLiveMode: () =>
+    set({ isLiveModeActive: false, currentPosition: null, currentKmOnRoute: null }),
+
+  setGeolocationConsent: (consented) => set({ geolocationConsented: consented }),
+
+  updateGpsPosition: (position) => set({ currentPosition: position }),
+
+  setCurrentKm: (km) => set({ currentKmOnRoute: km }),
+  setSpeedKmh: (speed) => set({ speedKmh: speed }),
+  setTargetAheadKm: (km) => set({ targetAheadKm: km }),
+  setSearchRadius: (km) => set({ searchRadiusKm: km }),
+  setWeatherDepartureTime: (time) => set({ weatherDepartureTime: time }),
+  setStageLayerActive: (active) => set({ stageLayerActive: active }),
+  setGpsTrackingActive: (active) => set({ gpsTrackingActive: active }),
+}));

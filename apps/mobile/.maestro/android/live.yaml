@@ -1,0 +1,28 @@
+appId: app.ridenrest
+---
+# MOB-5.1 mode Live — variante ANDROID. Pré-requis : app chargée (passé le dev-launcher
+# Expo → choisir le serveur Metro), connectée (user e2e via email/mot de passe), locale
+# fr-FR. Voir ../README.md §Android. adb reverse 3010/3011/8081 requis.
+#
+# Le consentement est un overlay RN absolu (pas un Modal) → texte introspectable.
+# Le prompt OS (ACCESS_FINE_LOCATION) est une alerte système → non couvert ici.
+- launchApp
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# AC1 : consentement explicite avant activation / prompt OS.
+- extendedWaitUntil:
+    visible: "Activer la géolocalisation"
+    timeout: 15000
+- assertVisible: "Activer"
+- assertVisible: "Refuser"
+- takeScreenshot: screenshots/android-live-consent
+
+# Refus → message AC1, Live non activé.
+- tapOn: "Refuser"
+- extendedWaitUntil:
+    visible: "La géolocalisation est nécessaire pour le mode Live. Activez-la pour démarrer."
+    timeout: 8000
+- takeScreenshot: screenshots/android-live-refused

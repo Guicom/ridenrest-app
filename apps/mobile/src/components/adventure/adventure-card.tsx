@@ -16,9 +16,10 @@ import { useTranslation } from '@/lib/i18n';
 //   - actions : « Démarrer en Live » (pleine largeur, `bg-text-primary`/blanc) puis
 //     « Planning » (`bg-surface-raised`) + « Modifier » (bordure).
 //
-// « Planning » (carte MOB-4.1) navigue désormais vers `map/[id]`. « Démarrer en
-// Live » (mode Live MOB-5) reste **désactivé** (opacity-50, non tactile). « Modifier »
-// → détail `[id]` (renommage/suppression, parité web). Le corps navigue aussi au détail.
+// « Planning » (carte MOB-4.1) navigue vers `map/[id]`. « Démarrer en Live » (MOB-5.1)
+// navigue désormais vers `live/[id]` (consentement RGPD → permission → suivi GPS).
+// « Modifier » → détail `[id]` (renommage/suppression, parité web). Le corps navigue
+// aussi au détail.
 
 export interface AdventureCardProps {
   adventure: AdventureResponse;
@@ -91,17 +92,17 @@ export function AdventureCard({ adventure, onPress }: AdventureCardProps) {
         <Text className="text-sm font-montserrat text-text-muted">{dateLabel}</Text>
       </Pressable>
 
-      {/* « Démarrer en Live » — pleine largeur, désactivé (carte/live MOB-4/5). */}
-      <View
+      {/* « Démarrer en Live » — actif (MOB-5.1) → écran Live (consentement → GPS). */}
+      <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('adventures.card.live')}
-        accessibilityState={{ disabled: true }}
-        className="w-full items-center justify-center rounded-lg bg-text-primary py-3 opacity-50"
+        className="w-full items-center justify-center rounded-lg bg-text-primary py-3 active:opacity-70"
+        onPress={() => router.push(`/(app)/live/${adventure.id}`)}
       >
         <Text className="text-sm font-montserrat-semibold text-white">
           {t('adventures.card.live')}
         </Text>
-      </View>
+      </Pressable>
 
       <View className="flex-row gap-2">
         {/* « Planning » — actif (MOB-4.1) → carte interactive de l'aventure. */}

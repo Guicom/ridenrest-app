@@ -70,6 +70,20 @@ const config: ExpoConfig = {
     // `expo prebuild --clean -p ios` PUIS `expo run:ios` (cf. AGENTS.md, sinon
     // `Cannot find native module`). v11 requiert la New Architecture (déjà activée SDK 56).
     '@maplibre/maplibre-react-native',
+    // MOB-5.1 — Géolocalisation Live FOREGROUND uniquement. Le plugin injecte au
+    // prebuild `NSLocationWhenInUseUsageDescription` (iOS « Lorsque l'app est active »)
+    // + `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` (Android). La rationale (FR) est
+    // affichée par l'OS au prompt runtime (FR-MOB-015 / NFR-013). ⚠️ Background
+    // (`isIosBackgroundLocationEnabled`/`UIBackgroundModes`/foreground service Android) =
+    // MOB-5.2 — NE PAS activer ici. Module natif neuf → `expo prebuild --clean -p ios`
+    // OBLIGATOIRE avant `run:ios`/`pnpm sim` (sinon « Cannot find native module »).
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Ride’n’Rest utilise votre position pour vous situer sur votre trace pendant que vous roulez. Votre position reste sur votre appareil et n’est jamais envoyée à nos serveurs.',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

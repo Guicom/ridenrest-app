@@ -190,6 +190,22 @@
     "readOnly": "Offline viewing (read-only)",
     "actionUnavailable": "Action unavailable offline"
   },
+  "live": {
+    "start": "Start Live",
+    "consent": {
+      "title": "Enable location",
+      "body": "Live mode shows your real-time position on your route while you ride.",
+      "rgpd": "Your position is used only on your device. No coordinates are sent to or stored on our servers.",
+      "accept": "Enable",
+      "refuse": "Decline"
+    },
+    "refusedNotice": "Location is required for Live mode. Enable it to start.",
+    "permissionDenied": {
+      "title": "Location access denied",
+      "body": "Allow location access in Settings to use Live mode.",
+      "openSettings": "Open Settings"
+    }
+  },
   "map": {
     "title": "Map",
     "back": "Back",

@@ -8,7 +8,7 @@ import { i18n } from '@/lib/i18n';
 // Test de composant (co-localisé — pas une route, hors `require.context`).
 // Carte iso web : rendu (nom + distance + dénivelé + date), navigation via le corps
 // ET le bouton « Modifier » (→ onPress). « Planning » navigue vers la carte (MOB-4.1) ;
-// « Live » reste désactivé (MOB-5). i18n réel (langue fr en test).
+// « Live » navigue vers l'écran Live (MOB-5.1). i18n réel (langue fr en test).
 
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
@@ -72,9 +72,11 @@ describe('AdventureCard (MOB-3.1 / AC1 — iso web)', () => {
     expect(onPress).toHaveBeenCalledWith('adv-1');
   });
 
-  it('le bouton « Live » reste désactivé (mode Live MOB-5 à venir)', async () => {
+  it('tap sur « Live » → navigue vers l’écran Live (MOB-5.1)', async () => {
+    const user = userEvent.setup();
     await render(<AdventureCard adventure={baseAdventure} onPress={jest.fn()} />);
-    expect(screen.getByLabelText(t('adventures.card.live'))).toBeDisabled();
+    await user.press(screen.getByLabelText(t('adventures.card.live')));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/live/adv-1');
   });
 
   it('tap sur « Planning » → navigue vers la carte (MOB-4.1)', async () => {

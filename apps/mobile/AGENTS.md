@@ -65,6 +65,18 @@ Note : `setState` issu de la projection (asynchrone) doit vivre dans le callback
 d'un effet (ou un handler d'event), jamais en synchrone dans le corps d'un `useEffect`
 (règle `react-hooks/set-state-in-effect`).
 
+**Corollaire RN `<Modal>` + Maestro/XCUITest (iOS)** : un RN `<Modal>` rend son contenu
+dans une **fenêtre UIKit séparée** que XCUITest (donc Maestro) **n'introspecte pas** sur
+iOS — la hiérarchie ne remonte que la barre de statut, et le contenu derrière le Modal est
+masqué aussi. Symptôme : un flow Maestro qui lit/tape un dialog échoue (« element not
+found ») alors que le dialog est bien visible à l'écran. → Pour tout overlay qui doit être
+**testable par Maestro** (ou simplement fiable au tap iOS), préférer une **`<View>` absolue
+plein écran** (`absolute inset-0`, fond `bg-black/40` inerte, `accessibilityViewIsModal`)
+plutôt qu'un `<Modal>`. Vécu en MOB-5.1 (`geolocation-consent.tsx` : Modal → overlay
+absolu). ⚠️ `accessibilityViewIsModal` **masque les frères** aux requêtes a11y (VoiceOver,
+Maestro **et RNTL**) → en test, asserter le contenu de l'overlay quand il est ouvert, et le
+contenu derrière (header/trace) dans un scénario où l'overlay est fermé.
+
 ## Toolchain de build natif (CRITIQUE)
 
 **Expo SDK 56 exige Xcode 26.4** (et iOS deployment target **16.4**) pour compiler le
@@ -93,6 +105,36 @@ de build **locale** n'est jamais sollicitée — un Xcode local périmé passe i
 révèle qu'au premier `expo run:ios`. Pour tester un **deep link à scheme custom**
 (`ridenrest://`), un dev build est obligatoire (Expo Go ne gère pas les schemes custom) :
 soit `expo run:ios` (local, Xcode 26.4), soit un build EAS dev-client installé sur le simulateur.
+
+## Ajout d'un module natif Expo : versions précompilées & locale CocoaPods (CRITIQUE)
+
+Vécu en MOB-5.1 (ajout `expo-location` + `expo-keep-awake`). Deux pièges natifs durables :
+
+**1. Version d'un module Expo : suivre `bundledNativeModules.json`, PAS le max de la plage.**
+`npx expo install <module>` résout parfois un **patch plus récent** que celui testé par le
+SDK (ex. `expo install expo-location` → `~56.0.18`, alors que
+`node_modules/expo/bundledNativeModules.json` épingle `expo-location: ~56.0.16`). Or les
+binaires **précompilés** d'Expo (ex. `ExpoModulesCore` 56.0.15, log `[Expo-precompiled]`)
+sont figés à la version du SDK. Un module trop récent référence un symbole Swift absent du
+core précompilé → **crash dyld au lancement** :
+```
+EXC_CRASH (SIGABRT) — DYLD, "Symbol not found:
+  _$s15ExpoModulesCore6RecordPAAE4from10dictionary10appContextxSDySSypG_AA03AppH0CtKFZ"
+  (terminated at launch; ignore backtrace)
+```
+→ **Pin la version EXACTE de `bundledNativeModules.json`** (ex. `"expo-location": "56.0.16"`,
+sans `~` — sinon pnpm re-résout 56.0.18). Puis `pnpm install` + `cd ios && pod update
+ExpoLocation --no-repo-update` + rebuild. Diagnostic : crash report
+`~/Library/Logs/DiagnosticReports/RidenRest-*.ips` (`reasons[0]` = le symbole manquant).
+
+**2. `pod install` / `pnpm sim` exigent une locale UTF-8.**
+CocoaPods + Ruby 4.0.x plante en `Encoding::CompatibilityError` (« Unicode Normalization not
+appropriate for ASCII-8BIT ») si `LANG`/`LC_ALL` ne sont pas UTF-8 :
+```bash
+LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install      # ou devant `pnpm sim`
+```
+`pnpm sim` relance `pod install` en interne → préfixer la commande entière par la locale.
+(Si `prebuild --clean` échoue sur `ENOTEMPTY ios/Pods`, déplacer `ios/` puis `prebuild -p ios`.)
 
 ## Tester l'app sur simulateur — LE FLUX STABLE : `pnpm sim` (build standalone)
 

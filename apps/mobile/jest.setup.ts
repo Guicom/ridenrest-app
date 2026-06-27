@@ -34,3 +34,10 @@ jest.mock('@gorhom/bottom-sheet');
 // (`__mocks__/expo-blur.js`, `__mocks__/expo-clipboard.js`). `jest.mock` explicite requis.
 jest.mock('expo-blur');
 jest.mock('expo-clipboard');
+
+// expo-location / expo-keep-awake (MOB-5.1 mode Live) : modules natifs (GPS foreground +
+// écran allumé) absents hors device → mocks manuels globaux (`__mocks__/expo-location.js`,
+// `__mocks__/expo-keep-awake.js`). `jest.mock` explicite requis. Les tests `use-live-mode`
+// surchargent `watchPositionAsync`/`requestForegroundPermissionsAsync` au cas par cas.
+jest.mock('expo-location');
+jest.mock('expo-keep-awake');
