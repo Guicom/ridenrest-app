@@ -34,3 +34,8 @@ pnpm-debug.log*
 
 # Agent worktrees (ephemeral, never commit)
 .claude/worktrees/
+# Lock runtime du MCP scheduled-tasks (artefact local)
+.claude/scheduled_tasks.lock
+
+# Expo : cache/artefacts locaux à la racine (logs xcodebuild, prebuild, devices…)
+.expo/
