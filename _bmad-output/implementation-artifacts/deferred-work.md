@@ -1,5 +1,11 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-4-8-planning-weather-pace-adjusted (2026-06-27)
+
+- **`cached` stale pendant la transition `adventureId`** — si le composant restait monté (non-applicable avec le routing expo-router actuel), les forecasts du précédent adventureId seraient utilisés avec les segments du nouveau adventureId le temps que `getCachedWeather` résolve. Non-triggerable en l'état ; à adresser si le routing change. [`apps/mobile/src/hooks/use-weather.ts`]
+- **`setCachedWeather` sans try/catch** — une erreur disque (full, permissions) génère une promise rejection non rattrapée depuis le `void setCachedWeather(...)` du `useEffect`. Pré-existant dans le squelette weather-cache (MOB-3.5) ; à corriger en même temps que le durcissement général du cache. [`apps/mobile/src/lib/cache/weather-cache.ts`]
+- **`weatherPoints` offset=0 pour `segmentId` inconnu** — si le serveur renvoie une prévision pour un segment absent de `segments` locaux, l'offset `offsetById.get(segmentId) ?? 0` positionne les points météo en km relatif au lieu de cumulé (mauvaise position sur la carte). Cas défensif : inconsistance backend. [`apps/mobile/src/hooks/use-weather.ts`]
+
 ## Deferred from: code review of MOB-4-5-booking-deeplinks-affiliate-tracking (2026-06-27, round 2)
 
 - **Dropdown sans tap-outside-to-close** — appuyer dans la fiche mais hors de la dropdown (hors pin) ne la ferme pas ; `setOpen(false)` ne se déclenche qu'au re-press du CTA ou au tap d'une entrée. Acceptable MVP ; à confirmer lors de T7 (validation device). [`apps/mobile/src/components/shared/booking-links.tsx`]
