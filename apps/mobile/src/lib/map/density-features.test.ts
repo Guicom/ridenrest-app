@@ -54,4 +54,25 @@ describe('buildDensityColoredFeatures', () => {
     s.waypoints = null;
     expect(buildDensityColoredFeatures([s], [])).toHaveLength(0);
   });
+
+  it('filtre les waypoints à coordonnées non finies (anti-crash SIGABRT)', () => {
+    const s = seg();
+    s.waypoints = [
+      { lat: 45.0, lng: 5.0, distKm: 0 },
+      { lat: NaN, lng: 5.1, distKm: 5 },   // corrompu → exclu
+      { lat: 45.2, lng: 5.2, distKm: 10 },
+      { lat: 45.3, lng: null as unknown as number, distKm: 15 }, // lng null → exclu
+      { lat: 45.4, lng: 5.4, distKm: 20 },
+      { lat: 45.5, lng: 5.5, distKm: 25 },
+    ];
+    // Les points invalides sont filtrés ; les tronçons avec < 2 points valides sont ignorés.
+    const features = buildDensityColoredFeatures([s], []);
+    expect(features.length).toBeGreaterThan(0);
+    for (const f of features) {
+      for (const [lng, lat] of f.geometry.coordinates) {
+        expect(Number.isFinite(lng)).toBe(true);
+        expect(Number.isFinite(lat)).toBe(true);
+      }
+    }
+  });
 });

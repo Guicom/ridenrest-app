@@ -4,7 +4,7 @@ baseline_commit: 26059dea0e8e855356437a0cd86a62487db7b9a3
 
 # Story MOB-4.4 : Analyse de densité & trace colorisée
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -98,6 +98,19 @@ So that **j'identifie d'un coup d'œil les zones à risque d'hébergement**.
   - [ ] Sélectionner catégories + Analyser → progression, puis trace colorisée vert/orange/rouge cohérente. 2ᵉ déclenchement immédiat → message « déjà en cours ».
   - [ ] Toggle colorisation OFF → trace verte uniforme ; ON → colorisée. Légende lisible.
   - [ ] Forcer erreur / stale → ErrorBanner / indicateur relance. Offline → trigger désactivé, dernière colorisation visible.
+
+### Review Findings
+
+- [x] [Review][Patch] `isValidLngLat` return type `lng is number` ne narrowe pas `lat` — changer en `boolean` [apps/mobile/src/lib/map/maplibre-config.ts:54]
+- [x] [Review][Patch] `buildWeatherLineSegments` manque le filtre `isValidLngLat` explicite — robustesse défensive même si inputs filtrés upstream [apps/mobile/src/lib/map/weather-geojson.ts]
+- [x] [Review][Patch] Test `collectTraceWaypoints` incomplet — manque le cas "segment entièrement invalide → retourne `[]`" [apps/mobile/src/lib/map/__tests__/maplibre-config.test.ts]
+- [x] [Review][Patch] Test `buildDensityColoredFeatures` manque le cas waypoints invalides filtrés par `isValidLngLat` [apps/mobile/src/lib/map/__tests__/density-features.test.ts]
+- [x] [Review][Defer] Divergences clés i18n spec vs impl (stale→staleHint, analyzeButton→calculate) — deferred, pre-existing (pivot MOB-4.3)
+- [x] [Review][Defer] Tests hook-level 409/error absents dans use-density.test.ts — deferred, pre-existing (couvert au niveau composant)
+- [x] [Review][Defer] Epsilon-matching test manquant dans density-features — deferred, pre-existing (pivot MOB-4.3)
+- [x] [Review][Defer] Stale branch non testée dans sidebar-density-section — deferred, pre-existing
+- [x] [Review][Defer] Offline cache read path non testé (architectural, TanStack persist) — deferred, pre-existing
+- [x] [Review][Defer] Edge case slider km si GPX commence par des points corrompus → corridor vide — deferred, pre-existing (hypothétique, UX gracieuse)
 
 ## Dev Notes
 

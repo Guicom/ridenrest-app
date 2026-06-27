@@ -205,6 +205,16 @@ describe('collectTraceWaypoints', () => {
     ]);
     expect(wp).toEqual([{ lat: 45, lng: 5 }]);
   });
+
+  it('retourne [] pour un segment entièrement invalide', () => {
+    const wp = collectTraceWaypoints([
+      makeSegment('a', [
+        { lat: NaN, lng: NaN, distKm: 0 },
+        { lat: NaN, lng: NaN, distKm: 1 },
+      ]),
+    ]);
+    expect(wp).toEqual([]);
+  });
 });
 
 describe('safeFitPadding (fit caméra robuste)', () => {

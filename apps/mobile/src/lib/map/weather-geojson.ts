@@ -1,5 +1,7 @@
 import type { MapWaypoint, WeatherPoint } from '@ridenrest/shared';
 
+import { isValidLngLat } from '@/lib/map/maplibre-config';
+
 // Construction GeoJSON de l'overlay météo — port iso de `weather-geojson.ts` web.
 // `weatherPoints` et `waypoints` sont en km **cumulés** (alignés). PUR → testable.
 
@@ -14,7 +16,7 @@ export function buildWeatherLineSegments(
     const current = weatherPoints[i]!;
     const next = weatherPoints[i + 1]!;
     const coords = waypoints
-      .filter((wp) => wp.distKm >= current.km && wp.distKm <= next.km)
+      .filter((wp) => wp.distKm >= current.km && wp.distKm <= next.km && isValidLngLat(wp.lng, wp.lat))
       .map((wp) => [wp.lng, wp.lat] as [number, number]);
     if (coords.length < 2) continue;
 

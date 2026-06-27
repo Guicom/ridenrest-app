@@ -56,7 +56,7 @@ export function getMapStyle(colorScheme: 'light' | 'dark'): string {
  * (web) tolère et ignore silencieusement — d'où « ok sur le web, crash sur iOS ».
  * Toute coordonnée passée à un `<GeoJSONSource>` DOIT d'abord passer ce filtre.
  */
-export function isValidLngLat(lng: unknown, lat: unknown): lng is number {
+export function isValidLngLat(lng: unknown, lat: unknown): boolean {
   return Number.isFinite(lng) && Number.isFinite(lat);
 }
 
