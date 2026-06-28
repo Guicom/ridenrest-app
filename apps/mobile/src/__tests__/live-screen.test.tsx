@@ -16,6 +16,7 @@ import * as adventuresApi from '@/lib/api/adventures';
 import * as mapApi from '@/lib/api/map';
 import { i18n } from '@/lib/i18n';
 import { useLiveStore } from '@/lib/stores/live.store';
+import { useLivePoiSearch } from '@/hooks/use-live-poi-search';
 
 // ⚠️ Hors de `src/app/` À DESSEIN (importe une route — cf. AGENTS.md). On mocke les façades
 // réseau (carte/aventure), `expo-router` + safe-area + use-color-scheme. `expo-location` et
@@ -41,6 +42,21 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('@/hooks/use-color-scheme', () => ({
   useColorScheme: () => ({ colorScheme: 'light' }),
 }));
+// MOB-5.3 : la route Live monte maintenant PoiPopup (→ useSession `@better-auth/expo/client`
+// ESM-only) + BookingLinks (`@ridenrest/analytics`) + use-live-poi-search (`useProfile`).
+// Mocks alignés sur map-screen.test (mêmes raisons ESM/réseau).
+jest.mock('@/lib/auth/client', () => ({
+  useSession: jest.fn(() => ({ data: null })),
+}));
+jest.mock('@/hooks/use-profile', () => ({
+  useProfile: jest.fn(() => ({ data: null })),
+}));
+jest.mock('@ridenrest/analytics', () => ({
+  trackBookingClick: jest.fn(),
+}));
+jest.mock('@/hooks/use-live-poi-search', () => ({
+  useLivePoiSearch: jest.fn(),
+}));
 
 const mockGetMap = mapApi.getAdventureMapData as jest.Mock;
 const mockGetAdventure = adventuresApi.getAdventure as jest.Mock;
@@ -48,6 +64,7 @@ const mockParams = useLocalSearchParams as jest.Mock;
 const mockRequestForeground =
   Location.requestForegroundPermissionsAsync as jest.Mock;
 const mockWatchPosition = Location.watchPositionAsync as jest.Mock;
+const mockUseLivePoi = useLivePoiSearch as jest.Mock;
 
 function makeAdventure(name: string): AdventureResponse {
   return { id: 'adv-1', name, totalDistanceKm: 10 } as AdventureResponse;
@@ -98,6 +115,15 @@ beforeEach(async () => {
   useLiveStore.setState({ ...initialStore }, true);
   mockRequestForeground.mockResolvedValue({ status: 'granted' });
   mockWatchPosition.mockResolvedValue({ remove: jest.fn() });
+  mockUseLivePoi.mockReturnValue({
+    pois: [],
+    hasFetched: false,
+    isFetching: false,
+    targetKm: null,
+    isError: false,
+    refetch: jest.fn(),
+    canSearch: false,
+  });
 });
 
 describe('LiveScreen', () => {
@@ -174,5 +200,47 @@ describe('LiveScreen', () => {
       await screen.findByText(i18n.t('live.refusedNotice')),
     ).toBeOnTheScreen();
     expect(mockRequestForeground).not.toHaveBeenCalled();
+  });
+});
+
+describe('auto-zoom transitions', () => {
+  beforeEach(async () => {
+    await setConsent(true);
+    mockParams.mockReturnValue({ id: 'adv-1' });
+    mockGetAdventure.mockResolvedValue(makeAdventure('Tour'));
+    mockGetMap.mockResolvedValue(makeMap(true));
+  });
+
+  it('overlay de chargement POI visible pendant isFetching (précondition wasFetching)', async () => {
+    mockUseLivePoi.mockReturnValue({
+      pois: [],
+      hasFetched: false,
+      isFetching: true,
+      targetKm: 5,
+      isError: false,
+      refetch: jest.fn(),
+      canSearch: true,
+    });
+    await renderScreen();
+    expect(
+      await screen.findByLabelText(i18n.t('pois.search.loading')),
+    ).toBeOnTheScreen();
+  });
+
+  it('aucun freeze ni crash quand isFetching passe à false + hasFetched true', async () => {
+    mockUseLivePoi.mockReturnValue({
+      pois: [],
+      hasFetched: true,
+      isFetching: false,
+      targetKm: 5,
+      isError: false,
+      refetch: jest.fn(),
+      canSearch: true,
+    });
+    await renderScreen();
+    // Overlay retiré — l'effet auto-zoom (mapRef.current?.fitToSearchZone) a bien
+    // utilisé l'optional-chain → pas de crash si le ref est null dans le mock global.
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(await screen.findByText('Tour')).toBeOnTheScreen();
   });
 });

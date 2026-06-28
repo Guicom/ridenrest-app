@@ -1,0 +1,58 @@
+appId: app.ridenrest
+---
+# MOB-5.3 — Découverte de POIs en mode Live, variante ANDROID. Voir ../README.md §Android.
+# Pré-requis : build release (bundle embarqué), adb reverse 3010/3011, locale fr-FR,
+# permission localisation pré-accordée (`adb shell pm grant app.ridenrest
+# android.permission.ACCESS_FINE_LOCATION`) + position simulée (`adb emu geo fix 1.4442 43.6047`).
+# Login email/mot de passe scriptable (user e2e) si la session n'est pas persistée.
+# Carte/pins GL non introspectables → screenshots (revue visuelle).
+- launchApp
+
+# Login conditionnel (session non persistée sur Android).
+- runFlow:
+    when:
+      visible: "Se connecter"
+    commands:
+      - tapOn: "Email"
+      - inputText: "e2e@ridenrest.local"
+      - tapOn: "Mot de passe"
+      - inputText: "Test1234!"
+      - hideKeyboard
+      - tapOn: "Se connecter"
+
+# Liste des aventures → carte « Démarrer en Live » (bouton pleine largeur).
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# Consentement (conditionnel : returning user auto-démarre sans dialog, AC4).
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+# AC1/AC2 : fix GPS → panneau Live visible.
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 25000
+- assertVisible: "Rechercher"
+- takeScreenshot: screenshots/android-live-poi-panel
+
+# AC2/AC3 : recherche explicite → POIs + cercle + cible (GL → screenshot).
+- tapOn: "Rechercher"
+- takeScreenshot: screenshots/android-live-poi-results
+
+# AC7 : tiroir de filtres + persistance à la fermeture.
+- tapOn: "Ouvrir les filtres"
+- extendedWaitUntil:
+    visible: "Filtres"
+    timeout: 8000
+- assertVisible: "Vitesse moyenne"
+- assertVisible: "Distance de la trace"
+- takeScreenshot: screenshots/android-live-poi-filters
+- tapOn: "Fermer les filtres"
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 8000

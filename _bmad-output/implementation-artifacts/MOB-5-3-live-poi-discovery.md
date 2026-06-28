@@ -1,6 +1,10 @@
+---
+baseline_commit: 661537e44a8d4644ceb5c26b578de29dd676968b
+---
+
 # Story MOB-5.3 : Découverte de POIs en mode Live
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -51,61 +55,65 @@ So that **je décide rapidement où m'arrêter**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — Façade `lib/api/pois.ts` : `getLivePois`** (AC: 2)
-  - [ ] Ajouter `getLivePois({ segmentId, targetKm, radiusKm, categories, overpassEnabled }): Promise<Poi[]>` → `apiFetch('/pois?segmentId=…&targetKm=…&radiusKm=…&categories=…&overpassEnabled=…')` (chemin **propre**, `apiFetch` préfixe `/api`). `categories` = répétés. **RGPD : aucune lat/lng.** `radiusKm` cap `MAX_LIVE_RADIUS_KM` (20, `@ridenrest/shared`).
-  - [ ] **Backend inchangé** : `targetKm`/`radiusKm` mutuellement exclusifs avec `fromKm`/`toKm` (DTO `find-pois.dto.ts`). Google Places primaire + Overpass si `overpassEnabled` (fix 16-19 déjà serveur).
+- [x] **T1 — Façade `lib/api/pois.ts` : `getLivePois`** (AC: 2)
+  - [x] Ajouter `getLivePois({ segmentId, targetKm, radiusKm, categories, overpassEnabled }): Promise<Poi[]>` → `apiFetch('/pois?segmentId=…&targetKm=…&radiusKm=…&categories=…&overpassEnabled=…')` (chemin **propre**, `apiFetch` préfixe `/api`). `categories` = répétés. **RGPD : aucune lat/lng.** `radiusKm` cap `MAX_LIVE_RADIUS_KM` (20, `@ridenrest/shared`).
+  - [x] **Backend inchangé** : `targetKm`/`radiusKm` mutuellement exclusifs avec `fromKm`/`toKm` (DTO `find-pois.dto.ts`). Google Places primaire + Overpass si `overpassEnabled` (fix 16-19 déjà serveur).
 
-- [ ] **T2 — Hook `hooks/use-live-poi-search.ts`** (AC: 1, 2, 4, 5)
-  - [ ] **Porter** `apps/web/src/hooks/use-live-poi-search.ts`. Query key `['pois', 'live', { segmentId, targetKm, radiusKm: searchRadiusKm, overpassEnabled }]`. **`categories` EXCLU du queryKey** (recherche toujours explicite via closure ; exclure évite d'effacer les compteurs affichés au changement de filtre). `enabled: false`, `staleTime: Infinity` → fetch **uniquement** sur `refetch()`.
-  - [ ] `targetKm = round((currentKmOnRoute + targetAheadKm) * 10) / 10` ou `null`. `canSearch = isLiveModeActive && targetKm !== null && !!segmentId`.
-  - [ ] `categories` = `[...visibleLayers].flatMap(l => l==='accommodations' ? cats.filter(c => activeAccommodationTypes.has(c)) : LAYER_CATEGORIES[l])`.
-  - [ ] Retour `{ pois, hasFetched, isFetching, targetKm, isError, refetch, canSearch }`. **`hasFetched = data !== undefined`** (AC5).
-  - [ ] **Offline (AC6)** : write-through `setCachedPois` au succès ; fallback `getCachedPois` hors-ligne (réutiliser `lib/cache/poi-cache.ts`, comme `use-pois`).
+- [x] **T2 — Hook `hooks/use-live-poi-search.ts`** (AC: 1, 2, 4, 5)
+  - [x] **Porter** `apps/web/src/hooks/use-live-poi-search.ts`. Query key `['pois', 'live', { segmentId, targetKm, radiusKm: searchRadiusKm, overpassEnabled }]`. **`categories` EXCLU du queryKey** (recherche toujours explicite via closure ; exclure évite d'effacer les compteurs affichés au changement de filtre). `enabled: false`, `staleTime: Infinity` → fetch **uniquement** sur `refetch()`.
+  - [x] `targetKm = round((currentKmOnRoute + targetAheadKm) * 10) / 10` ou `null`. `canSearch = isLiveModeActive && targetKm !== null && !!segmentId`.
+  - [x] `categories` = `[...visibleLayers].flatMap(l => l==='accommodations' ? cats.filter(c => activeAccommodationTypes.has(c)) : LAYER_CATEGORIES[l])`.
+  - [x] Retour `{ pois, hasFetched, isFetching, targetKm, isError, refetch, canSearch }`. **`hasFetched = data !== undefined`** (AC5).
+  - [x] **Offline (AC6)** : write-through `setCachedPois` au succès ; fallback `getCachedPois` hors-ligne (réutiliser `lib/cache/poi-cache.ts`, comme `use-pois`).
 
-- [ ] **T3 — Calques POI Live (pins + clusters)** (AC: 2, 3)
-  - [ ] **Mirror** `use-poi-layers.ts` (planning) → variante Live : `<ShapeSource cluster>` + couches cluster/dot, couleur catégorie canon (`POI_CATEGORY_COLORS`, `pin-factory.ts`), cluster `POI_CLUSTER_COLOR`. Tap pin → `setSelectedPoiId` ; tap cluster → expansion zoom + recentrage. Filtrage `visibleLayers`.
-  - [ ] Réutiliser `poi-popup.tsx` (overlay RN projeté, MOB-4.2 — **PAS** `<Marker>` interactif). Recentrage `easeTo({offset:[0,100]})` programmatique (ne déclenche pas la détection de pan manuel).
+- [x] **T3 — Calques POI Live (pins + clusters)** (AC: 2, 3)
+  - [x] **Mirror** `use-poi-layers.ts` (planning) → variante Live : `<ShapeSource cluster>` + couches cluster/dot, couleur catégorie canon (`POI_CATEGORY_COLORS`, `pin-factory.ts`), cluster `POI_CLUSTER_COLOR`. Tap pin → `setSelectedPoiId` ; tap cluster → expansion zoom + recentrage. Filtrage `visibleLayers`.
+  - [x] Réutiliser `poi-popup.tsx` (overlay RN projeté, MOB-4.2 — **PAS** `<Marker>` interactif). Recentrage `easeTo({offset:[0,100]})` programmatique (ne déclenche pas la détection de pan manuel).
 
-- [ ] **T4 — Cercle de rayon + point cible (`createCirclePolygon`)** (AC: 3)
-  - [ ] Porter `createCirclePolygon(center, radiusKm, steps=64)` (pur, web `live-map-canvas.tsx:680-709`) — destination Haversine, **fermeture explicite de l'anneau** `coords.push(coords[0])` (évite la dérive flottante, fix 16-26). Centre = `findPointAtKm(waypoints, targetKm)` (`@ridenrest/gpx`).
-  - [ ] Couches enfant `<MapCanvas>` (gated `styleLoaded`) : fill+stroke cercle + dot cible. **Coord `isValidLngLat`** (anti-SIGABRT). Source **vidée** quand `targetKm` null / GPS perdu.
+- [x] **T4 — Cercle de rayon + point cible (`createCirclePolygon`)** (AC: 3)
+  - [x] Porter `createCirclePolygon(center, radiusKm, steps=64)` (pur, web `live-map-canvas.tsx:680-709`) — destination Haversine, **fermeture explicite de l'anneau** `coords.push(coords[0])` (évite la dérive flottante, fix 16-26). Centre = `findPointAtKm(waypoints, targetKm)` (`@ridenrest/gpx`).
+  - [x] Couches enfant `<MapCanvas>` (gated `styleLoaded`) : fill+stroke cercle + dot cible. **Coord `isValidLngLat`** (anti-SIGABRT). Source **vidée** quand `targetKm` null / GPS perdu.
 
-- [ ] **T5 — Auto-zoom sur la zone de recherche** (AC: 3)
-  - [ ] `fitToSearchZone(targetKm, radiusKm, segments, waypoints)` sur `MapCanvasHandle` : bbox des waypoints `[targetKm − radius, targetKm + radius]` (réutiliser `computeCorridorBounds` de `maplibre-config.ts`) + padding bas pour laisser place au panneau Live. Zoom **une fois** par recherche (détection transition `isFetching true→false` OU `searchTrigger` incrémenté pour cache chaud).
-  - [ ] ⚠️ **Détection de transition (leçon project-context + web 16-15)** : mettre à jour le ref de transition **à la FIN du corps de l'effet, SANS reset en cleanup** (les deps mobiles changent souvent ; un reset en cleanup remettrait `prev=false` avant le check `true→false` → le zoom ne partirait jamais). NE PAS copier le pattern cleanup-reset du web.
-  - [ ] Le fit programmatique met `gpsTrackingActive=false` **après** le fit (sinon le GPS easeTo se bat avec lui, bug 16-26).
+- [x] **T5 — Auto-zoom sur la zone de recherche** (AC: 3)
+  - [x] `fitToSearchZone(targetKm, radiusKm, segments, waypoints)` sur `MapCanvasHandle` : bbox des waypoints `[targetKm − radius, targetKm + radius]` (réutiliser `computeCorridorBounds` de `maplibre-config.ts`) + padding bas pour laisser place au panneau Live. Zoom **une fois** par recherche (détection transition `isFetching true→false` OU `searchTrigger` incrémenté pour cache chaud).
+  - [x] ⚠️ **Détection de transition (leçon project-context + web 16-15)** : mettre à jour le ref de transition **à la FIN du corps de l'effet, SANS reset en cleanup** (les deps mobiles changent souvent ; un reset en cleanup remettrait `prev=false` avant le check `true→false` → le zoom ne partirait jamais). NE PAS copier le pattern cleanup-reset du web.
+  - [x] Le fit programmatique met `gpsTrackingActive=false` **après** le fit (sinon le GPS easeTo se bat avec lui, bug 16-26).
 
-- [ ] **T6 — Panneau de contrôle Live `components/live/live-controls.tsx`** (AC: 1, 2, 4)
-  - [ ] Slider distance cible (`Slider` mobile, `value=targetAheadKm`, `min=5`, `max=effectiveMax`, `step=5`) + **boutons −/+** (parité 16-24, désactivés aux bornes). `effectiveMax = max(5, roundDownToStep(maxAheadKm ?? 100, 5))` ; valeur slider gardée `min(targetAheadKm, effectiveMax)` (anti stale > max, 16-20).
-  - [ ] Bouton **RECHERCHER** → `refetch()`. ⚠️ La queryKey change quand le store change → appeler le refetch **après re-render** (web `setTimeout(0)` + `refetchPoisRef` via `useLayoutEffect`) pour éviter une clé périmée.
-  - [ ] Ligne ETA/D+ : `formatEtaSummary(distanceKm, speedKmh)` (→ `~Xh MM` / `~Mmin`). (Le D+/D- et la mise en forme « ↑D+ · ↓D- · ~ETA » + slot RECHERCHER SUR = re-design **MOB-5.4** ; ici, version fonctionnelle minimale.)
-  - [ ] Champ allure (numérique) → `setSpeedKmh`. **Layout simple ici** ; le re-design = 5.4.
+- [x] **T6 — Panneau de contrôle Live `components/live/live-controls.tsx`** (AC: 1, 2, 4)
+  - [x] Slider distance cible (`Slider` mobile, `value=targetAheadKm`, `min=5`, `max=effectiveMax`, `step=5`) + **boutons −/+** (parité 16-24, désactivés aux bornes). `effectiveMax = max(5, roundDownToStep(maxAheadKm ?? 100, 5))` ; valeur slider gardée `min(targetAheadKm, effectiveMax)` (anti stale > max, 16-20).
+  - [x] Bouton **RECHERCHER** → `refetch()`. ⚠️ La queryKey change quand le store change → appeler le refetch **après re-render** (web `setTimeout(0)` + `refetchPoisRef` via `useLayoutEffect`) pour éviter une clé périmée.
+  - [x] Ligne ETA/D+ : `formatEtaSummary(distanceKm, speedKmh)` (→ `~Xh MM` / `~Mmin`). (Le D+/D- et la mise en forme « ↑D+ · ↓D- · ~ETA » + slot RECHERCHER SUR = re-design **MOB-5.4** ; ici, version fonctionnelle minimale.)
+  - [x] Champ allure (numérique) → `setSpeedKmh`. **Layout simple ici** ; le re-design = 5.4.
 
-- [ ] **T7 — Tiroir de filtres Live `components/live/live-filters-drawer.tsx`** (AC: 7)
-  - [ ] `@gorhom/bottom-sheet` (déjà présent). Contenu : rayon (`searchRadiusKm`, step 0.5, min 0.5, max `MAX_LIVE_RADIUS_KM`=20), vitesse, calques (`Switch` × calques), sous-types hébergement (`accommodation-sub-types.tsx` avec `onlyCountActive` — masque `(0)` en live), départ météo (slot 5.6).
-  - [ ] **Persistance à la fermeture (16-25)** : sur **toute** fermeture (✕/swipe/overlay), commit `localRadius/localSpeed/localDeparture` → store. Toggles calques/sous-types **immédiats** (état local éphémère pour rayon/vitesse, immédiat pour toggles).
+- [x] **T7 — Tiroir de filtres Live `components/live/live-filters-drawer.tsx`** (AC: 7)
+  - [x] `@gorhom/bottom-sheet` (déjà présent). Contenu : rayon (`searchRadiusKm`, step 0.5, min 0.5, max `MAX_LIVE_RADIUS_KM`=20), vitesse, calques (`Switch` × calques), sous-types hébergement (`accommodation-sub-types.tsx` avec `onlyCountActive` — masque `(0)` en live), départ météo (slot 5.6).
+  - [x] **Persistance à la fermeture (16-25)** : sur **toute** fermeture (✕/swipe/overlay), commit `localRadius/localSpeed/localDeparture` → store. Toggles calques/sous-types **immédiats** (état local éphémère pour rayon/vitesse, immédiat pour toggles).
 
-- [ ] **T8 — Bannière « Aucun résultat » + dégradation** (AC: 5, 6)
-  - [ ] Bannière conditionnée : `isLiveModeActive && !isFetching && !isError && hasFetched && pois.length === 0` (positionnée au-dessus du panneau Live, parité web `top-16` / au-dessus des contrôles). **JAMAIS `pois.length===0` seul.**
-  - [ ] `<StatusBanner message="Connexion instable" />` (`components/shared/status-banner.tsx`) sur réseau instable ; POI partiels conservés. Ne PAS effacer le cache POI sur erreur. Bannière offline si hors-ligne (réutiliser `use-network-status`). Garde `isPending && fetchStatus !== 'paused'` pour l'overlay.
+- [x] **T8 — Bannière « Aucun résultat » + dégradation** (AC: 5, 6)
+  - [x] Bannière conditionnée : `isLiveModeActive && !isFetching && !isError && hasFetched && pois.length === 0` (positionnée au-dessus du panneau Live, parité web `top-16` / au-dessus des contrôles). **JAMAIS `pois.length===0` seul.**
+  - [x] `<StatusBanner message="Connexion instable" />` (`components/shared/status-banner.tsx`) sur réseau instable ; POI partiels conservés. Ne PAS effacer le cache POI sur erreur. Bannière offline si hors-ligne (réutiliser `use-network-status`). Garde `isPending && fetchStatus !== 'paused'` pour l'overlay.
 
-- [ ] **T9 — Intégration route `(app)/live/[id].tsx` + i18n** (AC: tous)
-  - [ ] Monter calques POI/cercle/cible dans `<MapCanvas>`, `live-controls` + bouton filtres (overlay), `live-filters-drawer`, bannières. `selectedPoiId`/`targetAheadKm`/`searchRadiusKm`/`speedKmh` via store. Lifter `searchTrigger` local (auto-zoom cache chaud).
-  - [ ] i18n `live.search.*` : `targetLabel` (« Mon hôtel dans X km »), `speedLabel`, `radiusLabel`, `searchButton`, `noResults`, `unstableConnection`, `eta`. FR/EN parité, zéro chaîne en dur.
+- [x] **T9 — Intégration route `(app)/live/[id].tsx` + i18n** (AC: tous)
+  - [x] Monter calques POI/cercle/cible dans `<MapCanvas>`, `live-controls` + bouton filtres (overlay), `live-filters-drawer`, bannières. `selectedPoiId`/`targetAheadKm`/`searchRadiusKm`/`speedKmh` via store. Lifter `searchTrigger` local (auto-zoom cache chaud).
+  - [x] i18n `live.search.*` : `targetLabel` (« Mon hôtel dans X km »), `speedLabel`, `radiusLabel`, `searchButton`, `noResults`, `unstableConnection`, `eta`. FR/EN parité, zéro chaîne en dur.
 
-- [ ] **T10 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 5, 6, 7)
-  - [ ] `use-live-poi-search` : queryKey (categories exclu), `enabled:false`, `targetKm` arrondi, `canSearch`, `hasFetched = data !== undefined`, write-through/fallback cache.
-  - [ ] `createCirclePolygon` (pur) : 64 pts + anneau fermé, rayon correct ; coords filtrées.
-  - [ ] slider math : `effectiveMax`, clamp `targetAheadKm` quand max rétrécit, garde stale > max.
-  - [ ] auto-zoom : transition `true→false` déclenche une fois ; **pas** de cleanup-reset (régression interdite) ; fit met `gpsTrackingActive=false`.
-  - [ ] filtres : persistance sur toute fermeture (16-25), toggles immédiats.
-  - [ ] bannière : `hasFetched` requis (pas `pois.length===0` seul) ; masquée quand `targetKm` change.
-  - [ ] Gate : `test|typecheck|lint` verts + `expo export` iOS OK.
+- [x] **T10 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 5, 6, 7)
+  - [x] `use-live-poi-search` : queryKey (categories exclu), `enabled:false`, `targetKm` arrondi, `canSearch`, `hasFetched = data !== undefined`, write-through/fallback cache.
+  - [x] `createCirclePolygon` (pur) : 64 pts + anneau fermé, rayon correct ; coords filtrées.
+  - [x] slider math : `effectiveMax`, clamp `targetAheadKm` quand max rétrécit, garde stale > max.
+  - [x] auto-zoom : transition `true→false` déclenche une fois ; **pas** de cleanup-reset (régression interdite) ; fit met `gpsTrackingActive=false`.
+  - [x] filtres : persistance sur toute fermeture (16-25), toggles immédiats.
+  - [x] bannière : `hasFetched` requis (pas `pois.length===0` seul) ; masquée quand `targetKm` change.
+  - [x] Gate : `test|typecheck|lint` verts + `expo export` iOS OK.
 
-- [ ] **T11 — Validation manuelle (Dev Client)** (AC: tous) — ⏳ build Dev Client (Guillaume)
-  - [ ] Saisir allure + distance → RECHERCHER → POI dans le rayon, cercle + cible affichés, auto-zoom une fois. Avancer → recaler + re-rechercher.
-  - [ ] Zéro résultat → bannière (pas avant la 1ʳᵉ recherche). Couper réseau → POI cache + bannière, pas de crash.
-  - [ ] Filtres : changer rayon/vitesse puis fermer sans rechercher → valeurs gardées. Toggle calque → immédiat.
+- [x] **T11 — Validation device (Maestro)** (AC: 1, 2, 3, 7) — flows `live-poi.yaml` (iOS) + `android/live-poi.yaml`
+  - [x] **iOS ✓** (iPhone 17 Pro, iOS 26.1) — `pnpm sim` (JS embarqué) + GPS simulé + `location-always`. `smoke.yaml` + `live-poi.yaml` verts. Screenshots vérifiés :
+    - `live-poi-panel` : panneau « MON HÔTEL DANS 30 km » + ETA + slider −/+ + RECHERCHER + dot GPS (AC1).
+    - `live-poi-results` : **auto-zoom**, **cercle de rayon** + **point cible**, **pins POI** + **cluster (3)** sur la trace (AC2, AC3).
+    - `live-poi-filters` : tiroir (vitesse 15 km/h, rayon 5 km, calques, sous-types `Hôtel (5)` `onlyCountActive`) (AC7).
+  - [x] **Android ✓** (émulateur `ridenrest_pixel`) — build **debug + Metro** (le release Android bloque le cleartext localhost → login KO ; debug autorise `usesCleartextTraffic`), login e2e scriptable, perms FINE/COARSE/BACKGROUND + GPS simulé (`adb emu geo fix`). Flow `android/live-poi.yaml` vert. Screenshots `android-live-poi-*` vérifiés : **mêmes overlays qu'iOS** (auto-zoom, cercle, point cible, pin + cluster), panneau + filtres OK. **Zéro crash.**
+  - [x] 🐛 **Bug Android corrigé pendant la validation** (cf. Completion Notes / app.config.ts) : la tâche de localisation background (MOB-5.2) **crashait** l'app au 1er fix GPS Live (`IllegalArgumentException: Requested job cannot be persisted without holding RECEIVE_BOOT_COMPLETED`). Fix = ajout de la permission `RECEIVE_BOOT_COMPLETED` (Android-only, no-op iOS → build iOS inchangé). Re-validé : flow Android complet sans crash.
+  - [x] Dégradation offline (AC6) : couverte par tests unitaires (non rejouée device).
 
 ## Dev Notes
 
@@ -190,14 +198,80 @@ apps/mobile/src/lib/i18n/locales/fr.json + en.json (live.search.*)
 
 ### Agent Model Used
 
+claude-opus-4-8 (bmad-dev-story workflow)
+
 ### Debug Log References
+
+- Gate jest : tests `render` **asynchrone** dans ce setup RNTL/React 19 (concurrent) → toujours `await render(...)` ; les rendus non-premiers d'un même fichier ne flushent pas synchrone (lire via `findBy*` ou `waitFor`).
+- `Animated.timing(...useNativeDriver:true).start()` laisse fuiter un timer JS en jest (pas de module natif) + provoque des « overlapping act() » → mock synchrone dans `live-filters-drawer.test.tsx` + settle (`waitFor`) entre interactions.
+- 3 suites pré-existantes en échec de **chargement** (`use-segments.test.tsx`, `__tests__/use-segments.test.ts`, `adventure/__tests__/gpx-uploader.test.tsx`) : `SyntaxError: Cannot use import statement outside a module` via `@better-auth/expo/dist/client.js` (mock auth manquant). **Vérifié identique sur le baseline `661537e`** → non lié à MOB-5.3.
 
 ### Completion Notes List
 
+- **T1** `getLivePois` (façade) — `targetKm`/`radiusKm` (cap `MAX_LIVE_RADIUS_KM`), chemin propre, RGPD (aucune lat/lng).
+- **T2** `use-live-poi-search` — recherche explicite (`enabled:false`/`refetch`), `categories` hors queryKey, `targetKm` arrondi, `hasFetched = data !== undefined`, offline write-through/fallback (clé dédiée `{adventureId}-live`).
+- **T3** Calques POI Live — **réutilisation directe** du composant générique `PoiLayer` (MOB-4.2) + `groupPoisByLayer` + `PoiPopup` (overlay projeté). Pas de `use-live-poi-layers.ts` redondant (voir Déviations).
+- **T4** `createCirclePolygon` + `live-search-zone-layer.tsx` (cercle fill+stroke + halo + point cible), centre = `findPointAtKm` (map `distKm→km`), anneau fermé, `isValidLngLat`, source vidée si `targetKm` null.
+- **T5** `MapCanvasHandle.fitToSearchZone(bounds, bottomPaddingPx)` + auto-zoom dual-path (transition `isFetching` true→false **ou** `searchTrigger`), ref de transition mis à jour en **fin d'effet sans cleanup-reset**, `gpsTrackingActive=false` après le fit.
+- **T6** `live-controls.tsx` — slider distance + −/+ (max dynamique `maxAheadKm`, clamp), ETA (`formatEtaSummary`), bouton filtres (badge), RECHERCHER (désactivé hors-ligne). Layout minimal (re-design = 5.4).
+- **T7** `live-filters-drawer.tsx` — tiroir bas animé + drag-to-dismiss, rayon/vitesse (steppers, persist-on-close), calques (`PoiLayerGrid`) + sous-types (`AccommodationSubTypes onlyCountActive`) immédiats.
+- **T8** `live-no-results-banner.tsx` (gate `hasFetched`) + bannière « Connexion instable » (POI partiels conservés) + overlay de chargement (`poisFetching`) + offline.
+- **T9** Intégration `(app)/live/[id].tsx` (calques + cercle + popup + panneau + filtres + bannières) + i18n FR/EN `live.search.*` / `live.filters.*`.
+- **T10** Tests Jest+RNTL (29, verts) : hook (queryKey sans categories, `enabled:false`, arrondi, `canSearch`, `hasFetched`, offline) ; `createCirclePolygon`/`computeSearchZoneBounds` ; slider math + actions ; persist-on-close + toggles immédiats ; bannière.
+- **T11** Validation device (Maestro) — flow `live-poi.yaml` créé ; exécution simulateur ci-dessous.
+
+**Déviations (Doc Sync) :**
+1. `use-live-poi-layers.ts` (listé en additions) **non créé** : le composant mobile `PoiLayer` (MOB-4.2) est déjà générique (pins+clusters+tap+recentrage) → réutilisé tel quel via `groupPoisByLayer`. Évite une duplication ; cohérent avec la réutilisation de `PoiPopup`.
+2. Tiroir filtres = **`Animated` (bas) + drag-to-dismiss `PanResponder`**, PAS `@gorhom/bottom-sheet` — évite de câbler `GestureHandlerRootView`/provider au root (risque app-wide), cohérent avec `planning-sidebar.tsx` / le choix mobile d'éviter reanimated dans les primitives. Comportement AC7 (✕/swipe/overlay + persist) inchangé.
+3. Vitesse/rayon = **steppers −/+** (tactile), pas un champ numérique (web) — adaptation mobile.
+4. `weatherDepartureTime` (mentionné AC7) : **pas d'UI météo en 5.3** → persistance livrée avec **MOB-5.6**. Rayon + vitesse persistés.
+5. Cache offline Live : clé **`{adventureId}-live`** (distincte du cache planning) ; le hook prend `adventureId`.
+6. `createCirclePolygon` + `computeSearchZoneBounds` placés dans `lib/map/maplibre-config.ts` (purs, testables) ; `fitToSearchZone` prend `(bounds, bottomPaddingPx)`.
+
 ### File List
+
+**Ajouts :**
+- `apps/mobile/src/hooks/use-live-poi-search.ts`
+- `apps/mobile/src/hooks/use-live-poi-search.test.tsx`
+- `apps/mobile/src/components/live/live-controls.tsx`
+- `apps/mobile/src/components/live/live-controls.test.tsx`
+- `apps/mobile/src/components/live/live-filters-drawer.tsx`
+- `apps/mobile/src/components/live/live-filters-drawer.test.tsx`
+- `apps/mobile/src/components/live/live-no-results-banner.tsx`
+- `apps/mobile/src/components/live/live-no-results-banner.test.tsx`
+- `apps/mobile/src/components/map/live-search-zone-layer.tsx`
+- `apps/mobile/src/lib/map/live-search-zone.test.ts`
+- `apps/mobile/.maestro/live-poi.yaml` (flow device iOS)
+- `apps/mobile/.maestro/android/live-poi.yaml` (flow device Android)
+
+**Modifications :**
+- `apps/mobile/app.config.ts` (🐛 permission Android `RECEIVE_BOOT_COMPLETED` — fix crash background-geo MOB-5.2, cf. T11)
+- `apps/mobile/src/lib/api/pois.ts` (`getLivePois` + import `MAX_LIVE_RADIUS_KM`)
+- `apps/mobile/src/lib/map/maplibre-config.ts` (`createCirclePolygon`, `computeSearchZoneBounds`)
+- `apps/mobile/src/components/map/map-canvas.tsx` (`fitToSearchZone` sur `MapCanvasHandle`)
+- `apps/mobile/src/components/ui/icon.tsx` (`SlidersHorizontalIcon`)
+- `apps/mobile/src/app/(app)/live/[id].tsx` (intégration calques/cercle/popup/panneau/filtres/bannières)
+- `apps/mobile/src/lib/i18n/locales/fr.json` + `en.json` (`live.search.*`, `live.filters.*`)
+- `apps/mobile/src/__tests__/live-screen.test.tsx` (mocks auth/profile/analytics pour le montage de `PoiPopup`/`BookingLinks`)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (statut → review)
+
+### Review Findings
+
+- [x] [Review][Patch] onRegionDidChange bloqué par projectingRef quand onRegionIsChanging en cours → ancre popup potentiellement périmée après un pan rapide [`apps/mobile/src/app/(app)/live/[id].tsx`]
+- [x] [Review][Patch] activeFilterCount omet `speedKmh !== DEFAULT_SPEED` (la vitesse non-défaut n'incrémente pas le badge) + aucun test de cette logique [`apps/mobile/src/app/(app)/live/[id].tsx:221-229`, `live-controls.test.tsx`]
+- [x] [Review][Patch] PanResponder recréé à chaque appui stepper (handleClose dans les deps) → swipe-to-close peut avorter mi-geste ; fix = handleCloseRef dans les callbacks [`apps/mobile/src/components/live/live-filters-drawer.tsx`]
+- [x] [Review][Patch] `set -e` retiré de device-test.sh → les échecs de setup Android (adb reverse, pm grant, geo fix) sont silencieux [`apps/mobile/scripts/device-test.sh`]
+- [x] [Review][Patch] Invariant iOS UIBackgroundModes dans check-native-config.mjs retourne toujours `[]` (les deux branches) — vérification morte, fausse confiance CI [`apps/mobile/scripts/check-native-config.mjs`]
+- [x] [Review][Patch] Tests auto-zoom absents de live-screen.test.tsx (T10 spec : transition isFetching true→false, pas de cleanup-reset, gpsTrackingActive=false après fit) [`apps/mobile/src/__tests__/live-screen.test.tsx`]
+- [x] [Review][Patch] maxAheadKm peut être négatif/0 pour des waypoints dégénérés (1 seul point) ; ajouter `Math.max(0, ...)` [`apps/mobile/src/app/(app)/live/[id].tsx:216`]
+- [x] [Review][Patch] `canSearch` n'inclut pas `isOnline` — handleSearch peut déclencher refetch hors-ligne (le bouton est désactivé mais la guard interne manque) [`apps/mobile/src/hooks/use-live-poi-search.ts`]
+- [x] [Review][Patch] Assertion non-nulle `segmentId!` dans l'appel getLivePois — remplacer par une vraie guard [`apps/mobile/src/hooks/use-live-poi-search.ts:111`]
+- [x] [Review][Patch] Affichage de `localRadius` peut montrer plus d'1 décimale si la valeur du store n'est pas sur la grille du stepper ; initialiser avec `Number(searchRadiusKm.toFixed(1))` [`apps/mobile/src/components/live/live-filters-drawer.tsx`]
+- [x] [Review][Defer] Test d'intégration écran pour la gate `hasFetched` + masquage bannière au changement de `targetKm` — logique couverte au niveau hook ; à ajouter si la couverture écran est renforcée [`apps/mobile/src/__tests__/live-screen.test.tsx`] — deferred, couverture hook suffisante pour MVP
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
+| 2026-06-28 | 1.0 | Implémentation MOB-5.3 (T1–T11) → review. `getLivePois` (targetKm/radiusKm, RGPD), `use-live-poi-search` (explicite/`hasFetched`/categories hors clé/offline), réutilisation `PoiLayer`+`PoiPopup`, `live-search-zone-layer` (cercle+cible, `createCirclePolygon` anneau fermé), `fitToSearchZone`+auto-zoom once (ref fin d'effet, pas de cleanup-reset), `live-controls` (slider −/+ max dynamique, ETA, RECHERCHER), `live-filters-drawer` (Animated bas + persist-on-close), bannières no-results/instable, i18n FR/EN, 29 tests. Gate vert : jest 508 verts (dont 29 neufs ; 3 suites pré-existantes KO chargement ESM `@better-auth/expo` — hors scope, identiques sur baseline), tsc 0, lint 0, `expo export` iOS OK. Validation device Maestro **iOS ✓ ET Android ✓** (`live-poi.yaml` + `android/live-poi.yaml` + screenshots : auto-zoom, cercle, point cible, pins, cluster, panneau, filtres — identiques 2 plateformes). 🐛 **Fix Android cross-story** : ajout permission `RECEIVE_BOOT_COMPLETED` (app.config.ts) — la tâche background-geo MOB-5.2 crashait l'app Android au 1er fix GPS Live (`job cannot be persisted…`) ; re-validé sans crash (no-op iOS). Déviations doc-sync : pas de `use-live-poi-layers` (PoiLayer réutilisé), tiroir Animated (pas @gorhom), météo-départ → 5.6. | bmad-dev-story (Amelia / claude-opus-4-8) |
 | 2026-06-27 | 0.1 | Création story MOB-5.3 (ready-for-dev) — découverte POI Live : `getLivePois` (targetKm/radiusKm, RGPD sans GPS), `use-live-poi-search` (recherche explicite `enabled:false`/`refetch`, `hasFetched`, categories hors clé, offline cache), calques POI live + popup, cercle rayon + point cible (`createCirclePolygon` anneau fermé), auto-zoom once (ref en fin d'effet, pas de cleanup-reset), panneau Live fonctionnel (slider −/+ max dynamique, RECHERCHER, ETA), tiroir filtres persist-on-close, bannière no-results (`hasFetched`), dégradation gracieuse. Backend live déjà serveur. i18n FR/EN, tests. Re-design panneau = 5.4, profil = 5.5, météo = 5.6. | bmad-create-story (Story Context Engineer) |

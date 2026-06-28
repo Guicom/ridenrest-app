@@ -45,6 +45,12 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck --filter='*'
 
+      # Invariants de config native Expo (déterministe, sans device). Attrape la classe de
+      # bug « feature native activée sans sa permission/clé » (ex. background-location sans
+      # RECEIVE_BOOT_COMPLETED) AVANT le build/device. Voir apps/mobile/scripts/check-native-config.mjs.
+      - name: Native config invariants (mobile)
+        run: pnpm --filter @ridenrest/mobile check:native-config
+
       - name: Build
         run: pnpm turbo run build --filter='*'
         env:

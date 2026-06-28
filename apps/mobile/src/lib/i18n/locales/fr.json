@@ -211,6 +211,29 @@
       "notificationTitle": "Mode Live actif",
       "notificationBody": "Ride’n’Rest suit votre position pendant que vous roulez.",
       "permissionDeniedNotice": "Suivi en arrière-plan désactivé. Le Live reste actif écran allumé."
+    },
+    "search": {
+      "targetLabel": "Mon hôtel dans",
+      "distanceSliderA11y": "Distance cible (km)",
+      "decrement": "Diminuer de 5 km",
+      "increment": "Augmenter de 5 km",
+      "filters": "Ouvrir les filtres",
+      "searchButton": "Rechercher",
+      "etaA11y": "Temps estimé : {{eta}}",
+      "noResults": "Aucun résultat dans cette zone",
+      "unstableConnection": "Connexion instable — {{count}} résultat(s) chargé(s)",
+      "speedLabel": "Vitesse moyenne",
+      "radiusLabel": "Distance de la trace",
+      "radiusUnit": "km",
+      "layersLabel": "Je cherche",
+      "speedDecrement": "Diminuer la vitesse",
+      "speedIncrement": "Augmenter la vitesse",
+      "radiusDecrement": "Diminuer le rayon",
+      "radiusIncrement": "Augmenter le rayon"
+    },
+    "filters": {
+      "title": "Filtres",
+      "close": "Fermer les filtres"
     }
   },
   "map": {

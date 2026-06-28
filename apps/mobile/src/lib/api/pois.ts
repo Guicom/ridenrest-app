@@ -1,5 +1,10 @@
 import { apiFetch } from '@/lib/api/api-client';
-import type { GooglePlaceDetails, Poi, PoiCategory } from '@ridenrest/shared';
+import {
+  MAX_LIVE_RADIUS_KM,
+  type GooglePlaceDetails,
+  type Poi,
+  type PoiCategory,
+} from '@ridenrest/shared';
 
 // Façade API typée POI (MOB-4.2 / AC2, 4, 5). Unique point d'accès HTTP aux POIs
 // d'une aventure — via `apiFetch` (Bearer JWT + 401/refresh + déballage `{ data }`),
@@ -30,6 +35,40 @@ export function findPois(params: FindPoisParams): Promise<Poi[]> {
     segmentId: params.segmentId,
     fromKm: String(params.fromKm),
     toKm: String(params.toKm),
+  });
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => search.append('categories', c));
+  }
+  if (params.overpassEnabled) {
+    search.set('overpassEnabled', 'true');
+  }
+  return apiFetch<Poi[]>(`/pois?${search.toString()}`);
+}
+
+export interface GetLivePoisParams {
+  segmentId: string;
+  /** km **cumulé** relatif à la trace du point cible (jamais de lat/lng — RGPD). */
+  targetKm: number;
+  /** Rayon de recherche autour du point cible (km). Capé à `MAX_LIVE_RADIUS_KM`. */
+  radiusKm: number;
+  categories?: PoiCategory[];
+  overpassEnabled?: boolean;
+}
+
+/**
+ * GET /pois (mode **Live**) → POIs autour du point cible `targetKm` (rayon `radiusKm`).
+ * `targetKm`/`radiusKm` sont **mutuellement exclusifs** avec `fromKm`/`toKm` côté DTO
+ * serveur (`find-pois.dto.ts`). Le serveur résout le point via `getWaypointAtKm`
+ * (interpolation des waypoints stockés, ownership check) → **aucune lat/lng envoyée**
+ * par le client (RGPD, NFR-012). `radiusKm` est capé à `MAX_LIVE_RADIUS_KM` (20) côté
+ * client en plus de la validation serveur. Google Places primaire + Overpass si opt-in.
+ */
+export function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
+  const radiusKm = Math.min(params.radiusKm, MAX_LIVE_RADIUS_KM);
+  const search = new URLSearchParams({
+    segmentId: params.segmentId,
+    targetKm: String(params.targetKm),
+    radiusKm: String(radiusKm),
   });
   if (params.categories && params.categories.length > 0) {
     params.categories.forEach((c) => search.append('categories', c));

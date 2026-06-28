@@ -1,11 +1,19 @@
+import { findPointAtKm } from '@ridenrest/gpx';
+import { type MapSegmentData } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GeolocationConsent } from '@/components/live/geolocation-consent';
+import { LiveControls } from '@/components/live/live-controls';
+import { LiveFiltersDrawer } from '@/components/live/live-filters-drawer';
+import { LiveNoResultsBanner } from '@/components/live/live-no-results-banner';
 import { LiveGpsLayer } from '@/components/map/live-gps-layer';
+import { LiveSearchZoneLayer } from '@/components/map/live-search-zone-layer';
 import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
+import { PoiLayer } from '@/components/map/poi-layer';
+import { PoiPopup } from '@/components/map/poi-popup';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { ChevronLeftIcon, NavigationIcon } from '@/components/ui/icon';
@@ -14,22 +22,51 @@ import { useAdventure } from '@/hooks/use-adventures';
 import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
 import { useLiveMode } from '@/hooks/use-live-mode';
+import { useLivePoiSearch } from '@/hooks/use-live-poi-search';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { hasTrace } from '@/lib/map/maplibre-config';
+import { groupPoisByLayer } from '@/hooks/use-pois';
+import {
+  collectTraceWaypoints,
+  computeSearchZoneBounds,
+  computeTraceBounds,
+  hasTrace,
+} from '@/lib/map/maplibre-config';
 import { useLiveStore } from '@/lib/stores/live.store';
+import { useMapStore } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
 
-// Écran Live (MOB-5.1 / T5 — SHELL FONDATION). Carte plein écran + trace (réutilise
-// `MapCanvas` MOB-4.1) + flow de consentement RGPD + permission foreground + suivi GPS
-// foreground (projeté client-side sur la trace → `currentKmOnRoute`). Le keep-awake est
-// porté par `live/_layout.tsx`.
+// Écran Live (MOB-5.1 fondation + MOB-5.2 GPS/caméra + **MOB-5.3 découverte POI**). Carte
+// plein écran + trace + dot GPS + flow consentement/permission, AUXQUELS s'ajoutent ici :
+//   - calques POI Live (pins + clusters, `PoiLayer` réutilisé) + popup (`PoiPopup`),
+//   - cercle de rayon + point cible (`LiveSearchZoneLayer`),
+//   - panneau de contrôle Live (`LiveControls`) : slider distance, RECHERCHER, ETA,
+//   - tiroir filtres (`LiveFiltersDrawer`, persist-on-close),
+//   - bannières « Aucun résultat » / « Connexion instable » + dégradation gracieuse.
 //
-// Hors scope ici (stories suivantes) : background GPS écran-éteint / caméra auto-follow /
-// dot GPS (5.2), découverte POI (5.3), panneau de recherche (5.4), profil d'élévation
-// (5.5), météo (5.6). On affiche juste un repère minimal du PK courant pour matérialiser
-// la projection (AC3) sans préempter le rendu du dot/caméra de 5.2.
+// RGPD : la recherche n'envoie QUE `segmentId` + `targetKm` (km relatif) + `radiusKm` —
+// jamais de lat/lng (NFR-012). La position GPS reste sur le device.
 //
-// RGPD : aucun appel serveur GPS — la position reste sur le device (NFR-LP-001).
+// Le **re-design** du panneau + section PROFIL repliable = MOB-5.4 ; le profil
+// d'élévation = MOB-5.5 ; la météo Live = MOB-5.6.
+
+const SEGMENT_KM_EPSILON = 0.001;
+
+/** Segment portant le km cumulé `km` (fallback 1er segment) — pour l'enrichissement popup. */
+function findSegmentIdForKm(
+  segments: readonly MapSegmentData[],
+  km: number,
+): string | null {
+  const seg = segments.find(
+    (s) =>
+      km >= s.cumulativeStartKm - SEGMENT_KM_EPSILON &&
+      km <= s.cumulativeStartKm + s.distanceKm + SEGMENT_KM_EPSILON,
+  );
+  return seg?.id ?? segments[0]?.id ?? null;
+}
+
+/** Padding bas (px) de l'auto-zoom quand le panneau n'est pas encore mesuré. */
+const PANEL_FALLBACK_PADDING = 260;
+const PANEL_PADDING_GAP = 16;
 
 export default function LiveScreen() {
   const { t } = useTranslation();
@@ -45,6 +82,7 @@ export default function LiveScreen() {
   const traceReady = hasTrace(segments);
   const title = adventure.data?.name ?? t('map.title');
   const paddingTop = insets.top + 12;
+  const segmentId = segments[0]?.id;
 
   const {
     needsConsent,
@@ -56,14 +94,199 @@ export default function LiveScreen() {
     isLiveModeActive,
   } = useLiveMode(waypoints);
 
-  // Refus du consentement in-app : on ferme le dialog et on affiche le message AC1
-  // (la géoloc est nécessaire) avec une action pour re-tenter. Le mode Live n'est PAS activé.
   const [refused, setRefused] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute);
   const currentPosition = useLiveStore((s) => s.currentPosition);
+  const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm);
+  const speedKmh = useLiveStore((s) => s.speedKmh);
+  const visibleLayers = useMapStore((s) => s.visibleLayers);
 
-  // Ref impérative de la caméra (MOB-5.2) — bouton « recentrer » → `centerOnGps()`.
+  // ── Recherche POI Live (explicite — refetch, AC2) ───────────────────────────
+  const {
+    pois,
+    hasFetched,
+    isFetching: poisFetching,
+    targetKm,
+    isError: poisError,
+    refetch: refetchPois,
+    canSearch,
+  } = useLivePoiSearch({ adventureId: id, segmentId });
+
+  // Refs « latest » : la queryKey change quand le store change (rayon/targetKm) → on
+  // appelle le refetch le plus récent (post-render) pour ne pas fetch avec une clé périmée.
+  const refetchPoisRef = useRef(refetchPois);
+  const canSearchRef = useRef(canSearch);
+  useEffect(() => {
+    refetchPoisRef.current = refetchPois;
+    canSearchRef.current = canSearch;
+  });
+
+  const [searchTrigger, setSearchTrigger] = useState(0);
+  const handleSearch = useCallback(() => {
+    setSearchTrigger((v) => v + 1);
+    // Différé d'un tick : React a re-rendu avec le dernier état store → clé à jour.
+    setTimeout(() => {
+      if (!canSearchRef.current) return;
+      void refetchPoisRef.current();
+    }, 0);
+  }, []);
+
+  // POIs groupés par calque (pins). En Live, l'API filtre déjà par sous-types actifs →
+  // pas de re-filtrage d'affichage (parité web : les pins restent jusqu'à la re-recherche).
+  const poisByLayer = useMemo(
+    () => groupPoisByLayer(pois, visibleLayers),
+    [pois, visibleLayers],
+  );
+  const allPois = useMemo(
+    () => Object.values(poisByLayer).flat(),
+    [poisByLayer],
+  );
+
+  // ── POI sélectionné + popup projeté (overlay RN, pas un Marker — cf. poi-popup) ──
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+  const selectedPoi = useMemo(
+    () => allPois.find((p) => p.id === selectedPoiId) ?? null,
+    [allPois, selectedPoiId],
+  );
+  if (selectedPoiId !== null && !allPois.some((p) => p.id === selectedPoiId)) {
+    setSelectedPoiId(null);
+  }
+  const selectedSegmentId = selectedPoi
+    ? findSegmentIdForKm(segments, selectedPoi.distAlongRouteKm)
+    : null;
+
   const mapRef = useRef<MapCanvasHandle>(null);
+  const getCamera = useCallback(() => mapRef.current?.getCamera() ?? null, []);
+  const getMap = useCallback(() => mapRef.current?.getMap() ?? null, []);
+  const handleCloseSheet = useCallback(() => setSelectedPoiId(null), []);
+
+  // Variante d'accès sélectionnée (popup hébergement) — reset à 0 au changement de POI.
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [variantForPoiId, setVariantForPoiId] = useState(selectedPoiId);
+  const [popupAnchor, setPopupAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+  const projectingRef = useRef(false);
+  if (variantForPoiId !== selectedPoiId) {
+    setVariantForPoiId(selectedPoiId);
+    setSelectedVariantIndex(0);
+    setPopupAnchor(null);
+  }
+
+  const reprojectPopup = useCallback(async () => {
+    const m = getMap();
+    if (!m?.project || !selectedPoi) return;
+    if (projectingRef.current) return;
+    projectingRef.current = true;
+    try {
+      const px = await m.project([selectedPoi.lng, selectedPoi.lat]);
+      setPopupAnchor({ x: px[0], y: px[1] });
+    } catch {
+      // Projection indisponible (style pas prêt) → on garde la dernière position connue.
+    } finally {
+      projectingRef.current = false;
+    }
+  }, [getMap, selectedPoi]);
+
+  useEffect(() => {
+    const m = getMap();
+    if (!m?.project || !selectedPoi) return;
+    let cancelled = false;
+    void m
+      .project([selectedPoi.lng, selectedPoi.lat])
+      .then((px) => {
+        if (!cancelled) setPopupAnchor({ x: px[0], y: px[1] });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [getMap, selectedPoi]);
+
+  // Quand la région s'arrête, le projectingRef peut encore être true (onRegionIsChanging
+  // a lancé une projection en vol). On le remet à false pour que reprojectPopup capture
+  // la position finale de manière fiable.
+  const handleRegionDidChange = useCallback(async () => {
+    projectingRef.current = false;
+    await reprojectPopup();
+  }, [reprojectPopup]);
+
+  // ── Cercle de rayon + point cible (AC3) ─────────────────────────────────────
+  const targetPoint = useMemo(() => {
+    if (targetKm === null || waypoints.length === 0) return null;
+    const km = waypoints.map((w) => ({ lat: w.lat, lng: w.lng, km: w.distKm }));
+    return findPointAtKm(km, targetKm);
+  }, [targetKm, waypoints]);
+
+  // ── Slider max dynamique = distance restante (AC1, parité 16-20) ─────────────
+  const maxAheadKm = useMemo(() => {
+    if (currentKmOnRoute === null || waypoints.length === 0) return undefined;
+    const totalDistKm = waypoints[waypoints.length - 1]!.distKm;
+    return Math.max(0, Math.ceil(totalDistKm - currentKmOnRoute));
+  }, [currentKmOnRoute, waypoints]);
+
+  // ── Compteur de filtres actifs (badge) ──────────────────────────────────────
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (!visibleLayers.has('accommodations')) count++;
+    if (visibleLayers.has('restaurants')) count++;
+    if (visibleLayers.has('supplies')) count++;
+    if (visibleLayers.has('bike')) count++;
+    if (searchRadiusKm !== 5) count++;
+    if (speedKmh !== 15) count++;
+    return count;
+  }, [visibleLayers, searchRadiusKm, speedKmh]);
+
+  // ── Auto-zoom sur la zone de recherche, UNE FOIS par recherche (AC3) ─────────
+  // Dual-path : cache froid (`poisFetching` true→false) + cache chaud (`searchTrigger`
+  // incrémenté sans fetch). ⚠️ Refs de transition mises à jour en FIN d'effet, **sans
+  // cleanup-reset** (deps fréquentes ; un reset en cleanup empêcherait le zoom — leçon
+  // project-context / régression 2026-06-16). Le fit met `gpsTrackingActive=false`.
+  const [panelHeight, setPanelHeight] = useState(0);
+  const prevPoisFetchingRef = useRef(false);
+  const prevSearchTriggerRef = useRef(0);
+  useEffect(() => {
+    const justResolved = prevPoisFetchingRef.current && !poisFetching;
+    const justSearched =
+      searchTrigger > 0 &&
+      searchTrigger !== prevSearchTriggerRef.current &&
+      !poisFetching &&
+      hasFetched;
+    if ((justResolved || justSearched) && isLiveModeActive && targetKm !== null) {
+      const bounds =
+        computeSearchZoneBounds(waypoints, targetKm, searchRadiusKm) ??
+        computeTraceBounds(collectTraceWaypoints(segments));
+      const bottomPadding =
+        (panelHeight > 0 ? panelHeight : PANEL_FALLBACK_PADDING) +
+        PANEL_PADDING_GAP;
+      mapRef.current?.fitToSearchZone(bounds, bottomPadding);
+    }
+    prevPoisFetchingRef.current = poisFetching;
+    prevSearchTriggerRef.current = searchTrigger;
+  }, [
+    poisFetching,
+    hasFetched,
+    isLiveModeActive,
+    searchTrigger,
+    targetKm,
+    searchRadiusKm,
+    waypoints,
+    segments,
+    panelHeight,
+  ]);
+
+  // ── États des bannières (précédence : offline > erreur > aucun résultat) ─────
+  const showOffline = !isOnline && isLiveModeActive;
+  const showUnstable =
+    isOnline && isLiveModeActive && poisError && !poisFetching;
+  const showNoResults =
+    isLiveModeActive &&
+    !poisFetching &&
+    !poisError &&
+    hasFetched &&
+    allPois.length === 0 &&
+    !showOffline;
 
   const header = (
     <View
@@ -111,15 +334,38 @@ export default function LiveScreen() {
 
   return (
     <View className="flex-1 bg-background-page">
-      <MapCanvas ref={mapRef} segments={segments}>
-        {/* Point GPS (dot + halo) à la position courante (MOB-5.2 / AC5). Enfant de
-            MapCanvas → rendu seulement après `styleLoaded` (gate anti-SIGABRT). */}
+      <MapCanvas
+        ref={mapRef}
+        segments={segments}
+        onRegionIsChanging={reprojectPopup}
+        onRegionDidChange={handleRegionDidChange}
+      >
+        {/* Cercle de rayon + point cible AVANT les pins → pins au-dessus (AC3). */}
+        <LiveSearchZoneLayer center={targetPoint} radiusKm={searchRadiusKm} />
+        <PoiLayer
+          poisByLayer={poisByLayer}
+          visibleLayers={visibleLayers}
+          onSelectPoi={setSelectedPoiId}
+          getCamera={getCamera}
+        />
+        {/* Point GPS (dot + halo) à la position courante (MOB-5.2). */}
         <LiveGpsLayer />
       </MapCanvas>
+
+      {/* Popup POI = overlay RN absolu au-dessus de la carte (tactile fiable iOS). */}
+      <PoiPopup
+        poi={selectedPoi}
+        anchor={popupAnchor}
+        segmentId={selectedSegmentId}
+        onClose={handleCloseSheet}
+        getCamera={getCamera}
+        getMap={getMap}
+        selectedVariantIndex={selectedVariantIndex}
+        onSelectVariant={setSelectedVariantIndex}
+      />
       {header}
 
-      {/* Bouton « recentrer » (AC5) : recentre sur le GPS + réactive l'auto-follow.
-          Visible dès qu'une position est connue. */}
+      {/* Bouton « recentrer » (AC5 MOB-5.2). */}
       {isLiveModeActive && currentPosition ? (
         <View
           pointerEvents="box-none"
@@ -138,11 +384,11 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {/* Indicateur « acquisition GPS… » : watch démarré, pas encore de 1er fix (NFR-007). */}
+      {/* Indicateur « acquisition GPS… » (NFR-007) — haut, au-dessus du panneau. */}
       {isAcquiring ? (
         <View
           pointerEvents="none"
-          style={{ bottom: insets.bottom + 16 }}
+          style={{ top: insets.top + 64 }}
           className="absolute left-0 right-0 z-20 items-center"
         >
           <View
@@ -156,12 +402,51 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {/* Dégradation gracieuse background (AC6) : « Always » refusé → avis NON bloquant,
-          le Live foreground continue. */}
+      {/* Overlay de chargement recherche (AC2) — garde paused-safe via `poisFetching`. */}
+      {poisFetching ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-0 z-20 items-center justify-center"
+        >
+          <View
+            accessibilityRole="progressbar"
+            accessibilityLabel={t('pois.search.loading')}
+            className="flex-row items-center gap-2 rounded-lg bg-card/90 px-4 py-3"
+          >
+            <ActivityIndicator size="small" className="text-primary" />
+            <Text className="text-sm font-montserrat text-text-primary">
+              {t('pois.search.loading')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Bannière « Connexion instable » (AC6) — POI partiels conservés, non bloquant. */}
+      {showUnstable ? (
+        <View
+          pointerEvents="none"
+          style={{ top: insets.top + 56 }}
+          className="absolute left-0 right-0 z-40 items-center px-4"
+        >
+          <View
+            accessibilityRole="alert"
+            className="rounded-lg bg-text-muted px-4 py-2"
+          >
+            <Text className="text-center text-sm font-montserrat-semibold text-white">
+              {t('live.search.unstableConnection', { count: allPois.length })}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* Bannière « Aucun résultat » (AC5) — gate `hasFetched`, jamais `length===0` seul. */}
+      <LiveNoResultsBanner visible={showNoResults && !showUnstable} />
+
+      {/* Avis dégradation background (AC6 MOB-5.2) — « Always » refusé, non bloquant. */}
       {backgroundDenied && isLiveModeActive ? (
         <View
           pointerEvents="none"
-          style={{ top: insets.top + 64 }}
+          style={{ top: insets.top + 108 }}
           className="absolute left-4 right-16 z-10"
         >
           <View
@@ -175,30 +460,30 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {/* Repère minimal du PK courant (matérialise la projection AC3 ; dot/caméra = 5.2). */}
-      {isLiveModeActive && currentKmOnRoute != null ? (
-        <View
-          pointerEvents="none"
-          style={{ bottom: insets.bottom + 16 }}
-          className="absolute left-0 right-0 z-20 items-center"
-        >
-          <View
-            accessibilityRole="text"
-            accessibilityLabel={`${currentKmOnRoute.toFixed(1)} km`}
-            className="rounded-full bg-primary/90 px-4 py-2"
-          >
-            <Text className="text-sm font-montserrat-semibold text-white">
-              {`${currentKmOnRoute.toFixed(1)} km`}
-            </Text>
-          </View>
-        </View>
+      {/* Panneau de contrôle Live (slider, RECHERCHER, ETA, filtres). */}
+      {isLiveModeActive && traceReady ? (
+        <LiveControls
+          onFiltersOpen={() => setFiltersOpen(true)}
+          onSearch={handleSearch}
+          activeFilterCount={activeFilterCount}
+          maxAheadKm={maxAheadKm}
+          isOnline={isOnline}
+          onHeightChange={setPanelHeight}
+        />
       ) : null}
 
-      {/* Permission OS refusée → message + Réglages (jamais de cul-de-sac, AC2). */}
+      {/* Tiroir de filtres Live (persist-on-close, AC7). */}
+      <LiveFiltersDrawer
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        accommodationPois={poisByLayer.accommodations}
+      />
+
+      {/* Permission OS refusée → message + Réglages (AC2). */}
       {permissionDenied ? (
         <View
           pointerEvents="box-none"
-          className="absolute inset-0 z-30 items-center justify-center px-8"
+          className="absolute inset-0 z-50 items-center justify-center px-8"
         >
           <View className="w-full max-w-md gap-3 rounded-2xl border border-border bg-card p-5">
             <Text className="text-lg font-montserrat-semibold text-text-primary">
@@ -220,7 +505,7 @@ export default function LiveScreen() {
       {refused ? (
         <View
           pointerEvents="box-none"
-          className="absolute inset-0 z-30 items-center justify-center px-8"
+          className="absolute inset-0 z-50 items-center justify-center px-8"
         >
           <View className="w-full max-w-md gap-3 rounded-2xl border border-border bg-card p-5">
             <Text
@@ -238,7 +523,6 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {/* Dialog de consentement RGPD (non-dismissible). Modal RN → overlay au-dessus de tout. */}
       <GeolocationConsent
         open={needsConsent && !refused}
         onConsent={grantConsent}
@@ -290,7 +574,7 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {!isOnline ? (
+      {showOffline ? (
         <View
           pointerEvents="none"
           style={{ top: insets.top + 64 }}

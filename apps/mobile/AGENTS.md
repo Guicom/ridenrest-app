@@ -210,6 +210,26 @@ component: RNSVG… »* tant que `RNSVG` n'était pas dans `Podfile.lock`. Même
 (`prebuild --clean -p ios` + `run:ios`). Règle : **toute icône lucide / SVG sur mobile
 dépend de `react-native-svg` (natif)** — pas de rendu sans rebuild du dev client.
 
+### Module natif neuf = rebuild iOS **ET** Android, sinon crash au boot (CRITIQUE)
+
+Vécu en MOB-5.2 (ajout `expo-task-manager`) : **ne rebuilder qu'une seule plateforme** laisse
+l'autre app sur son **ancien binaire natif sans le module** → dès que la nouvelle JS charge le
+module (ex. `import '@/lib/live/location-task'` → `TaskManager.defineTask`), **crash dur au
+boot** (« app died » Android / dyld iOS). Le piège : le bundle JS est partagé, mais le binaire
+natif ne l'est PAS.
+
+→ **Tout ajout/màj de module natif OU changement de `app.config.ts` (plugins, permissions)
+impose un rebuild des DEUX plateformes avant de déclarer quoi que ce soit testé :**
+- iOS : `expo prebuild -p ios` (workaround ENOTEMPTY : déplacer `ios/` puis prebuild) + `pnpm sim`
+- Android : `expo prebuild -p android` (régénère AndroidManifest = nouvelles permissions) + `expo run:android --variant release`
+- **Vérifier le boot de chaque plateforme** (logcat Android `pidof`/pas de FATAL ; `.ips` iOS), pas seulement « le process est vivant ».
+
+**Règle de reporting (anti-arrondi)** : ne JAMAIS écrire un « ✓ » global. Toujours nommer
+l'état **réel par plateforme** : « iOS ✓ / Android **non testé** » est une réponse valide et
+honnête ; « tout est ok » alors qu'une seule plateforme a été buildée ne l'est pas. Un
+comportement bizarre sur un device (même « le mauvais device ») = **on s'arrête et on creuse**,
+on ne contourne pas.
+
 ## Tests de routes : JAMAIS sous `src/app/` (CRITIQUE)
 
 Expo Router découvre les routes via `require.context(process.env.EXPO_ROUTER_APP_ROOT, …)`
@@ -300,3 +320,52 @@ plein → **OrbStack redémarre** → Postgres/Redis remontent mais les serveurs
   `id` NI par label (alors que `adb shell uiautomator dump` le voit) → le taper par
   **coordonnée**. `testID` ne surface PAS en `resource-id` sur cette archi → cibler par
   **label** sur Android, pas par id.
+
+## Géoloc background Android : `RECEIVE_BOOT_COMPLETED` OBLIGATOIRE (CRITIQUE)
+
+Vécu en validation device MOB-5.3 (mode Live, émulateur). Dès le **1er fix GPS background**,
+`expo-location` (`LocationTaskConsumer.reportLocationsImmediately`) planifie via
+`expo-task-manager` un **JobScheduler job persisté** (`setPersisted(true)`). Android **exige**
+alors la permission `RECEIVE_BOOT_COMPLETED`, sinon **crash dur** :
+
+```
+FATAL EXCEPTION: java.lang.IllegalArgumentException:
+  Requested job cannot be persisted without holding android.permission.RECEIVE_BOOT_COMPLETED
+  at expo.modules.taskManager.TaskManagerUtils.updateOrScheduleJob
+  at expo.modules.location.taskConsumers.LocationTaskConsumer.reportLocationsImmediately
+```
+
+→ Toute app avec une **tâche de localisation background** (`startLocationUpdatesAsync` +
+`TaskManager`) DOIT déclarer la permission. Le plugin `expo-location` ne l'ajoute PAS tout
+seul. Fix : `app.config.ts` → `android.permissions: ['android.permission.RECEIVE_BOOT_COMPLETED']`
+puis `expo prebuild -p android`. Permission **Android-only** (no-op iOS). Diagnostic :
+`adb logcat -d -b crash`. (Le crash n'apparaît que quand un update GPS background est
+réellement délivré → un test court qui n'atteint pas ce point le rate.)
+
+## Tester Android en local : DEBUG + Metro (le release bloque le login localhost)
+
+Contrairement à iOS (`pnpm sim` = build **release** standalone autonome), le build
+**release Android NE marche PAS** pour tester le login en local : le manifest *release*
+n'a **pas** `usesCleartextTraffic="true"` (seul le manifest *debug* l'a) → Android **bloque
+le HTTP cleartext vers `localhost`** → l'auth (`http://localhost:3011`) échoue
+(« Connexion impossible »). L'app release boote et affiche le login, mais ne peut pas se
+connecter à l'API/auth locale.
+
+→ Pour une validation device Android **avec login**, utiliser le build **debug + Metro** :
+1. `adb reverse tcp:8081 tcp:8081` + `tcp:3010` + `tcp:3011`.
+2. Metro : `npx expo start --dev-client` (laisser tourner).
+3. Build/install debug : `npx expo run:android` (signature debug ≠ release →
+   `adb uninstall app.ridenrest` d'abord si un release était installé).
+4. **Charger depuis Metro** (sinon l'app tente le bundle embarqué inexistant →
+   « Unable to load script » : `loadJSBundleFromAssets`) — lancer le deep-link
+   dev-client en `localhost` (PAS l'IP LAN que `expo run:android` ouvre par défaut,
+   injoignable depuis l'émulateur) :
+   `adb shell am start -a android.intent.action.VIEW -d "exp+ridenrest://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081" app.ridenrest`
+   (force-stop d'abord, sinon l'intent est avalé par l'instance déjà ouverte).
+5. GPS : `adb emu geo fix <lng> <lat>` (ordre **lng lat**), à **renvoyer en boucle**
+   (le fix décroît ; un seul envoi ne suffit pas à alimenter `watchPositionAsync`).
+6. Permissions localisation : le prompt runtime ouvre la **page Réglages** (radios
+   « Toujours autoriser » / « …si l'appli est utilisée ») — la sélection ne ferme pas la
+   page, il faut **revenir en arrière** (`KEYCODE_BACK`). Pré-accorder évite le détour :
+   `adb shell pm grant app.ridenrest android.permission.ACCESS_FINE_LOCATION`
+   (+ `ACCESS_COARSE_LOCATION` + `ACCESS_BACKGROUND_LOCATION`).

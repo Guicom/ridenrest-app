@@ -111,6 +111,92 @@ export function computeCorridorBounds(
   return computeTraceBounds(inRange);
 }
 
+/** Rayon de la Terre (km) — destination Haversine du cercle de recherche Live. */
+const EARTH_RADIUS_KM = 6371;
+
+/**
+ * Polygone GeoJSON approximant un cercle géodésique de `radiusKm` autour de `center`
+ * (`steps` sommets, défaut 64). Port **pur** du web `live-map-canvas.tsx:createCirclePolygon`
+ * (cercle de rayon Live, AC3) — destination Haversine par cap régulier. **Fermeture
+ * explicite de l'anneau** (`coords.push(coords[0])`) pour éviter la dérive flottante entre
+ * le cap 2π et 0 (fix 16-26). `null` si le centre n'est pas une coordonnée finie
+ * (anti-SIGABRT MapLibre Native — un anneau à coordonnée non finie ferait crasher l'app).
+ */
+export function createCirclePolygon(
+  center: { lat: number; lng: number },
+  radiusKm: number,
+  steps = 64,
+): GeoJSON.Feature<GeoJSON.Polygon> | null {
+  if (!isValidLngLat(center.lng, center.lat) || !Number.isFinite(radiusKm)) {
+    return null;
+  }
+  const coords: [number, number][] = [];
+  const lat1 = (center.lat * Math.PI) / 180;
+  const lng1 = (center.lng * Math.PI) / 180;
+  const d = radiusKm / EARTH_RADIUS_KM;
+  for (let i = 0; i < steps; i++) {
+    const bearing = (2 * Math.PI * i) / steps;
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(d) +
+        Math.cos(lat1) * Math.sin(d) * Math.cos(bearing),
+    );
+    const lng2 =
+      lng1 +
+      Math.atan2(
+        Math.sin(bearing) * Math.sin(d) * Math.cos(lat1),
+        Math.cos(d) - Math.sin(lat1) * Math.sin(lat2),
+      );
+    coords.push([(lng2 * 180) / Math.PI, (lat2 * 180) / Math.PI]);
+  }
+  coords.push(coords[0]!); // fermeture explicite de l'anneau (anti-dérive flottante)
+  return {
+    type: 'Feature',
+    geometry: { type: 'Polygon', coordinates: [coords] },
+    properties: {},
+  };
+}
+
+/**
+ * Bbox de la **zone de recherche Live** = waypoints (km cumulés) dans
+ * `[targetKm − radiusKm, targetKm + radiusKm]`, élargie de `0.3 × radiusKm` autour de la
+ * trace pour montrer le rayon (port pur du web `fitToSearchZone`, AC3). `null` si aucun
+ * waypoint dans la plage → l'appelant retombe sur la trace entière (`computeTraceBounds`).
+ */
+export function computeSearchZoneBounds(
+  waypoints: readonly { lat: number; lng: number; distKm: number }[],
+  targetKm: number,
+  radiusKm: number,
+): LngLatBounds | null {
+  const fromKm = Math.max(0, targetKm - radiusKm);
+  const toKm = targetKm + radiusKm;
+  const inRange = waypoints.filter(
+    (w) =>
+      w.distKm >= fromKm && w.distKm <= toKm && isValidLngLat(w.lng, w.lat),
+  );
+  if (inRange.length === 0) return null;
+  let minLng = inRange[0]!.lng;
+  let maxLng = inRange[0]!.lng;
+  let minLat = inRange[0]!.lat;
+  let maxLat = inRange[0]!.lat;
+  for (const wp of inRange) {
+    if (wp.lng < minLng) minLng = wp.lng;
+    if (wp.lng > maxLng) maxLng = wp.lng;
+    if (wp.lat < minLat) minLat = wp.lat;
+    if (wp.lat > maxLat) maxLat = wp.lat;
+  }
+  // 1° lat ≈ 111,32 km ; 1° lng ≈ 111,32 km × cos(lat) (parité web).
+  const avgLat = (minLat + maxLat) / 2;
+  const expand = radiusKm * 0.3;
+  const expandLat = expand / 111.32;
+  const expandLng = expand / (111.32 * Math.cos((avgLat * Math.PI) / 180));
+  return [
+    minLng - expandLng,
+    minLat - expandLat,
+    maxLng + expandLng,
+    maxLat + expandLat,
+  ];
+}
+
 /** Look-ahead caméra (px) appliqué via le padding pour décaler le point GPS hors centre. */
 export const LOOK_AHEAD_PX = 120;
 

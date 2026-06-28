@@ -34,6 +34,14 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'app.ridenrest',
+    // RECEIVE_BOOT_COMPLETED : requis par la tâche de localisation **background**
+    // (`expo-location` + `expo-task-manager`, MOB-5.2). À chaque update GPS background,
+    // `LocationTaskConsumer.reportLocationsImmediately` planifie un JobScheduler job
+    // **persisté** (`setPersisted(true)`) → Android exige cette permission, sinon
+    // `IllegalArgumentException: Requested job cannot be persisted…` → **crash dur** de
+    // l'app au 1er fix GPS en mode Live. Découvert lors de la validation device Android
+    // MOB-5.3 (le crash bloquait l'écran Live). Permission Android-only (no-op iOS).
+    permissions: ['android.permission.RECEIVE_BOOT_COMPLETED'],
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/images/android-icon-foreground.png',
@@ -100,6 +108,11 @@ const config: ExpoConfig = {
         isAndroidForegroundServiceEnabled: true,
       },
     ],
+    // Android : autorise le cleartext localhost (dev local) — parité iOS
+    // `NSAllowsLocalNetworking`. Permet au release standalone (`pnpm sim`) de joindre
+    // l'API/auth locale (http://localhost:3010/3011) → validation device Android fiable
+    // sans debug+Metro. Sûr en prod (HTTPS only). Voir le plugin pour le détail.
+    './plugins/with-android-localhost-cleartext',
   ],
   experiments: {
     typedRoutes: true,

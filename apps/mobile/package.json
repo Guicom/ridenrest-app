@@ -92,6 +92,7 @@
     "lint": "expo lint",
     "test": "jest",
     "typecheck": "tsc --noEmit",
+    "check:native-config": "node scripts/check-native-config.mjs",
     "test:device": "bash scripts/device-test.sh"
   },
   "private": true

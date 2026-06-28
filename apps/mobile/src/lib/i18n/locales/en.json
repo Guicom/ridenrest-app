@@ -211,6 +211,29 @@
       "notificationTitle": "Live mode active",
       "notificationBody": "Ride’n’Rest is tracking your position while you ride.",
       "permissionDeniedNotice": "Background tracking is off. Live stays active while the screen is on."
+    },
+    "search": {
+      "targetLabel": "My hotel in",
+      "distanceSliderA11y": "Target distance (km)",
+      "decrement": "Decrease by 5 km",
+      "increment": "Increase by 5 km",
+      "filters": "Open filters",
+      "searchButton": "Search",
+      "etaA11y": "Estimated time: {{eta}}",
+      "noResults": "No results in this area",
+      "unstableConnection": "Unstable connection — {{count}} result(s) loaded",
+      "speedLabel": "Average speed",
+      "radiusLabel": "Distance from trace",
+      "radiusUnit": "km",
+      "layersLabel": "I'm looking for",
+      "speedDecrement": "Decrease speed",
+      "speedIncrement": "Increase speed",
+      "radiusDecrement": "Decrease radius",
+      "radiusIncrement": "Increase radius"
+    },
+    "filters": {
+      "title": "Filters",
+      "close": "Close filters"
     }
   },
   "map": {

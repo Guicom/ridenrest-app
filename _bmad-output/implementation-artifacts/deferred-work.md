@@ -1,5 +1,9 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-5-3-live-poi-discovery (2026-06-28)
+
+- **Test d'intégration écran `hasFetched` gate + bannière** — vérifier que la bannière « Aucun résultat » est bien masquée avant tout `refetch()` et se masque quand `targetKm` change (nouvelle queryKey). La logique est couverte au niveau hook (`use-live-poi-search.test.tsx`) ; un test écran compléterait la couverture. [`apps/mobile/src/__tests__/live-screen.test.tsx`]
+
 ## Deferred from: code review of MOB-4-8-planning-weather-pace-adjusted (2026-06-27)
 
 - **`cached` stale pendant la transition `adventureId`** — si le composant restait monté (non-applicable avec le routing expo-router actuel), les forecasts du précédent adventureId seraient utilisés avec les segments du nouveau adventureId le temps que `getCachedWeather` résolve. Non-triggerable en l'état ; à adresser si le routing change. [`apps/mobile/src/hooks/use-weather.ts`]

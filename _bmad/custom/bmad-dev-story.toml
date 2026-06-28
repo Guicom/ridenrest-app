@@ -7,7 +7,9 @@
 # Faits portés tout au long du dev : les suites de test à relancer existent + où.
 persistent_facts = [
   "GATE DE TEST COMPLET en fin de dev-story (voir on_complete) : au-delà des tests unitaires (turbo/jest/vitest), TOUTE story qui touche apps/mobile/ DOIT relancer la validation device Maestro (`cd apps/mobile && pnpm test:device`), et TOUTE story qui touche apps/web/ DOIT relancer le E2E Playwright (`cd apps/web && pnpm test:e2e`). Ces suites ne font PAS partie de `turbo test` → les lancer explicitement.",
-  "Validation device mobile : suite Maestro dans apps/mobile/.maestro/ (runner `pnpm test:device`, iOS + variante android/). Si une story mobile ajoute un écran/overlay sans flow, CRÉER le flow correspondant avant de clore. Détails + gotchas Android : apps/mobile/.maestro/README.md et apps/mobile/AGENTS.md §Android.",
+  "CHECK CONFIG NATIF (déterministe, 0 device) : toute story mobile lance `pnpm --filter @ridenrest/mobile check:native-config`. Il encode les invariants natifs Expo (ex. feature background-location → permission RECEIVE_BOOT_COMPLETED) et ÉCHOUE avant le device si app.config viole une règle. Quand une galère native récurrente survient → ajouter une règle dans apps/mobile/scripts/check-native-config.mjs.",
+  "Validation device mobile : runner `pnpm test:device` (apps/mobile/scripts/device-test.sh) — **fail-closed + multi-plateforme + scan crash**. Il auto-détecte les devices bootés (sim iOS + émulateur Android), lance les flows sur CHAQUE plateforme dispo (iOS = `.maestro/<flow>`, Android = `.maestro/android/<flow>`), ÉCHOUE si une plateforme bootée n'exécute aucun flow, ET ÉCHOUE sur tout crash natif (scan buffer logcat/.ips) même si les asserts UI passent. Si une story ajoute un écran/overlay non couvert → CRÉER le flow (iOS + variante android/). Gotchas : apps/mobile/.maestro/README.md + AGENTS.md §Android.",
+  "REBUILD DOUBLE PLATEFORME : si une story mobile change un module natif (deps natives package.json) OU app.config.ts (plugins/permissions), il faut rebuild iOS ET Android avant de tester — l'app non rebuildée crashe au boot (ancien binaire natif sans le module, vécu MOB-5.2 expo-task-manager). `BUILD=1 pnpm test:device` rebuild chaque plateforme dispo avant les flows. Reporter l'état RÉEL par plateforme — JAMAIS un ✓ global non étayé. (Le release standalone Android joint désormais localhost via le plugin cleartext → plus besoin de debug+Metro pour le login.)",
 ]
 
 # Instruction terminale (étape 10) : GATE DE TEST COMPLET. Aucune story n'est « terminée »
@@ -19,16 +21,33 @@ réellement terminée. Un échec (ou un rendu visuel faux) = story NON terminée
 (0) Gate standard déjà couvert par le workflow : `turbo test` (jest/vitest) + typecheck + lint
     verts, et pour le mobile `expo export` OK. Re-vérifier qu'ils passent.
 
-(1) Si la story a touché `apps/mobile/` → VALIDATION DEVICE (Maestro) :
-    - Pré-requis : backend local up (API :3010 + auth :3011) ; un device prêt — simulateur iOS
-      OU émulateur Android (`emulator @ridenrest_pixel`) — app installée et **connectée**
-      (session persistée ; login e2e@ridenrest.local / Test1234! via email-mot de passe, OU
-      session existante). Si le JS natif a changé, rebuild d'abord (`BUILD=1` devant la commande).
-    - Lancer : `cd apps/mobile && pnpm test:device smoke.yaml <flow(s)-de-la-story>` (toujours
-      inclure smoke.yaml). Sur Android, cibler le device (`maestro --device emulator-5554`) et
-      utiliser les flows `.maestro/android/` (cf. gotchas README : adb reverse 3010/3011/8081,
-      locale fr-FR, chevron bounds-zéro → tap coordonnée).
-    - Si la story ajoute un écran/overlay non couvert → CRÉER le flow Maestro correspondant.
+(0bis) CHECK CONFIG NATIF (mobile, déterministe, sans device — à faire AVANT tout build/device) :
+    `pnpm --filter @ridenrest/mobile check:native-config`. Encode les invariants natifs Expo
+    (ex. background-location → `RECEIVE_BOOT_COMPLETED`) ; ÉCHOUE si app.config viole une règle.
+    Attrape la classe « feature native sans sa permission/clé » sans émulateur. (Tourne aussi en CI.)
+    Si une nouvelle galère native récurrente apparaît → AJOUTER une règle dans check-native-config.mjs.
+
+(0ter) MODULE NATIF / app.config.ts changé → REBUILD DES DEUX PLATEFORMES avant tout test
+    device. L'app non rebuildée tourne sur son ancien binaire natif (sans le nouveau module) et
+    CRASHE au boot dès que la nouvelle JS charge ce module (vécu MOB-5.2, expo-task-manager).
+    - `BUILD=1 pnpm test:device …` rebuild chaque plateforme dispo avant les flows. Sinon, à la main :
+      iOS `expo prebuild -p ios` (workaround ENOTEMPTY : déplacer ios/ puis prebuild) + `pnpm sim` ;
+      Android `expo prebuild -p android` (régénère le manifest = permissions/NSC) + `expo run:android --variant release`.
+    - Le scan crash du runner (cf. (1)) vérifie l'absence de FATAL ; ne pas se contenter de « le process est vivant ».
+
+(1) Si la story a touché `apps/mobile/` → VALIDATION DEVICE (Maestro, runner fail-closed) :
+    - Pré-requis : backend local up (API :3010 + auth :3011) ; AU MOINS un device booté (simulateur
+      iOS et/ou émulateur Android `emulator @ridenrest_pixel`). Idéalement les DEUX bootés — le
+      runner teste **toutes** les plateformes dispo et ÉCHOUE si l'une est sautée ou crashe. Session
+      connectée (login e2e@ridenrest.local / Test1234! — scriptable Android, ou session persistée).
+    - Lancer : `cd apps/mobile && pnpm test:device <flow(s)-de-la-story>` (smoke est ajouté
+      automatiquement). Le runner : auto-détecte iOS+Android, lance `.maestro/<flow>` (iOS) et
+      `.maestro/android/<flow>` (Android), fait le setup Android (adb reverse 3010/3011/8081 +
+      grant localisation + geo fix) et iOS (grant+location), puis **scanne les crashs** (buffer
+      logcat / `.ips`) → un flow « vert » MAIS qui a crashé en natif = ÉCHEC.
+    - Si la story ajoute un écran/overlay non couvert → CRÉER le flow (iOS `.maestro/<x>.yaml`
+      + variante `.maestro/android/<x>.yaml`). Sinon le runner échoue (fail-closed : plateforme
+      bootée sans flow). Gotchas Android (locale fr-FR, chevron bounds-zéro → coordonnée) : README §Android.
     - **Lire les screenshots** (`.maestro/screenshots/`) : confirmer le rendu visuel des ACs
       sur la carte (overlays présents, pas de carte blanche/cassée) — les asserts Maestro ne
       voient PAS le canvas GL natif.
@@ -41,6 +60,9 @@ réellement terminée. Un échec (ou un rendu visuel faux) = story NON terminée
       ajoute une UI carte non couverte. Préférer les assertions déterministes (requête réseau,
       `map.getLayer(...)`) au visuel.
 
-(3) Rapporter PAR AC le résultat de chaque suite relancée. Ne marquer la story réellement
-    terminée que si toutes les suites pertinentes sont vertes (sinon : corriger, ne pas clore).
+(3) Rapporter PAR AC **et par plateforme** le résultat de chaque suite relancée. Nommer l'état
+    RÉEL (« iOS ✓ / Android ✓ », ou « iOS ✓ / Android non testé ») — JAMAIS un « ✓ » global non
+    étayé. Ne marquer la story réellement terminée que si toutes les suites pertinentes sont
+    vertes sur les plateformes concernées (sinon : corriger, ne pas clore). Un comportement
+    anormal sur un device = s'arrêter et creuser, ne pas contourner.
 """

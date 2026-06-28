@@ -1,0 +1,57 @@
+appId: app.ridenrest
+---
+# MOB-5.3 — Découverte de POIs en mode Live : panneau de contrôle (slider distance +
+# RECHERCHER), tiroir de filtres (rayon/vitesse/calques), cercle de rayon + point cible.
+#
+# PRÉ-REQUIS (externes, comme live-tracking.yaml) :
+#   1. App rebuildée (`pnpm sim` / BUILD=1) — MOB-5.3 est all-JS mais le bundle est embarqué.
+#   2. Permission localisation pré-accordée (alerte SYSTÈME iOS non introspectable) :
+#        xcrun simctl privacy <udid> grant location-always app.ridenrest
+#   3. Position GPS simulée sur/près d'une trace (sinon pas de fix → pas de panneau) :
+#        xcrun simctl location <udid> set 43.6047,1.4442
+#   4. Session connectée préservée (NE PAS clearState) + locale FR.
+#   5. 2 devices up → cibler l'iOS : maestro --device <ios-udid> test .maestro/live-poi.yaml
+#
+# La carte (GL natif) + pins + cercle + point cible ne sont PAS introspectables → on assert
+# via le panneau (texte) et on vérifie le rendu carte par screenshots (revue visuelle agent).
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# Consentement (conditionnel : returning user auto-démarre sans dialog, AC4).
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+# AC1/AC2 : fix GPS reçu → `currentKmOnRoute` connu → panneau Live visible.
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 20000
+- assertVisible: "Rechercher"
+- takeScreenshot: screenshots/live-poi-panel
+
+# AC2/AC3 : recherche EXPLICITE → POIs + cercle de rayon + point cible sur la carte
+# (GL non introspectable → screenshot pour la revue visuelle).
+- tapOn: "Rechercher"
+- takeScreenshot: screenshots/live-poi-results
+
+# AC7 : tiroir de filtres (rayon/vitesse/calques) — toggles immédiats, persist à la fermeture.
+- tapOn: "Ouvrir les filtres"
+- extendedWaitUntil:
+    visible: "Filtres"
+    timeout: 8000
+- assertVisible: "Vitesse moyenne"
+- assertVisible: "Distance de la trace"
+- takeScreenshot: screenshots/live-poi-filters
+- tapOn: "Fermer les filtres"
+
+# Retour au panneau (le tiroir s'est refermé).
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 8000
+- takeScreenshot: screenshots/live-poi-after-filters

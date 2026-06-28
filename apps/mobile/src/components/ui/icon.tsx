@@ -23,6 +23,7 @@ import {
   Search,
   Settings,
   ShoppingBasket,
+  SlidersHorizontal,
   Thermometer,
   Trash2,
   TrendingDown,
@@ -79,6 +80,7 @@ export const RouteIcon = enableClassName(Route);
 export const SearchIcon = enableClassName(Search);
 export const SettingsIcon = enableClassName(Settings);
 export const ShoppingBasketIcon = enableClassName(ShoppingBasket);
+export const SlidersHorizontalIcon = enableClassName(SlidersHorizontal);
 export const ThermometerIcon = enableClassName(Thermometer);
 export const Trash2Icon = enableClassName(Trash2);
 export const TrendingDownIcon = enableClassName(TrendingDown);

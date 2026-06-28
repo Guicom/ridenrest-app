@@ -33,6 +33,11 @@ TaskManager.defineTask(LIVE_LOCATION_TASK, async ({ data, error }) => {
   // faire (NFR-032 : jamais de crash silencieux). Le Live foreground reste fonctionnel.
   if (error) return;
 
+  // Race : une position background peut arriver APRÈS la sortie du Live — `deactivateLiveMode()`
+  // est synchrone au démontage de l'écran, mais `stopLocationUpdatesAsync` est async et peut
+  // laisser passer un dernier lot. Hors session Live, on n'écrit pas de position fantôme.
+  if (!useLiveStore.getState().isLiveModeActive) return;
+
   const { locations } = (data ?? {}) as LocationTaskData;
   // `at(-1)` : on ne garde que la position la **plus récente** du lot livré par l'OS
   // (le background batch parfois plusieurs fixes). Les positions intermédiaires ne sont

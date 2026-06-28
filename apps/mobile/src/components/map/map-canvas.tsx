@@ -72,6 +72,14 @@ export interface MapCanvasHandle {
    * (`gpsTrackingActive=true`) — bouton « recentrer » (AC5). No-op sans position GPS.
    */
   centerOnGps: () => void;
+  /**
+   * Fit caméra sur la zone de recherche Live (cercle cible±rayon, MOB-5.3 / AC3). Comme
+   * `fitToBounds` mais avec un **padding bas** supplémentaire (`bottomPaddingPx`, hauteur
+   * du panneau Live) pour que le cercle reste cadré AU-DESSUS du panneau. Met le suivi GPS
+   * en pause **après** le fit (sinon le prochain easeTo GPS annulerait le re-cadrage, bug
+   * 16-26). No-op si `bounds` null ou carte non mesurée.
+   */
+  fitToSearchZone: (bounds: LngLatBounds | null, bottomPaddingPx?: number) => void;
 }
 
 export interface MapCanvasProps {
@@ -187,6 +195,28 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
             padding: { top: padding, right: padding, bottom: padding, left: padding },
             duration: CAMERA_ANIMATION_MS,
           });
+        },
+        fitToSearchZone: (
+          bounds: LngLatBounds | null,
+          bottomPaddingPx = 0,
+        ) => {
+          if (!bounds) return;
+          if (mapSize.width <= 0 || mapSize.height <= 0) return;
+          const base = safeFitPadding(mapSize.width, mapSize.height);
+          // Padding bas = panneau Live, clampé pour garantir `top + bottom < height`
+          // (sinon MapLibre Native émet « padding > map height »).
+          const bottom = Math.min(
+            Math.max(base, bottomPaddingPx),
+            Math.max(0, mapSize.height - base - 1),
+          );
+          cameraRef.current?.fitBounds(bounds, {
+            padding: { top: base, right: base, bottom, left: base },
+            duration: CAMERA_ANIMATION_MS,
+          });
+          // Pause du suivi GPS APRÈS le fit (sinon le prochain easeTo GPS le recouvre).
+          if (useLiveStore.getState().currentPosition) {
+            useLiveStore.getState().setGpsTrackingActive(false);
+          }
         },
         centerOnGps: () => {
           const pos = useLiveStore.getState().currentPosition;
