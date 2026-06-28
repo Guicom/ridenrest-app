@@ -9,9 +9,15 @@ import {
 // Tests PURS (parité web 3.2) : pas de React, pas de réseau. On vérifie l'arrêt
 // conditionnel du polling (AC2) et la détection de transition de parsing (AC2/AC3).
 //
-// On mocke la façade API pour COUPER la chaîne d'import transitive vers
-// `api-client` → `@better-auth/expo/client` (ESM non transpilé par jest-expo, casse
-// au require). Les helpers testés ici sont purs et n'appellent jamais l'API.
+// `use-segments` importe `@/hooks/use-access` → `poi-access` → `api-client` →
+// `@/lib/auth/client`, qui importe `@better-auth/expo/client` (ESM non transpilé par
+// jest-expo → casse au require). On mocke le wrapper `@/lib/auth/client` (convention
+// AGENTS.md : jamais `@better-auth/expo` directement) pour couper cette chaîne ; mocker
+// la seule façade `@/lib/api/segments` ne suffit pas (la fuite passe par `use-access`).
+// Les helpers testés ici sont purs et n'appellent ni l'auth ni l'API.
+jest.mock('@/lib/auth/client', () => ({
+  useSession: jest.fn(() => ({ data: null })),
+}));
 jest.mock('@/lib/api/segments', () => ({
   listSegments: jest.fn(),
   uploadSegment: jest.fn(),

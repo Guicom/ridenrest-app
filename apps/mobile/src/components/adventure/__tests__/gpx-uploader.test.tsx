@@ -11,6 +11,15 @@ import { i18n } from '@/lib/i18n';
 // Uploader GPX (MOB-3.2 / AC1, AC3). Réseau mocké (façade segments) + picker mocké
 // (expo-document-picker, manuel `__mocks__`). `userEvent` (RNTL v14 + React 19).
 
+// `GpxUploader` → `use-segments` → `use-access` → `poi-access` → `api-client` →
+// `@/lib/auth/client`, qui importe `@better-auth/expo/client` (ESM non transpilé par
+// jest-expo → casse au require). On mocke le wrapper `@/lib/auth/client` (convention
+// AGENTS.md : jamais `@better-auth/expo` directement) pour couper la chaîne. L'auth
+// n'est jamais appelée par ce composant.
+jest.mock('@/lib/auth/client', () => ({
+  useSession: jest.fn(() => ({ data: null })),
+}));
+
 jest.mock('@/lib/api/segments', () => ({
   listSegments: jest.fn(),
   uploadSegment: jest.fn(),

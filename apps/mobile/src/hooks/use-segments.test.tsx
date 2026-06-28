@@ -21,6 +21,15 @@ import * as segmentsApi from '@/lib/api/segments';
 // au 2ᵉ render du fichier). Composant-sonde qui capture le hook dans son corps de
 // rendu synchrone (parité use-adventures.test.ts).
 
+// `use-segments` importe `@/hooks/use-access` → `poi-access` → `api-client` →
+// `@/lib/auth/client`, qui importe `@better-auth/expo/client` (ESM non transpilé par
+// jest-expo → casse au require). On mocke le wrapper `@/lib/auth/client` (convention
+// AGENTS.md : jamais `@better-auth/expo` directement) pour couper la chaîne. L'auth
+// n'est jamais appelée par les hooks testés ici.
+jest.mock('@/lib/auth/client', () => ({
+  useSession: jest.fn(() => ({ data: null })),
+}));
+
 jest.mock('@/lib/api/segments', () => ({
   listSegments: jest.fn(),
   uploadSegment: jest.fn(),
