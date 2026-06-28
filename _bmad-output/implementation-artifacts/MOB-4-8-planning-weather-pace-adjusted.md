@@ -62,7 +62,7 @@ So that **j'anticipe les conditions de mon étape**.
 - [x] **T1 — Façade `lib/api/weather.ts`** (AC: 1, 2, 3, 4)
   - [x] `getWeatherForecast(params): Promise<WeatherForecast>` → `apiFetch('/weather?segmentId=…[&departureTime=…&speedKmh=…&fromKm=…&stageDepartures=…]')`. `stageDepartures` = JSON-encodé `Array<{ startKm, endKm, departureTime }>`. _(Nommé `getWeatherForecast`, pas `getTraceWeather`.)_
   - [x] _(Non retenu MVP)_ `getStageWeather` / badge par étape : **pas** implémenté — les étapes mobiles (CRUD/badge) sont un epic ultérieur (hors frontière). `GET /stages/:id/weather` non consommé.
-  - [x] Types **`WeatherForecast` / `WeatherPoint`** importés de `@ridenrest/shared`. `WeatherPoint.km` = km **segment-relatif** côté API → réaligné en **cumulé** par `use-weather` (offset `cumulativeStartKm`).
+  - [x] Types **`WeatherForecast` / `WeatherPoint`** importés de `@ridenrest/shared`. `WeatherPoint.km` = km **cumulé aventure** côté API (`weather.service.ts` : `segment.cumulativeStartKm + wp.dist_km`) → utilisé tel quel par `use-weather`, **sans ré-offset** (cf. correctif multi-segments 2026-06-28 : un ré-offset double-décalait l'overlay).
 
 - [x] **T2 — Pace store (heure départ)** (AC: 1, 3, 4)
   - [x] Pace **global** persisté local (parité web `weather-pace.ts` localStorage → **AsyncStorage** mobile) : `{ departureTime?, speedKmh? }`, clé `ridenrest:weather-pace`. Helper `lib/weather-pace.ts` (`getStoredWeatherPace`/`setStoredWeatherPace`, lectures robustes → `{}`). Hydraté/persisté au niveau de l'écran (`map/[id].tsx`).
@@ -70,7 +70,7 @@ So that **j'anticipe les conditions de mon étape**.
   - [x] `stagesHaveDepartures` (≡ `hasAnyStageDeparture`) → masque le champ départ global (« Dates définies par étape »).
 
 - [x] **T3 — Hook `hooks/use-weather.ts`** (AC: 1, 2, 3, 6)
-  - [x] `useWeather({ adventureId, segments, weatherActive, departureTime, speedKmh, stageDepartures })` → `useQueries` (une query par segment ready), `queryKey: ['weather', { segmentId, departureTime, speedKmh, stageDepartures }]`, `staleTime = 3 600 000 ms` (= `WEATHER_CACHE_TTL*1000`). **Pas de `refetchInterval`** (refresh horaire = `staleTime` + refetch on focus). Points réalignés en **km cumulés** (offset `cumulativeStartKm` par `segmentId`).
+  - [x] `useWeather({ adventureId, segments, weatherActive, departureTime, speedKmh, stageDepartures })` → `useQueries` (une query par segment ready), `queryKey: ['weather', { segmentId, departureTime, speedKmh, stageDepartures }]`, `staleTime = 3 600 000 ms` (= `WEATHER_CACHE_TTL*1000`). **Pas de `refetchInterval`** (refresh horaire = `staleTime` + refetch on focus). Points météo utilisés **tels quels** : leurs `km` sont déjà cumulés aventure côté serveur (aucun ré-offset — parité web `map-view.tsx`).
   - [x] **Offline (AC6)** : write-through `setCachedWeather(adventureId, forecasts)` au succès **complet** ; fallback `getCachedWeather` quand aucune donnée live (cold start hors-ligne). **`weather-cache.ts` retypé** `CachedWeather = WeatherForecast[]` (1 entrée par segment) — TODO du squelette MOB-3.5 levé.
 
 - [x] **T4 — Données de rendu `lib/weather-geojson.ts`** (AC: 1, 5, 6)
@@ -94,7 +94,7 @@ So that **j'anticipe les conditions de mon étape**.
   - [x] Bloc i18n `map.weather.*` (parité FR/EN) : `title`, `temperature`/`precipitation`/`wind` (+ `*Short`), `departure`, `byStage`, + `map.showOnMap`. **Zéro chaîne en dur.** _(Le grisé « indisponible » est rendu par couleur de couche, pas par un label → pas de clé `unavailable`.)_
 
 - [x] **T8 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5, 6)
-  - [x] `use-weather` : query key `{ segmentId, departureTime, speedKmh, stageDepartures }` ; `staleTime = 3 600 000` ; **pas** de `refetchInterval` ; réalignement km cumulés ; write-through + fallback cache offline ; `stageDepartures` prioritaire (departureTime null) ; `weatherActive=false` → 0 requête.
+  - [x] `use-weather` : query key `{ segmentId, departureTime, speedKmh, stageDepartures }` ; `staleTime = 3 600 000` ; **pas** de `refetchInterval` ; km serveur cumulés utilisés tels quels (mock forecast en km cumulés, garde anti-double-offset multi-segments) ; write-through + fallback cache offline ; `stageDepartures` prioritaire (departureTime null) ; `weatherActive=false` → 0 requête.
   - [x] `weather-geojson` (pur) : `buildWeatherLineSegments` (available si temp non null, `[lng,lat]`) ; `buildWindArrowPoints` ; conversion `(deg-90+360)%360`.
   - [x] pace store : get/set AsyncStorage round-trip, clé `ridenrest:weather-pace`, absence/JSON corrompu → `{}`.
   - [x] `weather-cache` : round-trip typé `WeatherForecast[]`, miss/JSON corrompu → null, création répertoire.
@@ -117,7 +117,7 @@ So that **j'anticipe les conditions de mon étape**.
 - [x] [Review][Patch] `JSON.parse` dans `getStoredWeatherPace` peut retourner un JSON valide non-objet (ex. `"foo"`, `42`) casté silencieusement en `StoredWeatherPace` — ajouter un guard `typeof parsed === 'object' && parsed !== null`. [`apps/mobile/src/lib/weather-pace.ts`]
 - [x] [Review][Defer] `cached` stale pendant la transition `adventureId` — si le composant restait monté (non-applicable avec le routing expo-router actuel), les forecasts du précédent adventureId seraient utilisés avec les segments du nouveau. [`apps/mobile/src/hooks/use-weather.ts`] — deferred, pré-existant/non-triggerable avec le routing actuel
 - [x] [Review][Defer] `setCachedWeather` sans try/catch — une erreur disque (full/permissions) génère une rejection non rattrapée. Issue pré-existante dans le squelette weather-cache. [`apps/mobile/src/lib/cache/weather-cache.ts`] — deferred, pré-existant
-- [x] [Review][Defer] `weatherPoints` offset=0 pour `segmentId` inconnu — si le serveur renvoie une prévision pour un segment absent de la liste locale, les km sont affichés en relatif au lieu de cumulé. [`apps/mobile/src/hooks/use-weather.ts`] — deferred, cas défensif backend-inconsistency
+- [x] [Review][Defer] ~~`weatherPoints` offset=0 pour `segmentId` inconnu~~ — **caduc depuis le correctif 2026-06-28** : le hook ne ré-offsette plus du tout (les `km` serveur sont déjà cumulés aventure), donc il n'y a plus de table d'offset par `segmentId` ni de cas « offset=0 pour segment inconnu ». [`apps/mobile/src/hooks/use-weather.ts`]
 
 ## Dev Notes
 
@@ -236,7 +236,7 @@ la doc** sur l'implémentation réelle (Doc Sync Rule), sans réécrire l'approc
 **Comblé ce passage (gap-fill)** :
 - ✅ **AC6 — cache offline** : `weather-cache.ts` retypé `CachedWeather = WeatherForecast[]`
   (TODO MOB-3.5 levé) ; `use-weather` ajoute le **write-through** au succès complet et le
-  **fallback** `getCachedWeather` hors-ligne (réalignement km cumulés par `segmentId`).
+  **fallback** `getCachedWeather` hors-ligne (cache = prévisions serveur brutes, km déjà cumulés).
   `adventureId` ajouté aux params du hook (clé du cache).
 - ✅ **T2 — pace store** : `lib/weather-pace.ts` (AsyncStorage, clé `ridenrest:weather-pace`,
   parité web) ; `map/[id].tsx` hydrate la saisie au montage et la persiste à chaque changement.
