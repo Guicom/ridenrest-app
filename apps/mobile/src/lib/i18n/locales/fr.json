@@ -239,6 +239,10 @@
       "dMinus": "Dénivelé négatif {{value}} mètres",
       "eta": "Temps estimé {{eta}}"
     },
+    "profile": {
+      "noElevation": "Données d'élévation non disponibles",
+      "a11yLabel": "Profil d'élévation. Dénivelé sur la fenêtre : {{dPlus}} m de montée, {{dMinus}} m de descente."
+    },
     "filters": {
       "title": "Filtres",
       "close": "Fermer les filtres"

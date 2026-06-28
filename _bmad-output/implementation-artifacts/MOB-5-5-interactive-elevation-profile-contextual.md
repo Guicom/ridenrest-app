@@ -1,6 +1,10 @@
+---
+baseline_commit: 1f1aa10c1f7907ea57bc352c9fd74196767edc79
+---
+
 # Story MOB-5.5 : Profil d'élévation interactif contextualisé
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -44,40 +48,40 @@ So that **je lis le terrain entre moi et mon prochain arrêt**.
 
 ## Tasks / Subtasks
 
-- [ ] **T1 — `hooks/use-elevation-profile.ts` (porté verbatim, pur)** (AC: 1)
-  - [ ] Porter `apps/web/src/hooks/use-elevation-profile.ts` (72 l) **tel quel** (pur, memoïsé, zéro DOM → 100% portable). Entrées : `waypoints` (cumulés), `segments`. Sortie : `{ points, boundaries, hasElevationData, totalDPlus, totalDMinus }` — filtre les waypoints à `ele` valide, calcule par point `cumulativeDPlus`/`cumulativeDMinus`/`slope%`, `boundaries` = débuts de segment (sauf 1er).
-  - [ ] **Memoïsation stricte** : `points[]` ne dépend QUE de `waypoints`/`segments` (pas du slider) → stable sur déplacement du slider (NFR-LP-002).
+- [x] **T1 — `hooks/use-elevation-profile.ts` (porté verbatim, pur)** (AC: 1)
+  - [x] Porter `apps/web/src/hooks/use-elevation-profile.ts` (72 l) **tel quel** (pur, memoïsé, zéro DOM → 100% portable). Entrées : `waypoints` (cumulés), `segments`. Sortie : `{ points, boundaries, hasElevationData, totalDPlus, totalDMinus }` — filtre les waypoints à `ele` valide, calcule par point `cumulativeDPlus`/`cumulativeDMinus`/`slope%`, `boundaries` = débuts de segment (sauf 1er).
+  - [x] **Memoïsation stricte** : `points[]` ne dépend QUE de `waypoints`/`segments` (pas du slider) → stable sur déplacement du slider (NFR-LP-002). _(Test : référence `points` stable au rerender.)_
 
-- [ ] **T2 — Rendu RN `components/live/elevation-chart.tsx` (`react-native-svg`)** (AC: 1, 2, 3)
-  - [ ] **Construire** le graphe en `react-native-svg` (web Recharts non portable). Un seul `<Path>` d'aire **memoïsé** (`useMemo` sur `points` + dimensions, **pas** sur le domaine). Échelles x/y calculées depuis le **domaine visible** (props), pas re-tranchage des points.
-  - [ ] **Marqueur position** : ligne verticale verte `#16a34a` (strokeWidth 2) à `currentKmOnRoute` (FR-LP-007).
-  - [ ] **Zone recherchée** : rectangle bleu `#3498db` opacité 0.2 sur `[searchFromKm, searchToKm]` (FR-LP-008).
-  - [ ] **Zoom = domaine X** : les props `domainFromKm`/`domainToKm` pilotent les échelles ; le `<Path>` est clippé au domaine (équivalent `allowDataOverflow` Recharts) — **ne recompute jamais `points[]`** (FR-LP-010). Y reste sur le **domaine plein** (le windowing Y a été tenté puis **REVERTÉ** côté web, v1.4 — ne PAS le refaire).
-  - [ ] Transition fluide du domaine via `react-native-reanimated` (optionnel, NFR-LP-004 partagé avec 5.4).
+- [x] **T2 — Rendu RN `components/live/elevation-chart.tsx` (`react-native-svg`)** (AC: 1, 2, 3)
+  - [x] **Construire** le graphe en `react-native-svg` (web Recharts non portable). Un seul `<Path>` d'aire **memoïsé** (`useMemo` sur `points` + `height`, **pas** sur le domaine — `buildAreaPathD` pur, x = km BRUT). Le domaine visible pilote le `<G transform>` (zoom), pas le `d` du path.
+  - [x] **Marqueur position** : ligne verticale verte `#16a34a` (strokeWidth 2) à `currentKmOnRoute` (FR-LP-007).
+  - [x] **Zone recherchée** : rectangle bleu `#3498db` opacité 0.2 sur `[searchFromKm, searchToKm]` (FR-LP-008).
+  - [x] **Zoom = domaine X** : `domainFromKm`/`domainToKm` pilotent le transform (`translate`+`scale x`) + `clipPath` (équivalent `allowDataOverflow` Recharts) — **ne recompute jamais `points[]` ni le `d`** (FR-LP-010). Y reste sur le **domaine plein** (windowing Y reverté web v1.4 — non refait). `vectorEffect="non-scaling-stroke"` → crête à épaisseur constante malgré le scale x.
+  - [~] Transition fluide via `react-native-reanimated` (optionnel NFR-LP-004) : **non implémenté** — la coquille repliable (MOB-5.4) anime déjà l'ouverture (Animated) ; le zoom domaine est instantané par re-render (pas de saccade vu la stabilité des `points`). Reanimated différé (pas requis par les AC).
 
-- [ ] **T3 — Wrapper Live `components/live/live-elevation-profile.tsx` (windowing)** (AC: 1, 2, 3, 4)
-  - [ ] **Porter** la math web `live-elevation-profile.tsx` (80 l, pure) : `PROFILE_LOOKAHEAD_KM = 100` (constante nommée) ; `domainFromKm = max(0, currentKmOnRoute)` ; `domainToKm = max(domainFromKm, min(total, currentKmOnRoute + targetAheadKm + 100))` (**garde anti-inversion** `max(domainFromKm, …)` — patch review web P1, évite l'axe qui s'effondre/inverse en fin de trace) ; zone `searchFromKm/ToKm = clamp(target ± searchRadiusKm, domainFromKm, domainToKm)` (zone bornée DANS la fenêtre).
-  - [ ] **`currentKmOnRoute === null`** → rendre la **trace pleine**, pas de marqueur, pas de zone.
-  - [ ] **`hasElevationData === false`** (AC4) → **ne rien rendre** (retourner `null`) → côté MOB-5.4 `profileContent = null` → section non dépliable + message discret. **Pas de graphe vide.**
+- [x] **T3 — Wrapper Live `components/live/live-elevation-profile.tsx` (windowing)** (AC: 1, 2, 3, 4)
+  - [x] **Porter** la math web (pure, `computeProfileWindow`) : `PROFILE_LOOKAHEAD_KM = 100` (constante nommée) ; `domainFromKm = max(0, currentKmOnRoute)` ; `domainToKm = max(domainFromKm, min(dataMaxKm, currentKmOnRoute + targetAheadKm + 100))` (**garde anti-inversion** `max(domainFromKm, …)`) ; zone `searchFromKm/ToKm = clamp(target ± searchRadiusKm, domainFromKm, domainToKm)` (bornée DANS la fenêtre).
+  - [x] **`currentKmOnRoute === null`** → **trace pleine** (domaine [dataMinKm, dataMaxKm]), pas de marqueur, pas de zone.
+  - [x] **`hasElevationData === false`** (ou < 2 points) (AC4) → **retourner `null`** → côté MOB-5.4 `profileContent` `null`/`undefined` → section non dépliable. **Pas de graphe vide.**
 
-- [ ] **T4 — Branchement comme `profileContent` (MOB-5.4)** (AC: 1, 4, 5)
-  - [ ] Dans `(app)/live/[id].tsx` : `profileContent = hasElevationData ? <LiveElevationProfile waypoints segments currentKmOnRoute={...} targetAheadKm searchRadiusKm /> : null` (passé à la section PROFIL de 5.4). `currentKmOnRoute` vient de `useLiveStore` (projeté `snapToTrace` en MOB-5.1, **client-side**).
-  - [ ] D+/D- de la fenêtre (métriques 5.4) : exposer depuis le wrapper (`computeElevationGain/Loss` sur `[currentKmOnRoute, +targetAheadKm]`) → single-source pour la ligne métriques de 5.4 (résout l'Open Question 5.4).
+- [x] **T4 — Branchement comme `profileContent` (MOB-5.4)** (AC: 1, 4, 5)
+  - [x] Dans `(app)/live/[id].tsx` : `profileContent = showProfile ? <LiveElevationProfile waypoints segments currentKmOnRoute targetAheadKm searchRadiusKm accessibilityLabel /> : undefined`. `showProfile` = ≥ 2 waypoints à `ele` valide (gate AC4). `currentKmOnRoute` vient de `useLiveStore` (`snapToTrace`, **client-side** — RGPD).
+  - [x] D+/D- de la fenêtre (métriques 5.4) : **exposé depuis le wrapper** (`computeWindowElevation` sur `[currentKmOnRoute, +targetAheadKm]`) → single-source pour la ligne métriques de 5.4 (l'ancien calcul local de `[id].tsx` est remplacé — résout l'Open Question 5.4).
 
-- [ ] **T5 — i18n + a11y** (AC: 4)
-  - [ ] `live.profile.noElevation` (message discret AC4), `live.profile.a11yLabel` (description du graphe pour lecteur d'écran : D+/D- de la fenêtre, position). FR/EN parité, zéro chaîne en dur.
+- [x] **T5 — i18n + a11y** (AC: 4)
+  - [x] `live.profile.noElevation` (repli graphe, AC4), `live.profile.a11yLabel` (description graphe pour lecteur d'écran : D+/D- fenêtre `{{dPlus}}`/`{{dMinus}}`). FR/EN parité, zéro chaîne en dur (chart `accessibilityLabel`).
 
-- [ ] **T6 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5)
-  - [ ] `use-elevation-profile` (pur) : `points`/`boundaries`/`hasElevationData`/D+/D- ; filtre `ele` invalide ; `points` stable (référence) quand seules les props de domaine changent (NFR-LP-002).
-  - [ ] windowing (`live-elevation-profile`) : `domainToKm >= domainFromKm` (anti-inversion), `PROFILE_LOOKAHEAD_KM=100`, zone clampée DANS la fenêtre, `currentKmOnRoute=null` → trace pleine sans marqueur.
-  - [ ] `hasElevationData=false` → `null` (pas de graphe vide).
-  - [ ] `elevation-chart` (mock svg) : `<Path>` memoïsé (pas recomputé sur changement de domaine), marqueur vert à `currentKmOnRoute`, zone bleue sur le rayon.
-  - [ ] Gate : `test|typecheck|lint` verts + `expo export` iOS OK.
+- [x] **T6 — Tests (Jest + RNTL)** (AC: 1, 2, 3, 4, 5)
+  - [x] `use-elevation-profile` (pur) : `points`/`boundaries`/`hasElevationData`/D+/D- ; filtre `ele` invalide ; `points` stable (référence) au rerender (NFR-LP-002).
+  - [x] windowing (`computeProfileWindow`) : `domainToKm >= domainFromKm` (anti-inversion, overshoot fin de trace), `PROFILE_LOOKAHEAD_KM=100`, zone clampée DANS la fenêtre, `currentKmOnRoute=null` → trace pleine sans marqueur. + `computeWindowElevation` (single source D+/D-).
+  - [x] `hasElevationData=false` → wrapper rend `null` (`ElevationChart` jamais appelé — pas de graphe vide).
+  - [x] `elevation-chart` (helpers purs) : `buildAreaPathD` invariant au domaine (NFR-LP-002, x = km brut), `projectX` (marqueur/zone repositionnés selon domaine), couleurs marqueur `#16a34a`/zone `#3498db`. _(Le rendu SVG natif n'est pas introspectable sous jest-expo → couvert par Maestro T7.)_
+  - [x] Gate : `test` (576 verts) `typecheck` 0 `lint` 0 + `expo export` iOS OK.
 
-- [ ] **T7 — Validation manuelle (Dev Client)** (AC: 1, 2, 3, 4) — ⏳ build Dev Client
-  - [ ] Ouvrir PROFIL → graphe commence à ma position (marqueur), zone bleue centrée sur la cible (largeur = rayon), bord droit ~100 km après.
-  - [ ] Bouger le slider → la fenêtre zoome en temps réel, marqueur/zone suivent, pas de saccade (points stables).
-  - [ ] Aventure sans élévation → pas de graphe vide (message/section non dépliable).
+- [x] **T7 — Validation device (Maestro, runner fail-closed)** (AC: 1, 2, 3, 4)
+  - [x] `BUILD=1 pnpm test:device live-poi.yaml live-profile.yaml` → **iOS ✓** (smoke + live-poi + live-profile verts, **0 crash**). `live-profile` ouvre la section PROFIL → graphe monté (`id: elevation-chart` visible). Variante `android/live-profile.yaml` créée (cible le label a11y `Dénivelé sur la fenêtre`) — **Android non testé** (émulateur non booté ce run). Reporting honnête : iOS ✓ / Android non testé.
+  - [x] Revue visuelle screenshot `live-profile-expanded` : ✅ aire d'élévation verte rendue (`react-native-svg`), marqueur position au **bord gauche** (= position GPS), **zone bleue** sur la cible, silhouette terrain jusqu'au bord droit. Pas de graphe vide / pas de canvas blanc.
+  - [x] **🐛 Bug latent MOB-5.4 corrigé** (révélé par T7) : la `CollapsibleProfileSection` ne s'ouvrait JAMAIS avec un contenu réel — l'enfant mesuré était clampé à la hauteur 0 (animée) du parent → `onLayout` reportait 0 → `contentHeight` restait 0 → la garde `expanded && contentHeight===0` bloquait l'expansion à jamais. Jamais déclenché tant que le slot profil était vide (MOB-5.4). Fix : contenu mesuré en `position:'absolute'` (pattern react-native-collapsible) → mesure non clampée. Isolé via un box debug (le box plain ne s'ouvrait pas non plus → bug collapsible, pas chart), puis re-validé device (graphe visible).
 
 ## Dev Notes
 
@@ -148,14 +152,68 @@ apps/mobile/src/lib/i18n/locales/fr.json + en.json (live.profile.*)
 
 ### Agent Model Used
 
+claude-opus-4-8 (Claude Code, dev-story workflow)
+
 ### Debug Log References
+
+- Tests RNTL : `renderHook` jugé peu fiable (leçon MOB-3.1) → composant-sonde + `await render` pour le hook pur.
+- `react-native-svg` non rendable sous jest-expo (les primitives ne produisent pas de nœuds hôtes introspectables) ET une factory `jest.mock('react-native-svg', …)` déclenche le guard NativeWind `_ReactNativeCSSInterop` (interdit par babel-jest-hoist). → Géométrie du chart extraite en helpers **purs** (`buildAreaPathD`, `projectX`) testés directement ; rendu SVG (couleurs/transform/clip) couvert par Maestro (T7).
 
 ### Completion Notes List
 
+- **T1** `use-elevation-profile.ts` porté verbatim du web (pur, memoïsé `[waypoints, segments]`, zéro DOM). Référence `points` stable au rerender → NFR-LP-002.
+- **T2** `elevation-chart.tsx` (react-native-svg) : un seul `<Path>` d'aire dont le `d` est construit par `buildAreaPathD(points, height)` (x = km **brut**, y = pixels échelle Y figée = domaine plein) → **memoïsé sur `[points, height]`, jamais sur le domaine**. Le zoom est appliqué par un `<G transform="translate(tx) scale(sx 1)">` + `clipPath` (équivalent `allowDataOverflow`) — `points[]`/`d` jamais recomputés (NFR-LP-002). Marqueur position vert `#16a34a`, zone recherchée bleue `#3498db`, bornes pointillées. `vectorEffect=non-scaling-stroke`.
+- **T3** `live-elevation-profile.tsx` : `computeProfileWindow` (pur) — gauche = position (≥0), droite = cible + `PROFILE_LOOKAHEAD_KM` (100) borné par `dataMaxKm`, **garde anti-inversion** `domainToKm = max(domainFromKm, …)`, zone clampée DANS la fenêtre. `currentKmOnRoute=null` → trace pleine. `!hasElevationData || points<2` → `null` (AC4, pas de graphe vide).
+- **T4** Branchement `(app)/live/[id].tsx` : `profileContent = showProfile ? <LiveElevationProfile …/> : undefined` (`showProfile` = ≥2 waypoints à `ele` valide). Le calcul D+/D- local de `[id].tsx` est **remplacé** par `computeWindowElevation` (exporté du wrapper) → single source partagée écran↔profil (résout l'Open Question 5.4). RGPD : `currentKmOnRoute` client-side (`snapToTrace`), aucune coordonnée serveur.
+- **T5** i18n `live.profile.noElevation` + `live.profile.a11yLabel` (FR/EN) ; le chart porte un `accessibilityLabel` décrivant le D+/D- de la fenêtre.
+- **T6** 23 tests neufs (hook, windowing/window-elevation, helpers chart). Suite mobile : **576 verts**. `typecheck` 0, `lint` 0, `check:native-config` OK, `expo export` iOS OK.
+- **T7** Validation device **iOS ✓** (`BUILD=1 pnpm test:device live-poi live-profile`, 0 crash) : graphe d'élévation monté + visible (`id: elevation-chart`) après ouverture de la section ; screenshot confirme l'aire verte + marqueur position (bord gauche) + zone bleue. **Android non testé** (émulateur non booté) — variante `android/live-profile.yaml` prête.
+- **🐛 Fix cross-story MOB-5.4** (`collapsible-profile-section.tsx`) : la section PROFIL ne s'ouvrait jamais avec un contenu réel (enfant mesuré clampé à la hauteur 0 du parent animé → `onLayout`=0 → garde bloquante). Contenu désormais mesuré en `position:'absolute'` (mesure naturelle non clampée, pattern react-native-collapsible). Bug latent invisible en MOB-5.4 (slot vide), révélé par MOB-5.5 (1er contenu réel) → corrigé ici. 28 tests collapsible/live-controls toujours verts.
+- **Hors-scope confirmé** : aucun module natif neuf (`react-native-svg` déjà lié) → **pas de prebuild** ; frontend-only, aucun appel serveur.
+
 ### File List
+
+**Ajouts :**
+- `apps/mobile/src/hooks/use-elevation-profile.ts` (port verbatim, pur)
+- `apps/mobile/src/hooks/use-elevation-profile.test.ts`
+- `apps/mobile/src/components/live/elevation-chart.tsx` (rendu react-native-svg + helpers purs)
+- `apps/mobile/src/components/live/elevation-chart.test.tsx`
+- `apps/mobile/src/components/live/live-elevation-profile.tsx` (wrapper windowing + `computeWindowElevation`)
+- `apps/mobile/src/components/live/live-elevation-profile.test.tsx`
+- `apps/mobile/.maestro/live-profile.yaml`
+- `apps/mobile/.maestro/android/live-profile.yaml`
+
+**Modifs :**
+- `apps/mobile/src/app/(app)/live/[id].tsx` (profileContent + D+/D- via `computeWindowElevation` single source + `showProfile`)
+- `apps/mobile/src/components/live/collapsible-profile-section.tsx` (**🐛 fix MOB-5.4** : mesure du contenu en `position:'absolute'` → la section s'ouvre réellement)
+- `apps/mobile/src/lib/i18n/locales/fr.json` (`live.profile.*`)
+- `apps/mobile/src/lib/i18n/locales/en.json` (`live.profile.*`)
+
+**Docs :**
+- `_bmad-output/implementation-artifacts/MOB-5-5-interactive-elevation-profile-contextual.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+## Review Findings (code review 2026-06-28)
+
+### Patches appliqués
+
+- [x] **P-A (P2)** — `overflow:'hidden'` ajouté sur la View interne `position:'absolute'` dans `CollapsibleProfileSection`. Sur Android, `overflow:'hidden'` sur `Animated.View` ne clippe pas les enfants absolus → le graphe débordait visuellement pendant l'animation de fermeture. Fix: `style={{ …, overflow: 'hidden' }}` sur la View interne. `apps/mobile/src/components/live/collapsible-profile-section.tsx`.
+- [x] **P-B (P2)** — `profileContent` extrait en `useMemo` dans `[id].tsx`. En mode Live, `LiveScreen` re-rend à ~1 Hz (ticks GPS). Sans mémo, une nouvelle référence JSX était créée à chaque render → `LiveControls` re-rendait systématiquement et `ElevationChart` recomputait `sx`/`tx` inutilement. `apps/mobile/src/app/(app)/live/[id].tsx`.
+- [x] **P-C (P3)** — `ClipPath id` remplacé par `useId()` dans `ElevationChart`. Sur iOS le scoping est par `<Svg>` instance (sûr), mais sur Android le `RNSVGRenderableManager` enregistre les IDs globalement → deux instances simultanées collisionneraient. `apps/mobile/src/components/live/elevation-chart.tsx`.
+
+### Acceptances vérifiées
+
+- ✅ AC1, AC2, AC3, AC4, AC5 — tous PASS
+- ✅ NFR-LP-001 (GPS client-side), NFR-LP-002 (zoom = domaine X, pathD invariant), NFR-LP-005 (frontend-only)
+
+### Déférés → `deferred-work.md`
+
+4 items documentés (D-1 à D-4) : divergence algo D+/D-, dead fields totalDPlus/totalDMinus, edge case currentKmOnRoute<0, fallback noElevation dead code.
 
 ## Change Log
 
 | Date | Version | Description | Auteur |
 |---|---|---|---|
 | 2026-06-27 | 0.1 | Création story MOB-5.5 (ready-for-dev) — profil d'élévation interactif Live : `useElevationProfile` (port verbatim, pur, memo stable), rendu **`react-native-svg`** (Path memoïsé — Recharts web non portable), marqueur position (`currentKmOnRoute`), zone recherchée (`target±radius`), windowing (gauche=position, droite=+100km, garde anti-inversion), **zoom = domaine X sans re-slice** (NFR-LP-002), `hasElevationData=false` → pas de graphe vide (FR-LP-011), branchement `profileContent` (5.4) + D+/D- fenêtre. RGPD client-side (`snapToTrace`). react-native-svg déjà lié → pas de prebuild. i18n FR/EN, tests. | bmad-create-story (Story Context Engineer) |
+| 2026-06-28 | 0.2 | Implémentation MOB-5.5 (dev-story) — T1→T6 livrés : `useElevationProfile` (port verbatim pur), `ElevationChart` (react-native-svg ; `<Path>` aire memoïsé `buildAreaPathD` invariant au domaine, zoom = `<G transform>`+clip, Y plein, marqueur vert `#16a34a`, zone bleue `#3498db`), `LiveElevationProfile` (`computeProfileWindow` lookahead 100 + anti-inversion + zone clampée, `null` si pas d'élévation/<2 pts), branchement `profileContent` (`showProfile`) + **single source D+/D-** `computeWindowElevation` (remplace le calcul local de `[id].tsx`, résout Open Question 5.4), i18n `live.profile.*` FR/EN. 23 tests neufs ; gate vert : **jest 576 · tsc 0 · lint 0 · check:native-config OK · expo export iOS OK**. Aucun module natif neuf → pas de prebuild. T7 : flows Maestro `live-profile.yaml` (iOS) + `android/live-profile.yaml` créés, validation device en cours. | bmad-dev-story (Amelia) |
+| 2026-06-28 | 0.3 | Validation device **iOS ✓** (`BUILD=1 pnpm test:device live-poi live-profile`, 0 crash) — graphe d'élévation visible après ouverture de la section ; screenshot confirme aire verte + marqueur position (bord gauche) + zone bleue. **🐛 Fix cross-story MOB-5.4** : `collapsible-profile-section.tsx` ne s'ouvrait jamais avec un contenu réel (enfant clampé à la hauteur 0 animée du parent → `onLayout`=0 → garde bloquante) ; contenu mesuré en `position:'absolute'` (pattern react-native-collapsible). Bug latent invisible tant que le slot profil était vide, révélé par MOB-5.5. Isolé via box debug puis re-validé device. **Android non testé** (émulateur non booté ; variante `android/live-profile.yaml` prête). Gate re-vert : jest 576 · tsc 0 · lint 0 · expo export iOS OK. | bmad-dev-story (Amelia) |

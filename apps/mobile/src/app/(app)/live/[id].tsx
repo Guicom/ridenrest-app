@@ -1,8 +1,4 @@
-import {
-  computeElevationGain,
-  computeElevationLoss,
-  findPointAtKm,
-} from '@ridenrest/gpx';
+import { findPointAtKm } from '@ridenrest/gpx';
 import { type MapSegmentData } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GeolocationConsent } from '@/components/live/geolocation-consent';
 import { LiveControls } from '@/components/live/live-controls';
+import {
+  computeWindowElevation,
+  LiveElevationProfile,
+} from '@/components/live/live-elevation-profile';
 import { LiveFiltersDrawer } from '@/components/live/live-filters-drawer';
 import { LiveNoResultsBanner } from '@/components/live/live-no-results-banner';
 import { LiveGpsLayer } from '@/components/map/live-gps-layer';
@@ -246,30 +246,51 @@ export default function LiveScreen() {
   }, [isLiveModeActive, targetKm, waypoints]);
 
   // ── Métriques D+/D- de la fenêtre `[currentKm, +targetAheadKm]` (MOB-5.4) ─────
-  // Calcul LOCAL temporaire (`computeElevationGain/Loss`, port web page.tsx:215-226).
-  // Frontière de story (Open Question 1) : quand MOB-5.5 livre `useElevationProfile`,
-  // exposer le D+/D- depuis ce hook (single-source) et retirer ce calcul local.
+  // Single source (MOB-5.5 / T4, résout l'Open Question 5.4) : `computeWindowElevation`
+  // est exposé par le wrapper du profil → la ligne métriques de 5.4 ET le profil
+  // partagent le même calcul. RGPD : `currentKmOnRoute` est client-side (snapToTrace).
   const elevation = useMemo(() => {
-    if (currentKmOnRoute === null || waypoints.length === 0)
+    if (currentKmOnRoute === null)
       return { gain: null as number | null, loss: null as number | null };
-    const targetDistKm = currentKmOnRoute + targetAheadKm;
-    const slice = waypoints.filter(
-      (wp) => wp.distKm >= currentKmOnRoute && wp.distKm <= targetDistKm,
+    return computeWindowElevation(
+      waypoints,
+      currentKmOnRoute,
+      currentKmOnRoute + targetAheadKm,
     );
-    if (slice.length < 2) return { gain: null, loss: null };
-    const gpxPoints = slice.map((wp) => ({
-      lat: wp.lat,
-      lng: wp.lng,
-      elevM: wp.ele ?? undefined,
-    }));
-    // GPX sans données d'élévation : computeElevationGain/Loss retourne 0 (pas null).
-    // On retourne null explicitement pour afficher « — » plutôt que « ↑ 0 m · ↓ 0 m ».
-    if (!gpxPoints.some((p) => p.elevM !== undefined)) return { gain: null, loss: null };
-    return {
-      gain: computeElevationGain(gpxPoints),
-      loss: computeElevationLoss(gpxPoints),
-    };
   }, [waypoints, currentKmOnRoute, targetAheadKm]);
+
+  // ── Profil d'élévation Live (MOB-5.5) — gate `hasElevationData` (AC4) ─────────
+  // Au moins 2 waypoints à élévation valide → un profil est rendable ; sinon
+  // `profileContent` reste `undefined` → la section PROFIL de 5.4 demeure non dépliable
+  // (pas de graphe vide, FR-LP-011).
+  const showProfile = useMemo(
+    () =>
+      waypoints.filter((wp) => wp.ele !== null && wp.ele !== undefined).length >= 2,
+    [waypoints],
+  );
+  // Libellé a11y du graphe (D+/D- de la fenêtre — single source ci-dessus).
+  const profileA11y = t('live.profile.a11yLabel', {
+    dPlus: elevation.gain != null ? Math.round(elevation.gain) : 0,
+    dMinus: elevation.loss != null ? Math.round(elevation.loss) : 0,
+  });
+  // `profileContent` mémoïsé : en mode Live, `LiveScreen` re-rend à chaque tick GPS (~1 Hz
+  // via `currentKmOnRoute`). Sans mémo, une nouvelle référence d'élément JSX est créée à
+  // chaque render → `LiveControls` (si memoïsé) re-rend systématiquement, et `ElevationChart`
+  // recompute `sx`/`tx` à chaque tick même si le domaine n'a pas changé.
+  const profileContent = useMemo(
+    () =>
+      showProfile ? (
+        <LiveElevationProfile
+          waypoints={waypoints}
+          segments={segments}
+          currentKmOnRoute={currentKmOnRoute}
+          targetAheadKm={targetAheadKm}
+          searchRadiusKm={searchRadiusKm}
+          accessibilityLabel={profileA11y}
+        />
+      ) : undefined,
+    [showProfile, waypoints, segments, currentKmOnRoute, targetAheadKm, searchRadiusKm, profileA11y],
+  );
 
   // ── Compteur de filtres actifs (badge) ──────────────────────────────────────
   const activeFilterCount = useMemo(() => {
@@ -506,9 +527,9 @@ export default function LiveScreen() {
       ) : null}
 
       {/* Panneau de contrôle Live refondu (MOB-5.4) : en-tête PROFIL repliable, slider,
-          métriques ↑D+·↓D-·~ETA, RECHERCHER / RECHERCHER SUR. `profileContent` reste
-          `undefined` tant que MOB-5.5 ne livre pas le profil → section non dépliable (AC7)
-          ET FR-LP-012 (le profil ne vit QUE dans la section PROFIL, pas de double affichage). */}
+          métriques ↑D+·↓D-·~ETA, RECHERCHER / RECHERCHER SUR. `profileContent` = profil
+          d'élévation Live (MOB-5.5) quand des données existent, sinon `undefined` → section
+          non dépliable (AC4/AC7) ET FR-LP-012 (le profil ne vit QUE dans la section PROFIL). */}
       {isLiveModeActive && traceReady ? (
         <LiveControls
           onFiltersOpen={() => setFiltersOpen(true)}
@@ -523,7 +544,7 @@ export default function LiveScreen() {
           profileOpen={profileOpen}
           onProfileToggle={() => setProfileOpen((v) => !v)}
           onProfileAutoOpen={() => setProfileOpen(true)}
-          profileContent={undefined}
+          profileContent={profileContent}
         />
       ) : null}
 

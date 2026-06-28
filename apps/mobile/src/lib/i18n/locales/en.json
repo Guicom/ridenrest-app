@@ -239,6 +239,10 @@
       "dMinus": "Elevation loss {{value}} metres",
       "eta": "Estimated time {{eta}}"
     },
+    "profile": {
+      "noElevation": "Elevation data unavailable",
+      "a11yLabel": "Elevation profile. Window elevation change: {{dPlus}} m up, {{dMinus}} m down."
+    },
     "filters": {
       "title": "Filters",
       "close": "Close filters"

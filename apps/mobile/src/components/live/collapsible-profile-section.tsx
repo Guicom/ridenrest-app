@@ -13,9 +13,15 @@ import { useTranslation } from '@/lib/i18n';
 // plugin babel worklets configuré). NFR-LP-004 (transition fluide ~200 ms) est satisfait
 // à l'identique. Aucun module natif neuf → pas de prebuild.
 //
-// **Mesure de la hauteur cible** : le contenu est TOUJOURS rendu à sa taille réelle ;
-// l'animation ne fait que clipper le conteneur (`overflow: hidden`), donc `onLayout`
-// reporte la hauteur naturelle même quand la section est repliée → on anime `0 ↔ h`.
+// **Mesure de la hauteur cible** (pattern react-native-collapsible) : le contenu est rendu
+// en `position: 'absolute'` DANS le conteneur animé. Un enfant absolu n'est PAS contraint
+// par la hauteur (animée à 0) de son parent → il se dimensionne à sa taille naturelle et
+// `onLayout` reporte la VRAIE hauteur même quand la section est repliée. On anime alors la
+// hauteur du conteneur (`overflow: hidden` clippe) `0 ↔ h`.
+// ⚠️ Sans `position:'absolute'`, iOS clampe l'enfant à la hauteur 0 du parent → `onLayout`
+// reporte 0 → `contentHeight` reste 0 → la garde `expanded && contentHeight===0` bloque
+// l'expansion À JAMAIS (bug latent MOB-5.4, jamais déclenché tant que le slot profil était
+// vide ; révélé + corrigé en MOB-5.5 quand le profil d'élévation a rempli le slot).
 //
 // **Garde `hasProfile`** (AC7) : sans contenu (`content == null`, ex. pas de données
 // d'élévation tant que MOB-5.5 n'alimente pas le slot), le toggle est désactivé, la
@@ -119,6 +125,13 @@ export function CollapsibleProfileSection({
           accessibilityElementsHidden={!expanded}
           importantForAccessibility={expanded ? 'auto' : 'no-hide-descendants'}
           onLayout={handleContentLayout}
+          // `absolute` → l'enfant se mesure à sa taille naturelle sans être clampé par la
+          // hauteur (0) du parent replié → `onLayout` reporte la vraie hauteur (cf. note plus haut).
+          // `overflow:'hidden'` : sur Android, l'`Animated.View` parent ne clippe pas les enfants
+          // absolus → le contenu déborderait visuellement pendant l'animation de fermeture. Ce
+          // second `overflow:'hidden'` garantit le clip sur les deux plateformes sans affecter
+          // le `onLayout` (qui reporte la taille propre de la View, pas celle de ses enfants).
+          style={{ position: 'absolute', left: 0, right: 0, top: 0, overflow: 'hidden' }}
         >
           {content}
         </View>

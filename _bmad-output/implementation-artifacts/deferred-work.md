@@ -1,5 +1,12 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-5-5-interactive-elevation-profile-contextual (2026-06-28)
+
+- **D-1 (P2) — D+/D- algo divergence** : `useElevationProfile` bridge les waypoints null-élévation (connexion directe aux voisins valides) tandis que `computeWindowElevation` les garde puis laisse `computeElevationGain/Loss` les sauter (paires adjacentes à `elevM:undefined` ignorées). Pour un GPX à élévation partielle, le D+ du panneau texte peut différer de la montée visuelle du graphe. Fix : pre-filtrer les null dans `computeWindowElevation` avant mappage en `gpxPoints`. `apps/mobile/src/components/live/live-elevation-profile.tsx:88-99`.
+- **D-2 (P2) — `totalDPlus`/`totalDMinus` dead output fields** : calculés dans `useElevationProfile` sur la route COMPLÈTE mais jamais consommés en Live (la métrique affichée vient de `computeWindowElevation`). Structurellement piégeux (quantité différente de la fenêtre, même nom). Soit retirer de `UseElevationProfileResult`, soit les exposer explicitement via `LiveElevationProfile` en les distinguant du D+ fenêtré. `apps/mobile/src/hooks/use-elevation-profile.ts:83-84`.
+- **D-3 (P3) — `currentKmOnRoute < 0` edge case** : si `currentKmOnRoute` était négatif (float overshoot théorique avant `snapToTrace`), `domainFromKm = 0` mais le marqueur serait à `xPixel(-1) < 0` (invisible après clip). En pratique `snapToTrace` borne à `[dataMinKm, dataMaxKm]` → ne se déclenche pas. `apps/mobile/src/components/live/live-elevation-profile.tsx:62`.
+- **D-4 (P3) — `ElevationChart.noElevation` fallback dead code** : la branche `< 2 points` dans `ElevationChart` est inatteignable — `LiveElevationProfile` retourne `null` en amont. Défensivement utile si `ElevationChart` est utilisé directement, mais trompeuse dans le contexte Live. `apps/mobile/src/components/live/elevation-chart.tsx:122-134`.
+
 ## Deferred from: code review of MOB-5-4-live-search-panel-collapsible-profile (2026-06-28)
 
 - **`handleContentLayout` closure périmée sur `contentHeight`** : si le contenu de la section change de hauteur dynamiquement (MOB-5.5 profil d'élévation), la garde `h !== contentHeight` peut bloquer la mise à jour. Ajouter `useCallback` ou migrer vers une ref. Risque faible jusqu'à contenu dynamique. `apps/mobile/src/components/live/collapsible-profile-section.tsx:62-65`.
