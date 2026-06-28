@@ -231,6 +231,14 @@
       "radiusDecrement": "Decrease radius",
       "radiusIncrement": "Increase radius"
     },
+    "panel": {
+      "profileHeader": "PROFILE",
+      "profileShow": "Show elevation profile",
+      "profileHide": "Hide elevation profile",
+      "dPlus": "Elevation gain {{value}} metres",
+      "dMinus": "Elevation loss {{value}} metres",
+      "eta": "Estimated time {{eta}}"
+    },
     "filters": {
       "title": "Filters",
       "close": "Close filters"

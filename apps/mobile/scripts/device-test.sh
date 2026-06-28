@@ -27,7 +27,9 @@ GEO_LNG="${GEO_LNG:-1.4442}"   # Toulouse par défaut (sur/près d'une trace de 
 GEO_LAT="${GEO_LAT:-43.6047}"
 
 # --- Toolchain ---
-export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home 2>/dev/null || echo /opt/homebrew/opt/openjdk)}"
+# JDK 17 obligatoire (AGENTS.md : Gradle/AGP refuse un JDK trop récent → erreurs toolchain
+# type `JvmVendorSpec IBM_SEMERU`). On préfère un JDK 17 enregistré, sinon le Homebrew openjdk@17.
+export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null || echo /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home)}"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH:$HOME/.maestro/bin"
 export MAESTRO_CLI_NO_ANALYTICS=1
@@ -85,8 +87,11 @@ run_flow() {  # $1=platform $2=device $3=flowpath
   if ! maestro --device "$device" test "$flow"; then
     echo "❌ [$platform] flow ÉCHOUÉ : $flow"; FAILED=1
   fi
-  # Scan crash post-flow (même si Maestro est vert).
-  if [ "$platform" = "android" ]; then crash="$(android_crash_since "$start")"; else crash="$(ios_crash_since "$start")"; fi
+  # Scan crash post-flow (même si Maestro est vert). `|| true` OBLIGATOIRE : sous `set -e`,
+  # `find -newermt @epoch` (BSD/macOS) ET `logcat | awk` retournent un code ≠ 0 quand il n'y a
+  # AUCUN crash → sans la garde, l'assignation tuait le runner APRÈS le 1er flow (smoke), sans
+  # jamais exécuter les flows suivants. La sortie (matches de crash) reste capturée.
+  if [ "$platform" = "android" ]; then crash="$(android_crash_since "$start" || true)"; else crash="$(ios_crash_since "$start" || true)"; fi
   if [ -n "$crash" ]; then
     echo "❌ [$platform] CRASH natif détecté pendant $flow (asserts UI verts ≠ pas de crash) :"
     echo "$crash" | head -6

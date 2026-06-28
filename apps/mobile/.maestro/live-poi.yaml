@@ -2,6 +2,8 @@ appId: app.ridenrest
 ---
 # MOB-5.3 — Découverte de POIs en mode Live : panneau de contrôle (slider distance +
 # RECHERCHER), tiroir de filtres (rayon/vitesse/calques), cercle de rayon + point cible.
+# MOB-5.4 — panneau REFONDU : en-tête « PROFIL » + chevron en haut, métriques sous le
+# slider, RECHERCHER / RECHERCHER SUR. On assert la présence de l'en-tête « PROFIL ».
 #
 # PRÉ-REQUIS (externes, comme live-tracking.yaml) :
 #   1. App rebuildée (`pnpm sim` / BUILD=1) — MOB-5.3 est all-JS mais le bundle est embarqué.
@@ -33,6 +35,8 @@ appId: app.ridenrest
     visible: "Mon hôtel dans"
     timeout: 20000
 - assertVisible: "Rechercher"
+# MOB-5.4 AC1 : en-tête « PROFIL » de la section repliable (en haut du panneau refondu).
+- assertVisible: "PROFIL"
 - takeScreenshot: screenshots/live-poi-panel
 
 # AC2/AC3 : recherche EXPLICITE → POIs + cercle de rayon + point cible sur la carte

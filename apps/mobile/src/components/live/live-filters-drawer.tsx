@@ -178,6 +178,10 @@ export function LiveFiltersDrawer({
   // Swipe vers le bas sur la poignée → fermeture (suivi du doigt, snap-back sinon).
   const responder = useMemo(
     () =>
+      // `react-hooks/refs` faux positif : `handleCloseRef.current` n'est lu QUE dans le
+      // handler de geste (jamais en rendu) ; la ref sert justement à mémoïser le responder
+      // sur [translateY] sans le recréer quand `handleClose` change.
+      // eslint-disable-next-line react-hooks/refs
       PanResponder.create({
         onMoveShouldSetPanResponder: (_e, g) => g.dy > 4,
         onPanResponderMove: (_e, g) => {

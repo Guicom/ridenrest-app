@@ -1,6 +1,7 @@
 appId: app.ridenrest
 ---
 # MOB-5.3 — Découverte de POIs en mode Live, variante ANDROID. Voir ../README.md §Android.
+# MOB-5.4 — panneau REFONDU : assert l'en-tête « PROFIL » de la section repliable.
 # Pré-requis : build release (bundle embarqué), adb reverse 3010/3011, locale fr-FR,
 # permission localisation pré-accordée (`adb shell pm grant app.ridenrest
 # android.permission.ACCESS_FINE_LOCATION`) + position simulée (`adb emu geo fix 1.4442 43.6047`).
@@ -38,6 +39,8 @@ appId: app.ridenrest
     visible: "Mon hôtel dans"
     timeout: 25000
 - assertVisible: "Rechercher"
+# MOB-5.4 AC1 : en-tête « PROFIL » de la section repliable.
+- assertVisible: "PROFIL"
 - takeScreenshot: screenshots/android-live-poi-panel
 
 # AC2/AC3 : recherche explicite → POIs + cercle + cible (GL → screenshot).

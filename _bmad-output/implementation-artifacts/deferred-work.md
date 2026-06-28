@@ -1,5 +1,15 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-5-4-live-search-panel-collapsible-profile (2026-06-28)
+
+- **`handleContentLayout` closure périmée sur `contentHeight`** : si le contenu de la section change de hauteur dynamiquement (MOB-5.5 profil d'élévation), la garde `h !== contentHeight` peut bloquer la mise à jour. Ajouter `useCallback` ou migrer vers une ref. Risque faible jusqu'à contenu dynamique. `apps/mobile/src/components/live/collapsible-profile-section.tsx:62-65`.
+- **`setSelectedPoiId(null)` pendant le rendu (setState in render)** : violation React 19 concurrent mode, peut causer une boucle infinie si `allPois` est instable. Convertir en `useEffect`. Pré-existant avant MOB-5.4. `apps/mobile/src/app/(app)/live/[id].tsx:163-165`.
+- **`activeFilterCount` logique inversée pour `accommodations`** : la couche `accommodations` incrémente le badge quand elle est **absente** (inverse des autres couches). Pré-existant MOB-5.3. `apps/mobile/src/app/(app)/live/[id].tsx:273-280`.
+- **`getCorridorCenter` sans garde `isValidLngLat`** : les waypoints ne sont pas filtrés avant passage. Impact limité à l'URL Booking — pas une source MapLibre, pas de crash natif. `apps/mobile/src/app/(app)/live/[id].tsx:245`.
+- **`elevation` memo potentiellement instable en GPS haute fréquence** : si `useAdventureWaypoints` retourne une nouvelle référence à chaque render, le memo recalcule O(n) à chaque tick GPS. Vérifier la stabilité du hook avant MOB-5.5. `apps/mobile/src/app/(app)/live/[id].tsx:252`.
+- **`profileOpen` non réinitialisé à la désactivation du mode Live** : sans impact tant que `profileContent=undefined` (garde `hasProfile=false`). Deviendra visible dès MOB-5.5. `apps/mobile/src/app/(app)/live/[id].tsx:107`.
+- **Chemin `slider onChange` non testé pour l'auto-open PROFIL** : `changeTarget` (par `onChange`) invoque `onProfileAutoOpen` — correct mais non couvert (seuls −/+ testés). Compléter en MOB-5.5. `apps/mobile/src/components/live/live-controls.test.tsx`.
+
 ## Deferred from: code review of MOB-5-3-live-poi-discovery (2026-06-28)
 
 - **Test d'intégration écran `hasFetched` gate + bannière** — vérifier que la bannière « Aucun résultat » est bien masquée avant tout `refetch()` et se masque quand `targetKm` change (nouvelle queryKey). La logique est couverte au niveau hook (`use-live-poi-search.test.tsx`) ; un test écran compléterait la couverture. [`apps/mobile/src/__tests__/live-screen.test.tsx`]

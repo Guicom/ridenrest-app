@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CollapsibleProfileSection } from '@/components/live/collapsible-profile-section';
+import { SearchOnDropdown } from '@/components/map/search-on-dropdown';
 import { Button } from '@/components/ui/button';
 import {
   MinusIcon,
@@ -13,24 +15,30 @@ import { Slider } from '@/components/ui/slider';
 import { useLiveStore } from '@/lib/stores/live.store';
 import { useTranslation } from '@/lib/i18n';
 
-// Panneau de contrôle Live **fonctionnel** (MOB-5.3 / AC1, 2, 4) — port du web
-// `live-controls.tsx`. Le **re-design** du layout (ordre maquettes, métriques
-// « ↑D+ · ↓D- · ~ETA », slot « RECHERCHER SUR ») + la **section PROFIL repliable** sont
-// la story **MOB-5.4**. Ici : version minimale = en-tête « MON HÔTEL DANS X km », slider
-// distance cible avec boutons −/+ (max dynamique), ligne ETA, bouton RECHERCHER, bouton
-// filtres (badge). La saisie d'allure se fait dans le tiroir filtres (T7).
+// Panneau de contrôle Live **refondu** (MOB-5.4 / AC1) — port du re-design web
+// `live-controls.tsx`. Ordre vertical des maquettes (FR-LP-001) :
+//   (a) en-tête « PROFIL » + chevron  ┐ section PROFIL repliable
+//   (b) section repliable (slot)      ┘ (coquille animée, MOB-5.5 alimente le contenu)
+//   (c) séparateur + « MON HÔTEL DANS {X} km » + icône filtres
+//   (d) slider distance cible + boutons −/+
+//   (e) ligne métriques « ↑ D+ · ↓ D- · ~ ETA » SOUS le slider
+//   (f) RECHERCHER / RECHERCHER SUR (SearchOnDropdown Booking/Airbnb)
+//
+// Frontend-only, aucun appel serveur (NFR-LP-005). 44 px sur toutes les cibles tactiles
+// (NFR-LP-003). La logique slider/recherche/filtres provient de MOB-5.3 ; le contenu du
+// profil d'élévation est MOB-5.5 (slot `profileContent`).
 
 const SLIDER_STEP = 5;
 const DEFAULT_MAX = 100;
 
-/** Arrondi à l'inférieur au multiple de `step`. Pur → testable (T10). */
+/** Arrondi à l'inférieur au multiple de `step`. Pur → testable (T5). */
 export function roundDownToStep(value: number, step: number): number {
   return Math.floor(value / step) * step;
 }
 
 /**
  * Résumé ETA « ~Xh MM » / « ~Mmin » depuis distance + allure. `''` si allure ≤ 0.
- * Pur → testable (T10). Port du web `live-controls.tsx:formatEtaSummary`.
+ * Pur → testable (T5). Port du web `live-controls.tsx:formatEtaSummary`.
  */
 export function formatEtaSummary(distanceKm: number, speedKmh: number): string {
   if (speedKmh <= 0) return '';
@@ -49,8 +57,27 @@ export interface LiveControlsProps {
   maxAheadKm?: number;
   /** Réseau accessible — sinon RECHERCHER désactivé. */
   isOnline: boolean;
-  /** Hauteur mesurée du panneau (px) → padding bas de l'auto-zoom (AC3). */
+  /** Hauteur mesurée du panneau (px) → padding bas de l'auto-zoom (AC3 MOB-5.3). */
   onHeightChange?: (height: number) => void;
+  /** D+ de la fenêtre `[currentKm, +targetAheadKm]` (m) — `null` si indisponible. */
+  elevationGain: number | null;
+  /** D- de la fenêtre `[currentKm, +targetAheadKm]` (m) — `null` si indisponible. */
+  elevationLoss: number | null;
+  /**
+   * Centre de la plage de recherche (corridor) pour « RECHERCHER SUR » — `null` →
+   * dropdown désactivé. RGPD : centre du corridor, jamais la position GPS.
+   */
+  searchCenter: { lat: number; lng: number } | null;
+  /** Ville résolue (Booking `?ss=city`) — optionnel, repli coordonnées sinon. */
+  city?: string | null;
+  /** Section « PROFIL » ouverte (FR-LP-002..005) — état remonté à l'écran. */
+  profileOpen: boolean;
+  /** Toggle manuel de la section via le chevron (FR-LP-005). */
+  onProfileToggle: () => void;
+  /** Auto-open de la section au 1er contact slider / −/+ (FR-LP-003). */
+  onProfileAutoOpen: () => void;
+  /** Contenu de la section « PROFIL » (profil d'élévation — MOB-5.5). */
+  profileContent?: ReactNode;
 }
 
 export function LiveControls({
@@ -60,6 +87,14 @@ export function LiveControls({
   maxAheadKm,
   isOnline,
   onHeightChange,
+  elevationGain,
+  elevationLoss,
+  searchCenter,
+  city,
+  profileOpen,
+  onProfileToggle,
+  onProfileAutoOpen,
+  profileContent,
 }: LiveControlsProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -78,10 +113,38 @@ export function LiveControls({
     if (targetAheadKm > effectiveMax) setTargetAheadKm(effectiveMax);
   }, [effectiveMax, targetAheadKm, setTargetAheadKm]);
 
+  // Auto-open de la section PROFIL au contact slider / −/+, PUIS applique la valeur
+  // (FR-LP-003). `onProfileAutoOpen` est idempotent côté écran (`setProfileOpen(true)`).
+  const changeTarget = (value: number) => {
+    onProfileAutoOpen();
+    setTargetAheadKm(value);
+  };
+
   const sliderValue = Math.min(targetAheadKm, effectiveMax);
   const atMin = targetAheadKm <= SLIDER_STEP;
   const atMax = targetAheadKm >= effectiveMax;
   const etaSummary = formatEtaSummary(targetAheadKm, speedKmh);
+
+  // Ligne métriques — joint UNIQUEMENT les valeurs présentes avec « · » (pas de
+  // séparateur orphelin si une valeur manque, parité review web P3).
+  const hasElevation = elevationGain != null || elevationLoss != null;
+  const elevationText = (() => {
+    const parts: string[] = [];
+    if (elevationGain != null) parts.push(`↑ ${Math.round(elevationGain)} m`);
+    if (elevationLoss != null) parts.push(`↓ ${Math.round(elevationLoss)} m`);
+    return parts.length > 0 ? parts.join(' · ') : '—';
+  })();
+
+  // Libellé a11y de la ligne métriques (valeurs présentes uniquement).
+  const metricsA11y = (() => {
+    const parts: string[] = [];
+    if (elevationGain != null)
+      parts.push(t('live.panel.dPlus', { value: Math.round(elevationGain) }));
+    if (elevationLoss != null)
+      parts.push(t('live.panel.dMinus', { value: Math.round(elevationLoss) }));
+    if (etaSummary) parts.push(t('live.panel.eta', { eta: etaSummary }));
+    return parts.join(', ');
+  })();
 
   const handleLayout = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
@@ -93,10 +156,20 @@ export function LiveControls({
       testID="live-controls"
       onLayout={handleLayout}
       style={{ paddingBottom: insets.bottom + 12 }}
-      className="absolute bottom-0 left-0 right-0 z-30 rounded-t-2xl border-t border-border bg-card px-4 pt-3"
+      className="absolute bottom-0 left-0 right-0 z-30 rounded-t-2xl border-t border-border bg-card px-4 pt-2"
     >
-      {/* En-tête : « MON HÔTEL DANS X km » + bouton filtres (badge). */}
-      <View className="flex-row items-start justify-between">
+      {/* (a)(b) En-tête « PROFIL » + chevron + section repliable (slot MOB-5.5). */}
+      <CollapsibleProfileSection
+        open={profileOpen}
+        onToggle={onProfileToggle}
+        content={profileContent}
+      />
+
+      {/* (c) Séparateur + « MON HÔTEL DANS X km » + bouton filtres (badge). */}
+      <View
+        testID="profile-separator"
+        className="flex-row items-start justify-between border-t border-border pt-2"
+      >
         <View>
           <Text className="text-xs font-montserrat-semibold uppercase tracking-wide text-text-secondary">
             {t('live.search.targetLabel')}
@@ -123,15 +196,17 @@ export function LiveControls({
         </Pressable>
       </View>
 
-      {/* Slider distance cible + boutons −/+ (parité 16-24, désactivés aux bornes). */}
+      {/* (d) Slider distance cible + boutons −/+ (parité 16-24, désactivés aux bornes).
+          Le contact slider / −/+ ouvre la section PROFIL (FR-LP-003). */}
       <View className="mt-3 flex-row items-center gap-2">
         <Pressable
           testID="btn-minus"
           accessibilityRole="button"
           accessibilityLabel={t('live.search.decrement')}
           disabled={atMin}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           onPress={() =>
-            !atMin && setTargetAheadKm(Math.max(SLIDER_STEP, targetAheadKm - SLIDER_STEP))
+            !atMin && changeTarget(Math.max(SLIDER_STEP, targetAheadKm - SLIDER_STEP))
           }
           className={
             atMin
@@ -149,15 +224,17 @@ export function LiveControls({
           max={effectiveMax}
           step={SLIDER_STEP}
           label={t('live.search.distanceSliderA11y')}
-          onChange={setTargetAheadKm}
+          onChange={changeTarget}
+          onInteractStart={onProfileAutoOpen}
         />
         <Pressable
           testID="btn-plus"
           accessibilityRole="button"
           accessibilityLabel={t('live.search.increment')}
           disabled={atMax}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           onPress={() =>
-            !atMax && setTargetAheadKm(Math.min(effectiveMax, targetAheadKm + SLIDER_STEP))
+            !atMax && changeTarget(Math.min(effectiveMax, targetAheadKm + SLIDER_STEP))
           }
           className={
             atMax
@@ -169,31 +246,46 @@ export function LiveControls({
         </Pressable>
       </View>
 
-      {/* Ligne ETA (D+/D- + mise en forme « ↑D+ · ↓D- · ~ETA » = re-design MOB-5.4). */}
-      {etaSummary ? (
-        <Text
-          testID="eta-display"
-          accessibilityLabel={t('live.search.etaA11y', { eta: etaSummary })}
-          className="mt-2 font-montserrat-semibold text-sm text-text-primary"
-        >
-          {etaSummary}
-        </Text>
-      ) : null}
-
-      {/* RECHERCHER (explicite — jamais auto). Désactivé hors-ligne. */}
-      <Button
-        size="lg"
-        className="mt-3 rounded-full"
-        testID="btn-search"
-        disabled={!isOnline}
-        accessibilityLabel={t('live.search.searchButton')}
-        onPress={onSearch}
+      {/* (e) Ligne métriques « ↑ D+ · ↓ D- · ~ ETA » SOUS le slider (FR-LP-001). */}
+      <View
+        testID="metrics-row"
+        accessible
+        accessibilityLabel={metricsA11y || undefined}
+        className="mt-2 flex-row items-center gap-2"
       >
-        <SearchIcon size={16} color="#ffffff" />
-        <Text className="text-sm font-montserrat-semibold text-primary-foreground">
-          {t('live.search.searchButton')}
+        <Text
+          testID="elevation-display"
+          className="font-montserrat-semibold text-sm text-text-primary"
+        >
+          {elevationText}
         </Text>
-      </Button>
+        {etaSummary ? (
+          <Text
+            testID="eta-display"
+            className="font-montserrat-semibold text-sm text-text-primary"
+          >
+            {hasElevation ? `· ${etaSummary}` : etaSummary}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* (f) RECHERCHER (explicite — jamais auto, désactivé hors-ligne) / RECHERCHER SUR. */}
+      <View className="mt-3 flex-row gap-3">
+        <Button
+          size="lg"
+          className="flex-1 rounded-full"
+          testID="btn-search"
+          disabled={!isOnline}
+          accessibilityLabel={t('live.search.searchButton')}
+          onPress={onSearch}
+        >
+          <SearchIcon size={16} color="#ffffff" />
+          <Text className="text-sm font-montserrat-semibold text-primary-foreground">
+            {t('live.search.searchButton')}
+          </Text>
+        </Button>
+        <SearchOnDropdown center={searchCenter} city={city} className="flex-1" />
+      </View>
     </View>
   );
 }

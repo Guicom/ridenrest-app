@@ -1,4 +1,8 @@
-import { findPointAtKm } from '@ridenrest/gpx';
+import {
+  computeElevationGain,
+  computeElevationLoss,
+  findPointAtKm,
+} from '@ridenrest/gpx';
 import { type MapSegmentData } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +29,7 @@ import { useLiveMode } from '@/hooks/use-live-mode';
 import { useLivePoiSearch } from '@/hooks/use-live-poi-search';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { groupPoisByLayer } from '@/hooks/use-pois';
+import { getCorridorCenter } from '@/lib/booking-url';
 import {
   collectTraceWaypoints,
   computeSearchZoneBounds,
@@ -96,10 +101,15 @@ export default function LiveScreen() {
 
   const [refused, setRefused] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Section « PROFIL » du panneau Live (MOB-5.4) — état UI-only LOCAL (pas dans le store,
+  // parité web) : repliée par défaut (AC2), auto-open au contact slider (AC3), close on
+  // RECHERCHER (AC4), toggle manuel via chevron (AC5).
+  const [profileOpen, setProfileOpen] = useState(false);
   const currentKmOnRoute = useLiveStore((s) => s.currentKmOnRoute);
   const currentPosition = useLiveStore((s) => s.currentPosition);
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm);
   const speedKmh = useLiveStore((s) => s.speedKmh);
+  const targetAheadKm = useLiveStore((s) => s.targetAheadKm);
   const visibleLayers = useMapStore((s) => s.visibleLayers);
 
   // ── Recherche POI Live (explicite — refetch, AC2) ───────────────────────────
@@ -124,6 +134,7 @@ export default function LiveScreen() {
 
   const [searchTrigger, setSearchTrigger] = useState(0);
   const handleSearch = useCallback(() => {
+    setProfileOpen(false); // Referme la section PROFIL au lancement (FR-LP-004).
     setSearchTrigger((v) => v + 1);
     // Différé d'un tick : React a re-rendu avec le dernier état store → clé à jour.
     setTimeout(() => {
@@ -225,6 +236,40 @@ export default function LiveScreen() {
     const totalDistKm = waypoints[waypoints.length - 1]!.distKm;
     return Math.max(0, Math.ceil(totalDistKm - currentKmOnRoute));
   }, [currentKmOnRoute, waypoints]);
+
+  // ── Centre du corridor pour « RECHERCHER SUR » (MOB-5.4) ─────────────────────
+  // Disponible dès que Live actif + position connue (pas de recherche requise).
+  // RGPD : centre de la plage de recherche, jamais la position GPS de l'utilisateur.
+  const searchCenter = useMemo(() => {
+    if (!isLiveModeActive || targetKm === null || waypoints.length === 0) return null;
+    return getCorridorCenter(waypoints, targetKm);
+  }, [isLiveModeActive, targetKm, waypoints]);
+
+  // ── Métriques D+/D- de la fenêtre `[currentKm, +targetAheadKm]` (MOB-5.4) ─────
+  // Calcul LOCAL temporaire (`computeElevationGain/Loss`, port web page.tsx:215-226).
+  // Frontière de story (Open Question 1) : quand MOB-5.5 livre `useElevationProfile`,
+  // exposer le D+/D- depuis ce hook (single-source) et retirer ce calcul local.
+  const elevation = useMemo(() => {
+    if (currentKmOnRoute === null || waypoints.length === 0)
+      return { gain: null as number | null, loss: null as number | null };
+    const targetDistKm = currentKmOnRoute + targetAheadKm;
+    const slice = waypoints.filter(
+      (wp) => wp.distKm >= currentKmOnRoute && wp.distKm <= targetDistKm,
+    );
+    if (slice.length < 2) return { gain: null, loss: null };
+    const gpxPoints = slice.map((wp) => ({
+      lat: wp.lat,
+      lng: wp.lng,
+      elevM: wp.ele ?? undefined,
+    }));
+    // GPX sans données d'élévation : computeElevationGain/Loss retourne 0 (pas null).
+    // On retourne null explicitement pour afficher « — » plutôt que « ↑ 0 m · ↓ 0 m ».
+    if (!gpxPoints.some((p) => p.elevM !== undefined)) return { gain: null, loss: null };
+    return {
+      gain: computeElevationGain(gpxPoints),
+      loss: computeElevationLoss(gpxPoints),
+    };
+  }, [waypoints, currentKmOnRoute, targetAheadKm]);
 
   // ── Compteur de filtres actifs (badge) ──────────────────────────────────────
   const activeFilterCount = useMemo(() => {
@@ -460,7 +505,10 @@ export default function LiveScreen() {
         </View>
       ) : null}
 
-      {/* Panneau de contrôle Live (slider, RECHERCHER, ETA, filtres). */}
+      {/* Panneau de contrôle Live refondu (MOB-5.4) : en-tête PROFIL repliable, slider,
+          métriques ↑D+·↓D-·~ETA, RECHERCHER / RECHERCHER SUR. `profileContent` reste
+          `undefined` tant que MOB-5.5 ne livre pas le profil → section non dépliable (AC7)
+          ET FR-LP-012 (le profil ne vit QUE dans la section PROFIL, pas de double affichage). */}
       {isLiveModeActive && traceReady ? (
         <LiveControls
           onFiltersOpen={() => setFiltersOpen(true)}
@@ -469,6 +517,13 @@ export default function LiveScreen() {
           maxAheadKm={maxAheadKm}
           isOnline={isOnline}
           onHeightChange={setPanelHeight}
+          elevationGain={elevation.gain}
+          elevationLoss={elevation.loss}
+          searchCenter={searchCenter}
+          profileOpen={profileOpen}
+          onProfileToggle={() => setProfileOpen((v) => !v)}
+          onProfileAutoOpen={() => setProfileOpen(true)}
+          profileContent={undefined}
         />
       ) : null}
 

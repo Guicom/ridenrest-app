@@ -231,6 +231,14 @@
       "radiusDecrement": "Diminuer le rayon",
       "radiusIncrement": "Augmenter le rayon"
     },
+    "panel": {
+      "profileHeader": "PROFIL",
+      "profileShow": "Afficher le profil d'élévation",
+      "profileHide": "Masquer le profil d'élévation",
+      "dPlus": "Dénivelé positif {{value}} mètres",
+      "dMinus": "Dénivelé négatif {{value}} mètres",
+      "eta": "Temps estimé {{eta}}"
+    },
     "filters": {
       "title": "Filtres",
       "close": "Fermer les filtres"
