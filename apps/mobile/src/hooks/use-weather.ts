@@ -11,15 +11,15 @@ import { getWeatherForecast } from '@/lib/api/weather';
 import { getCachedWeather, setCachedWeather } from '@/lib/cache/weather-cache';
 
 // Météo du parcours (mode planning) — port iso du web. Une query par segment prêt,
-// **gatée par `weatherActive`**. Les `km` des points météo sont segment-relatifs → on
-// les ramène en **cumulé** (offset `cumulativeStartKm`) pour coller aux waypoints
-// cumulés de la trace (overlay). `staleTime` 1 h (parité TTL serveur Redis = refresh
-// horaire, PAS de `refetchInterval`).
+// **gatée par `weatherActive`**. Le serveur renvoie DÉJÀ des `km` en **cumulé aventure**
+// (`weather.service.ts` : `km = segment.cumulativeStartKm + wp.dist_km`) → on les utilise
+// tels quels, SANS ré-offset (sinon double-offset → overlay décalé sur les aventures
+// multi-segments ; parité web `map-view.tsx` qui aplatit `data.waypoints` directement).
+// `staleTime` 1 h (parité TTL serveur Redis = refresh horaire, PAS de `refetchInterval`).
 //
 // Offline (AC6) : write-through `setCachedWeather(adventureId, forecasts)` au succès
 // complet, fallback `getCachedWeather` quand aucune donnée live (cold start hors-ligne).
-// Le cache est indexé **par aventure** → on réaligne chaque prévision via le
-// `cumulativeStartKm` du segment correspondant (clé `segmentId`).
+// Le cache stocke les prévisions serveur brutes (km déjà cumulés) → même usage direct.
 
 const WEATHER_STALE_MS = 60 * 60 * 1000;
 
@@ -125,22 +125,12 @@ export function useWeather({
     };
   }, [shouldLoadCache, adventureId]);
 
-  // Réalignement km segment-relatif → cumulé (offset par segment, clé `segmentId`).
-  // Source = live si dispo, sinon cache offline (sélection à l'intérieur du memo).
+  // Les `km` serveur sont déjà cumulés aventure → aplatissement direct, SANS ré-offset
+  // (parité web `map-view.tsx`). Source = live si dispo, sinon cache offline.
   const weatherPoints = useMemo<WeatherPoint[]>(() => {
     const source = hasLiveData ? liveForecasts : (cached ?? []);
-    const offsetById = new Map(
-      segments.map((s) => [s.id, s.cumulativeStartKm] as const),
-    );
-    const points: WeatherPoint[] = [];
-    for (const forecast of source) {
-      const offset = offsetById.get(forecast.segmentId) ?? 0;
-      for (const wp of forecast.waypoints) {
-        points.push({ ...wp, km: offset + wp.km });
-      }
-    }
-    return points;
-  }, [hasLiveData, liveForecasts, cached, segments]);
+    return source.flatMap((forecast) => forecast.waypoints);
+  }, [hasLiveData, liveForecasts, cached]);
 
   return { weatherPoints, isFetching: live.isFetching };
 }

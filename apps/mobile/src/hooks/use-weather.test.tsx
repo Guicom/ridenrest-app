@@ -48,14 +48,18 @@ function makeSegment(id: string, cumulativeStartKm: number): MapSegmentData {
   };
 }
 
-function makeForecast(segmentId: string): WeatherForecast {
+// Le serveur (`weather.service.ts`) renvoie des `km` **cumulés aventure**
+// (`segment.cumulativeStartKm + wp.dist_km`) — PAS segment-relatifs. Le mock doit donc
+// produire des km déjà cumulés (param `startKm` = `cumulativeStartKm` du segment), sinon
+// il masquerait le double-offset (bug réel multi-segments corrigé en juin 2026).
+function makeForecast(segmentId: string, startKm = 0): WeatherForecast {
   return {
     segmentId,
     cachedAt: '2026-06-15T08:00:00.000Z',
     expiresAt: '2026-06-15T09:00:00.000Z',
     waypoints: [
       {
-        km: 0,
+        km: startKm,
         forecastAt: '2026-06-15T08:00:00.000Z',
         temperatureC: 18,
         precipitationProbability: 10,
@@ -65,7 +69,7 @@ function makeForecast(segmentId: string): WeatherForecast {
         iconEmoji: '☀️',
       },
       {
-        km: 5,
+        km: startKm + 5,
         forecastAt: '2026-06-15T09:00:00.000Z',
         temperatureC: 20,
         precipitationProbability: 5,
@@ -108,8 +112,9 @@ beforeEach(() => {
 });
 
 describe('useWeather (online)', () => {
-  it('appelle la façade avec les params pace + réaligne les km en cumulé', async () => {
-    mockGet.mockResolvedValue(makeForecast('s1'));
+  it('appelle la façade avec les params pace + utilise les km cumulés du serveur (pas de ré-offset)', async () => {
+    // Segment à cumulativeStartKm=10 → le serveur renvoie déjà km cumulés (10,15).
+    mockGet.mockResolvedValue(makeForecast('s1', 10));
     const qc = newClient();
     const ref = await mountHook(
       {
@@ -124,7 +129,7 @@ describe('useWeather (online)', () => {
     );
 
     await waitFor(() => expect(ref.current.weatherPoints).toHaveLength(2));
-    // km segment-relatifs (0,5) + offset cumulativeStartKm (10) → 10,15.
+    // km serveur déjà cumulés (10,15) → utilisés tels quels. Un ré-offset (double) donnerait [20,25].
     expect(ref.current.weatherPoints.map((p) => p.km)).toEqual([10, 15]);
     expect(mockGet).toHaveBeenCalledWith({
       segmentId: 's1',
@@ -254,9 +259,10 @@ describe('useWeather (online)', () => {
 });
 
 describe('useWeather (offline)', () => {
-  it('hors-ligne sans data live → fallback cache fichier (km réalignés)', async () => {
+  it('hors-ligne sans data live → fallback cache fichier (km cumulés du serveur, pas de ré-offset)', async () => {
     mockOnline = false;
-    mockGetCached.mockResolvedValue([makeForecast('s1')]);
+    // Cache = prévisions serveur brutes (km déjà cumulés 10,15 pour un segment à 10).
+    mockGetCached.mockResolvedValue([makeForecast('s1', 10)]);
     const qc = newClient();
     const ref = await mountHook(
       {
