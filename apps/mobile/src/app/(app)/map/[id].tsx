@@ -53,6 +53,7 @@ import {
 import { useMapStore } from '@/lib/stores/map.store';
 import {
   getStoredWeatherPace,
+  parseDeparture,
   setStoredWeatherPace,
 } from '@/lib/weather-pace';
 import { useTranslation } from '@/lib/i18n';
@@ -92,14 +93,6 @@ function nearestKm(
     }
   }
   return best?.distKm ?? null;
-}
-
-/** « 2026-06-15 07:30 » → ISO, sinon null. */
-function parseDeparture(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const d = new Date(trimmed.replace(' ', 'T'));
-  return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export default function MapScreen() {

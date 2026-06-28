@@ -32,6 +32,15 @@ export async function getStoredWeatherPace(): Promise<StoredWeatherPace> {
   }
 }
 
+/** « 2026-06-15 07:30 » (texte de saisie) → ISO 8601, sinon `null`. Partagé entre la
+ *  carte planning et la météo Live (saisie d'une heure de départ override). */
+export function parseDeparture(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const d = new Date(trimmed.replace(' ', 'T'));
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 /** Écrit le pace persisté (best-effort — un échec d'écriture n'interrompt pas l'UI).
  *  Merge avec la valeur existante pour ne pas écraser les champs non fournis. */
 export async function setStoredWeatherPace(pace: StoredWeatherPace): Promise<void> {

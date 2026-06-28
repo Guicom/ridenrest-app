@@ -76,6 +76,13 @@ export interface WeatherLayerProps {
   weatherPoints: readonly WeatherPoint[];
   dimension: WeatherDimension;
   enabled: boolean;
+  /**
+   * Préfixe des `id` de source/calque MapLibre — défaut `'weather'` (planning). Passer
+   * une valeur distincte (ex. `'weather-live'`) en mode Live pour ne pas entrer en conflit
+   * avec l'overlay planning (MOB-5.6 / T3). Planning et Live sont sur des écrans séparés,
+   * mais des `id` distincts gardent l'isolation explicite.
+   */
+  sourceIdPrefix?: string;
 }
 
 export function WeatherLayer({
@@ -83,6 +90,7 @@ export function WeatherLayer({
   weatherPoints,
   dimension,
   enabled,
+  sourceIdPrefix = 'weather',
 }: WeatherLayerProps) {
   const lines = useMemo(
     () => buildWeatherLineSegments(waypoints, weatherPoints),
@@ -97,9 +105,9 @@ export function WeatherLayer({
 
   return (
     <>
-      <GeoJSONSource id="weather-lines" data={lines}>
+      <GeoJSONSource id={`${sourceIdPrefix}-lines`} data={lines}>
         <Layer
-          id="weather-lines-layer"
+          id={`${sourceIdPrefix}-lines-layer`}
           type="line"
           layout={{ 'line-cap': 'round', 'line-join': 'round' }}
           paint={{
@@ -115,9 +123,9 @@ export function WeatherLayer({
           pointe vers l'Est → `icon-rotate = windDirectionMaplibre` préserve la conversion
           `(deg-90+360)%360`. */}
       <Images images={WIND_ARROW_IMAGES} />
-      <GeoJSONSource id="weather-wind-arrows" data={arrows}>
+      <GeoJSONSource id={`${sourceIdPrefix}-wind-arrows`} data={arrows}>
         <Layer
-          id="weather-wind-arrows-layer"
+          id={`${sourceIdPrefix}-wind-arrows-layer`}
           type="symbol"
           layout={{
             'icon-image': 'wind-arrow',

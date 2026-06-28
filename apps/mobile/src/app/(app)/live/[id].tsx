@@ -13,11 +13,13 @@ import {
 } from '@/components/live/live-elevation-profile';
 import { LiveFiltersDrawer } from '@/components/live/live-filters-drawer';
 import { LiveNoResultsBanner } from '@/components/live/live-no-results-banner';
+import { LiveWeatherStrip } from '@/components/live/live-weather-strip';
 import { LiveGpsLayer } from '@/components/map/live-gps-layer';
 import { LiveSearchZoneLayer } from '@/components/map/live-search-zone-layer';
 import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
 import { PoiLayer } from '@/components/map/poi-layer';
 import { PoiPopup } from '@/components/map/poi-popup';
+import { WeatherLayer } from '@/components/map/weather-layer';
 import { Button } from '@/components/ui/button';
 import { ErrorBanner } from '@/components/ui/error-banner';
 import { ChevronLeftIcon, NavigationIcon } from '@/components/ui/icon';
@@ -27,6 +29,7 @@ import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
 import { useLiveMode } from '@/hooks/use-live-mode';
 import { useLivePoiSearch } from '@/hooks/use-live-poi-search';
+import { useLiveWeather } from '@/hooks/use-live-weather';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { groupPoisByLayer } from '@/hooks/use-pois';
 import { getCorridorCenter } from '@/lib/booking-url';
@@ -38,6 +41,7 @@ import {
 } from '@/lib/map/maplibre-config';
 import { useLiveStore } from '@/lib/stores/live.store';
 import { useMapStore } from '@/lib/stores/map.store';
+import { parseDeparture } from '@/lib/weather-pace';
 import { useTranslation } from '@/lib/i18n';
 
 // Écran Live (MOB-5.1 fondation + MOB-5.2 GPS/caméra + **MOB-5.3 découverte POI**). Carte
@@ -110,7 +114,10 @@ export default function LiveScreen() {
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm);
   const speedKmh = useLiveStore((s) => s.speedKmh);
   const targetAheadKm = useLiveStore((s) => s.targetAheadKm);
+  const weatherDepartureTime = useLiveStore((s) => s.weatherDepartureTime);
   const visibleLayers = useMapStore((s) => s.visibleLayers);
+  const weatherActive = useMapStore((s) => s.weatherActive);
+  const weatherDimension = useMapStore((s) => s.weatherDimension);
 
   // ── Recherche POI Live (explicite — refetch, AC2) ───────────────────────────
   const {
@@ -142,6 +149,20 @@ export default function LiveScreen() {
       void refetchPoisRef.current();
     }, 0);
   }, []);
+
+  // ── Météo Live (MOB-5.6) — calée sur position GPS projetée + allure ──────────
+  // RGPD : la requête ne porte QUE `segmentId` + `fromKm` (km relatif) + `departureTime`
+  // + `speedKmh`, jamais de lat/lng. L'heure de départ (texte) est convertie en ISO ici
+  // (override du pace-adjusted automatique du hook).
+  const {
+    weatherPoints,
+    isPending: weatherPending,
+    isError: weatherError,
+    isGpsLost: weatherGpsLost,
+  } = useLiveWeather(segmentId, {
+    adventureId: id,
+    departureTime: parseDeparture(weatherDepartureTime ?? '') ?? undefined,
+  });
 
   // POIs groupés par calque (pins). En Live, l'API filtre déjà par sous-types actifs →
   // pas de re-filtrage d'affichage (parité web : les pins restent jusqu'à la re-recherche).
@@ -406,6 +427,15 @@ export default function LiveScreen() {
         onRegionIsChanging={reprojectPopup}
         onRegionDidChange={handleRegionDidChange}
       >
+        {/* Overlay météo (MOB-5.6) — ligne colorée + flèches de vent, AVANT les pins
+            (pins au-dessus). Source `id` distincte (`weather-live`) pour l'isolation. */}
+        <WeatherLayer
+          waypoints={waypoints}
+          weatherPoints={weatherPoints}
+          dimension={weatherDimension}
+          enabled={weatherActive}
+          sourceIdPrefix="weather-live"
+        />
         {/* Cercle de rayon + point cible AVANT les pins → pins au-dessus (AC3). */}
         <LiveSearchZoneLayer center={targetPoint} radiusKm={searchRadiusKm} />
         <PoiLayer
@@ -545,6 +575,16 @@ export default function LiveScreen() {
           onProfileToggle={() => setProfileOpen((v) => !v)}
           onProfileAutoOpen={() => setProfileOpen(true)}
           profileContent={profileContent}
+          weatherContent={
+            weatherActive ? (
+              <LiveWeatherStrip
+                weatherPoints={weatherPoints}
+                isPending={weatherPending}
+                isError={weatherError}
+                isGpsLost={weatherGpsLost}
+              />
+            ) : undefined
+          }
         />
       ) : null}
 

@@ -1,0 +1,47 @@
+appId: app.ridenrest
+---
+# MOB-5.6 (Android) — Météo en mode Live. Variante Android de `.maestro/live-weather.yaml`.
+# Gotchas Android (cf. README §Android) : locale fr-FR requise ; `testID` ne surface PAS en
+# `resource-id` sur Fabric → on cible par LIBELLÉ (accessibilityLabel → contentDescription).
+# Revue visuelle par SCREENSHOTS (overlay ligne/flèches non introspectable, canvas GL natif).
+# Setup réseau + localisation + geo fix : encodé dans device-test.sh.
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 20000
+
+# Ouvrir le tiroir filtres → atteindre la section Météo (bas du tiroir).
+- tapOn: "Ouvrir les filtres"
+- extendedWaitUntil:
+    visible: "Filtres"
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      text: "Afficher la météo sur la carte"
+    direction: DOWN
+    timeout: 8000
+# Activer la météo + basculer en « Vent » (libellés, pas d'id sur Android Fabric).
+- tapOn: "Afficher la météo sur la carte"
+- tapOn: "Vent"
+# Fermer le tiroir.
+- tapOn: "Fermer les filtres"
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Panneau Live de nouveau visible (overlay météo + strip rendus → revue par screenshot).
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 12000
+- takeScreenshot: screenshots/android-live-weather-wind

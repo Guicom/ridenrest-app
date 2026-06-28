@@ -1,5 +1,10 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-5-6-live-weather (2026-06-28)
+
+- **`parseDeparture` timezone offset** : la fonction convertit la saisie utilisateur (ex. « 2026-06-15 07:30 ») en ISO via `new Date(...).toISOString()` — sans suffixe de fuseau, JS interprète l'input en heure locale, puis `toISOString()` le convertit en UTC → décalage égal au fuseau de l'appareil. Comportement pré-existant identique dans `map/[id].tsx` (planning mode déjà en prod, jamais signalé). Correctif : appendre `Z` à l'input ou proposer un champ avec timezone explicite. `apps/mobile/src/lib/weather-pace.ts:40`
+- **`isGpsLost` jamais true après le premier fix** : le hook vérifie `currentPosition === null`, mais le store Live ne met cette valeur à `null` qu'à `deactivateLiveMode()` — jamais lors d'une perte de signal GPS en cours de session. Le bandeau ambre GPS perdu (AC5) ne s'affichera donc pas en conditions réelles. Correction nécessite un mécanisme de timeout GPS (ex. `lastGpsTimestamp` + délai sans update → `gpsSignalLost: boolean`) dans le store Live, issu de MOB-5.1/5.2. `apps/mobile/src/hooks/use-live-weather.ts:153-154`
+
 ## Deferred from: code review of MOB-5-5-interactive-elevation-profile-contextual (2026-06-28)
 
 - **D-1 (P2) — D+/D- algo divergence** : `useElevationProfile` bridge les waypoints null-élévation (connexion directe aux voisins valides) tandis que `computeWindowElevation` les garde puis laisse `computeElevationGain/Loss` les sauter (paires adjacentes à `elevM:undefined` ignorées). Pour un GPX à élévation partielle, le D+ du panneau texte peut différer de la montée visuelle du graphe. Fix : pre-filtrer les null dans `computeWindowElevation` avant mappage en `gpxPoints`. `apps/mobile/src/components/live/live-elevation-profile.tsx:88-99`.

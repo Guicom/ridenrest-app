@@ -246,6 +246,18 @@
     "filters": {
       "title": "Filters",
       "close": "Close filters"
+    },
+    "weather": {
+      "title": "Weather",
+      "error": "Weather unavailable",
+      "unavailable": "unavailable",
+      "gpsLost": "GPS position unavailable",
+      "now": "now",
+      "inHours": "in ~{{hours}}h{{minutes}}",
+      "inMinutes": "in ~{{minutes}}min",
+      "showOnMap": "Show weather on map",
+      "departureLabel": "Departure time",
+      "cardA11y": "At {{eta}}: {{temp}}, wind {{wind}} km/h, precipitation {{precip}} %"
     }
   },
   "map": {

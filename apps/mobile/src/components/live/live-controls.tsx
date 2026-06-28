@@ -78,6 +78,8 @@ export interface LiveControlsProps {
   onProfileAutoOpen: () => void;
   /** Contenu de la section « PROFIL » (profil d'élévation — MOB-5.5). */
   profileContent?: ReactNode;
+  /** Strip météo Live (MOB-5.6) — rendu sous la ligne métriques quand la météo est active. */
+  weatherContent?: ReactNode;
 }
 
 export function LiveControls({
@@ -95,6 +97,7 @@ export function LiveControls({
   onProfileToggle,
   onProfileAutoOpen,
   profileContent,
+  weatherContent,
 }: LiveControlsProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -268,6 +271,9 @@ export function LiveControls({
           </Text>
         ) : null}
       </View>
+
+      {/* Strip météo Live (MOB-5.6) — résumé conditionnel (météo active). */}
+      {weatherContent}
 
       {/* (f) RECHERCHER (explicite — jamais auto, désactivé hors-ligne) / RECHERCHER SUR. */}
       <View className="mt-3 flex-row gap-3">

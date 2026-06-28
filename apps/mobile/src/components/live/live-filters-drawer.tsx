@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
@@ -15,9 +16,18 @@ import {
   AccommodationSubTypes,
 } from '@/components/map/accommodation-sub-types';
 import { PoiLayerGrid } from '@/components/map/poi-layer-grid';
-import { MinusIcon, PlusIcon, XIcon } from '@/components/ui/icon';
+import {
+  MinusIcon,
+  PlusIcon,
+  ThermometerIcon,
+  UmbrellaIcon,
+  WindIcon,
+  XIcon,
+  type LucideIcon,
+} from '@/components/ui/icon';
+import { Switch } from '@/components/ui/switch';
 import { useLiveStore } from '@/lib/stores/live.store';
-import { useMapStore } from '@/lib/stores/map.store';
+import { useMapStore, type WeatherDimension } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
 
 // Tiroir de filtres Live (MOB-5.3 / AC7) — port du web `live-filters-drawer.tsx`.
@@ -33,8 +43,11 @@ import { useTranslation } from '@/lib/i18n';
 // `setSpeedKmh`) — pas de bouton « Appliquer », pas de re-recherche silencieuse. Les
 // toggles calques/sous-types écrivent le store **immédiatement** (état non local).
 //
-// Le champ **départ météo** (`weatherDepartureTime`) est un slot **MOB-5.6** (pas d'UI
-// météo dans cette story) → sa persistance arrivera avec 5.6.
+// **Section météo (MOB-5.6)** : toggle « Afficher sur la carte » (`weatherActive`,
+// store carte, immédiat) + sélecteur de dimension (temp/pluie/vent, immédiat) + champ
+// **heure de départ** (texte « AAAA-MM-JJ HH:MM », parité planning `SidebarWeatherSection`
+// — pas de picker natif). L'heure de départ est persistée **à la fermeture** (comme
+// rayon/vitesse, 16-25) ; les toggles météo écrivent le store immédiatement.
 
 const ANIM_MS = 250;
 const SWIPE_CLOSE_THRESHOLD = 80;
@@ -44,6 +57,12 @@ const SPEED_STEP = 1;
 const SPEED_MIN = 5;
 const SPEED_MAX = 50;
 const SHEET_OFFSCREEN = 1000;
+
+const WEATHER_DIMENSIONS: { id: WeatherDimension; icon: LucideIcon; key: string }[] = [
+  { id: 'temperature', icon: ThermometerIcon, key: 'temperature' },
+  { id: 'precipitation', icon: UmbrellaIcon, key: 'precipitation' },
+  { id: 'wind', icon: WindIcon, key: 'wind' },
+];
 
 export interface LiveFiltersDrawerProps {
   open: boolean;
@@ -125,12 +144,20 @@ export function LiveFiltersDrawer({
   const speedKmh = useLiveStore((s) => s.speedKmh);
   const setSearchRadius = useLiveStore((s) => s.setSearchRadius);
   const setSpeedKmh = useLiveStore((s) => s.setSpeedKmh);
+  const weatherDepartureTime = useLiveStore((s) => s.weatherDepartureTime);
+  const setWeatherDepartureTime = useLiveStore((s) => s.setWeatherDepartureTime);
   const visibleLayers = useMapStore((s) => s.visibleLayers);
+  // Météo (store carte) — toggles immédiats (overlay partagé avec le planning).
+  const weatherActive = useMapStore((s) => s.weatherActive);
+  const setWeatherActive = useMapStore((s) => s.setWeatherActive);
+  const weatherDimension = useMapStore((s) => s.weatherDimension);
+  const setWeatherDimension = useMapStore((s) => s.setWeatherDimension);
 
-  // État local — rayon + vitesse requièrent une persistance à la fermeture (16-25). Les
-  // toggles calques/sous-types restent immédiats (lisent/écrivent le store directement).
+  // État local — rayon + vitesse + heure de départ requièrent une persistance à la
+  // fermeture (16-25). Les toggles calques/sous-types/météo restent immédiats.
   const [localRadius, setLocalRadius] = useState(Number(searchRadiusKm.toFixed(1)));
   const [localSpeed, setLocalSpeed] = useState(speedKmh);
+  const [localDeparture, setLocalDeparture] = useState(weatherDepartureTime ?? '');
 
   const [sheetHeight, setSheetHeight] = useState(0);
   const [translateY] = useState(() => new Animated.Value(SHEET_OFFSCREEN));
@@ -145,6 +172,7 @@ export function LiveFiltersDrawer({
       const s = useLiveStore.getState();
       setLocalRadius(s.searchRadiusKm);
       setLocalSpeed(s.speedKmh);
+      setLocalDeparture(s.weatherDepartureTime ?? '');
     }
   }
 
@@ -169,8 +197,17 @@ export function LiveFiltersDrawer({
   const handleClose = useCallback(() => {
     setSearchRadius(localRadius);
     setSpeedKmh(localSpeed);
+    setWeatherDepartureTime(localDeparture.trim() || null);
     onOpenChange(false);
-  }, [localRadius, localSpeed, setSearchRadius, setSpeedKmh, onOpenChange]);
+  }, [
+    localRadius,
+    localSpeed,
+    localDeparture,
+    setSearchRadius,
+    setSpeedKmh,
+    setWeatherDepartureTime,
+    onOpenChange,
+  ]);
 
   const handleCloseRef = useRef(handleClose);
   useEffect(() => { handleCloseRef.current = handleClose; });
@@ -327,6 +364,73 @@ export function LiveFiltersDrawer({
               onlyCountActive
             />
           ) : null}
+
+          {/* Météo (MOB-5.6) — toggle + dimension immédiats, heure de départ à la fermeture */}
+          <View className="gap-3 border-t border-border pt-4">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm font-montserrat-semibold text-text-primary">
+                {t('live.weather.showOnMap')}
+              </Text>
+              <Switch
+                checked={weatherActive}
+                onCheckedChange={setWeatherActive}
+                accessibilityLabel={t('live.weather.showOnMap')}
+                testID="weather-toggle"
+              />
+            </View>
+
+            {/* Sélecteur de dimension (temp/pluie/vent) */}
+            <View className="flex-row gap-1 rounded-full bg-muted p-1">
+              {WEATHER_DIMENSIONS.map(({ id, icon: Icon, key }) => {
+                const active = weatherDimension === id;
+                return (
+                  <Pressable
+                    key={id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={t(`map.weather.${key}`)}
+                    testID={`weather-dim-${id}`}
+                    onPress={() => setWeatherDimension(id)}
+                    className={
+                      active
+                        ? 'flex-1 flex-row items-center justify-center gap-1 rounded-full bg-background py-1.5'
+                        : 'flex-1 flex-row items-center justify-center gap-1 rounded-full py-1.5'
+                    }
+                  >
+                    <Icon
+                      size={14}
+                      className={active ? 'text-primary' : 'text-text-muted'}
+                    />
+                    <Text
+                      className={
+                        active
+                          ? 'text-xs font-montserrat-medium text-primary'
+                          : 'text-xs font-montserrat text-text-muted'
+                      }
+                    >
+                      {t(`map.weather.${key}Short`)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Heure de départ (texte) — override du pace-adjusted, persistée à la fermeture */}
+            <View className="gap-1.5">
+              <Text className="text-xs font-montserrat text-text-muted">
+                {t('live.weather.departureLabel')}
+              </Text>
+              <TextInput
+                testID="input-departure-time"
+                value={localDeparture}
+                onChangeText={setLocalDeparture}
+                placeholder="AAAA-MM-JJ HH:MM"
+                autoCapitalize="none"
+                accessibilityLabel={t('live.weather.departureLabel')}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm font-montserrat text-text-primary"
+              />
+            </View>
+          </View>
         </ScrollView>
       </Animated.View>
     </View>

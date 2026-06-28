@@ -25,7 +25,7 @@ interface LiveState {
   speedKmh: number; // User-configured pace
   targetAheadKm: number; // How far ahead to show POIs in live mode
   searchRadiusKm: number; // Radius for POI search around GPS position
-  weatherDepartureTime: string | null; // ISO 8601 — user-set departure overrides auto-compute
+  weatherDepartureTime: string | null; // Raw input text (« AAAA-MM-JJ HH:MM ») — parsed to ISO via parseDeparture before the API call; overrides the pace-adjusted departure (MOB-5.6)
   stageLayerActive: boolean;
   gpsTrackingActive: boolean; // false = user panned, auto-follow paused until centerOnGps()
 

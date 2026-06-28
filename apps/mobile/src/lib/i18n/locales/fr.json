@@ -246,6 +246,18 @@
     "filters": {
       "title": "Filtres",
       "close": "Fermer les filtres"
+    },
+    "weather": {
+      "title": "Météo",
+      "error": "Météo non disponible",
+      "unavailable": "indisponible",
+      "gpsLost": "Position GPS indisponible",
+      "now": "maintenant",
+      "inHours": "dans ~{{hours}}h{{minutes}}",
+      "inMinutes": "dans ~{{minutes}}min",
+      "showOnMap": "Afficher la météo sur la carte",
+      "departureLabel": "Heure de départ",
+      "cardA11y": "À {{eta}} : {{temp}}, vent {{wind}} km/h, précipitations {{precip}} %"
     }
   },
   "map": {

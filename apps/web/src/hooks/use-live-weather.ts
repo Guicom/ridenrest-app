@@ -19,6 +19,15 @@ export function useLiveWeather(segmentId: string | undefined, options?: UseLiveW
   const lastFetchKmRef = useRef<number | null>(null)
   const [activeFetchKm, setActiveFetchKm] = useState<number | null>(null)
 
+  // Reset threshold on Live deactivation — prevents first fetch being suppressed on
+  // re-activation near the previous session's last known position.
+  useEffect(() => {
+    if (!isLiveModeActive) {
+      lastFetchKmRef.current = null
+      setActiveFetchKm(null)
+    }
+  }, [isLiveModeActive])
+
   // Update activeFetchKm when GPS moves >= 5 km
   useEffect(() => {
     if (currentKmOnRoute === null) return
@@ -44,7 +53,12 @@ export function useLiveWeather(segmentId: string | undefined, options?: UseLiveW
   const fromKmRounded = activeFetchKm !== null ? Math.round(activeFetchKm / 5) * 5 : null
 
   const { data, isPending, isError } = useQuery<WeatherForecast>({
-    queryKey: ['weather', 'live', { segmentId, fromKm: fromKmRounded, departureTime: userDepartureTime }],
+    queryKey: [
+      'weather',
+      segmentId,
+      'live',
+      { fromKm: fromKmRounded, departureTime: userDepartureTime, speedKmh: speedKmh > 0 ? speedKmh : undefined },
+    ],
     queryFn: () => getWeatherForecast({
       segmentId: segmentId!,
       fromKm: activeFetchKm!,
