@@ -6,7 +6,7 @@
 #   pnpm test:device live-poi.yaml            # smoke + ce flow
 #   pnpm test:device smoke.yaml weather.yaml  # plusieurs flows
 #   PLATFORMS=ios pnpm test:device …          # forcer une plateforme (ios|android|ios,android)
-#   BUILD=1 pnpm test:device …                # rebuild standalone avant (iOS: pnpm sim ; Android: release)
+#   BUILD=1 pnpm test:device …                # rebuild standalone avant, détaché (iOS: pnpm sim ; Android: gradlew assembleRelease + adb install)
 #
 # Robustesse (leçons MOB-5.x) :
 #  - **Fail-closed** : si une plateforme a un device booté, ses flows DOIVENT tourner ;
@@ -27,8 +27,9 @@ GEO_LNG="${GEO_LNG:-1.4442}"   # Toulouse par défaut (sur/près d'une trace de 
 GEO_LAT="${GEO_LAT:-43.6047}"
 
 # --- Toolchain ---
-# JDK 17 obligatoire (AGENTS.md : Gradle/AGP refuse un JDK trop récent → erreurs toolchain
-# type `JvmVendorSpec IBM_SEMERU`). On préfère un JDK 17 enregistré, sinon le Homebrew openjdk@17.
+# JDK 17 OBLIGATOIRE pour Gradle/AGP (AGENTS.md : un JDK trop récent → erreurs toolchain
+# type `JvmVendorSpec IBM_SEMERU`). `/usr/libexec/java_home -v 17` cible explicitement la 17 ;
+# fallback sur le prefix Homebrew openjdk@17.
 export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 17 2>/dev/null || echo /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home)}"
 export ANDROID_HOME="${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH:$HOME/.maestro/bin"
@@ -58,10 +59,41 @@ fi
 
 [ -z "$IOS_UDID" ] && [ -z "$ANDROID_SERIAL" ] && { echo "❌ Aucun device booté (simulateur iOS / émulateur Android). Lance-en un."; exit 1; }
 
+# Rebuild Android standalone (release, JS embarqué) SANS rester attaché aux logs.
+# Piège : `expo run:android --variant release` build+install MAIS reste ensuite **attaché**
+# à tailer Metro/logcat (« Logs for your project will appear below ») → la commande ne rend
+# jamais la main et le script n'atteignait jamais l'exécution Maestro (hang infini). iOS,
+# lui, s'auto-détache via `pnpm sim` (→ `simctl launch`) ; seul Android coinçait.
+# On reproduit donc, **en détaché**, ce que `run:android` fait en interne :
+#   prebuild (sync AndroidManifest : permissions + cleartext localhost) → gradlew
+#   assembleRelease (rend la main quand le build est fini) → adb install → launch.
+android_build_release() {
+  local apk
+  echo "▶︎ Android prebuild (sync manifest : permissions + cleartext localhost)…"
+  (cd "$MOBILE_DIR" && npx expo prebuild -p android) || return 1
+  echo "▶︎ Android build release (./gradlew :app:assembleRelease — JS embarqué, sans Metro)…"
+  echo "   (1re compilation NDK longue : reanimated/worklets/maplibre. ☕)"
+  (cd "$MOBILE_DIR/android" && ./gradlew :app:assembleRelease) || return 1
+  # APK universel (toutes ABI ; pas de split par défaut). app-release.apk, sinon le + récent.
+  apk="$MOBILE_DIR/android/app/build/outputs/apk/release/app-release.apk"
+  [ -f "$apk" ] || apk="$(ls -t "$MOBILE_DIR"/android/app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)"
+  [ -n "$apk" ] && [ -f "$apk" ] || { echo "❌ APK release introuvable après build."; return 1; }
+  echo "▶︎ Install ($apk) → $ANDROID_SERIAL"
+  # -r : réinstalle en gardant les data. Signature/version incompatible → uninstall + reinstall.
+  if ! adb -s "$ANDROID_SERIAL" install -r "$apk"; then
+    echo "↻ install -r KO (signature/version) → uninstall + reinstall"
+    adb -s "$ANDROID_SERIAL" uninstall "$APP_ID" >/dev/null 2>&1 || true
+    adb -s "$ANDROID_SERIAL" install "$apk" || return 1
+  fi
+  # Lancement déterministe (hors Metro) — sanity boot ; Maestro relancera via launchApp.
+  adb -s "$ANDROID_SERIAL" shell monkey -p "$APP_ID" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  return 0
+}
+
 # --- Build optionnel ---
 if [ "${BUILD:-0}" = "1" ]; then
   [ -n "$IOS_UDID" ] && { echo "▶︎ iOS rebuild standalone (pnpm sim)…"; (cd "$MOBILE_DIR" && pnpm sim) || exit 1; }
-  [ -n "$ANDROID_SERIAL" ] && { echo "▶︎ Android rebuild release…"; (cd "$MOBILE_DIR" && npx expo run:android --variant release) || exit 1; }
+  [ -n "$ANDROID_SERIAL" ] && { echo "▶︎ Android rebuild standalone (release, détaché)…"; android_build_release || exit 1; }
 fi
 
 cd "$MAESTRO_DIR"
