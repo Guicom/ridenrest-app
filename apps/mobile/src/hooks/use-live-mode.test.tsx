@@ -1,4 +1,5 @@
 import type { MapWaypoint } from '@ridenrest/shared';
+import * as Analytics from '@ridenrest/analytics';
 import {
   act,
   fireEvent,
@@ -13,6 +14,11 @@ import { useLiveMode } from '@/hooks/use-live-mode';
 import { setConsent } from '@/lib/live/consent-storage';
 import { useLiveStore } from '@/lib/stores/live.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+jest.mock('@ridenrest/analytics', () => ({
+  trackLiveModeActivated: jest.fn(),
+  hashAdventureId: jest.fn((id: string) => `hash-${id}`),
+}));
 
 // Lifecycle du mode Live (MOB-5.1 / T3). Pattern **Probe** (pas `renderHook` — peu fiable
 // RNTL v14 + React 19, cf. use-network-status.test). `expo-location` est mocké globalement
@@ -34,9 +40,15 @@ const WAYPOINTS: MapWaypoint[] = [
   { lat: 46, lng: 6, distKm: 1 },
 ] as MapWaypoint[];
 
-function Probe({ waypoints = WAYPOINTS }: { waypoints?: MapWaypoint[] }) {
+function Probe({
+  waypoints = WAYPOINTS,
+  adventureId,
+}: {
+  waypoints?: MapWaypoint[];
+  adventureId?: string;
+}) {
   const { needsConsent, permissionDenied, isLiveModeActive, grantConsent } =
-    useLiveMode(waypoints);
+    useLiveMode(waypoints, adventureId);
   return (
     <>
       <Text>{needsConsent ? 'needsConsent' : 'noNeedConsent'}</Text>
@@ -174,6 +186,61 @@ describe('useLiveMode', () => {
     expect(await screen.findByText('denied')).toBeTruthy();
     expect(mockWatchPosition).not.toHaveBeenCalled();
     expect(useLiveStore.getState().isLiveModeActive).toBe(false);
+  });
+
+  describe('analytics (MOB-6.1)', () => {
+    it('trackLiveModeActivated émis UNE fois au 1er fix GPS avec adventureId hashé', async () => {
+      const mockTrack = Analytics.trackLiveModeActivated as jest.Mock;
+      let capturedCb:
+        | ((loc: { coords: { latitude: number; longitude: number } }) => void)
+        | null = null;
+      mockWatchPosition.mockImplementation(async (_opts, cb) => {
+        capturedCb = cb;
+        return { remove: jest.fn() };
+      });
+
+      await render(<Probe adventureId="adv-123" />);
+      await screen.findByText('needsConsent');
+      fireEvent.press(screen.getByLabelText('grant'));
+      await waitFor(() => expect(capturedCb).not.toBeNull());
+
+      await act(async () => {
+        capturedCb!({ coords: { latitude: 45, longitude: 5 } });
+      });
+
+      expect(await screen.findByText('active')).toBeTruthy();
+      expect(mockTrack).toHaveBeenCalledTimes(1);
+      expect(mockTrack).toHaveBeenCalledWith({ adventure_id_hash: 'hash-adv-123' });
+
+      // 2e fix GPS → pas de double émission
+      await act(async () => {
+        capturedCb!({ coords: { latitude: 45.1, longitude: 5.1 } });
+      });
+      expect(mockTrack).toHaveBeenCalledTimes(1);
+    });
+
+    it('trackLiveModeActivated non émis sans adventureId', async () => {
+      const mockTrack = Analytics.trackLiveModeActivated as jest.Mock;
+      let capturedCb:
+        | ((loc: { coords: { latitude: number; longitude: number } }) => void)
+        | null = null;
+      mockWatchPosition.mockImplementation(async (_opts, cb) => {
+        capturedCb = cb;
+        return { remove: jest.fn() };
+      });
+
+      await render(<Probe />);
+      await screen.findByText('needsConsent');
+      fireEvent.press(screen.getByLabelText('grant'));
+      await waitFor(() => expect(capturedCb).not.toBeNull());
+
+      await act(async () => {
+        capturedCb!({ coords: { latitude: 45, longitude: 5 } });
+      });
+
+      expect(await screen.findByText('active')).toBeTruthy();
+      expect(mockTrack).not.toHaveBeenCalled();
+    });
   });
 
   describe('escalade background (MOB-5.2)', () => {

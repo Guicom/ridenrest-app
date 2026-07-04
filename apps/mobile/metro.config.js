@@ -5,14 +5,18 @@
 //   l'« Expo Autolinking module resolution » gère le monorepo nativement et le forcer
 //   à true casse le runtime Expo Go ([runtime not ready] TypeError au boot) — confirmé
 //   par `expo doctor` (« Expected false, got: true »).
-const { getDefaultConfig } = require('expo/metro-config');
+// MOB-6.1 : `getSentryExpoConfig` enveloppe `getDefaultConfig` (Expo) en ajoutant le
+// sérialiseur de debug IDs requis pour des **source maps Metro** symbolisables côté Sentry
+// (AC1). Drop-in : même forme de config retournée → on conserve ensuite la config monorepo
+// (watchFolders / nodeModulesPaths) PUIS NativeWind, exactement comme avant.
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const { withNativeWind } = require('nativewind/metro');
 const path = require('path');
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
-const config = getDefaultConfig(projectRoot);
+const config = getSentryExpoConfig(projectRoot);
 
 config.watchFolders = [workspaceRoot];
 config.resolver.nodeModulesPaths = [

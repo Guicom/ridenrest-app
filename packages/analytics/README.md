@@ -30,14 +30,14 @@ Sans client injecté, tous les helpers sont des **no-ops** (comportement dev his
 
 ## Taxonomie des events
 
-| Event | Helper | Props | Écrans émetteurs (web) | Écrans émetteurs (mobile, à venir) |
+| Event | Helper | Props | Écrans émetteurs (web) | Écrans émetteurs (mobile) |
 |---|---|---|---|---|
-| `booking_click` | `trackBookingClick` | `source: 'booking.com' \| 'airbnb'` · `poi_type: string` · `page: 'map' \| 'live'` · `user_tier: UserTier` | `search-on-dropdown.tsx` (Planning + Live) | MOB-4.5 deep links affiliés |
-| `gpx_uploaded` | `trackGpxUploaded` | `segment_count` (stringifié) · `total_km` (arrondi, stringifié) | `adventure-detail.tsx` | MOB-3.2 upload GPX |
-| `map_opened` | `trackMapOpened` | `adventure_id_hash` (via `hashAdventureId`) | `map-view.tsx` | MOB-4.1 carte |
-| `poi_search_triggered` | `trackPoiSearchTriggered` | `mode: 'planning' \| 'live'` · `poi_categories` (join `,`) · `result_count` (stringifié) | `map-view.tsx` (planning), `live/[id]/page.tsx` (live) | MOB-4.3 / MOB-5.3 |
-| `poi_detail_opened` | `trackPoiDetailOpened` | `poi_type: string` · `source: 'overpass' \| 'google'` | `poi-popup.tsx` | MOB-4.2 detail sheet |
-| `live_mode_activated` | `trackLiveModeActivated` | `adventure_id_hash` **uniquement** — JAMAIS de GPS | `live/[id]/page.tsx` (après acceptation `<GeolocationConsent />`) | MOB-5.1 activation Live |
+| `booking_click` | `trackBookingClick` | `source: 'booking.com' \| 'airbnb'` · `poi_type: string` · `page: 'map' \| 'live'` · `user_tier: UserTier` | `search-on-dropdown.tsx` (Planning + Live) | ✅ `booking-links.tsx` (MOB-4.5, actif depuis MOB-6.1) |
+| `gpx_uploaded` | `trackGpxUploaded` | `segment_count` (stringifié) · `total_km` (arrondi, stringifié) | `adventure-detail.tsx` | ✅ `app/(app)/adventures/[id].tsx` (fin de parsing, MOB-6.1) |
+| `map_opened` | `trackMapOpened` | `adventure_id_hash` (via `hashAdventureId`) | `map-view.tsx` | ✅ `app/(app)/map/[id].tsx` (MOB-6.1) |
+| `poi_search_triggered` | `trackPoiSearchTriggered` | `mode: 'planning' \| 'live'` · `poi_categories` (join `,`) · `result_count` (stringifié) | `map-view.tsx` (planning), `live/[id]/page.tsx` (live) | ✅ `map/[id].tsx` (planning) + `live/[id].tsx` (live) (MOB-6.1) |
+| `poi_detail_opened` | `trackPoiDetailOpened` | `poi_type: string` · `source: 'overpass' \| 'google'` | `poi-popup.tsx` | ✅ `components/map/poi-popup.tsx` (MOB-6.1) |
+| `live_mode_activated` | `trackLiveModeActivated` | `adventure_id_hash` **uniquement** — JAMAIS de GPS | `live/[id]/page.tsx` (après acceptation `<GeolocationConsent />`) | ✅ `hooks/use-live-mode.ts` (activation Live, MOB-6.1) |
 | `landing_cta_clicked` | `trackLandingCtaClicked` | `placement: 'header' \| 'feature_step_one' \| 'feature_step_two' \| 'feature_step_three'` · `authenticated` (stringifié) | `marketing-header.tsx`, `feature-step-{one,two,three}.tsx` | n/a (web only) |
 | `signup_started` | `trackSignupStarted` | `method: 'email' \| 'google'` | `register-form.tsx` (submit valide), `google-sign-in-button.tsx` (flow="register"), `post-auth-tracker.tsx` (**backfill** : inscription Google via /login — compte frais détecté au retour OAuth) | MOB-2.2 |
 | `signup_completed` | `trackSignupCompleted` | `method: 'email' \| 'google'` | email : `register-form.tsx` (succès). google : `post-auth-tracker.tsx` au retour OAuth (marqueur sessionStorage `rnr_auth_flow` + `user.createdAt` < 5 min) | MOB-2.2/2.3 |

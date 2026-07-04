@@ -319,7 +319,19 @@ export const MapCanvas = forwardRef<MapCanvasHandle, MapCanvasProps>(
     };
 
     return (
-      <View className="flex-1" onLayout={handleLayout}>
+      // ⚠️ RGPD — NE PAS RETIRER `accessibilityLabel="ph-no-capture"` (MOB-6.1 / T5, AC4).
+      // Là où le session replay PostHog tourne (builds beta), ce label REDACTE la vue carte
+      // de l'enregistrement : la trace GPX et — en mode Live — la position GPS de
+      // l'utilisateur ne sont JAMAIS enregistrées (la règle « GPS jamais hors device »
+      // s'étend à l'écran enregistré). Équivalent natif du `ph-no-capture` web. Ce canvas
+      // est partagé par le Planning ET le Live → un seul point de masquage couvre les deux.
+      // `accessibilityLabel` sur une View non-`accessible` n'est PAS annoncée par VoiceOver
+      // (la View carte n'est pas un élément a11y) → posthog lit le label, les SR l'ignorent.
+      <View
+        className="flex-1"
+        onLayout={handleLayout}
+        accessibilityLabel="ph-no-capture"
+      >
         <Map
           ref={mapRef}
           style={{ flex: 1 }}

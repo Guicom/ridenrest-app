@@ -119,6 +119,20 @@ Copier `.env.example` → `.env` et renseigner :
 
 > ⚠️ **Gotcha device physique / émulateur Android** : `localhost` pointe sur le **device lui-même**, pas sur la machine de dev. Utiliser l'**IP LAN** de la machine (ex. `http://192.168.1.42:3011` / `:3010`). La trouver via `ipconfig getifaddr en0` (macOS). Le simulateur iOS, lui, partage `localhost` avec l'hôte.
 
+### Observabilité — Sentry & PostHog (MOB-6.1)
+
+Crash reporting (Sentry) + analytics produit (PostHog, façade `@ridenrest/analytics`). **Tout est key-gated** : sans clé/DSN, l'app fonctionne (init no-op) mais n'émet rien — comportement attendu en dev/CI. Les valeurs `APP_ENV` + `POSTHOG_HOST` sont déjà déclarées par profil dans `eas.json`. Les **clés** (publiques par design : embarquées dans le bundle) viennent des **EAS Environment Variables** (dashboard) pour les builds cloud, ou de `.env.local` pour les builds locaux.
+
+| Variable | Rôle | Secret ? |
+|---|---|---|
+| `EXPO_PUBLIC_APP_ENV` | `development` \| `preview` \| `production` — pilote l'`environment` Sentry **et** le gate du session replay (replay **beta-only** : actif si `!== 'production'`) | non (eas.json) |
+| `EXPO_PUBLIC_POSTHOG_KEY` | Clé projet PostHog (même projet que le web → dashboard unifié). Absente → analytics no-op | non (publique, bundle) |
+| `EXPO_PUBLIC_POSTHOG_HOST` | Endpoint PostHog Cloud **EU** (`https://eu.i.posthog.com`) | non (eas.json) |
+| `EXPO_PUBLIC_SENTRY_DSN` | DSN Sentry (public par design). Absent → Sentry non initialisé | non (publique, bundle) |
+| `SENTRY_AUTH_TOKEN` | **Upload des source maps** au build (symbolication). **SECRET CI / `.env.local` uniquement** — JAMAIS `EXPO_PUBLIC_*`, JAMAIS commité | **OUI** |
+
+> RGPD : **aucun bandeau de consentement sur mobile** (zéro cookie → `distinct_id` en AsyncStorage). Pas d'IDFA / pas de tracking cross-app → **pas de prompt ATT**. Jamais de GPS ni de PII (façade typée + scrub `beforeSend` Sentry). Le session replay (beta) **masque la carte MapLibre** (`ph-no-capture`) + les champs texte.
+
 ## Auth & session (MOB-2.1)
 
 Fondation auth posée par MOB-2.1 (aucun écran de login fonctionnel ici — il arrive en MOB-2.2).

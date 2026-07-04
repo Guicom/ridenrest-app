@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
 import { invalidateAuthTokenCache } from '@/lib/api/api-client';
+import { resetAnalytics } from '@/lib/analytics/posthog';
 import { authClient, signOut } from '@/lib/auth/client';
 
 // Actions de compte (MOB-2.5 / AC1, AC2) : déconnexion et suppression définitive.
@@ -42,6 +43,10 @@ export function useAccountActions(): UseAccountActions {
   // opération serveur réussie (signOut / deleteUser) — jamais sur échec.
   const finishSession = () => {
     invalidateAuthTokenCache();
+    // Dissocie la session analytique de l'utilisateur (MOB-6.1 / T4, parité web
+    // sign-out-button.tsx). Appelé APRÈS signOut, pour la déconnexion ET la
+    // suppression de compte (les deux passent par `finishSession`). No-op sans PostHog.
+    resetAnalytics();
     queryClient.clear();
     router.replace(LOGIN_ROUTE);
   };

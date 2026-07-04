@@ -2,7 +2,9 @@ import type { MapWaypoint } from '@ridenrest/shared';
 
 // Construction des URLs de recherche d'hébergement externe (Booking.com / Airbnb) —
 // port iso de `apps/web/src/lib/booking-url.ts`. Ouvertes via `Linking.openURL` côté
-// mobile (pas d'analytics mobile → pas de `trackBookingClick`).
+// mobile. NB : depuis MOB-6.1, l'analytics mobile EST branché (PostHog via la façade
+// `@ridenrest/analytics`) — le `trackBookingClick` est émis par `booking-links.tsx`,
+// pas ici (ce module ne fait que bâtir les URLs).
 
 /** Waypoint le plus proche de `targetKm` le long de la trace (centre du corridor). */
 export function getCorridorCenter(

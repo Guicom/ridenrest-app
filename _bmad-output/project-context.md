@@ -38,7 +38,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Reverse proxy | Caddy 2 | latest | Docker sur VPS, auto Let's Encrypt, HTTPS |
 | Process manager | PM2 | latest | Gère Next.js + NestJS sur VPS, restart auto |
 | Monitoring | Uptime Kuma | latest | Docker sur VPS, alertes email/Telegram |
-| Analytics | PostHog (`@ridenrest/analytics`) | posthog-js 1.x | A remplacé Plausible (amendement 2026-06-07) — consentement RGPD + proxy anti-adblock. Plausible CE reste en infra VPS historique. |
+| Analytics | PostHog (`@ridenrest/analytics`) | posthog-js 1.x (web) / posthog-react-native (mobile) | A remplacé Plausible (amendement 2026-06-07). **Web** : consentement RGPD + proxy anti-adblock. **Mobile** : pas de bandeau de consentement (zéro cookie, `distinct_id` AsyncStorage, pas d'IDFA → pas d'ATT requis) — décision architecturale MOB-6.1. Plausible CE reste en infra VPS historique. |
 | Mobile | Expo SDK 56 / React Native 0.85 | voir section Mobile | App native iOS/Android, monorepo `apps/mobile` |
 
 ---

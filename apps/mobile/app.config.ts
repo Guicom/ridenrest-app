@@ -113,6 +113,27 @@ const config: ExpoConfig = {
     // l'API/auth locale (http://localhost:3010/3011) → validation device Android fiable
     // sans debug+Metro. Sûr en prod (HTTPS only). Voir le plugin pour le détail.
     './plugins/with-android-localhost-cleartext',
+    // MOB-6.1 — Sentry (crash reporting JS + natif). Le plugin config branche au prebuild
+    // le SDK natif (iOS/Android) ET les phases de build d'upload des **source maps Metro**
+    // (symbolication lisible des stack traces — AC1). `organization`/`project` identifient
+    // le projet Sentry (publics) ; l'upload nécessite `SENTRY_AUTH_TOKEN` (secret CI /
+    // `.env.local`, JAMAIS commité, JAMAIS `EXPO_PUBLIC_*`). Sans token, le build n'échoue
+    // pas — les source maps ne sont simplement pas uploadées. ⚠️ Module natif neuf →
+    // `expo prebuild --clean -p ios` ET `-p android` OBLIGATOIRE avant `run:ios`/`pnpm sim`.
+    [
+      '@sentry/react-native/expo',
+      {
+        // Région **EU** (DSN en `…ingest.de.sentry.io`) → l'upload des source maps doit
+        // cibler `de.sentry.io`, sinon `sentry-cli` tape l'US par défaut → 401.
+        url: 'https://de.sentry.io/',
+        // org/projet Sentry (publics, non secrets) — défauts = projet de Guillaume ;
+        // surchargeable par `SENTRY_ORG`/`SENTRY_PROJECT` (.env local / EAS env). Le DSN
+        // runtime vient de `EXPO_PUBLIC_SENTRY_DSN` ; l'upload des source maps utilise
+        // `SENTRY_AUTH_TOKEN` (secret, jamais commité).
+        organization: process.env.SENTRY_ORG ?? '',
+        project: process.env.SENTRY_PROJECT ?? '',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

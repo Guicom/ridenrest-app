@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 
 import { AccountSection } from '@/components/shared/account-section';
 import { invalidateAuthTokenCache } from '@/lib/api/api-client';
+import { resetAnalytics } from '@/lib/analytics/posthog';
 import { authClient, signOut } from '@/lib/auth/client';
 import { i18n } from '@/lib/i18n';
 
@@ -32,6 +33,10 @@ jest.mock('@/lib/api/api-client', () => ({
   invalidateAuthTokenCache: jest.fn(),
 }));
 
+// MOB-6.1 / T4 : reset analytics après signOut (déconnexion ET suppression).
+jest.mock('@/lib/analytics/posthog', () => ({ resetAnalytics: jest.fn() }));
+
+const mockResetAnalytics = resetAnalytics as unknown as jest.Mock;
 const mockSignOut = signOut as unknown as jest.Mock;
 const mockDeleteUser = authClient.deleteUser as unknown as jest.Mock;
 const mockReplace = router.replace as unknown as jest.Mock;
@@ -73,6 +78,8 @@ describe('AccountSection — déconnexion (MOB-2.5 / AC1)', () => {
     expect(mockInvalidate).toHaveBeenCalledTimes(1);
     expect(queryClientClearSpy).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith(LOGIN_ROUTE);
+    // MOB-6.1 / T4 : dissociation de la session analytique après signOut.
+    expect(mockResetAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it('logout en échec : ErrorBanner + AUCUNE redirection (pas de purge partielle)', async () => {
@@ -138,6 +145,8 @@ describe('AccountSection — suppression de compte (MOB-2.5 / AC2)', () => {
     expect(mockInvalidate).toHaveBeenCalledTimes(1);
     expect(queryClientClearSpy).toHaveBeenCalledTimes(1);
     expect(mockReplace).toHaveBeenCalledWith(LOGIN_ROUTE);
+    // MOB-6.1 / T4 : reset analytique aussi à la suppression de compte.
+    expect(mockResetAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it('deleteUser renvoie { error } : ErrorBanner + reste connecté (aucun état partiel)', async () => {

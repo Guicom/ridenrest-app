@@ -45,6 +45,14 @@ else
   UDID="$(resolve_booted_udid)"
 fi
 
+# MOB-6.1 — Build LOCAL : ne PAS uploader les source maps vers Sentry. L'upload (phase
+# de build ajoutée par le plugin `@sentry/react-native/expo`) est un sujet RELEASE/CI
+# (EAS, avec `SENTRY_AUTH_TOKEN` + org/projet valides). En local, un token absent/invalide
+# ferait ÉCHOUER le build (`sentry-cli ... API request failed` → xcodebuild error 65), alors
+# que le crash reporting RUNTIME fonctionne déjà via `EXPO_PUBLIC_SENTRY_DSN`. On désactive
+# donc l'auto-upload pour les builds simulateur. (Surcharge possible : `SENTRY_DISABLE_AUTO_UPLOAD=false pnpm sim`.)
+export SENTRY_DISABLE_AUTO_UPLOAD="${SENTRY_DISABLE_AUTO_UPLOAD:-true}"
+
 echo "▶︎  Build STANDALONE iOS (Release, JS embarqué — aucun Metro requis)"
 echo "    Device : ${DEVICE:-${UDID:-<auto / défaut Expo>}}"
 echo "    (1re compilation longue ; incrémental ensuite. Va prendre un café ☕)"

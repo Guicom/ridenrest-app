@@ -369,3 +369,7 @@
 
 - **`hasInitialZoomedRef` re-zoom après perte GPS + pan + recentrer** : après une perte de signal GPS quand le suivi est en pause (pan manuel), si le signal revient et l'utilisateur tape « Recentrer », le `flyTo zoom:14` se déclenche (re-zoom forcé) plutôt qu'un `easeTo` doux — car `hasInitialZoomedRef` est réinitialisé quand `currentPosition` passe à null. Comportement discutable mais acceptable après une perte de signal. `apps/mobile/src/components/map/map-canvas.tsx`
 - **Position GPS froide (OS cold-start) en store sans session Live active** : quand l'OS relance l'app (cold-start) pour livrer des positions background (écran éteint, app précédemment tuée), `location-task.ts` écrit dans le store alors qu'aucun écran Live n'est monté et `deactivateLiveMode()` ne s'exécute jamais. Au prochain montage du `MapCanvas` Planning, `currentPosition` pourrait être non-null. Cas très rare en pratique ; `isLiveModeActive=false` limite l'impact direct. `apps/mobile/src/lib/live/location-task.ts`
+
+## Deferred from: code review of MOB-6-1-sentry-crash-posthog-analytics (2026-07-04)
+
+- **Ordre de boot `boot.ts` imposé par convention** : `import '@/lib/observability/boot'` doit rester le premier import side-effect dans `src/app/_layout.tsx` pour garantir AC1 (Sentry init avant location-task). Actuellement enforced par commentaire uniquement — aucune règle ESLint/import-order ne bloque un réordonnancement accidentel. Tooling gap pré-existant, non causé par MOB-6.1. `apps/mobile/src/app/_layout.tsx`

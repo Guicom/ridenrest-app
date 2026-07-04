@@ -97,6 +97,25 @@ const RULES = [
     },
   },
   {
+    name: 'Sentry (MOB-6.1) → plugin @sentry/react-native/expo présent',
+    check(config) {
+      // Le SDK natif Sentry + l'upload des source maps Metro sont branchés par le plugin
+      // config `@sentry/react-native/expo`. Sans lui, le module natif manque au runtime
+      // (crash/erreur) et les stack traces ne sont pas symbolisées (AC1). Le plugin doit
+      // donc TOUJOURS être déclaré dans app.config.ts dès lors que `@sentry/react-native`
+      // est une dépendance (MOB-6.1).
+      const present = pluginProps(config, '@sentry/react-native/expo') !== null;
+      if (present) return [];
+      return [
+        `Le plugin \`@sentry/react-native/expo\` est ABSENT de app.config.ts alors que\n` +
+          `   @sentry/react-native est une dépendance (MOB-6.1).\n` +
+          `   → Sans ce plugin : module natif manquant au runtime + pas de source maps\n` +
+          `     (stack traces non symbolisées). Ajoute-le dans app.config.ts → plugins\n` +
+          `     puis \`expo prebuild --clean -p ios\` ET \`-p android\`.`,
+      ];
+    },
+  },
+  {
     name: 'expo-location background iOS → UIBackgroundModes contient "location"',
     check(config) {
       const loc = pluginProps(config, 'expo-location');

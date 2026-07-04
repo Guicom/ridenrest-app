@@ -59,4 +59,12 @@ describe('MapCanvas', () => {
       await screen.findByText('© OpenStreetMap contributors'),
     ).toBeOnTheScreen();
   });
+
+  // RGPD — NE PAS RETIRER (MOB-6.1 / T5, AC4). Le conteneur carte porte
+  // `accessibilityLabel="ph-no-capture"` → là où le session replay PostHog tourne (beta),
+  // la vue carte (trace GPX + position GPS Live) est REDACTÉE de l'enregistrement.
+  it('masque la carte du session replay (ph-no-capture, RGPD)', async () => {
+    await render(<MapCanvas segments={TRACE} />);
+    expect(await screen.findByLabelText('ph-no-capture')).toBeOnTheScreen();
+  });
 });

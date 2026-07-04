@@ -75,6 +75,11 @@ export function useLiveWeather(
   useEffect(() => {
     if (!isLiveModeActive) {
       lastFetchKmRef.current = null;
+      // Sync légitime d'un flag externe (store Live → état local) : on remet le seuil à
+      // zéro à la SORTIE du Live. Le React Compiler eslint flag ce setState-in-effect, mais
+      // c'est exactement « subscribe to external system → setState » (cf. convention équipe
+      // eslint-disable + rationale, MOB-5.4). [MOB-6.1 : correctif de lint pré-existant.]
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset sync depuis le store Live
       setActiveFetchKm(null);
     }
   }, [isLiveModeActive]);

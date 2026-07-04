@@ -1,5 +1,12 @@
 import '../global.css';
 
+// MOB-6.1 — Observabilité EN TOUT PREMIER (AC1) : ce module à effet de bord appelle
+// `initSentry()` PUIS `bootstrapAnalytics()`. Importé AVANT `@/lib/live/location-task`
+// pour que `Sentry.init()` s'exécute avant tout autre code (l'ordre des imports dicte
+// l'ordre d'exécution en ESM — cf. `src/lib/observability/boot.ts`). Key-gated : no-op
+// sans DSN/clé. NE PAS déplacer sous les autres imports.
+import '@/lib/observability/boot';
+
 // MOB-5.2 — enregistre la tâche de localisation background AU SCOPE MODULE, avant toute
 // navigation. `expo-task-manager` peut ré-invoquer la tâche après un cold-start de l'OS
 // (app relancée pour livrer des positions écran éteint) → le handler DOIT exister dès le
@@ -14,6 +21,7 @@ import {
   Montserrat_700Bold,
   useFonts,
 } from '@expo-google-fonts/montserrat';
+import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -28,7 +36,7 @@ import { useAppStateRefetch } from '@/lib/query/use-app-state-refetch';
 // Garde le splash visible tant que Montserrat n'est pas chargée (MOB-1.3).
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Montserrat_400Regular,
     Montserrat_500Medium,
@@ -77,3 +85,8 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// MOB-6.1 / AC1 — `Sentry.wrap()` (recette officielle expo-router) instrumente la
+// navigation et capture les erreurs de rendu de l'arbre UI. No-op tant que Sentry n'est
+// pas initialisé (DSN absent). L'init lui-même se fait plus haut via `@/lib/observability/boot`.
+export default Sentry.wrap(RootLayout);

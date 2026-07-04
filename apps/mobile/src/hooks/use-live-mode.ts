@@ -1,4 +1,5 @@
 import { snapToTrace, type KmWaypoint } from '@ridenrest/gpx';
+import { hashAdventureId, trackLiveModeActivated } from '@ridenrest/analytics';
 import type { MapWaypoint } from '@ridenrest/shared';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -78,7 +79,11 @@ export interface UseLiveModeResult {
   isLiveModeActive: boolean;
 }
 
-export function useLiveMode(waypoints: readonly MapWaypoint[]): UseLiveModeResult {
+export function useLiveMode(
+  waypoints: readonly MapWaypoint[],
+  /** Aventure courante — requis pour l'event analytics `live_mode_activated` (RGPD : hashé). */
+  adventureId?: string,
+): UseLiveModeResult {
   // Flag persisté résolu (async) : tant qu'il ne l'est pas, on n'affiche PAS le dialog
   // pour éviter un flash chez le returning user (auto-start AC4).
   const [consentChecked, setConsentChecked] = useState(false);
@@ -231,6 +236,17 @@ export function useLiveMode(waypoints: readonly MapWaypoint[]): UseLiveModeResul
   }, []);
 
   const isLiveModeActive = useLiveStore((s) => s.isLiveModeActive);
+
+  // Analytics `live_mode_activated` (MOB-6.1 / T6) — émis UNE fois quand le mode Live
+  // s'active réellement (1er fix GPS : après acceptation du consentement OU auto-start d'un
+  // returning user). RGPD : `adventure_id_hash` UNIQUEMENT, jamais de coordonnée. No-op sans
+  // PostHog / sans `adventureId`. Ref par instance (re-mount = nouvelle session → ré-émission).
+  const liveActivatedTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!isLiveModeActive || !adventureId || liveActivatedTrackedRef.current) return;
+    liveActivatedTrackedRef.current = true;
+    trackLiveModeActivated({ adventure_id_hash: hashAdventureId(adventureId) });
+  }, [isLiveModeActive, adventureId]);
 
   return {
     needsConsent: consentChecked && !hasConsented,

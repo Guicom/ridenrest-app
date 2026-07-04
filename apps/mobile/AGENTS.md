@@ -369,3 +369,32 @@ connecter à l'API/auth locale.
    page, il faut **revenir en arrière** (`KEYCODE_BACK`). Pré-accorder évite le détour :
    `adb shell pm grant app.ridenrest android.permission.ACCESS_FINE_LOCATION`
    (+ `ACCESS_COARSE_LOCATION` + `ACCESS_BACKGROUND_LOCATION`).
+
+## Observabilité : Sentry + PostHog (MOB-6.1)
+
+Deux SDK natifs neufs : `@sentry/react-native` (crash reporting JS + natif, source maps Metro)
+et `posthog-react-native` (analytics produit, branché sur la façade **existante**
+`@ridenrest/analytics` — ne PAS recréer la taxonomie). Points durs :
+
+- **Modules natifs neufs + plugin `@sentry/react-native/expo` dans `app.config.ts`** →
+  `expo prebuild --clean -p ios` ET `-p android` OBLIGATOIRE avant `pnpm sim`/`run:android`,
+  sinon « Cannot find native module » / crash au boot. (ENOTEMPTY sur `ios/Pods` → déplacer
+  `ios/` puis `expo prebuild -p ios`.) Le pod **RNSentry** + **Sentry/HybridSDK** apparaissent
+  dans `ios/Podfile.lock` après prebuild ; PostHog core est **pur JS** (pas de pod).
+- **`check:native-config`** encode l'invariant « plugin Sentry présent » → échoue (sans device)
+  si on retire le plugin de `app.config.ts`.
+- **Tout est key-gated** : `initSentry()` no-op sans `EXPO_PUBLIC_SENTRY_DSN` ; le bootstrap
+  PostHog n'instancie rien sans `EXPO_PUBLIC_POSTHOG_KEY` → la façade reste `null`, helpers
+  no-op. Donc en dev/CI **sans clés**, l'app boote et ne crashe pas, mais n'émet rien.
+- **Ordre de boot (AC1)** : `Sentry.init()` doit s'exécuter **avant tout** (avant
+  `@/lib/live/location-task`). Réalisé par `import '@/lib/observability/boot'` en **1ère**
+  ligne d'effet de `src/app/_layout.tsx` (l'ordre des imports ESM dicte l'exécution ; un
+  appel de fonction après les imports tournerait APRÈS `location-task`). Ne pas réordonner.
+- **RGPD** : aucun bandeau de consentement mobile (zéro cookie, `distinct_id` AsyncStorage,
+  pas d'IDFA → pas d'ATT). Le **session replay** est **beta-only** (`EXPO_PUBLIC_APP_ENV !==
+  'production'`) et masque la carte MapLibre via `accessibilityLabel="ph-no-capture"` sur le
+  conteneur de `map-canvas.tsx` (NE PAS retirer — règle « GPS jamais hors device » étendue à
+  l'écran enregistré). Le replay **prod** = story dédiée MOB-6.6.
+- **Mocks Jest** : `__mocks__/@sentry/react-native.js` + `__mocks__/posthog-react-native.js`
+  (CommonJS, sans JSX ; `wrap` = HOC identité, `PostHogProvider`/`PostHogMaskView` =
+  `jest.fn(() => null)`), activés dans `jest.setup.ts`.

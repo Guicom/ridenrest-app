@@ -1,4 +1,5 @@
 import { findPointAtKm } from '@ridenrest/gpx';
+import { trackPoiSearchTriggered } from '@ridenrest/analytics';
 import { type MapSegmentData } from '@ridenrest/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -101,7 +102,7 @@ export default function LiveScreen() {
     grantConsent,
     openSettings,
     isLiveModeActive,
-  } = useLiveMode(waypoints);
+  } = useLiveMode(waypoints, id);
 
   const [refused, setRefused] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -348,9 +349,19 @@ export default function LiveScreen() {
         (panelHeight > 0 ? panelHeight : PANEL_FALLBACK_PADDING) +
         PANEL_PADDING_GAP;
       mapRef.current?.fitToSearchZone(bounds, bottomPadding);
+      // Analytics `poi_search_triggered` (live, MOB-6.1 / T6) — émis à la RÉSOLUTION d'une
+      // recherche (cache froid OU chaud, parité web live/[id]/page.tsx). RGPD : calques
+      // visibles + nombre de résultats, jamais de coordonnée.
+      trackPoiSearchTriggered({
+        mode: 'live',
+        poi_categories: [...visibleLayers],
+        result_count: allPois.length,
+      });
     }
     prevPoisFetchingRef.current = poisFetching;
     prevSearchTriggerRef.current = searchTrigger;
+    // `visibleLayers`/`allPois` absents des deps intentionnellement : on veut leur snapshot
+    // au moment de la transition, pas un ré-emit à chaque changement de filtre.
   }, [
     poisFetching,
     hasFetched,

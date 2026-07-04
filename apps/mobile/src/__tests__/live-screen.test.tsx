@@ -53,6 +53,10 @@ jest.mock('@/hooks/use-profile', () => ({
 }));
 jest.mock('@ridenrest/analytics', () => ({
   trackBookingClick: jest.fn(),
+  trackPoiDetailOpened: jest.fn(),
+  trackPoiSearchTriggered: jest.fn(),
+  trackLiveModeActivated: jest.fn(),
+  hashAdventureId: jest.fn((id) => String(id)),
 }));
 jest.mock('@/hooks/use-live-poi-search', () => ({
   useLivePoiSearch: jest.fn(),

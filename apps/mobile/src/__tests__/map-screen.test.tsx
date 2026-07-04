@@ -81,6 +81,10 @@ jest.mock('@/hooks/use-profile', () => ({
 }));
 jest.mock('@ridenrest/analytics', () => ({
   trackBookingClick: jest.fn(),
+  trackPoiDetailOpened: jest.fn(),
+  trackMapOpened: jest.fn(),
+  trackPoiSearchTriggered: jest.fn(),
+  hashAdventureId: jest.fn((id) => String(id)),
 }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },

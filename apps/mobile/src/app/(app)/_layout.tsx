@@ -1,5 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
+import { Fragment } from 'react';
 
+import { AnalyticsIdentity } from '@/components/providers/analytics-identity';
 import { SessionLoading } from '@/components/auth/session-loading';
 import { useSession } from '@/lib/auth/client';
 
@@ -19,5 +21,12 @@ export default function AppLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  // Session garantie ici → `<AnalyticsIdentity>` (identify(user.id), MOB-6.1) monté une
+  // seule fois pour tout le groupe authentifié, jamais par écran.
+  return (
+    <Fragment>
+      <AnalyticsIdentity />
+      <Stack screenOptions={{ headerShown: false }} />
+    </Fragment>
+  );
 }

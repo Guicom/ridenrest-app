@@ -36,6 +36,7 @@ jest.mock('@/hooks/use-profile', () => ({
 // Analytics no-op safe — on vérifie l'émission au press du lien booking.
 jest.mock('@ridenrest/analytics', () => ({
   trackBookingClick: jest.fn(),
+  trackPoiDetailOpened: jest.fn(),
 }));
 // Bloc accès (MOB-4.6) stubbé : ce test ne wrappe pas de QueryClientProvider et
 // `AccessMetrics` (via `useAccess`/`useQuery`) en exige un. Couvert par ses propres tests.

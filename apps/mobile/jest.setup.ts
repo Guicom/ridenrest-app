@@ -46,3 +46,10 @@ jest.mock('expo-keep-awake');
 // hors device → mock manuel global (`__mocks__/expo-task-manager.js`, `defineTask` capture
 // le handler pour les tests `location-task`). `jest.mock` explicite requis.
 jest.mock('expo-task-manager');
+
+// @sentry/react-native + posthog-react-native (MOB-6.1) : SDK natifs (crash reporting +
+// analytics) absents hors device → mocks manuels globaux (`__mocks__/@sentry/react-native.js`,
+// `__mocks__/posthog-react-native.js`, factories CommonJS sans JSX). `jest.mock` explicite
+// requis (packages node_modules). Les tests d'init/bootstrap pilotent les env vars.
+jest.mock('@sentry/react-native');
+jest.mock('posthog-react-native');

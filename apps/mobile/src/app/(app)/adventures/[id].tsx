@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { trackGpxUploaded } from '@ridenrest/analytics';
 import type { AdventureSegmentResponse } from '@ridenrest/shared';
 
 import {
@@ -88,12 +89,23 @@ export default function AdventureDetailScreen() {
   // L'échec est porté par la carte du segment fautif (ErrorBanner + Réessayer).
   const [parsedMessage, setParsedMessage] = useState<string | null>(null);
   const uploaderRef = useRef<GpxUploaderHandle>(null);
+  // Ref vers la dernière liste de segments — `onParsed` (déclaré avant `useSegments`) la
+  // lit au moment de l'émission analytics. Mise à jour à chaque render (cf. plus bas).
+  const segmentsRef = useRef<AdventureSegmentResponse[]>([]);
 
   const onParsed = useCallback(
     (segment: AdventureSegmentResponse) => {
       setParsedMessage(
         t('adventures.segments.parsedSuccess', { name: segment.name }),
       );
+      // Analytics `gpx_uploaded` (MOB-6.1 / T6, parité web adventure-detail.tsx) — émis à la
+      // fin de parsing d'un segment, avec le total des segments `done` + leur distance
+      // cumulée. RGPD : aucun nom de fichier ni coordonnée. No-op tant que PostHog absent.
+      const done = segmentsRef.current.filter((s) => s.parseStatus === 'done');
+      trackGpxUploaded({
+        segment_count: done.length,
+        total_km: done.reduce((sum, s) => sum + (s.distanceKm ?? 0), 0),
+      });
     },
     [t],
   );
@@ -103,6 +115,13 @@ export default function AdventureDetailScreen() {
     isPending: segmentsPending,
     isError: segmentsError,
   } = useSegments(id, { onParsed });
+  // Garde la ref à jour pour la prochaine émission `gpx_uploaded`. Écriture en phase de
+  // RENDER volontaire (pattern « latest ref ») : `onParsed` est appelé depuis l'effet
+  // INTERNE de `useSegments` (enregistré avant un éventuel effet de mise à jour déclaré
+  // ici → il s'exécuterait trop tard d'un render). La ref doit donc déjà refléter le render
+  // courant pour que `done` inclue le segment qui vient de passer `done`.
+  // eslint-disable-next-line react-hooks/refs -- latest-ref requis par l'émission gpx_uploaded
+  segmentsRef.current = segments ?? [];
 
   // Notification transitoire : le bandeau succès s'efface seul après ~4s (timer
   // ré-armé à chaque nouveau message, nettoyé au démontage) — pas de bandeau sticky.

@@ -5,7 +5,7 @@ import { LAYER_CATEGORIES, type Poi } from '@ridenrest/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, View, type LayoutChangeEvent } from 'react-native';
 
-import type { UserTier } from '@ridenrest/analytics';
+import { trackPoiDetailOpened, type UserTier } from '@ridenrest/analytics';
 
 import { BookingLinks } from '@/components/shared/booking-links';
 import { AccessMetrics } from '@/components/poi-access/access-metrics';
@@ -189,6 +189,18 @@ export function PoiPopup({
 
   // Nettoyage du timer au démontage.
   useEffect(() => clearCopyTimeout, [clearCopyTimeout]);
+
+  // Analytics `poi_detail_opened` (MOB-6.1 / T6, parité web poi-popup.tsx) — émis UNE fois
+  // par POI ouvert. `source` mappé sur la taxonomie (`amadeus` → `google`). RGPD : aucune
+  // coordonnée (que le type + la source). No-op tant que PostHog n'est pas injecté.
+  useEffect(() => {
+    if (!poi) return;
+    trackPoiDetailOpened({
+      poi_type: poi.category,
+      source: poi.source === 'overpass' ? 'overpass' : 'google',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- émission unique par POI (clé = poiId)
+  }, [poiId]);
 
   const handleNavigate = useCallback(() => {
     if (!poi) return;

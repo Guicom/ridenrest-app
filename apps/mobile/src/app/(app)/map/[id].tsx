@@ -6,6 +6,11 @@ import type {
   Poi,
 } from '@ridenrest/shared';
 import { LAYER_CATEGORIES } from '@ridenrest/shared';
+import {
+  hashAdventureId,
+  trackMapOpened,
+  trackPoiSearchTriggered,
+} from '@ridenrest/analytics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -317,19 +322,55 @@ export default function MapScreen() {
   // `fitToCorridorRange`) : on détecte la transition `isFetching` true→false. Fallback
   // sur la trace entière si la plage [fromKm, toKm] contient moins de 2 waypoints.
   const prevFetchingRef = useRef(isFetching);
+  const prevSearchCommittedRef = useRef(searchCommitted);
   useEffect(() => {
-    if (searchCommitted && prevFetchingRef.current && !isFetching) {
+    // Dual-path (parité web map-view.tsx) :
+    // - `justCommitted` : cache chaud — searchCommitted vient de passer à true, pas de fetch.
+    // - `justResolved`  : cache froid — fetch terminé alors que searchCommitted est actif.
+    const justCommitted =
+      searchCommitted && !prevSearchCommittedRef.current && !isFetching;
+    const justResolved =
+      searchCommitted && prevFetchingRef.current && !isFetching;
+    if (justCommitted || justResolved) {
       const bounds =
         computeCorridorBounds(waypoints, fromKm, toKm) ??
         computeTraceBounds(collectTraceWaypoints(segments));
       mapRef.current?.fitToBounds(bounds);
+      // Analytics `poi_search_triggered` (planning, MOB-6.1 / T6) — émis à la RÉSOLUTION
+      // d'une recherche committée (cache froid OU chaud, parité web map-view.tsx). RGPD :
+      // seuls les calques visibles + le nombre de résultats, jamais de coordonnée.
+      trackPoiSearchTriggered({
+        mode: 'planning',
+        poi_categories: [...visibleLayers],
+        result_count: Object.values(poisByLayer).flat().length,
+      });
     }
     prevFetchingRef.current = isFetching;
-    // ⚠️ PAS de cleanup `prevFetchingRef.current = false` ici : l'effet dépend de
-    // `waypoints/fromKm/toKm/segments`, donc se ré-exécute souvent. Un reset en cleanup
-    // tournerait AVANT chaque ré-exécution → `prev` serait remis à false juste avant la
-    // détection de transition → le zoom ne partirait jamais (régression code review).
-  }, [isFetching, searchCommitted, waypoints, fromKm, toKm, segments]);
+    prevSearchCommittedRef.current = searchCommitted;
+    // ⚠️ PAS de cleanup des refs ici : l'effet dépend de `waypoints/fromKm/toKm/segments`,
+    // donc se ré-exécute souvent. Un reset en cleanup tournerait AVANT chaque ré-exécution
+    // → `prev` remis à false juste avant la détection → zoom et analytics ne partiraient
+    // jamais (régression code review 2026-06-16). `visibleLayers`/`poisByLayer` absents des
+    // deps intentionnellement : on veut leur snapshot au moment de la transition, pas un
+    // ré-emit à chaque changement de filtre.
+  }, [
+    isFetching,
+    searchCommitted,
+    waypoints,
+    fromKm,
+    toKm,
+    segments,
+  ]);
+
+  // Analytics `map_opened` (MOB-6.1 / T6, parité web map-view.tsx) — émis UNE fois quand la
+  // carte est prête (trace chargée). RGPD : `adventure_id_hash` (jamais l'UUID brut). Ref
+  // par instance (re-mount = nouvelle émission, jamais de cleanup-reset).
+  const mapOpenedTrackedRef = useRef(false);
+  useEffect(() => {
+    if (mapOpenedTrackedRef.current || !id || !traceReady) return;
+    mapOpenedTrackedRef.current = true;
+    trackMapOpened({ adventure_id_hash: hashAdventureId(id) });
+  }, [id, traceReady]);
 
   // Auto-zoom sur le bbox englobant TOUTES les variantes d'accès — **une seule fois par
   // jeu de variantes distinct** (AC1, parité web `lastZoomedRef`). La référence
