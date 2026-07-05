@@ -18,7 +18,10 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'app.ridenrest',
-    icon: './assets/expo.icon',
+    // Pas d'override `icon` iOS : on utilise l'icône top-level `./assets/images/icon.png`
+    // (vraie icône Ride'n'Rest, full-bleed 1024²). L'ancien `./assets/expo.icon` était le
+    // template Icon Composer Expo par défaut (logo Expo générique, resté depuis l'init
+    // MOB-1.1) → il écrasait la vraie icône côté iOS (« pas d'icône »). (Fix 2026-07-05.)
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // ATS : autorise le HTTP cleartext vers `localhost`/`*.local` (API NestJS
