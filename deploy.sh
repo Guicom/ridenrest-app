@@ -28,7 +28,11 @@ set +a
 if [[ -z "$NEXT_PUBLIC_API_URL" ]]; then
   echo "WARNING: NEXT_PUBLIC_API_URL not found in $APP_DIR/.env — Next.js will embed empty API URL" >&2
 fi
-pnpm turbo build
+# Build ONLY the VPS-deployed apps (web + api). Turbo pulls their workspace deps
+# (database/shared/gpx/…) automatically. `apps/mobile` is built on EAS Build (cloud),
+# NEVER on the VPS — an unfiltered `turbo build` would run `expo export` here and
+# risks OOM/failure on the small VPS, aborting the whole deploy (set -e). (MOB-6.5)
+pnpm turbo build --filter=@ridenrest/web --filter=@ridenrest/api
 
 # ─── BRouter (POI Access Routing) — start + health-gate ─────────────────────
 # Image is BUILT FROM SOURCE (abrensch/brouter#v1.7.9 in docker-compose.yml), NOT
