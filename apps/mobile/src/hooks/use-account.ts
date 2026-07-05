@@ -2,8 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
 import { invalidateAuthTokenCache } from '@/lib/api/api-client';
+import { unregisterPushToken } from '@/lib/api/push';
 import { resetAnalytics } from '@/lib/analytics/posthog';
 import { authClient, signOut } from '@/lib/auth/client';
+import {
+  clearPushStorage,
+  getStoredPushToken,
+} from '@/lib/notifications/push-storage';
 
 // Actions de compte (MOB-2.5 / AC1, AC2) : déconnexion et suppression définitive.
 // La purge LOCALE est identique dans les deux cas — factorisée ici pour qu'aucun
@@ -20,6 +25,17 @@ import { authClient, signOut } from '@/lib/auth/client';
 // empêche le retour arrière vers une page authentifiée.
 
 const LOGIN_ROUTE = '/(auth)/login';
+
+// MOB-6.2 / AC4 — désinscrit le token push du device côté serveur AVANT `signOut` (le JWT
+// est encore valide). Best-effort : un échec réseau ne doit JAMAIS bloquer la déconnexion.
+async function unregisterPushBeforeSignOut(): Promise<void> {
+  try {
+    const token = await getStoredPushToken();
+    if (token) await unregisterPushToken(token);
+  } catch {
+    // Non bloquant : au pire le token expirera / sera purgé au 1er DeviceNotRegistered.
+  }
+}
 
 export interface UseAccountActions {
   /** Déconnecte : purge secure-store + caches, puis redirige vers login (AC1). */
@@ -47,12 +63,17 @@ export function useAccountActions(): UseAccountActions {
     // sign-out-button.tsx). Appelé APRÈS signOut, pour la déconnexion ET la
     // suppression de compte (les deux passent par `finishSession`). No-op sans PostHog.
     resetAnalytics();
+    // MOB-6.2 — efface les flags push locaux (token + prompt one-shot) pour ne pas fuiter
+    // entre deux comptes sur le même appareil. Best-effort, non bloquant.
+    void clearPushStorage();
     queryClient.clear();
     router.replace(LOGIN_ROUTE);
   };
 
   const logout = useMutation({
     mutationFn: async () => {
+      // MOB-6.2 / AC4 — désinscription du token push AVANT signOut (JWT encore valide).
+      await unregisterPushBeforeSignOut();
       // Purge la session du secure-store côté plugin expo.
       await signOut();
     },
@@ -61,6 +82,10 @@ export function useAccountActions(): UseAccountActions {
 
   const deleteAccount = useMutation({
     mutationFn: async () => {
+      // MOB-6.2 / AC4 — désinscription du token push AVANT deleteUser (JWT encore valide).
+      // La cascade DB (FK onDelete: cascade) efface le token en base, mais l'AC exige aussi
+      // la désinscription active côté serveur. Best-effort : n'arrête pas la suppression.
+      await unregisterPushBeforeSignOut();
       // `user.deleteUser.enabled: true` côté serveur (auth.ts) + aucune
       // `sendDeleteAccountVerification`/`beforeDelete` configurée → la suppression
       // est immédiate, sans session fraîche ni lien email. Les cascades DB

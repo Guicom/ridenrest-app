@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { ChevronDownIcon, ChevronUpIcon, MapIcon } from '@/components/ui/icon';
 import { Switch } from '@/components/ui/switch';
 import { useDensity } from '@/hooks/use-density';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { useMapStore } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
 
@@ -61,6 +62,8 @@ export function SidebarDensitySection({
   const [dialogOpen, setDialogOpen] = useState(false);
   const densityColorEnabled = useMapStore((s) => s.densityColorEnabled);
   const toggleDensityColor = useMapStore((s) => s.toggleDensityColor);
+  // MOB-6.2 — permission push demandée APRÈS la 1re analyse (AC1). One-shot géré par le hook.
+  const { requestAndRegister } = usePushNotifications();
 
   const {
     densityStatus,
@@ -209,6 +212,10 @@ export function SidebarDensitySection({
         onConfirm={async (categories) => {
           await trigger(categories);
           setDialogOpen(false);
+          // MOB-6.2 / AC1 — « après la première analyse de densité » : on demande la
+          // permission push (une seule fois, garde interne au hook). Best-effort, non
+          // bloquant : un refus n'impacte pas le flux (fallback in-app polling, AC3).
+          void requestAndRegister();
         }}
       />
     </Card>

@@ -53,3 +53,10 @@ jest.mock('expo-task-manager');
 // requis (packages node_modules). Les tests d'init/bootstrap pilotent les env vars.
 jest.mock('@sentry/react-native');
 jest.mock('posthog-react-native');
+
+// expo-notifications / expo-device (MOB-6.2 — notifications push) : modules natifs (permission
+// + token APNs/FCM + info device) absents hors device → mocks manuels globaux
+// (`__mocks__/expo-notifications.js`, `__mocks__/expo-device.js`). `jest.mock` explicite requis.
+// Les tests `use-push-notifications` pilotent permission/token/isDevice au cas par cas.
+jest.mock('expo-notifications');
+jest.mock('expo-device');

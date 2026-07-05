@@ -3,6 +3,7 @@ import type { DensityRepository } from '../density.repository.js'
 import type { OverpassProvider } from '../../pois/providers/overpass.provider.js'
 import type { GooglePlacesProvider } from '../../pois/providers/google-places.provider.js'
 import type { RedisProvider } from '../../common/providers/redis.provider.js'
+import type { EventEmitter2 } from '@nestjs/event-emitter'
 import type { Job } from 'bullmq'
 
 const mockRepo: jest.Mocked<Pick<DensityRepository, 'setDensityStatus' | 'setDensityProgress' | 'findSegmentsForAnalysis' | 'insertGaps' | 'setDensityAnalyzedAt'>> = {
@@ -30,11 +31,16 @@ const mockRedisProvider: jest.Mocked<Pick<RedisProvider, 'getClient'>> = {
   getClient: jest.fn().mockReturnValue(mockRedisClient),
 }
 
+// MOB-6.2 — EventEmitter injecté : le processor émet `density.completed` à la complétion
+// (le `PushService` écoute et notifie). On mocke `emit` pour vérifier l'émission.
+const mockEventEmitter = { emit: jest.fn() }
+
 const processor = new DensityAnalyzeProcessor(
   mockRepo as unknown as DensityRepository,
   mockOverpass as unknown as OverpassProvider,
   mockGooglePlaces as unknown as GooglePlacesProvider,
   mockRedisProvider as unknown as RedisProvider,
+  mockEventEmitter as unknown as EventEmitter2,
 )
 
 const DEFAULT_CATEGORIES = ['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse']
@@ -227,5 +233,35 @@ describe('DensityAnalyzeProcessor.process', () => {
     expect(mockOverpass.queryPois).not.toHaveBeenCalled()
     expect(mockRepo.setDensityStatus).toHaveBeenCalledWith('adv-1', 'success')
     expect(mockRepo.insertGaps).toHaveBeenCalledWith([])
+  })
+
+  // MOB-6.2 / AC2 — l'émission `density.completed` déclenche l'envoi push (PushService).
+  it('emits density.completed with adventureId after success (MOB-6.2)', async () => {
+    mockRepo.findSegmentsForAnalysis.mockResolvedValue([
+      { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
+    ])
+    mockOverpass.queryPois.mockResolvedValue([])
+
+    await processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'] }))
+
+    expect(mockEventEmitter.emit).toHaveBeenCalledWith('density.completed', { adventureId: 'adv-1' })
+    // Émis APRÈS le passage en 'success' (jamais avant la fin de l'analyse).
+    const successOrder = mockRepo.setDensityStatus.mock.invocationCallOrder.at(-1)!
+    const emitOrder = mockEventEmitter.emit.mock.invocationCallOrder[0]
+    expect(emitOrder).toBeGreaterThan(successOrder)
+  })
+
+  it('does NOT emit density.completed when analysis fails (MOB-6.2)', async () => {
+    mockRepo.findSegmentsForAnalysis.mockResolvedValue([
+      { id: 'seg-1', waypoints: WAYPOINTS_50KM.slice(0, 2) },
+    ])
+    mockOverpass.queryPois.mockResolvedValue([])
+    mockRepo.insertGaps.mockRejectedValue(new Error('DB error'))
+
+    await expect(
+      processor.process(makeJob({ adventureId: 'adv-1', segmentIds: ['seg-1'] })),
+    ).rejects.toThrow('DB error')
+
+    expect(mockEventEmitter.emit).not.toHaveBeenCalled()
   })
 })

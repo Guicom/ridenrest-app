@@ -6,6 +6,7 @@ export { tierEnum, unitPrefEnum, currencyEnum } from './schema/profiles'
 export { adventureStatusEnum, densityStatusEnum, routingProfileEnum } from './schema/adventures'
 export { parseStatusEnum } from './schema/adventure-segments'
 export { gapSeverityEnum } from './schema/coverage-gaps'
+export { pushPlatformEnum } from './schema/push-tokens'
 
 // Tables
 export { profiles } from './schema/profiles'
@@ -16,6 +17,7 @@ export { accommodationsCache } from './schema/accommodations-cache'
 export { weatherCache } from './schema/weather-cache'
 export { coverageGaps } from './schema/coverage-gaps'
 export { feedbacks } from './schema/feedbacks'
+export { pushTokens } from './schema/push-tokens'
 
 // Database instances
 export { db } from './db'
@@ -30,6 +32,7 @@ import type { profiles } from './schema/profiles'
 import type { accommodationsCache } from './schema/accommodations-cache'
 import type { weatherCache } from './schema/weather-cache'
 import type { coverageGaps } from './schema/coverage-gaps'
+import type { pushTokens } from './schema/push-tokens'
 
 export type Adventure = InferSelectModel<typeof adventures>
 export type NewAdventure = InferInsertModel<typeof adventures>
@@ -41,3 +44,5 @@ export type Profile = InferSelectModel<typeof profiles>
 export type AccommodationCache = InferSelectModel<typeof accommodationsCache>
 export type WeatherCache = InferSelectModel<typeof weatherCache>
 export type CoverageGap = InferSelectModel<typeof coverageGaps>
+export type PushToken = InferSelectModel<typeof pushTokens>
+export type NewPushToken = InferInsertModel<typeof pushTokens>

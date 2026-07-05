@@ -120,6 +120,17 @@ const config: ExpoConfig = {
     // `.env.local`, JAMAIS commité, JAMAIS `EXPO_PUBLIC_*`). Sans token, le build n'échoue
     // pas — les source maps ne sont simplement pas uploadées. ⚠️ Module natif neuf →
     // `expo prebuild --clean -p ios` ET `-p android` OBLIGATOIRE avant `run:ios`/`pnpm sim`.
+    // MOB-6.2 — notifications push (APNs iOS / FCM Android). Le plugin config branche au
+    // prebuild le module natif ET, sur Android, ajoute la permission `POST_NOTIFICATIONS`
+    // (Android 13+) + configure l'icône/couleur de la notification. iOS : l'entitlement
+    // `aps-environment` (APNs) est géré par EAS au build (credentials `.p8`), pas ici. On
+    // ne définit PAS d'`icon` custom (asset absent → défaut app) ; seule la `color` de la
+    // notif Android est fixée (vert brand). ⚠️ Module natif neuf → `expo prebuild --clean`
+    // iOS ET Android OBLIGATOIRE avant `run`/`sim` (sinon « Cannot find native module »).
+    // FCM (Android) : l'envoi serveur passe par l'Expo Push API → `google-services.json` +
+    // clé de service FCM V1 sont configurés côté EAS credentials (voir README, prérequis T8),
+    // pas commités. Sans credentials, l'app boote et le flux est no-op sûr.
+    ['expo-notifications', { color: '#2D6A4A' }],
     [
       '@sentry/react-native/expo',
       {

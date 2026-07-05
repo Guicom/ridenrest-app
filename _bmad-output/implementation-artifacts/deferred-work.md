@@ -373,3 +373,8 @@
 ## Deferred from: code review of MOB-6-1-sentry-crash-posthog-analytics (2026-07-04)
 
 - **Ordre de boot `boot.ts` imposé par convention** : `import '@/lib/observability/boot'` doit rester le premier import side-effect dans `src/app/_layout.tsx` pour garantir AC1 (Sentry init avant location-task). Actuellement enforced par commentaire uniquement — aucune règle ESLint/import-order ne bloque un réordonnancement accidentel. Tooling gap pré-existant, non causé par MOB-6.1. `apps/mobile/src/app/_layout.tsx`
+
+## Deferred from: code review of MOB-6-2-push-notifications-apns-fcm (2026-07-05)
+
+- **N DELETEs séquentiels pour le purge `DeviceNotRegistered`** : la boucle `for (const token of invalidTokens) { await this.repo.deleteByToken(token) }` effectue N aller-retours PostgreSQL. Pour un utilisateur avec beaucoup de devices historiques, cela peut devenir notable. Corriger avec un `deleteByTokens(tokens: string[])` utilisant `inArray`. `apps/api/src/push/push.service.ts:71-73`
+- **Apostrophe Unicode U+2019 dans `DENSITY_DONE_BODY`** : `'Votre analyse d'hébergements est prête…'` utilise un guillemet typographique `'` (U+2019) à l'intérieur d'une single-quoted string. Code valide TypeScript mais incohérent avec le reste de la base de code. Normaliser en template literal ou apostrophe droite. `apps/api/src/push/push.service.ts:17`

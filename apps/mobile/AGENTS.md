@@ -398,3 +398,43 @@ et `posthog-react-native` (analytics produit, branché sur la façade **existant
 - **Mocks Jest** : `__mocks__/@sentry/react-native.js` + `__mocks__/posthog-react-native.js`
   (CommonJS, sans JSX ; `wrap` = HOC identité, `PostHogProvider`/`PostHogMaskView` =
   `jest.fn(() => null)`), activés dans `jest.setup.ts`.
+
+## Notifications push : APNs / FCM (MOB-6.2)
+
+Notification « analyse de densité terminée » via `expo-notifications` + `expo-device` (mobile)
+et un `PushModule` NestJS (envoi serveur via **Expo Push API**, `expo-server-sdk` — un endpoint
+route APNs **et** FCM). Points durs :
+
+- **Timing permission (AC1)** : le prompt OS n'est demandé **ni au boot ni à l'onboarding**,
+  mais **après la 1re analyse de densité** (`sidebar-density-section.tsx` → `onConfirm` après
+  `trigger()`). Demander trop tôt = refus systématique = feature morte. Garde one-shot via
+  un flag **AsyncStorage** (`push-storage.ts`) — **jamais** `expo-secure-store` (réservé aux
+  tokens d'auth). Le token Expo enregistré est aussi persisté (AsyncStorage) pour la
+  désinscription au logout (AC4). RGPD : un token push **n'est pas** une donnée de position.
+- **Module natif neuf + plugin `expo-notifications` dans `app.config.ts`** →
+  `expo prebuild --clean -p ios` ET `-p android` OBLIGATOIRE avant `pnpm sim`/`run:android`,
+  sinon « Cannot find native module » / crash au boot. Pin **exact** de `expo-notifications`
+  (`56.0.16`) et `expo-device` (`56.0.4`) — `bundledNativeModules.json`, sans `~` (gotcha dyld
+  « Symbol not found »). Le plugin ajoute `POST_NOTIFICATIONS` (Android 13+) au manifest.
+- **`check:native-config`** encode l'invariant « plugin `expo-notifications` présent » → échoue
+  (sans device) si on retire le plugin de `app.config.ts`.
+- **No-op sûr sans credentials / sur simulateur** : `!Device.isDevice` (simulateur iOS,
+  émulateur Android) → `getExpoPushTokenAsync` échouerait faute de credentials APNs/FCM → on
+  court-circuite sans AUCUNE erreur. Le **push réel n'arrive PAS sur simulateur iOS** → tester
+  le flux permission/registration sur sim, l'envoi réel sur **device physique**.
+- **Envoi best-effort (AC2)** : le processor densité **émet** `density.completed` (EventEmitter,
+  après `setDensityStatus('success')`) ; `PushService.@OnEvent` résout l'owner (le payload du
+  job **n'a pas** de `userId` → lookup `adventures.userId`) puis envoie. Une erreur d'envoi
+  **ne fait jamais échouer le job densité** ; un `DeviceNotRegistered` purge le token en base.
+- **Fallback (AC3)** : si permission refusée, le **polling `useDensity` (3 s)** existant informe
+  quand même l'utilisateur — comportement MOB-4.4 intact, rien à recréer.
+- **Deep-link** : le tap sur la notif ouvre `map/[id]` avec l'`adventureId` du `data`
+  (`use-notification-observer.ts`, monté une fois dans le root layout : handler foreground +
+  canal Android `default` + listener réponse + cold-start `getLastNotificationResponseAsync`).
+- **Credentials (hors-code)** : clé APNs `.p8` (EAS), `google-services.json` + clé FCM V1 (EAS),
+  `EXPO_ACCESS_TOKEN` optionnel côté API (jamais dans le bundle). Détails : `README.md`.
+- **Mocks Jest** : `__mocks__/expo-notifications.js` + `__mocks__/expo-device.js` (CommonJS,
+  sans JSX), activés dans `jest.setup.ts`. ⚠️ `isDevice` du mock **doit être un getter/setter**
+  (pas une valeur brute) : l'interop wildcard de Babel **fige** les propriétés-valeur (snapshot
+  à l'import) → un test ne pourrait pas surcharger `Device.isDevice`. Getter accesseur = lecture
+  live.

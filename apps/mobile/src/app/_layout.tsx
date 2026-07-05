@@ -29,6 +29,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { StatusBanner } from '@/components/shared/status-banner';
+import { useNotificationObserver } from '@/hooks/use-notification-observer';
 import { I18nextProvider, i18n } from '@/lib/i18n';
 import { QueryProvider } from '@/lib/query/query-provider';
 import { useAppStateRefetch } from '@/lib/query/use-app-state-refetch';
@@ -47,6 +48,10 @@ function RootLayout() {
   // Listener de cycle de vie unique (MOB-2.1 / AC3) : refocus/refetch session +
   // bridge online. Centralisé ici — jamais dupliqué ailleurs.
   useAppStateRefetch();
+
+  // MOB-6.2 — notifications push : handler foreground + canal Android + deep-link vers
+  // `map/[id]` au tap. Monté une seule fois ici (jamais par écran). No-op sans notif.
+  useNotificationObserver();
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

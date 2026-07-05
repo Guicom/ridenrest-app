@@ -20,6 +20,7 @@ import { WeatherModule } from './weather/weather.module.js'
 import { StagesModule } from './stages/stages.module.js'
 import { ProfileModule } from './profile/profile.module.js'
 import { FeedbacksModule } from './feedbacks/feedbacks.module.js'
+import { PushModule } from './push/push.module.js'
 import { GeoModule } from './geo/geo.module.js'
 import { RoutingModule } from './routing/routing.module.js'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter.js'
@@ -71,6 +72,7 @@ const bullBoardImports =
     StagesModule,
     ProfileModule,
     FeedbacksModule,
+    PushModule,
     GeoModule,
     RoutingModule,
     ...bullBoardImports,

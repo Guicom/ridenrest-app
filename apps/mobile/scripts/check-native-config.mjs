@@ -116,6 +116,25 @@ const RULES = [
     },
   },
   {
+    name: 'Push (MOB-6.2) → plugin expo-notifications présent',
+    check(config) {
+      // Le module natif `expo-notifications` (permission + réception + token APNs/FCM) est
+      // branché par le plugin config `expo-notifications`. Sans lui : module natif manquant
+      // au runtime (« Cannot find native module ») + permission Android `POST_NOTIFICATIONS`
+      // absente. Le plugin doit TOUJOURS être déclaré dès lors qu'`expo-notifications` est
+      // une dépendance (MOB-6.2).
+      const present = pluginProps(config, 'expo-notifications') !== null
+      if (present) return []
+      return [
+        `Le plugin \`expo-notifications\` est ABSENT de app.config.ts alors qu'expo-notifications\n` +
+          `   est une dépendance (MOB-6.2).\n` +
+          `   → Sans ce plugin : module natif manquant au runtime + POST_NOTIFICATIONS (Android 13+)\n` +
+          `     absente. Ajoute-le dans app.config.ts → plugins puis \`expo prebuild --clean -p ios\`\n` +
+          `     ET \`-p android\`.`,
+      ]
+    },
+  },
+  {
     name: 'expo-location background iOS → UIBackgroundModes contient "location"',
     check(config) {
       const loc = pluginProps(config, 'expo-location');

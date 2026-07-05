@@ -133,6 +133,22 @@ Crash reporting (Sentry) + analytics produit (PostHog, façade `@ridenrest/analy
 
 > RGPD : **aucun bandeau de consentement sur mobile** (zéro cookie → `distinct_id` en AsyncStorage). Pas d'IDFA / pas de tracking cross-app → **pas de prompt ATT**. Jamais de GPS ni de PII (façade typée + scrub `beforeSend` Sentry). Le session replay (beta) **masque la carte MapLibre** (`ph-no-capture`) + les champs texte.
 
+### Notifications push — APNs / FCM (MOB-6.2)
+
+Notification « analyse de densité terminée » (`expo-notifications` + `expo-device`). La permission OS est demandée **après la 1re analyse de densité** (`sidebar-density-section.tsx`), jamais au boot — la garde one-shot vit dans `push-storage` (AsyncStorage, **jamais** SecureStore : un flag/token push n'est pas un secret d'auth). L'envoi serveur passe par l'**Expo Push API** (`expo-server-sdk`, un endpoint route APNs **et** FCM) : `PushModule` NestJS écoute `density.completed` (EventEmitter) et notifie tous les tokens du propriétaire, **best-effort** (une erreur d'envoi ne fait jamais échouer le job densité ; un `DeviceNotRegistered` purge le token). RGPD : le payload ne transporte que `{ adventureId }` (deep-link `map/[id]`), **zéro coordonnée GPS**.
+
+⚠️ **Module natif neuf** → `expo prebuild --clean -p ios` **ET** `-p android` avant `pnpm sim` / `run:android`, sinon « Cannot find native module ». Pin **exact** de `expo-notifications` / `expo-device` (`bundledNativeModules.json`, sans `~` — gotcha dyld « Symbol not found »). Le push réel **n'arrive PAS sur simulateur iOS** (`Device.isDevice === false` → flux permission/registration en no-op sûr) ; tester l'envoi réel sur **device physique**.
+
+**Prérequis credentials (hors-code, à provisionner avant l'envoi réel — voir §T8 de la story) :**
+
+| Élément | Où | Rôle |
+|---|---|---|
+| Clé APNs `.p8` | EAS credentials (`eas credentials`, iOS) | Signe les pushes APNs. Sans elle, `getExpoPushTokenAsync` échoue sur device iOS |
+| `google-services.json` + clé de service **FCM V1** (`.json`) | EAS credentials (Android) + config projet Firebase | Route les pushes FCM (Android). Référencé via `android.googleServicesFile` si fourni |
+| `EXPO_ACCESS_TOKEN` (optionnel) | **`.env` VPS (API NestJS)**, secret — jamais dans le bundle | Durcit la sécurité de l'envoi via l'Expo Push API. Absent → envoi non authentifié (OK MVP) |
+
+> Sans ces credentials, l'app **boote normalement** et tout le flux push est **no-op sûr** (aucune erreur). Le secret d'envoi (`EXPO_ACCESS_TOKEN`) vit **uniquement** côté API NestJS (`.env` VPS), **jamais** en `EXPO_PUBLIC_*`.
+
 ## Auth & session (MOB-2.1)
 
 Fondation auth posée par MOB-2.1 (aucun écran de login fonctionnel ici — il arrive en MOB-2.2).
