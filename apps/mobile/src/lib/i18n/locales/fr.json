@@ -1,17 +1,4 @@
 {
-  "home": {
-    "subtitle": "apps/mobile — coquille MOB-1.1 · design system MOB-1.3 · i18n MOB-1.4",
-    "navigateExplore": "Naviguer vers /explore"
-  },
-  "explore": {
-    "title": "Explorer",
-    "routerOk": "Navigation Expo Router opérationnelle ✓",
-    "back": "Retour"
-  },
-  "oauthCallback": {
-    "title": "Callback OAuth",
-    "subtitle": "Deep link ridenrest:// routé par Expo Router ✓"
-  },
   "auth": {
     "loadingSession": "Restauration de la session…",
     "common": {
@@ -87,7 +74,9 @@
     "retry": "Réessayer",
     "delete": "Supprimer",
     "rename": "Renommer",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "closeA11y": "Fermer",
+    "dateTimePlaceholder": "AAAA-MM-JJ HH:MM"
   },
   "adventures": {
     "title": "Mes aventures",
@@ -455,6 +444,13 @@
       "section": "Recherche de points d’intérêt",
       "title": "Recherche étendue (Overpass)",
       "description": "Résultats plus complets — notamment campings et refuges — mais recherches plus lentes."
+    },
+    "legalSection": "Légal",
+    "legal": {
+      "privacyPolicy": "Politique de confidentialité",
+      "terms": "Conditions générales d’utilisation",
+      "openError": "Impossible d’ouvrir le lien. Réessayez plus tard.",
+      "openInBrowser": "S’ouvre dans le navigateur"
     }
   },
   "strava": {

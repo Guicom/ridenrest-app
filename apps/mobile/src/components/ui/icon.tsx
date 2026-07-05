@@ -10,6 +10,7 @@ import {
   CloudRain,
   Copy,
   ExternalLink,
+  FileText,
   Globe,
   GripVertical,
   Map as LucideMap,
@@ -22,6 +23,7 @@ import {
   Route,
   Search,
   Settings,
+  Shield,
   ShoppingBasket,
   SlidersHorizontal,
   Thermometer,
@@ -67,6 +69,7 @@ export const ChevronUpIcon = enableClassName(ChevronUp);
 export const CloudRainIcon = enableClassName(CloudRain);
 export const CopyIcon = enableClassName(Copy);
 export const ExternalLinkIcon = enableClassName(ExternalLink);
+export const FileTextIcon = enableClassName(FileText);
 export const GlobeIcon = enableClassName(Globe);
 export const GripVerticalIcon = enableClassName(GripVertical);
 export const MapIcon = enableClassName(LucideMap);
@@ -79,6 +82,7 @@ export const RefreshCwIcon = enableClassName(RefreshCw);
 export const RouteIcon = enableClassName(Route);
 export const SearchIcon = enableClassName(Search);
 export const SettingsIcon = enableClassName(Settings);
+export const ShieldIcon = enableClassName(Shield);
 export const ShoppingBasketIcon = enableClassName(ShoppingBasket);
 export const SlidersHorizontalIcon = enableClassName(SlidersHorizontal);
 export const ThermometerIcon = enableClassName(Thermometer);

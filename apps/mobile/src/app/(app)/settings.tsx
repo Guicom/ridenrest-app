@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AccountSection } from '@/components/shared/account-section';
+import { LegalSection } from '@/components/shared/legal-section';
 import { OfflineCacheSection } from '@/components/shared/offline-cache-section';
 import { OverpassToggleSection } from '@/components/shared/overpass-toggle-section';
 import { StravaConnectionCard } from '@/components/shared/strava-connection-card';
@@ -47,6 +48,8 @@ export default function SettingsScreen() {
       <OverpassToggleSection />
 
       <OfflineCacheSection />
+
+      <LegalSection />
 
       <AccountSection />
     </ScrollView>

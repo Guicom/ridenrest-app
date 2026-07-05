@@ -1,5 +1,15 @@
 # Deferred Work
 
+## Deferred from: code review of MOB-6-4-store-compliance-legal-links (2026-07-05)
+
+- **Error banner jamais auto-effacée** : `openError` reste `true` jusqu'au prochain tap ou unmount ; pas de timeout ni de bouton de dismiss. Comportement conforme à la spec (feedback non bloquant). `apps/mobile/src/components/shared/legal-section.tsx:80`
+- **Tests avec chaînes FR hardcodées** : `getByText('Politique de confidentialité')` dépend de la locale Jest. Tests passent à 629/629 (locale correctement initialisée), mais fragiles si la locale par défaut change. `apps/mobile/src/components/shared/legal-section.test.tsx`
+- **`await render(...)` incorrect en RNTL** : `render` est synchrone ; l'`await` est inoffensif mais trompeur. Pattern cosmétique à aligner sur les conventions RNTL. `apps/mobile/src/components/shared/legal-section.test.tsx`
+- **Pas de test pour l'effacement de l'erreur après retry** : le chemin `openError: true → tap → openError: false` (happy path retry) n'est pas couvert par les tests.
+- **Pas de test pour double-tap concurrent** : le chemin de double-tap (race condition) ne sera couvert qu'après application du patch A (loading guard). `apps/mobile/src/components/shared/legal-section.test.tsx`
+- **Liens footer hardcodés en français** : `Confidentialité` et `CGU` sont des string literals FR sans i18n, cohérent avec le pattern actuel du footer web (app en français). `apps/web/src/app/(marketing)/_components/marketing-footer.tsx`
+- **`PRIVACY_URL`/`TERMS_URL` hardcodés en prod** : les URLs légales mobiles pointent toujours vers la production (pas d'env var `EXPO_PUBLIC_WEB_BASE_URL`). Décision MVP explicite ; à paramétrer si un env staging mobile est mis en place. `apps/mobile/src/components/shared/legal-section.tsx:21-22`
+
 ## Deferred from: code review of MOB-5-6-live-weather (2026-06-28)
 
 - **`parseDeparture` timezone offset** : la fonction convertit la saisie utilisateur (ex. « 2026-06-15 07:30 ») en ISO via `new Date(...).toISOString()` — sans suffixe de fuseau, JS interprète l'input en heure locale, puis `toISOString()` le convertit en UTC → décalage égal au fuseau de l'appareil. Comportement pré-existant identique dans `map/[id].tsx` (planning mode déjà en prod, jamais signalé). Correctif : appendre `Z` à l'input ou proposer un champ avec timezone explicite. `apps/mobile/src/lib/weather-pace.ts:40`
@@ -378,3 +388,12 @@
 
 - **N DELETEs séquentiels pour le purge `DeviceNotRegistered`** : la boucle `for (const token of invalidTokens) { await this.repo.deleteByToken(token) }` effectue N aller-retours PostgreSQL. Pour un utilisateur avec beaucoup de devices historiques, cela peut devenir notable. Corriger avec un `deleteByTokens(tokens: string[])` utilisant `inArray`. `apps/api/src/push/push.service.ts:71-73`
 - **Apostrophe Unicode U+2019 dans `DENSITY_DONE_BODY`** : `'Votre analyse d'hébergements est prête…'` utilise un guillemet typographique `'` (U+2019) à l'intérieur d'une single-quoted string. Code valide TypeScript mais incohérent avec le reste de la base de code. Normaliser en template literal ou apostrophe droite. `apps/api/src/push/push.service.ts:17`
+
+## Deferred from: code review of MOB-6-3-i18n-finalization (2026-07-05)
+
+- **`formatAccessEta` — paramètre `locale` mort** : accepté pour homogénéité de façade (Completion Notes) mais jamais utilisé. Si ETA nécessite une l10n future (traduction de « h »/« min »), passer `t` plutôt qu'une locale string. `apps/mobile/src/components/poi-access/format.ts:45`
+- **`dialog.tsx` backdrop `Pressable` sans `accessibilityRole="button"`** : gap a11y pré-existant — VoiceOver/TalkBack n'annonce pas le backdrop comme un bouton. `apps/mobile/src/components/ui/dialog.tsx`
+- **`Intl.NumberFormat` instancié à chaque appel** : micro-optimisation possible avec une `Map<string, Intl.NumberFormat>` module-level dans `format.ts`. Négligeable (<5 variants par POI). `apps/mobile/src/components/poi-access/format.ts`
+- **`formatAccessElevation` duplique `formatInt` de `distance.ts`** : le corps est équivalent à `` `${formatInt(Math.round(elevationM), locale)} m` ``. Factoriser si les deux fonctions divergent. `apps/mobile/src/components/poi-access/format.ts`
+- **`formatAccessDistance` appelée deux fois par variante dans `variant-selector.tsx`** : résultat identique calculé deux fois par item (a11y label + JSX). Cacher dans `const distStr = formatAccessDistance(...)`. `apps/mobile/src/components/poi-access/variant-selector.tsx`
+- **Boilerplate `const locale = i18n.language` × 3 composants** : pattern établi (11 occurrences codebase). Un hook `useLocale()` DRYerait 11 call-sites et centraliserait une éventuelle normalisation BCP-47.

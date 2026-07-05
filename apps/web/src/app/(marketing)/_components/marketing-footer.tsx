@@ -29,6 +29,18 @@ export function MarketingFooter() {
             >
               Mentions légales
             </Link>
+            <Link
+              href="/privacy"
+              className="hover:text-accent transition-colors hover:underline decoration-accent underline-offset-4"
+            >
+              Confidentialité
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-accent transition-colors hover:underline decoration-accent underline-offset-4"
+            >
+              CGU
+            </Link>
           </div>
         </div>
         <div className="mt-10 flex flex-col md:flex-row justify-between items-center gap-4">

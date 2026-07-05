@@ -216,3 +216,64 @@ Scaffold `i18next` + `react-i18next` + `expo-localization` dans `src/lib/i18n/` 
 npx uri-scheme open ridenrest://oauth-callback --ios       # ou --android
 # → ouvre l'app sur l'écran oauth-callback (routé par Expo Router)
 ```
+
+## Conformité stores & liens légaux (MOB-6.4)
+
+**App native pure** (guideline App Store 4.2) : 0 WebView (`react-native-webview` absent).
+Les liens sortants passent par `Linking.openURL` (navigateur système). Aucun contenu légal
+n'est dupliqué en natif — la section « Légal » des Paramètres pointe vers le web.
+
+**URLs légales** (routes web `(marketing)`, SSG indexables) :
+
+- Politique de confidentialité : `https://ridenrest.app/privacy`
+- CGU : `https://ridenrest.app/terms`
+- Mentions légales (historique) : `https://ridenrest.app/mentions-legales`
+
+> ⚠️ Le contenu des **CGU** (`/terms`) est un premier jet rédigé pour le MVP — **à faire valider
+> juridiquement** avant publication (décision story MOB-6.4).
+
+### Données réellement collectées (source de vérité — labels & Data Safety)
+
+| Donnée | Détail | iOS (Nutrition Label) | Android (Data Safety) |
+|---|---|---|---|
+| Géoloc (GPS précis) | On-device uniquement, jamais envoyée au serveur (scrub Sentry, aucun POST GPS) | Location → App Functionality → **Not Linked**, **Not Tracking** | Location → traitée sur l'appareil, non partagée |
+| Compte / identité | Better Auth : email + Google/Strava OAuth ; tokens en `expo-secure-store` | Email + User ID → Linked → App Functionality | Personal info (Email) + App activity |
+| Analytics produit | PostHog **EU**, `distinct_id` AsyncStorage, **zéro cookie**, **pas d'IDFA/ATT**, `identify(user.id)` | Product Interaction/Usage → **Not Tracking** → Linked to User ID | App activity |
+| Crash / diagnostics | Sentry `sendDefaultPii:false`, scrub GPS, key-gated, **EU** | Crash/Performance → App Functionality → **Not Tracking** | Crash logs + Diagnostics |
+
+**Invariant clé** : pas d'IDFA / pas de suivi cross-app → **ATT non requise**, toutes les catégories
+iOS marquées **« Not Used for Tracking »**. Hébergement **EU (Francfort)**.
+
+### Checklist App Store Connect — Privacy Nutrition Labels (à recopier au submit)
+
+1. **Location** → *Precise Location* : collecté. Usage = **App Functionality** uniquement.
+   Linked to user = **No**. Used for tracking = **No**.
+2. **Contact Info** → *Email Address* : collecté. Usage = App Functionality + Account.
+   Linked = **Yes**. Tracking = **No**.
+3. **Identifiers** → *User ID* : collecté. Usage = App Functionality + Analytics.
+   Linked = **Yes**. Tracking = **No**. *(Pas de Device ID / IDFA.)*
+4. **Usage Data** → *Product Interaction* : collecté. Usage = Analytics + App Functionality.
+   Linked = **Yes**. Tracking = **No**.
+5. **Diagnostics** → *Crash Data* + *Performance Data* : collecté. Usage = App Functionality.
+   Linked = **No**. Tracking = **No**.
+6. **Tracking** (section globale) : **No, we do not track**. Aucun ATT prompt.
+7. Vérifier après `expo prebuild` la présence de `ios/RidenRest/PrivacyInfo.xcprivacy`
+   (Apple Privacy Manifest, requis au submit depuis 2024 ; `NSPrivacyTracking = false`,
+   raisons d'API d'accès générées par Expo/SDK). ✅ présent.
+
+### Checklist Google Play Console — Data Safety (à recopier au submit)
+
+- **Location** → *Approximate/Precise location* : collectée mais **traitée sur l'appareil,
+  non partagée, non envoyée** → cocher « traitée de façon éphémère / sur l'appareil » ;
+  non transmise à des tiers. Aucune finalité publicitaire.
+- **Personal info** → *Email address* : collectée, chiffrée en transit, finalité = gestion de
+  compte / authentification. Non partagée. Suppression possible (compte supprimable in-app).
+- **App activity** → *App interactions* : collectée (analytics PostHog EU), finalité =
+  Analytics. Non partagée à des fins publicitaires.
+- **App info & performance** → *Crash logs* + *Diagnostics* : collectés (Sentry EU), finalité =
+  Analytics / prévention des bugs.
+- **Data is encrypted in transit** : Oui (HTTPS). **Users can request deletion** : Oui
+  (suppression de compte in-app + `contact@ridenrest.app`).
+- **Age / content rating (IARC)** : app utilitaire de planification d'itinéraires, **aucun**
+  contenu violent/sexuel/jeu d'argent/substances → catégorie « Tout public » (PEGI 3 /
+  ESRB Everyone / IARC 3+). Pas d'UGC partagé publiquement (les aventures restent privées).
