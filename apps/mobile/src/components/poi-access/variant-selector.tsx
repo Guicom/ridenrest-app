@@ -35,7 +35,8 @@ export function VariantSelector({
   selected,
   onSelect,
 }: VariantSelectorProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
 
   // Choix d'itinéraires : utile seulement à partir de 2 variantes ET si la sélection
   // est câblée. L'avertissement nationale dépend, lui, de la variante AFFICHÉE.
@@ -80,8 +81,8 @@ export function VariantSelector({
           const isActive = i === selected;
           const a11yLabel = t('pois.access.variantA11y', {
             index: i + 1,
-            distance: formatAccessDistance(v.distanceM),
-            eta: formatAccessEta(v.etaS),
+            distance: formatAccessDistance(v.distanceM, locale),
+            eta: formatAccessEta(v.etaS, locale),
           });
           return (
             <Pressable
@@ -109,13 +110,13 @@ export function VariantSelector({
                 className="text-xs font-montserrat-semibold"
                 style={{ color: isActive ? ACCENT : undefined }}
               >
-                {formatAccessDistance(v.distanceM)}
+                {formatAccessDistance(v.distanceM, locale)}
               </Text>
               <Text
                 className="text-xs font-montserrat text-text-secondary"
                 style={isActive ? { color: ACCENT } : undefined}
               >
-                {formatAccessEta(v.etaS)}
+                {formatAccessEta(v.etaS, locale)}
               </Text>
             </Pressable>
           );

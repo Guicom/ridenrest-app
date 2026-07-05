@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
 
 import { cn } from '@/lib/cn';
+import { useTranslation } from '@/lib/i18n';
 
 // Dialog modal — primitive UI manquante côté mobile (port des `Dialog`/`AlertDialog`
 // web). S'appuie sur le `Modal` natif RN (transparent + backdrop). Le contenu est une
@@ -14,6 +15,7 @@ export interface DialogProps {
 }
 
 export function Dialog({ open, onClose, children }: DialogProps) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={open}
@@ -24,7 +26,7 @@ export function Dialog({ open, onClose, children }: DialogProps) {
     >
       <Pressable
         onPress={onClose}
-        accessibilityLabel="close"
+        accessibilityLabel={t('common.closeA11y')}
         className="flex-1 items-center justify-center bg-black/40 px-6"
       >
         {/* Stop propagation : un tap dans la carte ne ferme pas. */}

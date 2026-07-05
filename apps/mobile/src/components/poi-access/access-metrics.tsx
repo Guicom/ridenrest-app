@@ -41,7 +41,8 @@ export function AccessMetrics({
   selectedVariantIndex = 0,
   onSelectVariant,
 }: AccessMetricsProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const { isOnline } = useNetworkStatus();
   const { data, isLoading, fetchStatus } = useAccess(poiId, origin);
 
@@ -87,18 +88,18 @@ export function AccessMetrics({
       </Text>
       <View className="flex-row items-center gap-4">
         <Text className="text-sm font-montserrat-medium text-text-primary">
-          {formatAccessDistance(active.distanceM)}
+          {formatAccessDistance(active.distanceM, locale)}
         </Text>
         <View className="flex-row items-center gap-1">
           <TrendingUpIcon size={16} className="text-primary" />
           <Text className="text-sm font-montserrat text-text-secondary">
-            {formatAccessElevation(active.elevationGainM)} D+
+            {formatAccessElevation(active.elevationGainM, locale)} D+
           </Text>
         </View>
         <View className="flex-row items-center gap-1">
           <TrendingDownIcon size={16} className="text-primary" />
           <Text className="text-sm font-montserrat text-text-secondary">
-            {formatAccessElevation(active.elevationLossM)} D-
+            {formatAccessElevation(active.elevationLossM, locale)} D-
           </Text>
         </View>
       </View>

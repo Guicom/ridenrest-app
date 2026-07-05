@@ -424,7 +424,7 @@ export function LiveFiltersDrawer({
                 testID="input-departure-time"
                 value={localDeparture}
                 onChangeText={setLocalDeparture}
-                placeholder="AAAA-MM-JJ HH:MM"
+                placeholder={t('common.dateTimePlaceholder')}
                 autoCapitalize="none"
                 accessibilityLabel={t('live.weather.departureLabel')}
                 className="rounded-md border border-border bg-background px-3 py-2 text-sm font-montserrat text-text-primary"

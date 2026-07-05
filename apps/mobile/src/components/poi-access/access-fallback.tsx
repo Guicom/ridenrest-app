@@ -12,12 +12,13 @@ interface AccessFallbackProps {
 }
 
 export function AccessFallback({ fallbackDistanceM }: AccessFallbackProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   return (
     <View className="gap-1" testID="access-fallback">
       <View className="flex-row items-center gap-2">
         <Text className="text-sm font-montserrat-medium text-text-secondary">
-          {formatAccessDistance(fallbackDistanceM)}
+          {formatAccessDistance(fallbackDistanceM, locale)}
         </Text>
         <View className="rounded-full border border-border px-2 py-0.5">
           <Text className="text-xs font-montserrat text-text-muted">

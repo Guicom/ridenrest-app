@@ -7,12 +7,14 @@ describe('i18n config (MOB-1.4 / AC1)', () => {
   });
 
   it('résout une chaîne UI via t() — preuve de câblage', () => {
-    expect(i18n.t('explore.back')).toBe('Retour');
-    expect(i18n.t('home.subtitle')).toContain('MOB-1.4');
+    // Clés VIVANTES (MOB-6.3 / T3) — les anciennes clés de démo `home`/`explore`/
+    // `oauthCallback` ont été retirées avec l'écran de scaffold MOB-1.1.
+    expect(i18n.t('common.cancel')).toBe('Annuler');
+    expect(i18n.t('auth.login.title')).toBe('Connexion');
   });
 
   it('retombe en fr pour une locale non supportée', () => {
-    expect(i18n.t('oauthCallback.title', { lng: 'de' })).toBe('Callback OAuth');
+    expect(i18n.t('common.retry', { lng: 'de' })).toBe('Réessayer');
   });
 
   it('détecte la langue du device via expo-localization (mock = fr)', () => {

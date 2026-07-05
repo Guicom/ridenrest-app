@@ -4,7 +4,9 @@ import {
   formatAccessEta,
 } from '@/components/poi-access/format';
 
-// MOB-4.6 / T4, T8 — helpers de format purs (parité web, virgule FR).
+// MOB-4.6 / T4, T8 + MOB-6.3 / T2 — helpers de format purs. Séparateur décimal
+// localisé (`Intl` + `locale`, défaut `'fr'`) : virgule FR / point EN, plus de
+// `.replace('.', ',')` figé.
 
 describe('formatAccessDistance', () => {
   it('< 1000 m → "X m" (entier arrondi)', () => {
@@ -21,12 +23,26 @@ describe('formatAccessDistance', () => {
   it('arrondi à 1000 m → bascule en km (999,6 m → "1,0 km")', () => {
     expect(formatAccessDistance(999.6)).toBe('1,0 km');
   });
+
+  it('locale EN → point décimal, 1 décimale conservée ("1.4 km", "2.0 km")', () => {
+    expect(formatAccessDistance(1400, 'en')).toBe('1.4 km');
+    expect(formatAccessDistance(2000, 'en')).toBe('2.0 km');
+    expect(formatAccessDistance(740, 'en')).toBe('740 m');
+  });
 });
 
 describe('formatAccessElevation', () => {
   it('entier en mètres', () => {
     expect(formatAccessElevation(40.7)).toBe('41 m');
     expect(formatAccessElevation(0)).toBe('0 m');
+  });
+
+  it('séparateur de milliers EN (virgule pour les milliers, pas le décimal)', () => {
+    expect(formatAccessElevation(1234, 'en')).toBe('1,234 m');
+  });
+
+  it('séparateur de milliers FR (espace fine insécable pour les milliers)', () => {
+    expect(formatAccessElevation(1234)).toBe('1 234 m');
   });
 });
 
