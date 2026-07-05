@@ -101,7 +101,102 @@ jobs:
       # eas submit (stores) → MOB-6.5
 ```
 
-**Hors scope ici** (volontairement) : job CI lint/test/typecheck mobile → **MOB-1.4** ; distribution TestFlight/Internal Testing + `eas submit` → **MOB-6.5**.
+**Hors scope ici** (volontairement) : job CI lint/test/typecheck mobile → **MOB-1.4**. La distribution TestFlight/Internal Testing + `eas submit` + soumission store est traitée dans la section **Release** ci-dessous (MOB-6.5).
+
+## Release — Beta (TestFlight / Internal Testing) → Production (MOB-6.5)
+
+> **Cette section est le runbook opérationnel.** ~80 % du travail = actions console (Apple/Google) + commandes EAS CLI. Le code/config est minimal et **déjà en place** : `submit.production` (eas.json), `SENTRY_AUTH_TOKEN` (env EAS), `version` (app.config.ts), et le **Workflow EAS** `.eas/workflows/deploy-to-production.yml` (fingerprint → build/submit **ou** OTA).
+>
+> ⚠️ **Rapporter l'état RÉEL par plateforme** (iOS / Android), jamais un « ✓ » global (règle anti-arrondi, AGENTS.md). La vraie validation = builds EAS + soumissions + install device (TestFlight / Internal Testing) + smoke test OTA.
+
+**Ordre des prérequis — suivre T0 → T5 dans l'ordre. Ne pas sauter T0.**
+
+### T0 — Comptes & credentials (BLOCKER, à faire en premier)
+
+| # | Action | Où | Récupérer |
+|---|---|---|---|
+| 1 | **Débloquer le compte Google Play Console** (paiement $25 — blocage bancaire hérité MOB-1.2) | [play.google.com/console](https://play.google.com/console) | compte actif |
+| 2 | Confirmer le **compte Apple Developer** actif | [developer.apple.com → Membership](https://developer.apple.com/account) | **Team ID** |
+| 2b | **Signer le contrat « Free Apps »** (Account Holder) — sinon toute requête API/`asc`/`eas submit` échoue avec *« A required agreement is missing or has expired »* | [App Store Connect → Business](https://appstoreconnect.apple.com/business) → Agreements → Free Apps → Agree | contrat *Active* (app gratuite : aucun bancaire requis ; propagation ~quelques min) |
+| 3 | Créer la **fiche App Store Connect** (bundle `app.ridenrest`) | [App Store Connect → Apps → +](https://appstoreconnect.apple.com) | **`ascAppId`** = champ « Apple ID » (numérique) de l'app |
+| 4 | Créer la **fiche Google Play** (package `app.ridenrest`) | Play Console → Créer une application | — |
+| 5 | Générer une **clé API App Store Connect** (rôle App Manager) | App Store Connect → Users & Access → Integrations → **App Store Connect API** | `.p8` (téléchargé **1 seule fois**) + **Key ID** + **Issuer ID** |
+| 6 | Créer un **service-account Google Cloud** puis l'inviter dans Play Console (permission *Releases*) | Google Cloud Console → IAM → Service accounts → clé JSON ; Play Console → Users & permissions | **JSON** → déposer dans `apps/mobile/credentials/google-service-account.json` (gitignored) |
+| 7 | Lier le repo **GitHub ↔ EAS** (active le Workflow) | [expo.dev](https://expo.dev) → projet → GitHub → installer l'app GitHub Expo | — |
+
+> Le `.p8` Apple : le stocker via `eas credentials` (recommandé — EAS le garde côté serveur) ou le référencer localement. **Ne jamais committer** `.p8` / JSON service-account (déjà gitignorés : `*.p8`, `credentials/`).
+>
+> ⚠️ **Gotcha bundle ID pré-enregistré (vécu 2026-07-05)** : si on enregistre l'App ID à la main / via l'API (`asc bundle-ids create`) **avant** le 1ᵉʳ `eas build`, il est créé **nu** → EAS génère un provisioning profile **sans** les capabilities requises → le build Xcode échoue avec *« Provisioning profile doesn't include the aps-environment entitlement / Push Notifications capability »*. L'app utilisant `expo-notifications` (APNs, MOB-6.2), il faut **activer Push Notifications sur l'App ID** : `asc bundle-ids capabilities add --bundle <BUNDLE_RES_ID> --capability PUSH_NOTIFICATIONS`, puis **rebuild** (EAS régénère le profil avec push). Alternative : laisser EAS enregistrer l'App ID lui-même au 1ᵉʳ build (il sync les capabilities), mais on perd la création de fiche ASC en amont. Seule capability App ID requise ici = `PUSH_NOTIFICATIONS` (localisation/deep-link custom-scheme n'en exigent pas).
+
+### T1 — Remplir `submit.production` (eas.json)
+
+Structure déjà en place ; **remplacer les placeholders** une fois T0 fait :
+
+- **iOS** : remplacer `"ascAppId": "REPLACE_WITH_ASC_APP_ID"` par l'`ascAppId` réel (T0.3). La clé API ASC (`.p8` + Key ID + Issuer ID) est fournie à `eas submit` **interactivement au 1er run** (EAS propose de la stocker) ou via `eas credentials`.
+- **Android** : `serviceAccountKeyPath` pointe déjà sur `./credentials/google-service-account.json` — **y déposer le JSON** (T0.6). `track: "internal"` pour la beta (AC1) ; passer à `"production"` pour la soumission finale (T5 / AC2).
+
+### T2 — `SENTRY_AUTH_TOKEN` en env EAS (release symbolisée)
+
+Source maps Sentry uploadées au build cloud (plugin déjà en région **EU** `de.sentry.io`, cf. `app.config.ts`). Corriger le 401 EU/US de MOB-6.1 : token créé côté **EU**, slugs org/projet exacts.
+
+```bash
+cd apps/mobile
+# Token SECRET (upload source maps) — jamais EXPO_PUBLIC_*, jamais commité
+eas env:create --name SENTRY_AUTH_TOKEN --scope project --environment production --visibility sensitive
+# Slugs org/projet Sentry (lus par app.config.ts via process.env, défaut '') — non secrets
+eas env:create --name SENTRY_ORG      --scope project --environment production --visibility plaintext
+eas env:create --name SENTRY_PROJECT  --scope project --environment production --visibility plaintext
+```
+
+> Vérifier après un build production que les source maps sont bien uploadées (logs EAS : phase `sentry-cli`). Sans token, le build **n'échoue pas** — les maps ne sont juste pas uploadées (stack traces non symbolisées).
+
+### T3 — Versioning
+
+- `version` (`app.config.ts`) : **`1.0.0`** pour la 1ʳᵉ release publique (rien à bumper *depuis*). Bumper pour **toute** release user-visible suivante.
+- `buildNumber` (iOS) / `versionCode` (Android) : **gérés par EAS** (`autoIncrement: true` + `appVersionSource: "remote"`) — ne **jamais** les éditer à la main.
+- `runtimeVersion.policy: "appVersion"` : une OTA ne s'applique qu'aux builds de **même `version`** — cohérent avec le mapping canal ↔ profil.
+
+### T4 — Build + distribution beta (AC1)
+
+```bash
+cd apps/mobile
+eas login                                    # ou EXPO_TOKEN en CI
+eas credentials --platform ios               # 1re fois : cert + provisioning (EAS-managed)
+
+eas build --profile production --platform all # ou --platform ios / android séparément
+
+eas submit --profile production --platform ios      # → TestFlight
+eas submit --profile production --platform android   # → Internal Testing (track internal)
+```
+
+> **Android — 1ᵉʳ upload** : Google exige souvent que le **tout premier** `.aab` soit uploadé **manuellement** dans la Play Console (crée la piste) avant que l'API service-account accepte les submits suivants.
+>
+> Puis : **inviter les beta-users** (événement Espagne) → TestFlight (App Store Connect) + Internal Testing (Play Console). **Smoke test device réel** : login, carte, mode Live, push (MOB-6.2). Rapporter **par plateforme**.
+
+### T5 — Soumission production (AC2) — après MOB-6.4 ✅
+
+Pré-requis **MOB-6.4 (done)** : Privacy Nutrition Labels iOS + Data Safety Android + age rating IARC renseignés dans les consoles.
+
+1. **iOS** : App Store Connect → soumettre le build TestFlight validé en review App Store.
+2. **Android** : passer `submit.production.android.track` de `internal` → `production` (eas.json) puis promouvoir en review Play (ou promouvoir la release depuis la console).
+3. **Smoke test OTA** (patch JS critique sans resoumission — FR-MOB-003) :
+
+```bash
+eas update --channel production --message "fix: …" --environment production
+```
+
+> ⚠️ `--environment` est **requis** en `--non-interactive`. Une OTA ne livre **que du JS/assets** : tout changement **natif** (module/plugin/permission/bump SDK) exige un **nouveau build + submit**, jamais une OTA silencieuse — garanti par le fingerprint du Workflow (T6).
+
+### T6 — Automatisation Workflow EAS (optionnel, recommandé)
+
+Une fois T0/T1/T2 satisfaits :
+
+```bash
+cd apps/mobile
+eas workflow:run deploy-to-production.yml
+```
+
+Push `main` → job `fingerprint` → natif **inchangé** = `update` (OTA branch `production`) ; natif **changé** = `build` + `submit`. Résout « natif ≠ OTA » automatiquement. Gate E2E Maestro pré-release : bloc commenté en fin de `.eas/workflows/deploy-to-production.yml` (à décommenter si souhaité — jamais en CI PR, cadence release).
 
 ## Variables d'environnement
 
@@ -118,6 +213,13 @@ Copier `.env.example` → `.env` et renseigner :
 | `EXPO_PUBLIC_API_URL` | API **NestJS** (données) — appelée par `apiFetch` avec `Authorization: Bearer` | `http://localhost:3010` |
 
 > ⚠️ **Gotcha device physique / émulateur Android** : `localhost` pointe sur le **device lui-même**, pas sur la machine de dev. Utiliser l'**IP LAN** de la machine (ex. `http://192.168.1.42:3011` / `:3010`). La trouver via `ipconfig getifaddr en0` (macOS). Le simulateur iOS, lui, partage `localhost` avec l'hôte.
+>
+> 🔴 **PRODUCTION (build store / TestFlight) — CRITIQUE (vécu 2026-07-05)** : `.env` est **gitignoré** → **non uploadé** au build EAS cloud. Sans valeur, le code retombe sur ses défauts **`http://localhost:*`** → sur un device réel `localhost` = le téléphone → **backend injoignable → login (Google/email) & données KO** (« La connexion Google a échouée »). ⇒ Les URLs prod **DOIVENT** être posées en **EAS Environment Variables (environnement `production`)** — elles alimentent le build **et** l'OTA (`eas update --environment production`), contrairement à `eas.json build.env` qui n'alimente que le build :
+> ```bash
+> eas env:create --name EXPO_PUBLIC_API_URL         --value "https://api.ridenrest.app" --visibility plaintext --scope project --environment production
+> eas env:create --name EXPO_PUBLIC_BETTER_AUTH_URL --value "https://ridenrest.app"     --visibility plaintext --scope project --environment production
+> ```
+> Toute modif d'une `EXPO_PUBLIC_*` = **inlinée au build** → nouveau build requis (ou OTA `--environment production`, qui re-bundle le JS avec ces env).
 
 ### Observabilité — Sentry & PostHog (MOB-6.1)
 

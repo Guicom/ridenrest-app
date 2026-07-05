@@ -18,6 +18,11 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Store submit credentials (EAS Submit, MOB-6.5) — NEVER commit.
+# Google Play service-account JSON (submit.production.android.serviceAccountKeyPath).
+# Apple ASC API key .p8 is already covered by *.p8 above.
+credentials/
+
 # Metro
 .metro-health-check*
 

@@ -4,7 +4,7 @@ baseline_commit: f0349415d9fe5b1fb173cf42d84072799e96cdf7
 
 # Story MOB-6.5 : Distribution beta & soumission production
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -50,23 +50,23 @@ So that **les beta-users (événement Espagne) puis le public puissent l'utilise
   - [ ] Générer une **clé API App Store Connect** (`.p8` + Key ID + Issuer ID) et un **service-account Google Cloud** lié à Play Console (JSON) pour `eas submit` non-interactif.
   - [ ] Lier le repo GitHub à EAS (dashboard Expo → GitHub → app GitHub Expo) pour activer le Workflow.
 
-- [ ] **T1 — Remplir `submit.production` dans `eas.json`** (AC: 1)
-  - [ ] iOS : `submit.production.ios` = `{ ascAppId, ascApiKeyPath | ascApiKeyId + ascApiKeyIssuerId }`.
-  - [ ] Android : `submit.production.android` = `{ serviceAccountKeyPath, track: 'internal' }` (puis `production` en AC2). Ne PAS committer les clés/JSON de credentials — référencer des chemins (`.env.local` / EAS secrets) ; le JSON service-account reste hors repo.
-  - [ ] Vérifier que le job `submit` du Workflow n'est plus interactif (sinon il bloque).
+- [ ] **T1 — Remplir `submit.production` dans `eas.json`** (AC: 1) — **structure scaffoldée ; valeurs réelles pending T0**
+  - [x] iOS : `submit.production.ios` = `{ ascAppId: "6787704466" }` **rempli avec la vraie valeur** (fiche ASC `Ride'n'Rest` créée 2026-07-05 via `asc` : bundle ID `app.ridenrest` enregistré [ID `CF8P6V3P6H`] + fiche web UI officielle → `ascAppId 6787704466`, locale `fr-FR`, SKU `ridenrest`). Clé API ASC créée + validée (`asc auth status --validate` = works). La clé API ASC (`.p8`) sera fournie à `eas build`/`eas submit` interactivement au 1er run (EAS la stocke). **NB : `asc web apps create` volontairement NON utilisé (endpoints web privés « discouraged » → risque ADPLA/compte) — fiche créée par la voie officielle.**
+  - [x] Android : `submit.production.android` = `{ serviceAccountKeyPath: './credentials/google-service-account.json', track: 'internal' }` **écrit** (puis `production` en AC2). `credentials/` ajouté à `.gitignore` → JSON service-account reste hors repo. Dépôt du JSON = T0.6 (compte Google pas encore créé).
+  - [~] Vérifier que le job `submit` du Workflow n'est plus interactif : structure eas.json OK ; **non vérifiable tant que ascAppId réel + JSON service-account absents** (pending T0).
 
-- [ ] **T2 — Poser `SENTRY_AUTH_TOKEN` en EAS env (release symbolisée)** (AC: 3)
-  - [ ] `eas env:create --name SENTRY_AUTH_TOKEN --scope project --environment production --visibility sensitive` (token **EU** valide — corriger le 401 EU/US + org/projet identifié en MOB-6.1 : `SENTRY_ORG`/`SENTRY_PROJECT` slugs corrects, région `de.sentry.io`).
-  - [ ] Confirmer que le plugin `@sentry/react-native/expo` (région EU, `app.config.ts:123-136`) + `getSentryExpoConfig` (metro) uploadent bien les source maps sur un build EAS production (pas désactivé comme en build local `sim-build.sh`).
+- [x] **T2 — Poser `SENTRY_AUTH_TOKEN` en EAS env (release symbolisée)** (AC: 3) — **FAIT (2026-07-05)**
+  - [x] `eas env:create` (production, scope project) posé pour les **3** variables : `SENTRY_ORG=ridenrest` (plaintext), `SENTRY_PROJECT=react-native` (plaintext), `SENTRY_AUTH_TOKEN=*****` (sensitive). **401 MOB-6.1 corrigé** : nouveau **org auth token EU** (`sntrys_…`, 191 car., région `de.sentry.io`) + **vrais slugs** (l'ancien `.env` avait `SENTRY_ORG=react-native` [=slug projet] et `SENTRY_PROJECT=4511643853717584` [=ID], tous deux faux → org réel `ridenrest`, projet slug `react-native`). Vérifié via `eas env:list --environment production`. NB : le token a le scope upload (`org:ci`) mais pas `project:read` → résolution des slugs faite hors-API (URL org + notes MOB-6.1). Preuve définitive du slug projet = upload `sentry-cli` au prochain build prod.
+  - [x] Confirmer que le plugin `@sentry/react-native/expo` (région EU) + `getSentryExpoConfig` (metro) sont correctement câblés pour l'upload source maps sur un build EAS prod. → **config vérifiée** : `app.config.ts:134-147` (`url: 'https://de.sentry.io/'`, org/projet via env) ; `metro.config.js:19` (`getSentryExpoConfig` debug IDs). L'upload réel sur build cloud reste à confirmer sur un build EAS prod (opérationnel).
 
-- [ ] **T3 — Versioning release** (AC: 3)
-  - [ ] Bumper `version` dans `app.config.ts` (`1.0.0` → cible release) pour toute release user-visible. `buildNumber`/`versionCode` restent gérés par EAS (`autoIncrement` + `appVersionSource: remote`).
-  - [ ] Vérifier `runtimeVersion.policy: 'appVersion'` : une OTA ne s'applique qu'aux builds de même `version` — cohérent avec le mapping channel↔profil.
+- [x] **T3 — Versioning release** (AC: 3)
+  - [x] Bumper `version` dans `app.config.ts` (`1.0.0` → cible release) pour toute release user-visible. `buildNumber`/`versionCode` restent gérés par EAS (`autoIncrement` + `appVersionSource: remote`). → **Décision : `1.0.0` conservé** — 1ʳᵉ release publique, rien à bumper *depuis* ; `1.0.0` **est** la version cible.
+  - [x] Vérifier `runtimeVersion.policy: 'appVersion'` : une OTA ne s'applique qu'aux builds de même `version` — cohérent avec le mapping channel↔profil. → vérifié `app.config.ts:160-161`.
 
-- [ ] **T4 — Build + distribution beta** (AC: 1) — **opérationnel**
-  - [ ] `eas build --profile production --platform all` (ou `all` séparé). Credentials iOS générés à la 1re fois (`eas credentials`), keystore Android EAS-managed.
-  - [ ] `eas submit --profile production --platform ios` → **TestFlight** ; `eas submit --profile production --platform android` (track `internal`) → **Internal Testing**.
-  - [ ] Inviter les beta-users (événement Espagne). Vérifier install + smoke test sur device réel (login, carte, mode Live, push si MOB-6.2 livré).
+- [ ] **T4 — Build + distribution beta** (AC: 1) — **iOS build ✅ ; submit + Android en cours**
+  - [~] `eas build --profile production --platform ios` → **iOS build #6 FINISHED** (2026-07-05, `1.0.0` / buildNumber 6, .ipa produit, credentials iOS EAS-managed via login Apple + `eas credentials`). Android : pending (compte Google). Gotchas résolus en route : (1) bundle ID pré-enregistré sans push → capability `PUSH_NOTIFICATIONS` ajoutée ; (2) build #5 échoué car `SENTRY_AUTH_TOKEN` présent mais `SENTRY_ORG` absent → **sentry-cli fait échouer le build** (poser T2 AVANT le build). **AC3 iOS validé** : build #6 a fini = upload source maps `ridenrest/react-native` réussi.
+  - [~] `eas submit --profile production --platform ios` → **TestFlight** : **iOS FAIT ✅** (2026-07-05 — build #6 soumis, EAS a généré+stocké sa propre clé API ASC `[Expo] EAS Submit` KeyID `LNU9JT6285` → submits/Workflow non-interactifs ; « Successfully uploaded to App Store Connect », en cours de traitement Apple). Android (`track internal`) → pending (compte Google).
+  - [ ] Inviter les beta-users (événement Espagne). Vérifier install + smoke test sur device réel (login, carte, mode Live, push si MOB-6.2 livré). → iOS : après traitement Apple, inviter via TestFlight (Internal Testing instantané / External = Beta App Review). Android pending.
 
 - [ ] **T5 — Soumission production** (AC: 2) — **opérationnel, après MOB-6.4**
   - [ ] Pré-requis MOB-6.4 : Privacy Nutrition Labels + Data Safety + age rating renseignés.
@@ -78,9 +78,9 @@ So that **les beta-users (événement Espagne) puis le public puissent l'utilise
   - [ ] (Optionnel) Décommenter la gate Maestro E2E pré-release du Workflow (jamais en CI PR — cadence release, cf. README §E2E).
 
 - [ ] **T7 — Doc Sync + gate** (règle CRITIQUE project-context)
-  - [ ] `apps/mobile/README.md` : documenter les commandes exactes (build/submit/update/credentials/env) + l'ordre des prérequis (T0→T5).
-  - [ ] `sprint-status.yaml` : MOB-6-5 → `in-progress` puis `review`. Mettre à jour la note MOB-1.2 (`sprint-status.yaml:329`) si le compte Google est débloqué.
-  - [ ] **Gate code** minimale (peu de code) : `tsc` 0 · `eslint` 0 · `eas.json` valide. La validation réelle = builds/soumissions (device + consoles).
+  - [x] `apps/mobile/README.md` : documenter les commandes exactes (build/submit/update/credentials/env) + l'ordre des prérequis (T0→T5). → section **« Release — Beta → Production (MOB-6.5) »** ajoutée (runbook T0→T6, tableaux console, commandes exactes).
+  - [~] `sprint-status.yaml` : MOB-6-5 → `in-progress` (✅ fait) puis `review` (⏳ après complétion opérationnelle). Note MOB-1.2 (`sprint-status.yaml:329`) : à mettre à jour **quand** le compte Google sera débloqué (pas encore fait — Guillaume s'en occupe).
+  - [x] **Gate code** minimale (peu de code) : `tsc` 0 · `eslint` 0 · `eas.json` valide. → `tsc --noEmit` 0 · `eslint` 0 erreurs (2 warnings pré-existants hors-scope) · `eas.json` parse OK · `check:native-config` 5 invariants OK. La validation réelle = builds/soumissions (device + consoles), **opérationnelle**.
 
 ## Dev Notes
 
@@ -162,10 +162,51 @@ eas workflow:run deploy-to-production.yml
 
 ### Agent Model Used
 
-_(à remplir par le dev agent)_
+claude-opus-4-8 (dev-story 2026-07-05)
 
 ### Debug Log References
 
+- `node -e 'require("./eas.json")'` → parse OK, `submit.production` structuré.
+- `pnpm check:native-config` → ✓ 5 invariants natifs OK (aucune violation ; `app.config.ts` non modifié).
+- `pnpm typecheck` (`tsc --noEmit`) → 0 erreur.
+- `pnpm lint` (`expo lint`) → **0 erreurs**, 2 warnings pré-existants `react-hooks/exhaustive-deps` dans `src/app/(app)/live/[id].tsx` + `src/app/(app)/map/[id].tsx` (fichiers **non touchés** par cette story).
+- **🔴 Finding beta iOS (2026-07-05)** : login Google KO sur TestFlight (« La connexion Google a échouée »). Root cause : le build store **n'embarquait aucune URL backend** (`eas.json production.env` = APP_ENV/POSTHOG_HOST seuls ; `.env` gitignoré donc absent du build cloud) → code retombe sur défauts `http://localhost:*` → `localhost` = le device → backend injoignable (login Google server-mediated + email + data tous KO). **Fix** : `EXPO_PUBLIC_API_URL=https://api.ridenrest.app` + `EXPO_PUBLIC_BETTER_AUTH_URL=https://ridenrest.app` posées en **EAS env (production)** (alimentent build **et** OTA) → **rebuild requis** (EXPO_PUBLIC inlinées au build). Documenté README §Env.
+
 ### Completion Notes List
 
+**Nature de la story (rappel) : ~80 % opérationnelle** (consoles Apple/Google + EAS CLI authentifié + test device). Le périmètre CODE réalisable par l'agent est minime et **fait** ; le reste est **human-gated** et fera l'objet d'un **guidage pas à pas en live** (choix de Guillaume).
+
+**Fait (code / config / doc) :**
+- **T1 (partiel)** — `eas.json → submit.production` scaffoldé : iOS `{ ascAppId: "REPLACE_WITH_ASC_APP_ID" }` (placeholder, valeur réelle pending T0.3) ; Android `{ serviceAccountKeyPath: "./credentials/google-service-account.json", track: "internal" }` (fonctionnel ; JSON à déposer = T0.6). `.gitignore` : `credentials/` ajouté (le `.p8` Apple était déjà couvert par `*.p8`).
+- **T2 (partiel)** — Config Sentry EU vérifiée (plugin `de.sentry.io` `app.config.ts:134-147` + `getSentryExpoConfig` `metro.config.js:19`). L'`eas env:create` (token EU + `SENTRY_ORG`/`SENTRY_PROJECT`) est opérationnel → documenté dans le runbook.
+- **T3 (fait)** — `version` = **`1.0.0`** conservé (1ʳᵉ release ; version cible correcte). `runtimeVersion.policy: 'appVersion'` vérifié.
+- **T7 (fait pour la partie code)** — README : section **« Release — Beta → Production (MOB-6.5) »** = runbook opérationnel complet (T0→T6, tableaux console, commandes exactes, gotchas Android 1er upload / OTA `--environment`). Gate code verte (voir Debug Log). `sprint-status.yaml` → `in-progress`.
+
+**Pending — opérationnel (human-gated, à faire par Guillaume ; guidage live en cours) :**
+- **T0** — comptes : ⏳ Google Play Console (blocage bancaire, « je m'en occupe tout à l'heure ») · Apple Team ID · fiches ASC (`ascAppId`) + Play · clé API ASC (`.p8`/Key ID/Issuer ID) · service-account Google (JSON) · lien GitHub↔EAS.
+- **T2** — `eas env:create SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`/`SENTRY_PROJECT`) sur EAS.
+- **T4** — `eas build --profile production` + `eas submit` → TestFlight (iOS) / Internal Testing (Android) + invitations beta + smoke test device (**par plateforme**).
+- **T5** — soumission production (MOB-6.4 ✅) : review App Store + Play (track `production`) + smoke test OTA.
+- **T6** — `eas workflow:run deploy-to-production.yml`.
+
+**Statut par AC (honnête, par plateforme) :**
+- **AC1** (beta TestFlight/Internal Testing + `submit.production` renseigné) : iOS ⏳ (scaffold ok, `ascAppId` + build/submit pending) · Android ⏳ (scaffold ok, compte + JSON + build/submit pending).
+- **AC2** (soumission production + OTA + natif→build) : ⏳ pending T4/T5 (dépendance MOB-6.4 **levée** ✅).
+- **AC3** (source maps Sentry EU + `version` bumpée) : config ✅ vérifiée · `version` ✅ `1.0.0` · upload réel + `SENTRY_AUTH_TOKEN` ⏳ pending build EAS prod.
+
+**Story NON terminée → reste `in-progress`** (le gros du travail est opérationnel et pending). Ne PAS marquer `review` tant que la beta (AC1) n'est pas réellement distribuée.
+
 ### File List
+
+- `apps/mobile/eas.json` (M) — `submit.production` scaffoldé (iOS `ascAppId` placeholder ; Android `serviceAccountKeyPath` + `track: internal`).
+- `apps/mobile/.gitignore` (M) — ignore `credentials/` (JSON service-account Google hors repo).
+- `apps/mobile/README.md` (M) — section runbook « Release — Beta → Production (MOB-6.5) » (T7).
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (M) — MOB-6-5 → `in-progress`.
+- `_bmad-output/implementation-artifacts/MOB-6-5-beta-distribution-production-submission.md` (M) — tâches cochées/annotées, Dev Agent Record, Change Log.
+
+## Change Log
+
+| Date | Version | Description | Auteur |
+|---|---|---|---|
+| 2026-07-05 | 0.1 | dev-story : partie CODE de MOB-6.5 (eas.json `submit.production` scaffold, `.gitignore credentials/`, runbook README, version 1.0.0 confirmée, config Sentry EU vérifiée) + gate verte (tsc 0 / eslint 0 / eas.json valide / native-config OK). Story reste `in-progress` — le reste (T0/T2 env/T4/T5/T6) est opérationnel, human-gated, guidage live en cours. | claude-opus-4-8 |
+| 2026-07-05 | 0.2 | **Guidage live (iOS) — installation `asc` + setup App Store Connect + build/submit** : bundle ID `app.ridenrest` (+ capability Push), fiche ASC `Ride'n'Rest` (`ascAppId 6787704466` → eas.json), T2 Sentry EU corrigé (token `sntrys_` + slugs `ridenrest`/`react-native` en env EAS), build iOS #6 FINISHED (source maps ✅), submit → **TestFlight** (clé API ASC EAS-managed). **Fix critique beta** : URLs backend prod (`API_URL`/`BETTER_AUTH_URL`) manquantes du build store (login localhost KO sur device) → posées en env EAS production + doc README → **rebuild**. Android + T5/T6 : pending compte Google. | claude-opus-4-8 |
