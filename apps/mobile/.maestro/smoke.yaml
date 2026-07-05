@@ -1,0 +1,8 @@
+appId: app.ridenrest
+---
+# Smoke device : l'app démarre, la liste s'affiche, le planning d'une aventure s'ouvre
+# (carte + trace rendues sans crash MapLibre natif). Filet de non-régression minimal,
+# indépendant de toute story.
+- runFlow: common/open-planning.yaml
+- takeScreenshot: screenshots/smoke-planning
+- assertVisible: "Ouvrir le panneau"

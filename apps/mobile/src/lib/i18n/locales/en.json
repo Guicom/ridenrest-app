@@ -1,0 +1,485 @@
+{
+  "auth": {
+    "loadingSession": "Restoring session…",
+    "common": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@email.com",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "••••••••",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
+    },
+    "signup": {
+      "title": "Create an account",
+      "subtitle": "Join Ride'n'Rest and plan your adventures.",
+      "submit": "Create my account",
+      "submitting": "Creating…",
+      "haveAccount": "Already have an account?",
+      "signinLink": "Sign in"
+    },
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Good to see you again.",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "No account yet?",
+      "signupLink": "Create an account",
+      "orContinueWith": "or continue with"
+    },
+    "google": {
+      "continue": "Continue with Google"
+    },
+    "strava": {
+      "title": "Strava",
+      "description": "Connect your account to import your Strava routes.",
+      "connected": "Account connected",
+      "notConnected": "Not connected",
+      "connect": "Connect Strava",
+      "connecting": "Connecting…",
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting…",
+      "errors": {
+        "loadFailed": "Couldn't load Strava status.",
+        "cancelled": "Strava connection cancelled.",
+        "connectFailed": "Strava connection failed. Please try again.",
+        "disconnectFailed": "Couldn't disconnect Strava. Please try again."
+      }
+    },
+    "reset": {
+      "title": "Forgot password",
+      "subtitle": "Enter your email to receive a reset link.",
+      "submit": "Send link",
+      "submitting": "Sending…",
+      "neutralTitle": "Check your inbox",
+      "neutralMessage": "If an account exists for this address, a reset email has been sent.",
+      "backToLogin": "Back to sign in"
+    },
+    "errors": {
+      "emailInvalid": "Invalid email",
+      "passwordTooShort": "Password: 8 characters minimum",
+      "passwordRequired": "Password required",
+      "emailTaken": "An account already exists with this email",
+      "invalidCredentials": "Incorrect email or password",
+      "tooManyRequests": "Too many attempts. Please try again later.",
+      "serverError": "Service temporarily unavailable. Please try again.",
+      "network": "Can't connect. Check your network.",
+      "generic": "Something went wrong. Please try again.",
+      "oauthCancelled": "Google sign-in cancelled.",
+      "oauthFailed": "Google sign-in failed. Please try again."
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "delete": "Delete",
+    "rename": "Rename",
+    "save": "Save",
+    "closeA11y": "Close",
+    "dateTimePlaceholder": "YYYY-MM-DD HH:MM"
+  },
+  "adventures": {
+    "title": "My adventures",
+    "newButton": "New adventure",
+    "settingsA11y": "Open settings",
+    "pastSection": "Past adventures ({{count}})",
+    "intro": {
+      "planningLabel": "Planning",
+      "planningText": "Plan your route: accommodation, density, weather on each leg.",
+      "liveLabel": "Live",
+      "liveText": "On the bike: see the options for the kilometres ahead of you."
+    },
+    "card": {
+      "renameA11y": "Rename adventure",
+      "deleteA11y": "Delete adventure",
+      "openA11y": "Open adventure",
+      "live": "Start Live",
+      "planning": "Planning",
+      "edit": "Edit"
+    },
+    "empty": {
+      "title": "No adventures yet",
+      "subtitle": "Create your first adventure to start planning your bike trips.",
+      "cta": "Create an adventure"
+    },
+    "new": {
+      "title": "New adventure",
+      "nameLabel": "Adventure name",
+      "namePlaceholder": "e.g. Tour du Mont-Blanc",
+      "submit": "Create adventure",
+      "submitting": "Creating…"
+    },
+    "rename": {
+      "title": "Rename adventure",
+      "nameLabel": "New name",
+      "submit": "Rename",
+      "submitting": "Renaming…"
+    },
+    "delete": {
+      "button": "Delete adventure",
+      "confirmTitle": "Delete “{{name}}”?",
+      "confirmMessage": "This action is irreversible. All associated segments and data will be deleted.",
+      "confirm": "Delete"
+    },
+    "detail": {
+      "comingSoon": "GPX segments, dates and the map are coming soon (MOB-3.2 / MOB-3.3)."
+    },
+    "segments": {
+      "title": "Segments",
+      "empty": "No segments yet. Add a GPX file to get started.",
+      "addButton": "Add a segment",
+      "picking": "Selecting…",
+      "uploading": "Uploading…",
+      "status": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "done": "Analysed",
+        "error": "Failed"
+      },
+      "parsedSuccess": "Segment “{{name}}” analysed",
+      "parseFailed": "Parsing failed — check the GPX file format",
+      "retry": "Retry",
+      "fileTooLarge": "File too large (max 10 MB)",
+      "invalidExtension": "Select a .gpx file",
+      "uploadError": "Upload failed. Check your network and try again.",
+      "loadFailed": "Couldn't load segments.",
+      "distanceKm": "{{value}} km",
+      "elevationGain": "↑ {{value}} m",
+      "elevationLoss": "↓ {{value}} m",
+      "elevationNA": "N/A",
+      "gainDPlus": "{{value}} m D+",
+      "lossDMinus": "{{value}} m D-",
+      "parsing": "Analysing…",
+      "reorderA11y": "Reorder segment",
+      "rename": "Rename",
+      "delete": "Delete",
+      "replace": "Replace",
+      "deleteConfirmTitle": "Delete “{{name}}”?",
+      "deleteConfirmBody": "This action is irreversible.",
+      "renameTitle": "Rename segment",
+      "renameLabel": "New name",
+      "errors": {
+        "reorder": "Reordering failed. Please try again.",
+        "rename": "Rename failed. Please try again.",
+        "delete": "Delete failed. Please try again.",
+        "replace": "Replace failed. Please try again."
+      }
+    },
+    "errors": {
+      "loadFailed": "Couldn't load your adventures.",
+      "createFailed": "Creation failed. Please try again.",
+      "renameFailed": "Rename failed.",
+      "deleteFailed": "Delete failed.",
+      "nameRequired": "Name is required.",
+      "nameTooLong": "Name cannot exceed 100 characters."
+    }
+  },
+  "offline": {
+    "banner": "Offline mode",
+    "readOnly": "Offline viewing (read-only)",
+    "actionUnavailable": "Action unavailable offline"
+  },
+  "live": {
+    "start": "Start Live",
+    "consent": {
+      "title": "Enable location",
+      "body": "Live mode shows your real-time position on your route while you ride.",
+      "rgpd": "Your position is used only on your device. No coordinates are sent to or stored on our servers.",
+      "accept": "Enable",
+      "refuse": "Decline"
+    },
+    "refusedNotice": "Location is required for Live mode. Enable it to start.",
+    "permissionDenied": {
+      "title": "Location access denied",
+      "body": "Allow location access in Settings to use Live mode.",
+      "openSettings": "Open Settings"
+    },
+    "recenter": "Recenter",
+    "gpsAcquiring": "Acquiring GPS signal…",
+    "bg": {
+      "notificationTitle": "Live mode active",
+      "notificationBody": "Ride’n’Rest is tracking your position while you ride.",
+      "permissionDeniedNotice": "Background tracking is off. Live stays active while the screen is on."
+    },
+    "search": {
+      "targetLabel": "My hotel in",
+      "distanceSliderA11y": "Target distance (km)",
+      "decrement": "Decrease by 5 km",
+      "increment": "Increase by 5 km",
+      "filters": "Open filters",
+      "searchButton": "Search",
+      "etaA11y": "Estimated time: {{eta}}",
+      "noResults": "No results in this area",
+      "unstableConnection": "Unstable connection — {{count}} result(s) loaded",
+      "speedLabel": "Average speed",
+      "radiusLabel": "Distance from trace",
+      "radiusUnit": "km",
+      "layersLabel": "I'm looking for",
+      "speedDecrement": "Decrease speed",
+      "speedIncrement": "Increase speed",
+      "radiusDecrement": "Decrease radius",
+      "radiusIncrement": "Increase radius"
+    },
+    "panel": {
+      "profileHeader": "PROFILE",
+      "profileShow": "Show elevation profile",
+      "profileHide": "Hide elevation profile",
+      "dPlus": "Elevation gain {{value}} metres",
+      "dMinus": "Elevation loss {{value}} metres",
+      "eta": "Estimated time {{eta}}"
+    },
+    "profile": {
+      "noElevation": "Elevation data unavailable",
+      "a11yLabel": "Elevation profile. Window elevation change: {{dPlus}} m up, {{dMinus}} m down."
+    },
+    "filters": {
+      "title": "Filters",
+      "close": "Close filters"
+    },
+    "weather": {
+      "title": "Weather",
+      "error": "Weather unavailable",
+      "unavailable": "unavailable",
+      "gpsLost": "GPS position unavailable",
+      "now": "now",
+      "inHours": "in ~{{hours}}h{{minutes}}",
+      "inMinutes": "in ~{{minutes}}min",
+      "showOnMap": "Show weather on map",
+      "departureLabel": "Departure time",
+      "cardA11y": "At {{eta}}: {{temp}}, wind {{wind}} km/h, precipitation {{precip}} %"
+    }
+  },
+  "map": {
+    "title": "Map",
+    "back": "Back",
+    "openButton": "View on map",
+    "empty": "No trace to display — add a GPX segment",
+    "emptyCta": "Back to details",
+    "parsing": "Processing trace…",
+    "loadFailed": "Unable to load the map",
+    "tilesOffline": "Map tiles unavailable offline",
+    "attributionA11y": "OpenStreetMap attribution",
+    "avgSpeed": {
+      "title": "Average speed",
+      "unit": "km/h",
+      "edit": "Edit average speed"
+    },
+    "sidebar": {
+      "open": "Open panel",
+      "close": "Close panel"
+    },
+    "showOnMap": "Show on map",
+    "stages": {
+      "title": "Stages",
+      "defaultName": "Stage {{n}}",
+      "addStage": "Add a stage",
+      "cancelPlacement": "Cancel placement",
+      "placementHint": "Tap the route to place the stage end",
+      "createTitle": "Name the stage",
+      "editTitle": "Edit stage",
+      "fieldName": "Name",
+      "fieldColor": "Color",
+      "colorAuto": "Auto color",
+      "fieldDeparture": "Start date",
+      "fieldSpeed": "Speed (km/h)",
+      "fieldPause": "Pause (h)",
+      "deleteTitle": "Delete stage?",
+      "deleteBody": "Delete “{{name}}”? Following stages will be recomputed.",
+      "pauseSuffix": "(incl. {{pause}} pause)"
+    },
+    "weather": {
+      "title": "Weather",
+      "temperature": "Temperature",
+      "precipitation": "Precipitation",
+      "wind": "Wind",
+      "temperatureShort": "Temp.",
+      "precipitationShort": "Rain",
+      "windShort": "Wind",
+      "departure": "Departure date",
+      "byStage": "Dates set per stage"
+    },
+    "density": {
+      "title": "Density",
+      "idleHint": "Finds areas with few accommodations along your route.",
+      "errorHint": "Analysis failed. Try again.",
+      "staleHint": "Segments changed. Re-run to update.",
+      "calculate": "Calculate density",
+      "analyzing": "Analyzing…",
+      "legendTitle": "Accommodation density / 10 km",
+      "high": "Good availability",
+      "highDetail": "2+ accommodations / 10 km",
+      "medium": "Limited availability",
+      "mediumDetail": "1 accommodation / 10 km",
+      "critical": "Critical area",
+      "criticalDetail": "No accommodation / 10 km",
+      "categoriesTitle": "Categories to analyze",
+      "launch": "Start analysis",
+      "inProgress": "Analysis already in progress",
+      "offline": "Density analysis unavailable offline",
+      "triggerFailed": "Couldn't start the analysis. Try again."
+    }
+  },
+  "pois": {
+    "layers": {
+      "accommodations": "Accommodations",
+      "restaurants": "Restaurants",
+      "supplies": "Supplies",
+      "bike": "Bike"
+    },
+    "category": {
+      "hotel": "Hotel",
+      "hostel": "Hostel",
+      "camp_site": "Campsite",
+      "shelter": "Shelter",
+      "guesthouse": "Guesthouse",
+      "restaurant": "Restaurant",
+      "supermarket": "Supermarket",
+      "convenience": "Convenience store",
+      "bike_shop": "Bike shop",
+      "bike_repair": "Bike repair"
+    },
+    "distanceFromTrace": "{{value}} from the route",
+    "kmMarker": "km {{value}}",
+    "sheet": {
+      "close": "Close details"
+    },
+    "detail": {
+      "loadFailedEnrichment": "Additional information unavailable"
+    },
+    "booking": {
+      "searchOn": "Search on",
+      "triggerA11y": "Search on Booking.com or Airbnb",
+      "bookingCom": "Booking.com",
+      "airbnb": "Airbnb",
+      "openFailed": "Couldn't open the link",
+      "bookingA11y": "Search on Booking.com",
+      "airbnbA11y": "Search on Airbnb"
+    },
+    "access": {
+      "label": {
+        "hotel": "Route to the hotel",
+        "hostel": "Route to the hostel",
+        "camp_site": "Route to the campsite",
+        "shelter": "Route to the shelter",
+        "guesthouse": "Route to the guesthouse",
+        "fallback": "Access route"
+      },
+      "fallbackBadge": "≈ approximate",
+      "fallbackHint": "BRouter unavailable — straight-line distance",
+      "unavailable": "Access route unavailable",
+      "offline": "Access route unavailable offline",
+      "mainRoadWarning": "Main road",
+      "variants": "Routes",
+      "variantGroupA11y": "Choose the access route",
+      "variantA11y": "Route {{index}}: {{distance}}, {{eta}}",
+      "polylineA11y": "Access route drawn on the map",
+      "ghostVariantA11y": "Alternative access route — tap to select it"
+    },
+    "actions": {
+      "navigate": "Navigate to {{name}}",
+      "call": "Call {{name}}",
+      "copyAddress": "Copy address",
+      "addressCopied": "Address copied",
+      "officialWebsite": "Official website"
+    },
+    "search": {
+      "range": "km {{from}} → km {{to}}",
+      "button": "Search",
+      "capHint": "{{value}} km · max 50",
+      "loading": "Searching…",
+      "noResults": "No POI in this range — widen or move the area",
+      "dismissNoResults": "Dismiss",
+      "error": "Search failed",
+      "offline": "Search unavailable offline",
+      "fromHandleA11y": "Start bound (km)",
+      "toHandleA11y": "End bound (km)",
+      "title": "Search",
+      "from": "From:",
+      "fromStart": "Start",
+      "accommodationTitle": "Accommodation type",
+      "rangeLabel": "Search over",
+      "rangeDecrement": "Decrease range",
+      "rangeIncrement": "Increase range",
+      "positionA11y": "Search position (km)",
+      "stepBack": "Back 1 km",
+      "stepForward": "Forward 1 km",
+      "searchOn": "Search on",
+      "searchOnA11y": "Search on Booking.com or Airbnb",
+      "bookingCom": "Search on Booking.com",
+      "airbnb": "Search on Airbnb"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "back": "Back",
+    "integrationsSection": "Integrations",
+    "accountSection": "Account",
+    "dangerSection": "Danger zone",
+    "offlineCache": {
+      "title": "Offline cache",
+      "description": "GPX tracks you view are stored on this device for offline use. Clearing the cache frees up space; data will be re-downloaded next time you're online.",
+      "clear": "Clear offline cache",
+      "confirm": "Delete all tracks and POIs stored offline on this device?",
+      "done": "Cache cleared"
+    },
+    "logout": {
+      "button": "Log out",
+      "loading": "Logging out…",
+      "hint": "Signs you out of your account on this device",
+      "error": "Logout failed. Please try again."
+    },
+    "deleteAccount": {
+      "button": "Delete my account",
+      "hint": "Permanently deletes your account and all your data",
+      "warningTitle": "Permanently delete account?",
+      "warning": "This action is irreversible. Your account and all your adventures and segments will be permanently deleted.",
+      "confirmWord": "DELETE",
+      "confirmLabel": "Type {{word}} to confirm",
+      "confirm": "Delete permanently",
+      "deleting": "Deleting…",
+      "cancel": "Cancel",
+      "error": "Deletion failed. Your account is intact."
+    },
+    "overpass": {
+      "section": "Points of interest search",
+      "title": "Extended search (Overpass)",
+      "description": "More complete results — especially campsites and shelters — but slower searches."
+    },
+    "legalSection": "Legal",
+    "legal": {
+      "privacyPolicy": "Privacy policy",
+      "terms": "Terms of service",
+      "openError": "Couldn't open the link. Please try again later.",
+      "openInBrowser": "Opens in browser"
+    }
+  },
+  "strava": {
+    "import": {
+      "openButton": "Import from Strava",
+      "title": "Strava routes",
+      "loadMore": "Load more",
+      "empty": "No Strava routes found.",
+      "importButton": "Import",
+      "importing": "Importing…",
+      "distance": "{{value}} km",
+      "elevation": "+{{value}} m",
+      "successToast": "Import started — analysing route",
+      "notConnected": {
+        "title": "Strava not connected",
+        "message": "Connect your Strava account in settings to import your routes.",
+        "cta": "Connect Strava"
+      }
+    },
+    "attribution": {
+      "poweredBy": "Powered by Strava"
+    },
+    "errors": {
+      "network": "Connection failed. Check your network.",
+      "rateLimit15": "Try again in a few minutes (Strava limit reached).",
+      "rateLimitDaily": "Strava limit reached for today, try again tomorrow.",
+      "stravaDown": "Strava is temporarily unavailable. Try again.",
+      "notConnected": "Strava account not connected.",
+      "generic": "Strava import failed. Try again."
+    }
+  }
+}

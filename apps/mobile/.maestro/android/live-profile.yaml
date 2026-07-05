@@ -1,0 +1,33 @@
+appId: app.ridenrest
+---
+# MOB-5.5 (Android) — Profil d'élévation interactif, section PROFIL du panneau Live.
+# Variante Android de `.maestro/live-profile.yaml`. Gotchas Android (cf. README §Android) :
+#   - locale fr-FR requise (sinon app en anglais → libellés KO) ;
+#   - `testID` ne surface PAS en `resource-id` sur cette archi Fabric → on cible le graphe
+#     par sa description d'accessibilité (`accessibilityLabel` → contentDescription),
+#     substring sans apostrophe « Dénivelé sur la fenêtre » (stable, FR).
+# Setup réseau + localisation + geo fix : encodé dans device-test.sh.
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 20000
+- assertVisible: "PROFIL"
+- takeScreenshot: screenshots/android-live-profile-collapsed
+
+- tapOn: "PROFIL"
+- extendedWaitUntil:
+    visible: "Dénivelé sur la fenêtre"
+    timeout: 8000
+- takeScreenshot: screenshots/android-live-profile-expanded

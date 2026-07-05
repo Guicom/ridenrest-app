@@ -55,10 +55,10 @@ export function AccommodationSubTypes({ accommodationPois, onlyCountActive = fal
               className={[
                 'text-sm px-3 py-1.5 rounded-full font-medium flex items-center gap-2 border transition-all duration-75 cursor-pointer active:scale-[0.95]',
                 hasZeroResults
-                  ? 'bg-white text-muted-foreground border-[--border] opacity-50'
+                  ? 'bg-white dark:bg-surface-raised text-muted-foreground border-[--border] opacity-50'
                   : isActive
                     ? 'border-transparent hover:brightness-90'
-                    : 'bg-white text-foreground border-[--border] hover:border-[--border-strong]',
+                    : 'bg-white dark:bg-surface-raised text-foreground border-[--border] hover:border-[--border-strong]',
               ].join(' ')}
             >
               <span

@@ -66,7 +66,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
           <span className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-2 text-foreground font-medium">ou</span>
+          <span className="bg-white dark:bg-surface px-2 text-foreground font-medium">ou</span>
         </div>
       </div>
 

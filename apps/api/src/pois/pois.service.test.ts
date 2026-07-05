@@ -300,6 +300,30 @@ describe('PoisService', () => {
       expect(mockPoisRepository.insertGooglePois).toHaveBeenCalled()
     })
 
+    it('re-inserts Google POI when guard returns false for an expired DB row (cache self-heal)', async () => {
+      // Expired POIs are treated as absent by googlePoiExistsInSegment → insertGooglePois
+      // is called → onConflictDoUpdate refreshes expiresAt → cache self-heals.
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue(['ChIJABC'])
+      mockPoisRepository.googlePoiExistsInSegment.mockResolvedValue(false)  // expired → treated as absent
+      mockRedisClient.get.mockResolvedValue(null)
+      mockGooglePlacesProvider.getPlaceDetails.mockResolvedValue({
+        placeId: 'ChIJABC', displayName: 'Guest House Expiré',
+        lat: 43.2, lng: 1.2, formattedAddress: null,
+        rating: 3.8, isOpenNow: true, phone: null, website: null, types: ['guest_house'],
+      })
+      mockPoisRepository.hasNearbyPoi.mockResolvedValue(false)
+
+      await service.findPois(baseDto, userId)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(mockPoisRepository.googlePoiExistsInSegment).toHaveBeenCalled()
+      expect(mockPoisRepository.insertGooglePois).toHaveBeenCalled()
+      expect(mockPoisRepository.updatePoiDistances).toHaveBeenCalled()
+    })
+
     it('skips Google POI when OSM duplicate exists within 100m', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])

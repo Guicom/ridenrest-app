@@ -1,0 +1,25 @@
+appId: app.ridenrest
+---
+# Smoke ANDROID : l'app démarre, la liste s'affiche, le planning s'ouvre (carte MapLibre
+# native montée sans crash). Filet de non-régression minimal. Login e2e scriptable si la
+# session n'est pas persistée. Le canvas GL n'est pas introspectable → screenshot + le
+# scan crash du runner (device-test.sh) couvre le crash MapLibre natif.
+- launchApp
+- runFlow:
+    when:
+      visible: "Se connecter"
+    commands:
+      - tapOn: "Email"
+      - inputText: "e2e@ridenrest.local"
+      - tapOn: "Mot de passe"
+      - inputText: "Test1234!"
+      - hideKeyboard
+      - tapOn: "Se connecter"
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Planning"
+- extendedWaitUntil:
+    visible: "Retour"
+    timeout: 25000
+- takeScreenshot: screenshots/android-smoke-planning

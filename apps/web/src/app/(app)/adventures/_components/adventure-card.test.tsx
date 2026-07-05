@@ -143,3 +143,23 @@ describe('AdventureCard — Strava badge', () => {
     expect(screen.queryByAltText('Powered by Strava')).toBeNull()
   })
 })
+
+describe('AdventureCard — dark mode « Charbon » (MOB-1.2b AC3)', () => {
+  it('carte : fond surface en dark (bg-white inchangé en light)', () => {
+    const { container } = render(
+      <AdventureCard adventure={makeAdventure()} isSelected={false} onSelect={vi.fn()} onNavigate={vi.fn()} />,
+    )
+    const card = container.firstChild as HTMLElement
+    expect(card.className).toContain('bg-white')
+    expect(card.className).toContain('dark:bg-surface')
+  })
+
+  it('wordmark Strava : variante blanche présente en dark', () => {
+    const { container } = render(
+      <AdventureCard adventure={makeAdventure({ hasStravaSegment: true })} isSelected={false} onSelect={vi.fn()} onNavigate={vi.fn()} />,
+    )
+    const white = container.querySelector('img[src="/powered-by-strava-white.svg"]')
+    expect(white).not.toBeNull()
+    expect(white!.className).toContain('dark:inline')
+  })
+})

@@ -286,7 +286,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
   if (!adventure) {
     return (
       <main className="min-h-screen bg-background-page pt-10">
-        <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8">
+        <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white dark:lg:bg-surface lg:rounded-2xl lg:shadow-sm lg:p-8">
           <p className="text-center text-muted-foreground">Aventure introuvable.</p>
         </div>
       </main>
@@ -295,7 +295,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
 
   return (
     <main className="min-h-screen bg-background-page pt-10">
-      <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-10">
+      <div className="max-w-3xl mx-auto px-4 py-6 lg:bg-white dark:lg:bg-surface lg:rounded-2xl lg:shadow-sm lg:p-8 space-y-10">
       <Link href="/adventures" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" />
         Mes aventures
@@ -404,7 +404,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             <input
               id="start-date-input"
               type="date"
-              className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
+              className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white dark:bg-surface-raised text-text-primary"
               value={adventure.startDate ?? ''}
               disabled={startDateMutation.isPending}
               onChange={(e) => {
@@ -418,7 +418,7 @@ export function AdventureDetail({ adventureId, stravaConnected = false }: Props)
             <input
               id="end-date-input"
               type="date"
-              className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white text-text-primary"
+              className="text-sm border border-[--border] rounded-lg px-3 py-1.5 bg-white dark:bg-surface-raised text-text-primary"
               value={adventure.endDate ?? ''}
               disabled={endDateMutation.isPending}
               onChange={(e) => {

@@ -23,6 +23,14 @@ export { poiSearchSchema } from './schemas/poi-search.schema'
 export type { PoiSearchInput } from './schemas/poi-search.schema'
 
 export {
+  PASSWORD_MIN_LENGTH,
+  signUpSchema,
+  signInSchema,
+  forgotPasswordSchema,
+} from './schemas/auth.schema'
+export type { SignUpInput, SignInInput, ForgotPasswordInput } from './schemas/auth.schema'
+
+export {
   AccessRequestSchema,
   AccessResponseSchema,
   AccessOriginSchema,

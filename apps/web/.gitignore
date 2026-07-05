@@ -47,3 +47,8 @@ next-env.d.ts
 /public/workbox-*.js
 /public/workbox-*.js.map
 /public/fallback-*.js
+.env.test
+e2e/.auth/
+e2e/screenshots/
+playwright-report/
+test-results/

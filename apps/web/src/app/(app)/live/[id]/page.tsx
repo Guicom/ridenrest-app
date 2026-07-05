@@ -39,6 +39,7 @@ import { LiveAccessPolyline } from '@/components/poi-access/LiveAccessPolyline'
 import { LiveElevationProfile } from './_components/live-elevation-profile'
 import { ElevationProfile } from '../../map/[id]/_components/elevation-profile'
 import { trackPoiSearchTriggered, trackLiveModeActivated, hashAdventureId } from '@ridenrest/analytics'
+import { PoweredByStrava } from '@/components/shared/powered-by-strava'
 
 const DEFAULT_RADIUS = 5
 
@@ -376,7 +377,11 @@ export default function LivePage() {
             Live
           </Badge>
           {readySegments.some((s) => s.source === 'strava') && (
-            <img src="/powered-by-strava.svg" alt="Powered by Strava" className="h-4" />
+            // chip sombre derrière la variante blanche — le wordmark flotte sur la
+            // carte (tuiles claires), même pattern que l'attribution planning
+            <span className="inline-flex items-center dark:bg-black/60 dark:px-1.5 dark:py-0.5 dark:rounded">
+              <PoweredByStrava />
+            </span>
           )}
         </div>
 
@@ -503,7 +508,7 @@ export default function LivePage() {
               data-testid="center-on-gps-btn"
               className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm border transition-colors ${
                 gpsTrackingActive
-                  ? 'bg-white border-[--border] text-foreground hover:bg-white/90'
+                  ? 'bg-white dark:bg-surface border-[--border] text-foreground hover:bg-white/90 dark:hover:bg-surface-raised'
                   : 'bg-primary border-primary text-primary-foreground hover:bg-primary/90'
               }`}
             >

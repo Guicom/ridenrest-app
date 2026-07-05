@@ -1,0 +1,42 @@
+appId: app.ridenrest
+---
+# MOB-5.5 — Profil d'élévation interactif dans la section PROFIL du panneau Live.
+# Vérifie : Live actif → panneau → ouverture de la section « PROFIL » → le graphe
+# d'élévation (react-native-svg) est monté (id `elevation-chart`). Le canvas SVG natif
+# n'est PAS introspectable par les asserts → on confirme le rendu par SCREENSHOTS
+# (revue visuelle de l'agent : aire + marqueur position vert + zone bleue + bord droit).
+#
+# PRÉ-REQUIS (idem live-poi.yaml, setup par device-test.sh) :
+#   1. App rebuildée (BUILD=1 / pnpm sim) — MOB-5.5 est all-JS, bundle embarqué.
+#   2. Permission localisation pré-accordée + position GPS simulée (sinon pas de fix → pas
+#      de panneau). 3. Session connectée (clearState:false). 4. Aventure AVEC données
+#      d'élévation (les seeds Test1 / Test1 (E2E) en ont → section PROFIL dépliable).
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# Consentement (conditionnel : returning user auto-démarre sans dialog).
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+# Fix GPS reçu → `currentKmOnRoute` connu → panneau Live visible.
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 20000
+# En-tête « PROFIL » (MOB-5.4) — section repliée par défaut (AC pas de double affichage).
+- assertVisible: "PROFIL"
+- takeScreenshot: screenshots/live-profile-collapsed
+
+# AC1/AC2/AC3 : ouvrir la section → le profil d'élévation se monte (FR-LP-006/007/008).
+- tapOn: "PROFIL"
+- extendedWaitUntil:
+    visible:
+      id: "elevation-chart"
+    timeout: 8000
+- takeScreenshot: screenshots/live-profile-expanded

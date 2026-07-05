@@ -1,0 +1,485 @@
+{
+  "auth": {
+    "loadingSession": "Restauration de la session…",
+    "common": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "votre@email.com",
+      "passwordLabel": "Mot de passe",
+      "passwordPlaceholder": "••••••••",
+      "showPassword": "Afficher le mot de passe",
+      "hidePassword": "Masquer le mot de passe"
+    },
+    "signup": {
+      "title": "Créer un compte",
+      "subtitle": "Rejoignez Ride'n'Rest et planifiez vos aventures.",
+      "submit": "Créer mon compte",
+      "submitting": "Création…",
+      "haveAccount": "Déjà un compte ?",
+      "signinLink": "Se connecter"
+    },
+    "login": {
+      "title": "Connexion",
+      "subtitle": "Heureux de vous revoir.",
+      "submit": "Se connecter",
+      "submitting": "Connexion…",
+      "forgotPassword": "Mot de passe oublié ?",
+      "noAccount": "Pas encore de compte ?",
+      "signupLink": "Créer un compte",
+      "orContinueWith": "ou continuer avec"
+    },
+    "google": {
+      "continue": "Continuer avec Google"
+    },
+    "strava": {
+      "title": "Strava",
+      "description": "Connectez votre compte pour importer vos itinéraires Strava.",
+      "connected": "Compte connecté",
+      "notConnected": "Non connecté",
+      "connect": "Connecter Strava",
+      "connecting": "Connexion…",
+      "disconnect": "Déconnecter",
+      "disconnecting": "Déconnexion…",
+      "errors": {
+        "loadFailed": "Impossible de charger l'état Strava.",
+        "cancelled": "Connexion Strava annulée.",
+        "connectFailed": "La connexion à Strava a échoué. Réessayez.",
+        "disconnectFailed": "Impossible de déconnecter Strava. Réessayez."
+      }
+    },
+    "reset": {
+      "title": "Mot de passe oublié",
+      "subtitle": "Saisissez votre email pour recevoir un lien de réinitialisation.",
+      "submit": "Envoyer le lien",
+      "submitting": "Envoi…",
+      "neutralTitle": "Vérifiez votre boîte mail",
+      "neutralMessage": "Si un compte existe pour cette adresse, un email de réinitialisation a été envoyé.",
+      "backToLogin": "Retour à la connexion"
+    },
+    "errors": {
+      "emailInvalid": "Email invalide",
+      "passwordTooShort": "Mot de passe : 8 caractères minimum",
+      "passwordRequired": "Mot de passe requis",
+      "emailTaken": "Un compte existe déjà avec cet email",
+      "invalidCredentials": "Email ou mot de passe incorrect",
+      "tooManyRequests": "Trop de tentatives. Réessayez plus tard.",
+      "serverError": "Service momentanément indisponible. Réessayez.",
+      "network": "Connexion impossible. Vérifiez votre réseau.",
+      "generic": "Une erreur est survenue. Réessayez.",
+      "oauthCancelled": "Connexion Google annulée.",
+      "oauthFailed": "La connexion Google a échoué. Réessayez."
+    }
+  },
+  "common": {
+    "cancel": "Annuler",
+    "retry": "Réessayer",
+    "delete": "Supprimer",
+    "rename": "Renommer",
+    "save": "Enregistrer",
+    "closeA11y": "Fermer",
+    "dateTimePlaceholder": "AAAA-MM-JJ HH:MM"
+  },
+  "adventures": {
+    "title": "Mes aventures",
+    "newButton": "Nouvelle aventure",
+    "settingsA11y": "Ouvrir les paramètres",
+    "pastSection": "Aventures passées ({{count}})",
+    "intro": {
+      "planningLabel": "Planning",
+      "planningText": "Prépare ton itinéraire : hébergements, densité, météo sur chaque tronçon.",
+      "liveLabel": "Live",
+      "liveText": "Sur le vélo : visualise les options pour les prochains kilomètres devant toi."
+    },
+    "card": {
+      "renameA11y": "Renommer l'aventure",
+      "deleteA11y": "Supprimer l'aventure",
+      "openA11y": "Ouvrir l'aventure",
+      "live": "Démarrer en Live",
+      "planning": "Planning",
+      "edit": "Modifier"
+    },
+    "empty": {
+      "title": "Aucune aventure",
+      "subtitle": "Créez votre première aventure pour commencer à planifier vos voyages à vélo.",
+      "cta": "Créer une aventure"
+    },
+    "new": {
+      "title": "Nouvelle aventure",
+      "nameLabel": "Nom de l'aventure",
+      "namePlaceholder": "Ex. Tour du Mont-Blanc",
+      "submit": "Créer l'aventure",
+      "submitting": "Création…"
+    },
+    "rename": {
+      "title": "Renommer l'aventure",
+      "nameLabel": "Nouveau nom",
+      "submit": "Renommer",
+      "submitting": "Renommage…"
+    },
+    "delete": {
+      "button": "Supprimer l'aventure",
+      "confirmTitle": "Supprimer « {{name}} » ?",
+      "confirmMessage": "Cette action est irréversible. Tous les segments et données associées seront supprimés.",
+      "confirm": "Supprimer"
+    },
+    "detail": {
+      "comingSoon": "Les segments GPX, dates et la carte arrivent prochainement (MOB-3.2 / MOB-3.3)."
+    },
+    "segments": {
+      "title": "Segments",
+      "empty": "Aucun segment pour l'instant. Ajoutez un fichier GPX pour commencer.",
+      "addButton": "Ajouter un segment",
+      "picking": "Sélection…",
+      "uploading": "Envoi…",
+      "status": {
+        "pending": "En attente",
+        "processing": "Analyse en cours",
+        "done": "Analysé",
+        "error": "Échec"
+      },
+      "parsedSuccess": "Segment « {{name}} » analysé",
+      "parseFailed": "Analyse échouée — vérifiez le format du fichier GPX",
+      "retry": "Réessayer",
+      "fileTooLarge": "Fichier trop volumineux (max 10 Mo)",
+      "invalidExtension": "Sélectionnez un fichier .gpx",
+      "uploadError": "L'envoi a échoué. Vérifiez votre réseau et réessayez.",
+      "loadFailed": "Impossible de charger les segments.",
+      "distanceKm": "{{value}} km",
+      "elevationGain": "↑ {{value}} m",
+      "elevationLoss": "↓ {{value}} m",
+      "elevationNA": "N/A",
+      "gainDPlus": "{{value}} m D+",
+      "lossDMinus": "{{value}} m D-",
+      "parsing": "Analyse en cours…",
+      "reorderA11y": "Réordonner le segment",
+      "rename": "Renommer",
+      "delete": "Supprimer",
+      "replace": "Remplacer",
+      "deleteConfirmTitle": "Supprimer « {{name}} » ?",
+      "deleteConfirmBody": "Cette action est irréversible.",
+      "renameTitle": "Renommer le segment",
+      "renameLabel": "Nouveau nom",
+      "errors": {
+        "reorder": "Le réordonnancement a échoué. Réessayez.",
+        "rename": "Le renommage a échoué. Réessayez.",
+        "delete": "La suppression a échoué. Réessayez.",
+        "replace": "Le remplacement a échoué. Réessayez."
+      }
+    },
+    "errors": {
+      "loadFailed": "Impossible de charger vos aventures.",
+      "createFailed": "La création a échoué. Réessayez.",
+      "renameFailed": "Le renommage a échoué.",
+      "deleteFailed": "La suppression a échoué.",
+      "nameRequired": "Le nom est requis.",
+      "nameTooLong": "Le nom ne peut pas dépasser 100 caractères."
+    }
+  },
+  "offline": {
+    "banner": "Mode hors ligne",
+    "readOnly": "Consultation hors ligne (lecture seule)",
+    "actionUnavailable": "Action indisponible hors ligne"
+  },
+  "live": {
+    "start": "Démarrer en Live",
+    "consent": {
+      "title": "Activer la géolocalisation",
+      "body": "Le mode Live vous situe en temps réel sur votre trace pendant que vous roulez.",
+      "rgpd": "Votre position est utilisée uniquement sur votre appareil. Aucune coordonnée n’est envoyée ni stockée sur nos serveurs.",
+      "accept": "Activer",
+      "refuse": "Refuser"
+    },
+    "refusedNotice": "La géolocalisation est nécessaire pour le mode Live. Activez-la pour démarrer.",
+    "permissionDenied": {
+      "title": "Accès à la position refusé",
+      "body": "Autorisez l’accès à votre position dans les Réglages pour utiliser le mode Live.",
+      "openSettings": "Ouvrir les Réglages"
+    },
+    "recenter": "Recentrer",
+    "gpsAcquiring": "Acquisition du signal GPS…",
+    "bg": {
+      "notificationTitle": "Mode Live actif",
+      "notificationBody": "Ride’n’Rest suit votre position pendant que vous roulez.",
+      "permissionDeniedNotice": "Suivi en arrière-plan désactivé. Le Live reste actif écran allumé."
+    },
+    "search": {
+      "targetLabel": "Mon hôtel dans",
+      "distanceSliderA11y": "Distance cible (km)",
+      "decrement": "Diminuer de 5 km",
+      "increment": "Augmenter de 5 km",
+      "filters": "Ouvrir les filtres",
+      "searchButton": "Rechercher",
+      "etaA11y": "Temps estimé : {{eta}}",
+      "noResults": "Aucun résultat dans cette zone",
+      "unstableConnection": "Connexion instable — {{count}} résultat(s) chargé(s)",
+      "speedLabel": "Vitesse moyenne",
+      "radiusLabel": "Distance de la trace",
+      "radiusUnit": "km",
+      "layersLabel": "Je cherche",
+      "speedDecrement": "Diminuer la vitesse",
+      "speedIncrement": "Augmenter la vitesse",
+      "radiusDecrement": "Diminuer le rayon",
+      "radiusIncrement": "Augmenter le rayon"
+    },
+    "panel": {
+      "profileHeader": "PROFIL",
+      "profileShow": "Afficher le profil d'élévation",
+      "profileHide": "Masquer le profil d'élévation",
+      "dPlus": "Dénivelé positif {{value}} mètres",
+      "dMinus": "Dénivelé négatif {{value}} mètres",
+      "eta": "Temps estimé {{eta}}"
+    },
+    "profile": {
+      "noElevation": "Données d'élévation non disponibles",
+      "a11yLabel": "Profil d'élévation. Dénivelé sur la fenêtre : {{dPlus}} m de montée, {{dMinus}} m de descente."
+    },
+    "filters": {
+      "title": "Filtres",
+      "close": "Fermer les filtres"
+    },
+    "weather": {
+      "title": "Météo",
+      "error": "Météo non disponible",
+      "unavailable": "indisponible",
+      "gpsLost": "Position GPS indisponible",
+      "now": "maintenant",
+      "inHours": "dans ~{{hours}}h{{minutes}}",
+      "inMinutes": "dans ~{{minutes}}min",
+      "showOnMap": "Afficher la météo sur la carte",
+      "departureLabel": "Heure de départ",
+      "cardA11y": "À {{eta}} : {{temp}}, vent {{wind}} km/h, précipitations {{precip}} %"
+    }
+  },
+  "map": {
+    "title": "Carte",
+    "back": "Retour",
+    "openButton": "Voir sur la carte",
+    "empty": "Aucune trace à afficher — ajoutez un segment GPX",
+    "emptyCta": "Retour au détail",
+    "parsing": "Trace en cours de traitement…",
+    "loadFailed": "Impossible de charger la carte",
+    "tilesOffline": "Fond de carte indisponible hors-ligne",
+    "attributionA11y": "Attribution OpenStreetMap",
+    "avgSpeed": {
+      "title": "Vitesse moyenne",
+      "unit": "km/h",
+      "edit": "Modifier la vitesse moyenne"
+    },
+    "sidebar": {
+      "open": "Ouvrir le panneau",
+      "close": "Fermer le panneau"
+    },
+    "showOnMap": "Afficher sur la carte",
+    "stages": {
+      "title": "Étapes",
+      "defaultName": "Étape {{n}}",
+      "addStage": "Ajouter une étape",
+      "cancelPlacement": "Annuler le placement",
+      "placementHint": "Touchez la trace pour placer la fin de l’étape",
+      "createTitle": "Nommer l’étape",
+      "editTitle": "Modifier l’étape",
+      "fieldName": "Nom",
+      "fieldColor": "Couleur",
+      "colorAuto": "Couleur auto",
+      "fieldDeparture": "Date de début",
+      "fieldSpeed": "Vitesse (km/h)",
+      "fieldPause": "Pause (h)",
+      "deleteTitle": "Supprimer l’étape ?",
+      "deleteBody": "Supprimer « {{name}} » ? Les étapes suivantes seront recalculées.",
+      "pauseSuffix": "(dont {{pause}} pause)"
+    },
+    "weather": {
+      "title": "Météo",
+      "temperature": "Température",
+      "precipitation": "Précipitations",
+      "wind": "Vent",
+      "temperatureShort": "Temp.",
+      "precipitationShort": "Pluie",
+      "windShort": "Vent",
+      "departure": "Date de départ",
+      "byStage": "Dates définies par étape"
+    },
+    "density": {
+      "title": "Densité",
+      "idleHint": "Identifie les zones avec peu d’hébergements sur votre parcours.",
+      "errorHint": "L’analyse a échoué. Réessayez.",
+      "staleHint": "Les segments ont changé. Relancez pour mettre à jour.",
+      "calculate": "Calculer la densité",
+      "analyzing": "Analyse en cours…",
+      "legendTitle": "Densité hébergements / 10 km",
+      "high": "Bonne disponibilité",
+      "highDetail": "2+ hébergements / 10 km",
+      "medium": "Disponibilité limitée",
+      "mediumDetail": "1 hébergement / 10 km",
+      "critical": "Zone critique",
+      "criticalDetail": "Aucun hébergement / 10 km",
+      "categoriesTitle": "Catégories à analyser",
+      "launch": "Lancer l’analyse",
+      "inProgress": "Analyse déjà en cours",
+      "offline": "Analyse indisponible hors-ligne",
+      "triggerFailed": "Échec du lancement. Réessayez."
+    }
+  },
+  "pois": {
+    "layers": {
+      "accommodations": "Hébergements",
+      "restaurants": "Restaurants",
+      "supplies": "Ravitaillement",
+      "bike": "Vélo"
+    },
+    "category": {
+      "hotel": "Hôtel",
+      "hostel": "Auberge",
+      "camp_site": "Camping",
+      "shelter": "Refuge",
+      "guesthouse": "Chambre d'hôte",
+      "restaurant": "Restauration",
+      "supermarket": "Alimentation",
+      "convenience": "Supérette",
+      "bike_shop": "Magasin de vélo",
+      "bike_repair": "Réparation vélo"
+    },
+    "distanceFromTrace": "À {{value}} de la trace",
+    "kmMarker": "km {{value}}",
+    "sheet": {
+      "close": "Fermer la fiche"
+    },
+    "detail": {
+      "loadFailedEnrichment": "Informations complémentaires indisponibles"
+    },
+    "booking": {
+      "searchOn": "Rechercher sur",
+      "triggerA11y": "Rechercher sur Booking.com ou Airbnb",
+      "bookingCom": "Booking.com",
+      "airbnb": "Airbnb",
+      "openFailed": "Impossible d'ouvrir le lien",
+      "bookingA11y": "Rechercher sur Booking.com",
+      "airbnbA11y": "Rechercher sur Airbnb"
+    },
+    "access": {
+      "label": {
+        "hotel": "Itinéraire vers l'hôtel",
+        "hostel": "Itinéraire vers l'auberge",
+        "camp_site": "Itinéraire vers le camping",
+        "shelter": "Itinéraire vers le refuge",
+        "guesthouse": "Itinéraire vers la chambre d'hôte",
+        "fallback": "Itinéraire d'accès"
+      },
+      "fallbackBadge": "≈ approximatif",
+      "fallbackHint": "BRouter indisponible — distance à vol d'oiseau",
+      "unavailable": "Itinéraire d'accès indisponible",
+      "offline": "Itinéraire d'accès indisponible hors-ligne",
+      "mainRoadWarning": "Route nationale",
+      "variants": "Itinéraires",
+      "variantGroupA11y": "Choix de l'itinéraire d'accès",
+      "variantA11y": "Itinéraire {{index}} : {{distance}}, {{eta}}",
+      "polylineA11y": "Itinéraire d'accès tracé sur la carte",
+      "ghostVariantA11y": "Variante d'accès alternative — toucher pour la sélectionner"
+    },
+    "actions": {
+      "navigate": "Naviguer vers {{name}}",
+      "call": "Appeler {{name}}",
+      "copyAddress": "Copier l'adresse",
+      "addressCopied": "Adresse copiée",
+      "officialWebsite": "Site officiel"
+    },
+    "search": {
+      "range": "km {{from}} → km {{to}}",
+      "button": "Rechercher",
+      "capHint": "{{value}} km · max 50",
+      "loading": "Recherche en cours…",
+      "noResults": "Aucun POI dans cette plage — élargissez ou déplacez la zone",
+      "dismissNoResults": "Fermer",
+      "error": "Échec de la recherche",
+      "offline": "Recherche indisponible hors-ligne",
+      "fromHandleA11y": "Borne de départ (km)",
+      "toHandleA11y": "Borne de fin (km)",
+      "title": "Recherche",
+      "from": "À partir :",
+      "fromStart": "Début",
+      "accommodationTitle": "Type d'hébergement",
+      "rangeLabel": "Rechercher sur",
+      "rangeDecrement": "Diminuer la plage",
+      "rangeIncrement": "Augmenter la plage",
+      "positionA11y": "Position de recherche (km)",
+      "stepBack": "Reculer de 1 km",
+      "stepForward": "Avancer de 1 km",
+      "searchOn": "Rechercher sur",
+      "searchOnA11y": "Rechercher sur Booking.com ou Airbnb",
+      "bookingCom": "Rechercher sur Booking.com",
+      "airbnb": "Rechercher sur Airbnb"
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "back": "Retour",
+    "integrationsSection": "Intégrations",
+    "accountSection": "Compte",
+    "dangerSection": "Zone de danger",
+    "offlineCache": {
+      "title": "Cache hors ligne",
+      "description": "Les traces GPX que vous consultez sont enregistrées sur cet appareil pour la consultation hors ligne. Vider le cache libère de l'espace ; les données seront retéléchargées à la prochaine connexion.",
+      "clear": "Vider le cache hors ligne",
+      "confirm": "Supprimer toutes les traces et POIs enregistrés hors ligne sur cet appareil ?",
+      "done": "Cache vidé"
+    },
+    "logout": {
+      "button": "Se déconnecter",
+      "loading": "Déconnexion…",
+      "hint": "Vous déconnecte de votre compte sur cet appareil",
+      "error": "La déconnexion a échoué. Veuillez réessayer."
+    },
+    "deleteAccount": {
+      "button": "Supprimer mon compte",
+      "hint": "Supprime définitivement votre compte et toutes vos données",
+      "warningTitle": "Supprimer définitivement le compte ?",
+      "warning": "Cette action est irréversible. Votre compte ainsi que toutes vos aventures et segments seront définitivement supprimés.",
+      "confirmWord": "SUPPRIMER",
+      "confirmLabel": "Saisissez {{word}} pour confirmer",
+      "confirm": "Supprimer définitivement",
+      "deleting": "Suppression…",
+      "cancel": "Annuler",
+      "error": "La suppression a échoué. Votre compte est intact."
+    },
+    "overpass": {
+      "section": "Recherche de points d’intérêt",
+      "title": "Recherche étendue (Overpass)",
+      "description": "Résultats plus complets — notamment campings et refuges — mais recherches plus lentes."
+    },
+    "legalSection": "Légal",
+    "legal": {
+      "privacyPolicy": "Politique de confidentialité",
+      "terms": "Conditions générales d’utilisation",
+      "openError": "Impossible d’ouvrir le lien. Réessayez plus tard.",
+      "openInBrowser": "S’ouvre dans le navigateur"
+    }
+  },
+  "strava": {
+    "import": {
+      "openButton": "Importer depuis Strava",
+      "title": "Itinéraires Strava",
+      "loadMore": "Charger plus",
+      "empty": "Aucun itinéraire Strava trouvé.",
+      "importButton": "Importer",
+      "importing": "Import…",
+      "distance": "{{value}} km",
+      "elevation": "+{{value}} m",
+      "successToast": "Import en cours — analyse du tracé",
+      "notConnected": {
+        "title": "Strava non connecté",
+        "message": "Connecte ton compte Strava dans les paramètres pour importer tes itinéraires.",
+        "cta": "Connecter Strava"
+      }
+    },
+    "attribution": {
+      "poweredBy": "Powered by Strava"
+    },
+    "errors": {
+      "network": "Connexion impossible. Vérifie ta connexion réseau.",
+      "rateLimit15": "Réessaie dans quelques minutes (limite Strava atteinte).",
+      "rateLimitDaily": "Limite Strava atteinte pour aujourd'hui, réessaie demain.",
+      "stravaDown": "Strava est momentanément indisponible. Réessaie.",
+      "notConnected": "Compte Strava non connecté.",
+      "generic": "L'import Strava a échoué. Réessaie."
+    }
+  }
+}

@@ -28,7 +28,7 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
   const { visibleLayers, toggleLayer } = useMapStore()
 
   return (
-    <div className="flex flex-wrap gap-2 p-2 bg-white border border-[--border] rounded-xl shadow-sm">
+    <div className="flex flex-wrap gap-2 p-2 bg-white dark:bg-surface border border-[--border] rounded-xl shadow-sm">
       {LAYER_CONFIGS.map(({ layer, label, icon }) => {
         const isActive = visibleLayers.has(layer)
         return (
@@ -41,7 +41,7 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
               'text-xs font-medium transition-all duration-75 cursor-pointer active:scale-[0.95]',
               isActive
                 ? 'bg-primary text-primary-foreground border border-primary hover:brightness-90'
-                : 'bg-white text-foreground border border-[--border]',
+                : 'bg-white dark:bg-surface-raised text-foreground border border-[--border]',
             ].join(' ')}
             aria-label={`${isActive ? 'Masquer' : 'Afficher'} les ${label}`}
             aria-pressed={isActive}
@@ -65,7 +65,7 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
             'text-xs font-medium transition-all duration-75 cursor-pointer active:scale-[0.95]',
             weatherActive
               ? 'bg-primary text-primary-foreground border border-primary hover:brightness-90'
-              : 'bg-white text-foreground border border-[--border]',
+              : 'bg-white dark:bg-surface-raised text-foreground border border-[--border]',
           ].join(' ')}
           aria-label={`${weatherActive ? 'Désactiver' : 'Activer'} la Météo`}
           aria-pressed={!!weatherActive}
@@ -84,7 +84,7 @@ export function LayerToggles({ isPending, weatherActive, onWeatherToggle, densit
             'text-xs font-medium transition-all duration-75 cursor-pointer active:scale-[0.95]',
             densityActive
               ? 'bg-primary text-primary-foreground border border-primary hover:brightness-90'
-              : 'bg-white text-foreground border border-[--border]',
+              : 'bg-white dark:bg-surface-raised text-foreground border border-[--border]',
           ].join(' ')}
           aria-label={`${densityActive ? 'Désactiver' : 'Activer'} la Densité`}
           aria-pressed={!!densityActive}

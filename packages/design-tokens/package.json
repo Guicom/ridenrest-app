@@ -1,0 +1,30 @@
+{
+  "name": "@ridenrest/design-tokens",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./nativewind-preset": "./nativewind-preset.js",
+    "./palette.json": "./src/palette.json"
+  },
+  "files": [
+    "src",
+    "nativewind-preset.js"
+  ],
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ridenrest/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@ridenrest/typescript-config": "workspace:*",
+    "vitest": "^4.0.18"
+  }
+}

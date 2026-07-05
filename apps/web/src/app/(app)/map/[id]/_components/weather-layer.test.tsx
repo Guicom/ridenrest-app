@@ -51,6 +51,10 @@ function createMockMap() {
     removeSource: vi.fn((id: string) => { sources.delete(id) }),
     setPaintProperty: vi.fn(),
     setLayoutProperty: vi.fn(),
+    // Image flèche déjà enregistrée → addArrowLayer() synchrone (cf. weather-layer).
+    hasImage: vi.fn().mockReturnValue(true),
+    loadImage: vi.fn().mockResolvedValue({ data: {} }),
+    addImage: vi.fn(),
     on: vi.fn((event: string, layerId: string, handler: ReturnType<typeof vi.fn>) => {
       eventHandlers.set(`${event}:${layerId}`, handler)
     }),
@@ -264,7 +268,7 @@ describe('WeatherLayer', () => {
     expect(popupMocks.instance.addTo).toHaveBeenCalled()
   })
 
-  it('mounts wind arrows layer with data-driven text-size interpolation (AC #1)', () => {
+  it('mounts wind arrows layer as an icon with data-driven icon-size interpolation (AC #1)', () => {
     render(
       <WeatherLayer
         map={mockMap as unknown as import('maplibre-gl').Map}
@@ -278,13 +282,19 @@ describe('WeatherLayer', () => {
     const addLayerCall = mockMap.addLayer.mock.calls.find(
       ([layer]: [{ id: string }]) => layer.id === 'weather-wind-arrows-layer-test',
     )
-    const textSize = addLayerCall?.[0]?.layout?.['text-size'] as unknown[]
-    expect(textSize[0]).toBe('interpolate')
-    expect(textSize).toContain(16)  // calm stop (2× increase from AC #3)
-    expect(textSize).toContain(48)  // storm stop (2× increase from AC #3)
+    const layer = addLayerCall?.[0] as
+      | { layout?: Record<string, unknown>; paint?: Record<string, unknown> }
+      | undefined
+    // Icône (PAS un glyphe texte) : `text-field: '→'` ne rend rien sur MapLibre Native.
+    expect(layer?.layout?.['icon-image']).toBe('wind-arrow')
+    expect(layer?.layout?.['text-field']).toBeUndefined()
+    const iconSize = layer?.layout?.['icon-size'] as unknown[]
+    expect(iconSize[0]).toBe('interpolate')
+    expect(iconSize).toContain(0.18)  // calm stop
+    expect(iconSize).toContain(0.52)  // storm stop
   })
 
-  it('mounts wind arrows layer with text-opacity 0.4 at calm and coalesce guard (AC #2)', () => {
+  it('mounts wind arrows layer with icon-opacity 0.4 at calm and coalesce guard (AC #2)', () => {
     render(
       <WeatherLayer
         map={mockMap as unknown as import('maplibre-gl').Map}
@@ -298,10 +308,11 @@ describe('WeatherLayer', () => {
     const addLayerCall = mockMap.addLayer.mock.calls.find(
       ([layer]: [{ id: string }]) => layer.id === 'weather-wind-arrows-layer-test',
     )
-    const textOpacity = addLayerCall?.[0]?.paint?.['text-opacity'] as unknown[]
-    expect(textOpacity[0]).toBe('interpolate')
-    expect(textOpacity).toContain(0.4)  // calm opacity per AC #2
-    expect(textOpacity).toContain(1.0)  // fully visible from 5 km/h
+    const layer = addLayerCall?.[0] as { paint?: Record<string, unknown> } | undefined
+    const iconOpacity = layer?.paint?.['icon-opacity'] as unknown[]
+    expect(iconOpacity[0]).toBe('interpolate')
+    expect(iconOpacity).toContain(0.4)  // calm opacity per AC #2
+    expect(iconOpacity).toContain(1.0)  // fully visible from 5 km/h
   })
 
   it('shows wind direction arrow → in popup alongside wind speed (AC #3)', async () => {

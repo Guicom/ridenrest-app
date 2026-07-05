@@ -1,0 +1,42 @@
+appId: app.ridenrest
+---
+# MOB-5.2 — Suivi GPS Live : dot + halo + caméra auto-follow + bouton recentrer (AC5).
+#
+# PRÉ-REQUIS (setup externe, hors flow — comme la session persistée de live.yaml) :
+#   1. Permission localisation pré-accordée pour éviter l'alerte SYSTÈME iOS (non
+#      introspectable par Maestro) :
+#        xcrun simctl privacy <udid> grant location-always app.ridenrest
+#   2. Position GPS simulée (sinon aucun fix → pas de dot) :
+#        xcrun simctl location <udid> set 43.6047,1.4442   # Toulouse (sur/près d'une trace)
+#   3. Session connectée préservée (NE PAS clearState) + locale FR.
+#   4. 2 devices up → cibler l'iOS : maestro --device <ios-udid> test .maestro/live-tracking.yaml
+#
+# Le fond de carte (GL natif) + le dot GPS ne sont PAS introspectables → on assert via le
+# bouton « Recentrer » (rendu UNIQUEMENT quand `currentPosition != null`, donc un fix GPS a
+# été reçu et le dot est monté) + screenshot pour vérif visuelle (dot vert + carte centrée).
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# Consentement RGPD → Activer (permission pré-accordée → pas d'alerte système bloquante).
+# CONDITIONNEL : un returning user déjà consenti auto-démarre sans dialog (AC4) → on ne
+# tape « Activer » QUE si le dialog est présent.
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+# AC5 : un fix GPS arrive → le dot se monte + la caméra suit + le bouton « Recentrer »
+# apparaît. Sa présence prouve `currentPosition != null` (donc dot rendu, pas de SIGABRT).
+- extendedWaitUntil:
+    visible: "Recentrer"
+    timeout: 20000
+- takeScreenshot: screenshots/live-tracking
+
+# AC5 : le bouton recentrer est actionnable (recentre + réactive l'auto-follow).
+- tapOn: "Recentrer"
+- assertVisible: "Recentrer"

@@ -1,0 +1,20 @@
+# Smoke test E2E Maestro (MOB-1.4 / AC2 + AC3).
+# Objectif : « l'app se lance et affiche l'écran d'accueil ».
+#
+# ⚠️ CADENCE PRÉ-RELEASE UNIQUEMENT (avant soumission stores) — JAMAIS sur les PR
+# CI : émulateur lent/coûteux + flakiness des E2E. Cf. AC3 + garde-fous MOB-1.4.
+# C'est volontairement absent du job CI GitHub Actions.
+#
+# Pré-requis local : un simulateur iOS ou émulateur Android avec l'app installée
+# (`npx expo run:ios` / `npx expo run:android`, ou un build dev-client EAS).
+# Lancer :  maestro test .maestro/launch.yaml
+#
+# On assert le titre de marque « Ride'n'Rest » (codé en dur dans index.tsx, donc
+# INDÉPENDANT de la locale du device) plutôt qu'une chaîne i18n : la langue d'un
+# simulateur neuf est souvent `en`, ce qui rendrait une assertion FR flaky.
+appId: app.ridenrest
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    text: 'Ride.n.Rest' # regex : tolère l'apostrophe droite/typographique

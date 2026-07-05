@@ -7,6 +7,7 @@ import * as adventureSegmentsSchema from './schema/adventure-segments'
 import * as accommodationsCacheSchema from './schema/accommodations-cache'
 import * as weatherCacheSchema from './schema/weather-cache'
 import * as coverageGapsSchema from './schema/coverage-gaps'
+import * as pushTokensSchema from './schema/push-tokens'
 
 // SSL: localhost connections (local Docker) skip TLS entirely.
 // Production (Aiven) uses a custom CA cert (DATABASE_CA_CERT, base64-encoded) for full TLS
@@ -41,5 +42,6 @@ export const db = drizzle(pool, {
     ...accommodationsCacheSchema,
     ...weatherCacheSchema,
     ...coverageGapsSchema,
+    ...pushTokensSchema,
   },
 })

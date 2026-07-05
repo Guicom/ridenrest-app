@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq'
 import { Logger } from '@nestjs/common'
+import { EventEmitter2 } from '@nestjs/event-emitter'
 import type { Job } from 'bullmq'
 import { computeBoundingBox } from '@ridenrest/gpx'
 import { DensityRepository } from '../density.repository.js'
@@ -55,6 +56,7 @@ export class DensityAnalyzeProcessor extends WorkerHost {
     private readonly overpassProvider: OverpassProvider,
     private readonly googlePlacesProvider: GooglePlacesProvider,
     private readonly redisProvider: RedisProvider,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super()
     this.logger.log('DensityAnalyzeProcessor initialized')
@@ -98,6 +100,12 @@ export class DensityAnalyzeProcessor extends WorkerHost {
       await this.densityRepo.setDensityStatus(adventureId, 'success')
       await this.densityRepo.setDensityAnalyzedAt(adventureId, new Date())
       this.logger.log(`Analysis complete — adventureId=${adventureId} gaps=${gapsToInsert.length} troncons=${totalTroncons}`)
+
+      // MOB-6.2 — notification push « analyse terminée ». Découplé via EventEmitter :
+      // `PushService.@OnEvent('density.completed')` résout l'owner (le payload du job n'a PAS
+      // de `userId`) puis envoie best-effort (Expo Push API). L'émission ne peut pas faire
+      // échouer le job (elle suit le succès) ; ne notifie PAS sur 'error' (fallback in-app).
+      this.eventEmitter.emit('density.completed', { adventureId })
     } catch (err) {
       this.logger.error(`[DensityAnalyzeProcessor] Failed for adventure ${adventureId}:`, err)
       await this.densityRepo.setDensityStatus(adventureId, 'error')

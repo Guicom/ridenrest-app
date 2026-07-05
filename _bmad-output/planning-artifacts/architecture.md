@@ -1251,3 +1251,14 @@ Les stories suivantes documentent le déploiement **original** (Vercel + Fly.io 
 - `apps/api/Dockerfile` — plus nécessaire (Node.js natif)
 - `apps/api/fly.toml` — plus nécessaire (pas de Fly.io)
 - `.dockerignore` — à adapter (Docker reste pour infra, pas pour apps)
+
+---
+
+## Amendement 2026-06-07 — Analytics : Plausible → PostHog
+
+> Décision actée via `sprint-change-proposal-2026-06-07.md`. Le présent document ne référençait pas Plausible (intégré post-rédaction via la story 15.3 — `next-plausible` + helpers `apps/web/src/lib/analytics.ts`).
+
+- **PostHog Cloud EU** remplace Plausible comme provider analytics web : session replay (masquage carte/PII obligatoire — extension de la règle « GPS jamais hors device » à l'écran enregistré), funnels, feature flags, serveur MCP.
+- **Consentement cookies** requis côté web (PostHog n'est pas cookieless) — UI de consentement livrée par `epic-posthog` (story posthog-1), qui tranche aussi la coexistence ou le décommissionnement de Plausible sur les pages publiques.
+- **`packages/analytics`** : façade monorepo typée (signatures héritées de `lib/analytics.ts`) partagée web ↔ mobile.
+- **FR-062 (tracking clics)** : couvert côté client par l'event `booking_click` (story 15.3, repris dans `packages/analytics`). Correctif factuel 2026-06-07 : l'endpoint NestJS `/analytics/click` envisagé dans la Gap Analysis n'a finalement **jamais été implémenté** (vérifié code — aucun module analytics dans `apps/api`).

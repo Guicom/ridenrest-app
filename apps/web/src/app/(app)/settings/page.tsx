@@ -6,6 +6,7 @@ import { StravaConnectionCard } from './_components/strava-connection-card'
 import { SignOutButton } from './_components/sign-out-button'
 import { DeleteAccountDialog } from './_components/delete-account-dialog'
 import { OverpassToggle } from './_components/overpass-toggle'
+import { ThemeToggle } from './_components/theme-toggle'
 import { PrivacyToggle } from './_components/privacy-toggle'
 import { AboutSection } from './_components/about-section'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,6 +31,15 @@ export default async function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 pt-10 pb-8 space-y-8">
       <h1 className="text-2xl font-bold">Paramètres</h1>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">Apparence</h2>
+        <Card>
+          <CardContent className="pt-4">
+            <ThemeToggle />
+          </CardContent>
+        </Card>
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-1">Intégrations</h2>

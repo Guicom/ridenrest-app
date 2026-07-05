@@ -118,6 +118,10 @@ export class PoisRepository {
 
   /** Check if a Google POI (by place_id) is already inserted for this segment. */
   async googlePoiExistsInSegment(placeId: string, segmentId: string): Promise<boolean> {
+    // Only NON-expired rows count as "already cached". An expired Google POI must be
+    // treated as absent so the prefetch re-inserts it (the upsert refreshes expires_at).
+    // Without this expiry gate the cache never self-heals after the TTL lapses: the
+    // expired row blocks its own re-fetch → findCachedPois stays empty → 0 results.
     const rows = await db
       .select({ id: accommodationsCache.id })
       .from(accommodationsCache)
@@ -126,6 +130,7 @@ export class PoisRepository {
           eq(accommodationsCache.segmentId, segmentId),
           eq(accommodationsCache.externalId, placeId),
           eq(accommodationsCache.source, 'google'),
+          gte(accommodationsCache.expiresAt, new Date()),
         ),
       )
       .limit(1)
@@ -134,9 +139,13 @@ export class PoisRepository {
 
   /** Check if any POI already exists within radiusM meters of (lat, lng) for the given segment. */
   async hasNearbyPoi(lat: number, lng: number, radiusM: number, segmentId: string): Promise<boolean> {
+    // Dedup only against LIVE POIs — an expired neighbour must not suppress the
+    // insertion of a fresh POI (else the area stays empty after the TTL lapses).
+    const now = new Date()
     const result = await db.execute(sql`
       SELECT 1 FROM accommodations_cache
       WHERE segment_id = ${segmentId}
+        AND expires_at >= ${now}
         AND ST_DWithin(
           ST_SetSRID(ST_MakePoint(accommodations_cache.lng, accommodations_cache.lat), 4326)::geography,
           ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
@@ -241,7 +250,8 @@ export class PoisRepository {
       })
   }
 
-  /** Find POI name and coordinates by externalId + segmentId for Google Details lookup. */
+  /** Find POI name and coordinates by externalId + segmentId for Google Details lookup.
+   * No expiry filter — used for geo coordinates only; lat/lng are stable across TTL boundaries. */
   async findByExternalId(
     externalId: string,
     segmentId: string,

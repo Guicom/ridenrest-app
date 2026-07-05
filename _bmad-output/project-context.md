@@ -1,9 +1,11 @@
 ---
 project_name: 'ridenrest-app'
 user_name: 'Guillaume'
-date: '2026-03-01'
-sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules']
-existing_patterns_found: 8
+date: '2026-06-13'
+sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'mobile_rules']
+existing_patterns_found: 9
+status: 'complete'
+optimized_for_llm: true
 ---
 
 # Project Context for AI Agents
@@ -36,6 +38,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Reverse proxy | Caddy 2 | latest | Docker sur VPS, auto Let's Encrypt, HTTPS |
 | Process manager | PM2 | latest | Gère Next.js + NestJS sur VPS, restart auto |
 | Monitoring | Uptime Kuma | latest | Docker sur VPS, alertes email/Telegram |
+| Analytics | PostHog (`@ridenrest/analytics`) | posthog-js 1.x (web) / posthog-react-native (mobile) | A remplacé Plausible (amendement 2026-06-07). **Web** : consentement RGPD + proxy anti-adblock. **Mobile** : pas de bandeau de consentement (zéro cookie, `distinct_id` AsyncStorage, pas d'IDFA → pas d'ATT requis) — décision architecturale MOB-6.1. Plausible CE reste en infra VPS historique. |
+| Mobile | Expo SDK 56 / React Native 0.85 | voir section Mobile | App native iOS/Android, monorepo `apps/mobile` |
 
 ---
 
@@ -516,7 +520,8 @@ Both `fitToTrace()` functions accept an optional `animate = false` parameter —
 In `map-view.tsx`, a `useEffect` detects the `isPending: true → false` transition (via `prevIsPendingRef`) while `searchCommitted === true`, then calls `mapRef.current?.fitToCorridorRange(mapFromKm, mapToKm, readySegments)`.
 
 - `readySegments` is wrapped in `useMemo` (not computed inline) to avoid spurious re-renders
-- `prevIsPendingRef` MUST be reset to `false` in the effect cleanup (React Strict Mode safety)
+- `prevIsPendingRef` is reset to `false` in the effect cleanup (React Strict Mode safety) — **ON WEB ONLY**, where the effect deps are limited to `[isPending, searchCommitted]`, so the cleanup runs only on unmount / those two transitions.
+- ⚠️ **Do NOT copy the cleanup-reset to an effect whose deps include frequently-changing values** (e.g. the mobile auto-zoom in `map/[id].tsx` depends on `[isFetching, searchCommitted, waypoints, fromKm, toKm, segments]`). There, React runs the cleanup **before every re-execution**, resetting `prev` to `false` right before the `true→false` transition check → the zoom never fires. On mobile the transition-detection ref is updated at the **end of the effect body** with **no cleanup reset**. (Regression introduced 2026-06-16 by a code review mechanically applying this web pattern; reverted.)
 - The auto-zoom fires **once per search commit**, not on re-renders
 
 #### MapSearchOverlay — Loading indicator
@@ -651,3 +656,101 @@ Popup POI (`poi-popup.tsx`) :
 - **Fermeture au clic extérieur** : `map.on('click', handleMapClick)` enregistré tant que le popup est monté. Guard `queryRenderedFeatures(e.point).some(f => f.layer.id.endsWith('-points') && !f.properties?.point_count)` — ne ferme pas si un pin individuel a été cliqué (un autre POI s'ouvre). MapLibre ne fire pas `click` sur un drag → pas de logique drag supplémentaire.
 - **Stabilité handler** : `onCloseRef` (ref mise à jour chaque render) dans le `useEffect` — évite de re-enregistrer le listener map à chaque changement d'identité de `onClose`.
 - **Recentrage automatique sur clic pin** (hooks `use-poi-layers` + `use-live-poi-layers`) : `map.easeTo({ center: coordinates, offset: [0, 100], duration: 300 })` dans `handlePoiClick` — positionne le pin 100px sous le centre du viewport, laissant la moitié supérieure pour le popup. `easeTo` programmatique ne déclenche pas la détection de pan manuel du suivi GPS live.
+
+---
+
+## Mobile App — Expo / React Native Rules
+
+> Source de vérité opérationnelle : `apps/mobile/AGENTS.md` (toolchain native).
+> Cette section résume les règles que l'agent rate le plus souvent.
+
+### Stack mobile
+
+| Layer | Techno | Version | Note |
+|---|---|---|---|
+| Runtime | Expo SDK | **56** (pinné `~56.x`) | Docs versionnées : https://docs.expo.dev/versions/v56.0.0/ |
+| RN | react-native | 0.85.3 | React 19.2.3 (aligné web) |
+| Routing | expo-router | ~56 | File-based, groupes `(app)` / `(auth)` |
+| Styling | NativeWind | 4.2.5 | Tailwind **v3** (`tailwindcss@3.4`), preset `@ridenrest/design-tokens` |
+| Carte | @maplibre/maplibre-react-native | 11.3.4 | API Camera v10/v11 — breaking changes |
+| Auth | better-auth + @better-auth/expo | **1.5.5 exact** | Tokens en `expo-secure-store` uniquement |
+| Data | TanStack Query + persist (AsyncStorage) | 5.x | Cache offline |
+| i18n | i18next + react-i18next | 26 / 17 | — |
+| Reanimated | react-native-reanimated | 4.3.1 | + react-native-worklets 0.8.3 |
+
+### Toolchain native (CRITIQUE)
+- Build iOS local exige **Xcode 26.4** (deployment target 16.4). Vérifier `xcodebuild -version` avant tout `run:ios`.
+- `expo start` = sert le bundle JS (pas de natif). `expo run:ios` / `eas build` = compile le natif.
+- **Après ajout d'un module natif** (`expo-secure-store`, `react-native-svg`, netinfo…) ou changement de plugins `app.config.ts` : `npx expo prebuild --clean -p ios` **OBLIGATOIRE** avant `run:ios`, sinon `Cannot find native module` au boot.
+- Toute icône **lucide-react-native / SVG dépend de `react-native-svg` (natif)** → pas de rendu sans rebuild du dev client (boîtes roses "Unimplemented component: RNSVG…").
+- **Tester en local = `pnpm sim` (build standalone, le flux STABLE).** Produit un build Release avec bundle JS embarqué → app autonome, **zéro Metro** (donc zéro « Cannot find native module » / « Could not connect to development server »). L'agent lance `pnpm sim` en fin de dev ; l'humain rouvre juste l'app. Prérequis : backend local up + ATS localhost (déjà dans `app.config.ts`). Détails + flux alternatif Fast Refresh : `apps/mobile/AGENTS.md` §« Tester l'app sur simulateur ». (Validé 2026-06-27.)
+
+### Tests — JAMAIS sous `src/app/` (CRITIQUE)
+- expo-router bundle TOUT `.[tj]sx` sous `src/app` via `require.context` (regex figée, non configurable). Un `*.test.tsx` placé là casse `expo export`.
+- Tests qui **importent une route** → `src/__tests__/`. Tests logique/composants → co-localisés (`src/lib/**`, `src/components/**`).
+- Runner : Jest + jest-expo + `@testing-library/react-native`.
+- Mocks auth : mocker le wrapper `@/lib/auth/client` (pas `@better-auth/expo`). **Pas de JSX RN dans une factory `jest.mock`** (le transform NativeWind injecte une variable hors-scope interdite) → `jest.fn(() => null)`.
+
+### Auth mobile
+- `better-auth@1.5.5` + `@better-auth/expo@1.5.5` **pinnés exact, alignés sur le serveur** (`apps/web`). Ne jamais bumper sans monter le serveur (peer strict, casse les sessions web prod).
+- Tokens **toujours** en `expo-secure-store` (Keychain/Keystore) — **jamais** `AsyncStorage` (présent en dep transitive, interdit pour l'auth).
+- Guard d'auth **centralisé** dans `src/app/(app)/_layout.tsx` — un seul point, jamais par écran.
+- Deep link scheme custom `ridenrest://` → nécessite un dev build (Expo Go ne gère pas les schemes custom).
+
+### Façade API mobile (CRITIQUE)
+- L'API NestJS monte tout sous le préfixe global `/api`. `apiFetch` préfixe **déjà** (`API_BASE = ${EXPO_PUBLIC_API_URL}/api`).
+- → Les façades utilisent des chemins **propres** (`/adventures`, **PAS** `/api/adventures`). `EXPO_PUBLIC_API_URL` = hôte seul (`http://localhost:3010`).
+
+### Data mobile — TanStack Query : états offline & polling (CRITIQUE)
+
+Patterns durables issus de MOB-4.1 (vues carte/data). À suivre pour MOB-4.2→4.8 et tout écran consommant `useQuery`.
+
+- **`fetchStatus: 'paused'` hors-ligne** : le QueryClient mobile utilise `networkMode: 'online'` (défaut) + `onlineManager` bridgé sur NetInfo (`use-app-state-refetch.ts`). Hors-ligne **sans donnée en cache**, une query reste `fetchStatus: 'paused'` avec `status: 'pending'` → **`isPending` est vrai indéfiniment**.
+  - ⇒ Tout overlay de chargement DOIT garder `query.isPending && query.fetchStatus !== 'paused'`. Sinon **skeleton infini** hors-ligne (bug réel corrigé en MOB-4.1).
+  - En `paused`/sans données, retomber sur l'état vide ou un message offline non bloquant — jamais le skeleton.
+- **Précédence des états (écran à polling)** : ordre obligatoire des branches de rendu : `loading (isPending && !paused) → error (isError && !data) → parsing (isXxxParsing(data)) → vide (!ready) → contenu`. Oublier la branche **parsing** affiche à tort « ajoutez un segment » pendant un parse en cours (polling actif).
+- **Polling conditionnel** : helper pur `xxxPollInterval(data)` branché sur `refetchInterval` — `3000` ms tant qu'une ressource est `pending`/`processing`, `false` sinon (arrêt auto). Parité `segmentsPollInterval` / `mapPollInterval`.
+- **Offline N1** : la trace/donnée reste affichable hors-ligne via la persistance TanStack Query (AsyncStorage, `gcTime` ≥ `maxAge` 24 h). Le fond de carte (tuiles), lui, peut être indisponible — dégradation acceptée MVP (bandeau non bloquant).
+- **Durcissement des params de route** : `const id = (rawId ?? '').trim()` avant tout usage — un `id` blanc (deep link `…/%20`) passe `!id` ET `Boolean(id)` et déclenche une requête malformée. Trimmer puis gater (`enabled: Boolean(id)`).
+
+### Carte MapLibre Native — GeoJSON à coordonnées finies OBLIGATOIRE (CRITIQUE)
+
+MapLibre **Native** parse la GeoJSON via `mapbox::geojson` (C++) qui **lève une exception
+C++ non rattrapée → `SIGABRT` (crash dur de l'app)** dès qu'une coordonnée est non
+numérique (`null`/`NaN`/`±Infinity`) — **un seul point GPX corrompu suffit**. MapLibre GL
+**JS** (web) tolère et ignore silencieusement → symptôme classique « **ok sur le web,
+crash sur iOS** » à l'ouverture de *certaines* aventures. Signature du crash report iOS :
+`__cxa_throw` → `MapLibre` → `-[MLRNGeoJSONSource setShape:]` → `std::terminate` → `abort`.
+
+- **Toute** coordonnée passée à un `<GeoJSONSource>` ou `<Marker lngLat>` DOIT être filtrée
+  par `isValidLngLat(lng, lat)` (`src/lib/map/maplibre-config.ts`) AVANT de bâtir la feature.
+- Filtrer **au niveau du point** (pas seulement « segment ≥ 2 waypoints »), puis re-vérifier
+  `coords.length >= 2` (une LineString peut retomber sous 2 points valides après filtrage).
+- Points de filtrage en place : `buildTraceFeatureCollection`, `collectTraceWaypoints`,
+  `useAdventureWaypoints` (alimente étapes/météo/corridor/marqueurs), `buildDensityColoredFeatures`,
+  `buildPoiFeatureCollection`. Tout nouveau builder GeoJSON doit suivre la même garde.
+- Diagnostic : les crash reports natifs iOS sont dans `~/Library/Logs/DiagnosticReports/*.ips`
+  (header + body JSON ; `faultingThread` → frames). (Régression réelle 2026-06-16.)
+
+### Conventions mobile
+- Fichiers : kebab-case ; routes : `_layout.tsx`, `index.tsx`, `[id].tsx`.
+- Styling : `className="…"` NativeWind (Tailwind v3 syntaxe). Tokens via `@ridenrest/design-tokens`, jamais de couleur hardcodée.
+- Icônes : `lucide-react-native` (mobile) vs `lucide-react` (web).
+- Réordre de liste : `react-native-reorderable-list` (Reanimated 4) — pas dnd-kit (web only).
+- `.npmrc` : `node-linker=hoisted` requis (Metro ne suit pas les symlinks pnpm) — impact monorepo global, validé non-régression en MOB-1.1.
+
+---
+
+## Usage Guidelines
+
+**Pour les agents IA :**
+- Lire ce fichier avant d'implémenter du code dans ce projet.
+- Suivre TOUTES les règles à la lettre ; en cas de doute, choisir l'option la plus restrictive.
+- Travail mobile → consulter aussi `apps/mobile/AGENTS.md` (source de vérité toolchain native).
+- Mettre à jour ce fichier si un nouveau pattern durable émerge.
+
+**Pour les humains :**
+- Garder ce fichier lean et focalisé sur les besoins des agents.
+- Mettre à jour quand la stack ou les patterns changent ; revoir périodiquement pour retirer les règles devenues évidentes.
+
+Last Updated: 2026-06-27

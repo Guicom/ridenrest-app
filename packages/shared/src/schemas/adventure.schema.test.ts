@@ -10,6 +10,16 @@ describe('createAdventureSchema', () => {
     expect(createAdventureSchema.safeParse({ name: '' }).success).toBe(false)
   })
 
+  it('rejects whitespace-only name (trimmed)', () => {
+    expect(createAdventureSchema.safeParse({ name: '   ' }).success).toBe(false)
+  })
+
+  it('trims surrounding whitespace from a valid name', () => {
+    const result = createAdventureSchema.safeParse({ name: '  Tour du Mont-Blanc  ' })
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.name).toBe('Tour du Mont-Blanc')
+  })
+
   it('rejects name over 100 characters', () => {
     expect(createAdventureSchema.safeParse({ name: 'a'.repeat(101) }).success).toBe(false)
   })

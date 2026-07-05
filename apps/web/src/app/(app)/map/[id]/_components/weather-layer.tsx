@@ -139,36 +139,52 @@ export function WeatherLayer({ map, weatherPoints, segmentWaypoints, dimension, 
       map.addSource(sourceArrows, { type: 'geojson', data: arrowsGeoJson })
 
       const beforeId = map.getLayer('poi-symbols') ? 'poi-symbols' : undefined
-      map.addLayer(
-        {
-          id: layerArrows,
-          type: 'symbol',
-          source: sourceArrows,
-          layout: {
-            'text-field': '→',
-            'text-size': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
-              0,  16,  // calm
-              20, 24,  // light breeze
-              40, 36,  // strong breeze
-              60, 48,  // storm
-            ] as maplibregl.ExpressionSpecification,
-            'text-rotate': ['coalesce', ['get', 'windDirectionMaplibre'], 0],
-            'text-rotation-alignment': 'map',
-            'text-allow-overlap': true,
-            'visibility': dimension === 'wind' ? 'visible' : 'none',
+      // Flèche en IMAGE (`icon-image`), PAS en glyphe `text-field: '→'` : MapLibre
+      // **Native** (mobile) ne rend pas U+2192 (absent de la fontstack OpenFreeMap) →
+      // approche unifiée web↔mobile via une icône (indépendante des glyphes). L'asset
+      // pointe vers l'Est → `icon-rotate = windDirectionMaplibre` conserve la convention.
+      const addArrowLayer = () => {
+        if (map.getLayer(layerArrows)) return
+        map.addLayer(
+          {
+            id: layerArrows,
+            type: 'symbol',
+            source: sourceArrows,
+            layout: {
+              'icon-image': 'wind-arrow',
+              'icon-size': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
+                0,  0.18,  // calm
+                20, 0.28,  // light breeze
+                40, 0.4,   // strong breeze
+                60, 0.52,  // storm
+              ] as maplibregl.ExpressionSpecification,
+              'icon-rotate': ['coalesce', ['get', 'windDirectionMaplibre'], 0],
+              'icon-rotation-alignment': 'map',
+              'icon-allow-overlap': true,
+              'visibility': dimension === 'wind' ? 'visible' : 'none',
+            },
+            paint: {
+              'icon-opacity': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
+                0, 0.4,  // barely visible at calm (AC #2)
+                5, 1.0,  // fully visible from 5 km/h
+              ] as maplibregl.ExpressionSpecification,
+            },
           },
-          paint: {
-            'text-color': '#1e40af',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1,
-            'text-opacity': ['interpolate', ['linear'], ['coalesce', ['get', 'windSpeedKmh'], 0],
-              0, 0.4,  // barely visible at calm (AC #2)
-              5, 1.0,  // fully visible from 5 km/h
-            ] as maplibregl.ExpressionSpecification,
-          },
-        },
-        beforeId,
-      )
+          beforeId,
+        )
+      }
+
+      if (map.hasImage('wind-arrow')) {
+        addArrowLayer()
+      } else {
+        map
+          .loadImage('/images/wind-arrow.png')
+          .then((res) => {
+            if (!map.hasImage('wind-arrow')) map.addImage('wind-arrow', res.data)
+          })
+          .catch(() => {})
+          .finally(addArrowLayer)
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, weatherPoints, segmentWaypoints, sourceLines, sourceArrows, layerLines, layerArrows])

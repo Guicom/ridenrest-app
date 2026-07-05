@@ -1,0 +1,118 @@
+# EAS Workflow — Deploy to production (Ride'n'Rest mobile)
+#
+# Déclenché à chaque merge sur `main`. Décide AUTOMATIQUEMENT, par plateforme, entre :
+#   • update OTA      → si le « fingerprint » natif est INCHANGÉ (modif JS/config seulement)
+#                       ⇒ patch instantané, AUCUNE revue store
+#   • build + submit  → si le fingerprint natif a CHANGÉ (nouveau module natif, plugin
+#                       `app.config.ts`, permission, bump SDK Expo)
+#                       ⇒ nouveau binaire envoyé aux stores (revue store ensuite)
+#
+# Ça résout tout seul le piège « natif ≠ OTA » (cf. AGENTS.md, MOB-5.2 : binaire natif
+# pas synchro avec le JS = crash au boot). Plus de décision manuelle.
+#
+# PRÉREQUIS (une fois, sinon le workflow ne se déclenche pas / échoue) :
+#   1. Lier ce repo à EAS : Expo dashboard → projet → GitHub → installer l'app GitHub Expo.
+#   2. Credentials store configurés : `eas credentials` (iOS) + service-account Google (Android).
+#   3. submit profile renseigné dans eas.json (clé API App Store Connect côté iOS,
+#      `serviceAccountKeyPath` côté Android) — sinon le job `submit` est interactif et bloque.
+#   4. `SENTRY_AUTH_TOKEN` en EAS env var (scope production, sensitive) pour l'upload des
+#      source maps par le build cloud : `eas env:create --name SENTRY_AUTH_TOKEN \
+#      --scope project --environment production --visibility sensitive`.
+#   5. Bump du `version` marketing dans app.config.ts pour une release user-visible
+#      (le build number est déjà auto via `autoIncrement` + `appVersionSource: remote`).
+#
+# Lancer à la main pour tester sans merger : `eas workflow:run deploy-to-production.yml`
+
+name: Deploy to production
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  fingerprint:
+    name: Fingerprint
+    type: fingerprint
+    environment: production
+
+  get_android_build:
+    name: Check for existing Android build
+    needs: [fingerprint]
+    type: get-build
+    params:
+      fingerprint_hash: ${{ needs.fingerprint.outputs.android_fingerprint_hash }}
+      profile: production
+
+  get_ios_build:
+    name: Check for existing iOS build
+    needs: [fingerprint]
+    type: get-build
+    params:
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      profile: production
+
+  # --- Chemin A : le natif a changé → build neuf puis soumission store ---
+  build_android:
+    name: Build Android
+    needs: [get_android_build]
+    if: ${{ !needs.get_android_build.outputs.build_id }}
+    type: build
+    params:
+      platform: android
+      profile: production
+
+  build_ios:
+    name: Build iOS
+    needs: [get_ios_build]
+    if: ${{ !needs.get_ios_build.outputs.build_id }}
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_android_build:
+    name: Submit Android build
+    needs: [build_android]
+    type: submit
+    params:
+      build_id: ${{ needs.build_android.outputs.build_id }}
+
+  submit_ios_build:
+    name: Submit iOS build
+    needs: [build_ios]
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+
+  # --- Chemin B : natif inchangé → update OTA sur le canal `production` ---
+  publish_android_update:
+    name: Publish Android update (OTA)
+    needs: [get_android_build]
+    if: ${{ needs.get_android_build.outputs.build_id }}
+    type: update
+    params:
+      branch: production
+      platform: android
+
+  publish_ios_update:
+    name: Publish iOS update (OTA)
+    needs: [get_ios_build]
+    if: ${{ needs.get_ios_build.outputs.build_id }}
+    type: update
+    params:
+      branch: production
+      platform: ios
+
+  # --- OPTIONNEL : gate E2E Maestro avant soumission ---
+  # Décommenter pour bloquer la soumission store tant que le smoke test ne passe pas.
+  # Le job maestro a besoin d'un build à tester (ici le build de production qui vient
+  # d'être produit) + le chemin du flow. Ajouter alors `needs: [maestro_ios]` au job
+  # `submit_ios_build` (idem Android). ⚠️ ça consomme un run device EAS supplémentaire.
+  #
+  # maestro_ios:
+  #   name: E2E smoke (iOS)
+  #   needs: [build_ios]
+  #   type: maestro
+  #   params:
+  #     build_id: ${{ needs.build_ios.outputs.build_id }}
+  #     flow_path: .maestro/smoke.yaml

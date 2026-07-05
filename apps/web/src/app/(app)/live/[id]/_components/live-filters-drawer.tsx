@@ -174,7 +174,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
                   if (v >= 5 && v <= 50) setLocalSpeed(v)
                 }}
                 data-testid="input-speed"
-                className="h-9 w-16 rounded-lg border border-[--border] bg-white px-2 text-sm text-center font-mono"
+                className="h-9 w-16 rounded-lg border border-[--border] bg-white dark:bg-surface px-2 text-sm text-center font-mono"
               />
               <span className="text-sm text-[--text-secondary]">km/h</span>
             </div>
@@ -186,7 +186,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setLocalRadius((r) => Math.max(0.5, r - 0.5))}
-                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
+                className="h-9 w-9 rounded-lg bg-white dark:bg-surface-raised border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
                 aria-label="Diminuer le rayon"
               >
                 —
@@ -196,7 +196,7 @@ export function LiveFiltersDrawer({ open, onOpenChange, accommodationPois, onSea
               </span>
               <button
                 onClick={() => setLocalRadius((r) => Math.min(MAX_LIVE_RADIUS_KM, r + 0.5))}
-                className="h-9 w-9 rounded-lg bg-white border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
+                className="h-9 w-9 rounded-lg bg-white dark:bg-surface-raised border border-[--border] text-foreground font-bold text-lg flex items-center justify-center cursor-pointer transition-all duration-75 hover:bg-[--surface-raised] active:scale-[0.90]"
                 aria-label="Augmenter le rayon"
               >
                 +

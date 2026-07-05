@@ -1,0 +1,381 @@
+# @ridenrest/mobile
+
+Application mobile native Ride'n'Rest (iOS + Android) — [Expo SDK 56](https://docs.expo.dev/versions/v56.0.0/) + expo-router, intégrée au monorepo Turborepo/pnpm.
+
+## Démarrage (développement local)
+
+```bash
+pnpm install                       # à la racine du monorepo
+pnpm --dir apps/mobile dev         # démarre le serveur Expo (Metro)
+# puis : i (simulateur iOS) / a (émulateur Android)
+```
+
+> ⚠️ Depuis MOB-1.2, le projet utilise un **Dev Client** (`expo-dev-client`) : les libs natives à venir (MapLibre RN, expo-secure-store…) ne fonctionnent pas dans Expo Go. Installer le build `development` (voir ci-dessous) sur le simulateur/émulateur, puis `pnpm --dir apps/mobile dev`.
+
+### ⚠️ Prérequis pour un build natif **en local** (`expo run:ios` / `run:android`)
+
+**Expo SDK 56 exige Xcode 26.4** (iOS deployment target **16.4**). Avec un Xcode plus ancien (ex. 26.1), `expo run:ios` **échoue à la compilation** (erreur Swift `'weak' must be a mutable variable` dans `expo-modules-jsi`, `xcodebuild error code 65`). Vérifier : `xcodebuild -version` → `Xcode 26.4`. Mettre à jour via l'App Store, puis `sudo xcodebuild -runFirstLaunch`.
+
+> 💡 **Pourquoi ça « marchait avant » sans Xcode 26.4 ?** Parce que les builds natifs du projet passent normalement par **EAS Build (cloud)**, dont les serveurs ont la bonne toolchain — la compilation **locale** n'est jamais sollicitée. Un `expo start` ne compile pas non plus (il sert juste le JS). Le besoin de Xcode 26.4 **en local** n'apparaît qu'au premier `expo run:ios` (utile p.ex. pour tester un **deep link `ridenrest://`** sans attendre un build cloud).
+
+> 🛠️ Gotcha runtime simulateur : si `xcodebuild -showdestinations` ne liste aucun simulateur (« iOS 26.1 is not installed » alors que `simctl` boote bien un sim), installer le **runtime de build** : `xcodebuild -downloadPlatform iOS`. Un runtime peut suffire à *lancer* un sim sans suffire à *compiler* vers lui.
+
+## Identité de l'app
+
+| Élément | Valeur |
+|---|---|
+| Bundle ID iOS / Package Android | `app.ridenrest` |
+| Projet EAS | [`@ridenrest/ridenrest`](https://expo.dev/accounts/ridenrest/projects/ridenrest) |
+| `projectId` EAS | `4548dbd0-ee0d-4ba7-8acb-e42469ec1ec3` (dans `app.config.ts` → `extra.eas`) |
+| Scheme deep link | `ridenrest://` (`app.config.ts` → `scheme`) |
+
+> 📝 Depuis **MOB-1.4** : la config Expo est en **`app.config.ts`** (TypeScript ; plus de `app.json`), `projectId` EAS + config `updates` (OTA) préservés. Le scheme `ridenrest://` génère au prebuild les `CFBundleURLTypes` (iOS) et l'intent filter (Android) — prérequis des callbacks OAuth `ridenrest://oauth-*` (MOB-2.3/2.4).
+
+## Builds (EAS Build — cloud)
+
+3 profils dans `eas.json`, chacun rattaché à un canal OTA du même nom :
+
+| Profil | Usage | Distribution | Canal OTA | Notes |
+|---|---|---|---|---|
+| `development` | Dev Client (iOS : simulateur **uniquement** ; Android : émulateur/device) | `internal` | `development` | `developmentClient: true`, `ios.simulator: true` — un device iOS physique exigerait un build sans `simulator: true` + provisioning |
+| `preview` | QA installable hors store | `internal` | `preview` | APK Android / ad-hoc iOS |
+| `production` | Binaire de soumission store | `store` | `production` | `autoIncrement`, versions gérées côté EAS (`appVersionSource: remote`) |
+
+```bash
+# Builds development (Dev Client)
+pnpm --dir apps/mobile exec eas build --profile development --platform ios
+pnpm --dir apps/mobile exec eas build --profile development --platform android
+
+# Suivi
+pnpm --dir apps/mobile exec eas build:list --limit 5
+```
+
+**Credentials** : gérés automatiquement par EAS (signing iOS via le compte Apple Developer, keystore Android généré et stocké sur les serveurs Expo). Rien à stocker dans le repo.
+
+**Free tier EAS ≈ 30 builds/mois** → économiser les builds natifs : tout changement **JS/assets pur** passe par OTA (voir ci-dessous), un build natif n'est nécessaire que pour un changement natif.
+
+## OTA (EAS Update)
+
+- `runtimeVersion` : policy **`appVersion`** — un build ne reçoit que les updates publiées avec la même version d'app (`1.0.0`). Un mismatch de `runtimeVersion` est la cause n°1 d'une OTA « qui ne s'applique pas ».
+- Publier un patch JS :
+
+```bash
+pnpm --dir apps/mobile exec eas update --channel preview --message "fix: …"
+```
+
+- ⚠️ **Toujours passer `--channel`** : sans lui, l'update part sur une branche par défaut qu'aucun build ne consomme (OTA invisible). En `--non-interactive` (CI), eas-cli 20.x exige aussi `--environment`.
+- L'update est récupérée **au prochain lancement** d'un build du canal ciblé (2 lancements pour la voir : fetch en arrière-plan puis application).
+
+### ⚠️ Règle OTA (à respecter sur tous les epics)
+
+Une OTA ne peut livrer **que du JS et des assets**. Tout changement **natif** (nouveau plugin/config natif, lib native, bump SDK Expo) impose un **nouveau build EAS** + (en production) une soumission store. En cas de doute : si `pnpm exec expo install <lib>` ajoute du code natif → build requis.
+
+## CI/CD → EAS Build (pattern cible — implémentation gate CI en MOB-1.4)
+
+**Principe** : GitHub Actions ne compile **jamais** de natif. Il ne fait qu'**appeler** EAS Build/Submit — la compilation s'exécute sur le cloud EAS.
+
+- **Déclencheur** : push d'un tag `v*` (ex. `v1.1.0`) → job GitHub Actions dédié mobile.
+  (Le workflow web actuel `.github/workflows/ci.yml` se déclenche sur push `main` → deploy VPS ; le déclenchement mobile par tag s'y ajoutera sans le modifier.)
+- **Auth CI** : créer un access token sur [expo.dev → Access tokens](https://expo.dev/settings/access-tokens) et le stocker en secret GitHub `EXPO_TOKEN` (jamais dans le repo).
+
+```yaml
+# Squelette cible (à implémenter en MOB-1.4 avec la gate lint/test/typecheck)
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  eas-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: '10.32.1' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      # Pas de compilation native ici — EAS Build s'en charge en cloud :
+      - run: pnpm --dir apps/mobile exec eas build --profile production --platform all --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # eas submit (stores) → MOB-6.5
+```
+
+**Hors scope ici** (volontairement) : job CI lint/test/typecheck mobile → **MOB-1.4**. La distribution TestFlight/Internal Testing + `eas submit` + soumission store est traitée dans la section **Release** ci-dessous (MOB-6.5).
+
+## Release — Beta (TestFlight / Internal Testing) → Production (MOB-6.5)
+
+> **Cette section est le runbook opérationnel.** ~80 % du travail = actions console (Apple/Google) + commandes EAS CLI. Le code/config est minimal et **déjà en place** : `submit.production` (eas.json), `SENTRY_AUTH_TOKEN` (env EAS), `version` (app.config.ts), et le **Workflow EAS** `.eas/workflows/deploy-to-production.yml` (fingerprint → build/submit **ou** OTA).
+>
+> ⚠️ **Rapporter l'état RÉEL par plateforme** (iOS / Android), jamais un « ✓ » global (règle anti-arrondi, AGENTS.md). La vraie validation = builds EAS + soumissions + install device (TestFlight / Internal Testing) + smoke test OTA.
+
+**Ordre des prérequis — suivre T0 → T5 dans l'ordre. Ne pas sauter T0.**
+
+### T0 — Comptes & credentials (BLOCKER, à faire en premier)
+
+| # | Action | Où | Récupérer |
+|---|---|---|---|
+| 1 | **Débloquer le compte Google Play Console** (paiement $25 — blocage bancaire hérité MOB-1.2) | [play.google.com/console](https://play.google.com/console) | compte actif |
+| 2 | Confirmer le **compte Apple Developer** actif | [developer.apple.com → Membership](https://developer.apple.com/account) | **Team ID** |
+| 2b | **Signer le contrat « Free Apps »** (Account Holder) — sinon toute requête API/`asc`/`eas submit` échoue avec *« A required agreement is missing or has expired »* | [App Store Connect → Business](https://appstoreconnect.apple.com/business) → Agreements → Free Apps → Agree | contrat *Active* (app gratuite : aucun bancaire requis ; propagation ~quelques min) |
+| 3 | Créer la **fiche App Store Connect** (bundle `app.ridenrest`) | [App Store Connect → Apps → +](https://appstoreconnect.apple.com) | **`ascAppId`** = champ « Apple ID » (numérique) de l'app |
+| 4 | Créer la **fiche Google Play** (package `app.ridenrest`) | Play Console → Créer une application | — |
+| 5 | Générer une **clé API App Store Connect** (rôle App Manager) | App Store Connect → Users & Access → Integrations → **App Store Connect API** | `.p8` (téléchargé **1 seule fois**) + **Key ID** + **Issuer ID** |
+| 6 | Créer un **service-account Google Cloud** puis l'inviter dans Play Console (permission *Releases*) | Google Cloud Console → IAM → Service accounts → clé JSON ; Play Console → Users & permissions | **JSON** → déposer dans `apps/mobile/credentials/google-service-account.json` (gitignored) |
+| 7 | Lier le repo **GitHub ↔ EAS** (active le Workflow) | [expo.dev](https://expo.dev) → projet → GitHub → installer l'app GitHub Expo | — |
+
+> Le `.p8` Apple : le stocker via `eas credentials` (recommandé — EAS le garde côté serveur) ou le référencer localement. **Ne jamais committer** `.p8` / JSON service-account (déjà gitignorés : `*.p8`, `credentials/`).
+>
+> ⚠️ **Gotcha bundle ID pré-enregistré (vécu 2026-07-05)** : si on enregistre l'App ID à la main / via l'API (`asc bundle-ids create`) **avant** le 1ᵉʳ `eas build`, il est créé **nu** → EAS génère un provisioning profile **sans** les capabilities requises → le build Xcode échoue avec *« Provisioning profile doesn't include the aps-environment entitlement / Push Notifications capability »*. L'app utilisant `expo-notifications` (APNs, MOB-6.2), il faut **activer Push Notifications sur l'App ID** : `asc bundle-ids capabilities add --bundle <BUNDLE_RES_ID> --capability PUSH_NOTIFICATIONS`, puis **rebuild** (EAS régénère le profil avec push). Alternative : laisser EAS enregistrer l'App ID lui-même au 1ᵉʳ build (il sync les capabilities), mais on perd la création de fiche ASC en amont. Seule capability App ID requise ici = `PUSH_NOTIFICATIONS` (localisation/deep-link custom-scheme n'en exigent pas).
+
+### T1 — Remplir `submit.production` (eas.json)
+
+Structure déjà en place ; **remplacer les placeholders** une fois T0 fait :
+
+- **iOS** : remplacer `"ascAppId": "REPLACE_WITH_ASC_APP_ID"` par l'`ascAppId` réel (T0.3). La clé API ASC (`.p8` + Key ID + Issuer ID) est fournie à `eas submit` **interactivement au 1er run** (EAS propose de la stocker) ou via `eas credentials`.
+- **Android** : `serviceAccountKeyPath` pointe déjà sur `./credentials/google-service-account.json` — **y déposer le JSON** (T0.6). `track: "internal"` pour la beta (AC1) ; passer à `"production"` pour la soumission finale (T5 / AC2).
+
+### T2 — `SENTRY_AUTH_TOKEN` en env EAS (release symbolisée)
+
+Source maps Sentry uploadées au build cloud (plugin déjà en région **EU** `de.sentry.io`, cf. `app.config.ts`). Corriger le 401 EU/US de MOB-6.1 : token créé côté **EU**, slugs org/projet exacts.
+
+```bash
+cd apps/mobile
+# Token SECRET (upload source maps) — jamais EXPO_PUBLIC_*, jamais commité
+eas env:create --name SENTRY_AUTH_TOKEN --scope project --environment production --visibility sensitive
+# Slugs org/projet Sentry (lus par app.config.ts via process.env, défaut '') — non secrets
+eas env:create --name SENTRY_ORG      --scope project --environment production --visibility plaintext
+eas env:create --name SENTRY_PROJECT  --scope project --environment production --visibility plaintext
+```
+
+> Vérifier après un build production que les source maps sont bien uploadées (logs EAS : phase `sentry-cli`). Sans token, le build **n'échoue pas** — les maps ne sont juste pas uploadées (stack traces non symbolisées).
+
+### T3 — Versioning
+
+- `version` (`app.config.ts`) : **`1.0.0`** pour la 1ʳᵉ release publique (rien à bumper *depuis*). Bumper pour **toute** release user-visible suivante.
+- `buildNumber` (iOS) / `versionCode` (Android) : **gérés par EAS** (`autoIncrement: true` + `appVersionSource: "remote"`) — ne **jamais** les éditer à la main.
+- `runtimeVersion.policy: "appVersion"` : une OTA ne s'applique qu'aux builds de **même `version`** — cohérent avec le mapping canal ↔ profil.
+
+### T4 — Build + distribution beta (AC1)
+
+```bash
+cd apps/mobile
+eas login                                    # ou EXPO_TOKEN en CI
+eas credentials --platform ios               # 1re fois : cert + provisioning (EAS-managed)
+
+eas build --profile production --platform all # ou --platform ios / android séparément
+
+eas submit --profile production --platform ios      # → TestFlight
+eas submit --profile production --platform android   # → Internal Testing (track internal)
+```
+
+> **Android — 1ᵉʳ upload** : Google exige souvent que le **tout premier** `.aab` soit uploadé **manuellement** dans la Play Console (crée la piste) avant que l'API service-account accepte les submits suivants.
+>
+> Puis : **inviter les beta-users** (événement Espagne) → TestFlight (App Store Connect) + Internal Testing (Play Console). **Smoke test device réel** : login, carte, mode Live, push (MOB-6.2). Rapporter **par plateforme**.
+
+### T5 — Soumission production (AC2) — après MOB-6.4 ✅
+
+Pré-requis **MOB-6.4 (done)** : Privacy Nutrition Labels iOS + Data Safety Android + age rating IARC renseignés dans les consoles.
+
+1. **iOS** : App Store Connect → soumettre le build TestFlight validé en review App Store.
+2. **Android** : passer `submit.production.android.track` de `internal` → `production` (eas.json) puis promouvoir en review Play (ou promouvoir la release depuis la console).
+3. **Smoke test OTA** (patch JS critique sans resoumission — FR-MOB-003) :
+
+```bash
+eas update --channel production --message "fix: …" --environment production
+```
+
+> ⚠️ `--environment` est **requis** en `--non-interactive`. Une OTA ne livre **que du JS/assets** : tout changement **natif** (module/plugin/permission/bump SDK) exige un **nouveau build + submit**, jamais une OTA silencieuse — garanti par le fingerprint du Workflow (T6).
+
+### T6 — Automatisation Workflow EAS (optionnel, recommandé)
+
+Une fois T0/T1/T2 satisfaits :
+
+```bash
+cd apps/mobile
+eas workflow:run deploy-to-production.yml
+```
+
+Push `main` → job `fingerprint` → natif **inchangé** = `update` (OTA branch `production`) ; natif **changé** = `build` + `submit`. Résout « natif ≠ OTA » automatiquement. Gate E2E Maestro pré-release : bloc commenté en fin de `.eas/workflows/deploy-to-production.yml` (à décommenter si souhaité — jamais en CI PR, cadence release).
+
+## Variables d'environnement
+
+- Variables publiques embarquées dans le bundle : préfixe **`EXPO_PUBLIC_*`** uniquement (via `eas.json` → `env` par profil, ou EAS Environment Variables).
+- **Aucun secret dans le bundle JS** (NFR-014). `BETTER_AUTH_SECRET` & co. restent côté serveur, toujours.
+
+### Auth — `EXPO_PUBLIC_*` (MOB-2.1)
+
+Copier `.env.example` → `.env` et renseigner :
+
+| Variable | Rôle | Dev (simulateur iOS) |
+|---|---|---|
+| `EXPO_PUBLIC_BETTER_AUTH_URL` | Serveur **Better Auth** (`apps/web`) — sign-in, session, endpoint token JWT | `http://localhost:3011` |
+| `EXPO_PUBLIC_API_URL` | API **NestJS** (données) — appelée par `apiFetch` avec `Authorization: Bearer` | `http://localhost:3010` |
+
+> ⚠️ **Gotcha device physique / émulateur Android** : `localhost` pointe sur le **device lui-même**, pas sur la machine de dev. Utiliser l'**IP LAN** de la machine (ex. `http://192.168.1.42:3011` / `:3010`). La trouver via `ipconfig getifaddr en0` (macOS). Le simulateur iOS, lui, partage `localhost` avec l'hôte.
+>
+> 🔴 **PRODUCTION (build store / TestFlight) — CRITIQUE (vécu 2026-07-05)** : `.env` est **gitignoré** → **non uploadé** au build EAS cloud. Sans valeur, le code retombe sur ses défauts **`http://localhost:*`** → sur un device réel `localhost` = le téléphone → **backend injoignable → login (Google/email) & données KO** (« La connexion Google a échouée »). ⇒ Les URLs prod **DOIVENT** être posées en **EAS Environment Variables (environnement `production`)** — elles alimentent le build **et** l'OTA (`eas update --environment production`), contrairement à `eas.json build.env` qui n'alimente que le build :
+> ```bash
+> eas env:create --name EXPO_PUBLIC_API_URL         --value "https://api.ridenrest.app" --visibility plaintext --scope project --environment production
+> eas env:create --name EXPO_PUBLIC_BETTER_AUTH_URL --value "https://ridenrest.app"     --visibility plaintext --scope project --environment production
+> ```
+> Toute modif d'une `EXPO_PUBLIC_*` = **inlinée au build** → nouveau build requis (ou OTA `--environment production`, qui re-bundle le JS avec ces env).
+
+### Observabilité — Sentry & PostHog (MOB-6.1)
+
+Crash reporting (Sentry) + analytics produit (PostHog, façade `@ridenrest/analytics`). **Tout est key-gated** : sans clé/DSN, l'app fonctionne (init no-op) mais n'émet rien — comportement attendu en dev/CI. Les valeurs `APP_ENV` + `POSTHOG_HOST` sont déjà déclarées par profil dans `eas.json`. Les **clés** (publiques par design : embarquées dans le bundle) viennent des **EAS Environment Variables** (dashboard) pour les builds cloud, ou de `.env.local` pour les builds locaux.
+
+| Variable | Rôle | Secret ? |
+|---|---|---|
+| `EXPO_PUBLIC_APP_ENV` | `development` \| `preview` \| `production` — pilote l'`environment` Sentry **et** le gate du session replay (replay **beta-only** : actif si `!== 'production'`) | non (eas.json) |
+| `EXPO_PUBLIC_POSTHOG_KEY` | Clé projet PostHog (même projet que le web → dashboard unifié). Absente → analytics no-op | non (publique, bundle) |
+| `EXPO_PUBLIC_POSTHOG_HOST` | Endpoint PostHog Cloud **EU** (`https://eu.i.posthog.com`) | non (eas.json) |
+| `EXPO_PUBLIC_SENTRY_DSN` | DSN Sentry (public par design). Absent → Sentry non initialisé | non (publique, bundle) |
+| `SENTRY_AUTH_TOKEN` | **Upload des source maps** au build (symbolication). **SECRET CI / `.env.local` uniquement** — JAMAIS `EXPO_PUBLIC_*`, JAMAIS commité | **OUI** |
+
+> RGPD : **aucun bandeau de consentement sur mobile** (zéro cookie → `distinct_id` en AsyncStorage). Pas d'IDFA / pas de tracking cross-app → **pas de prompt ATT**. Jamais de GPS ni de PII (façade typée + scrub `beforeSend` Sentry). Le session replay (beta) **masque la carte MapLibre** (`ph-no-capture`) + les champs texte.
+
+### Notifications push — APNs / FCM (MOB-6.2)
+
+Notification « analyse de densité terminée » (`expo-notifications` + `expo-device`). La permission OS est demandée **après la 1re analyse de densité** (`sidebar-density-section.tsx`), jamais au boot — la garde one-shot vit dans `push-storage` (AsyncStorage, **jamais** SecureStore : un flag/token push n'est pas un secret d'auth). L'envoi serveur passe par l'**Expo Push API** (`expo-server-sdk`, un endpoint route APNs **et** FCM) : `PushModule` NestJS écoute `density.completed` (EventEmitter) et notifie tous les tokens du propriétaire, **best-effort** (une erreur d'envoi ne fait jamais échouer le job densité ; un `DeviceNotRegistered` purge le token). RGPD : le payload ne transporte que `{ adventureId }` (deep-link `map/[id]`), **zéro coordonnée GPS**.
+
+⚠️ **Module natif neuf** → `expo prebuild --clean -p ios` **ET** `-p android` avant `pnpm sim` / `run:android`, sinon « Cannot find native module ». Pin **exact** de `expo-notifications` / `expo-device` (`bundledNativeModules.json`, sans `~` — gotcha dyld « Symbol not found »). Le push réel **n'arrive PAS sur simulateur iOS** (`Device.isDevice === false` → flux permission/registration en no-op sûr) ; tester l'envoi réel sur **device physique**.
+
+**Prérequis credentials (hors-code, à provisionner avant l'envoi réel — voir §T8 de la story) :**
+
+| Élément | Où | Rôle |
+|---|---|---|
+| Clé APNs `.p8` | EAS credentials (`eas credentials`, iOS) | Signe les pushes APNs. Sans elle, `getExpoPushTokenAsync` échoue sur device iOS |
+| `google-services.json` + clé de service **FCM V1** (`.json`) | EAS credentials (Android) + config projet Firebase | Route les pushes FCM (Android). Référencé via `android.googleServicesFile` si fourni |
+| `EXPO_ACCESS_TOKEN` (optionnel) | **`.env` VPS (API NestJS)**, secret — jamais dans le bundle | Durcit la sécurité de l'envoi via l'Expo Push API. Absent → envoi non authentifié (OK MVP) |
+
+> Sans ces credentials, l'app **boote normalement** et tout le flux push est **no-op sûr** (aucune erreur). Le secret d'envoi (`EXPO_ACCESS_TOKEN`) vit **uniquement** côté API NestJS (`.env` VPS), **jamais** en `EXPO_PUBLIC_*`.
+
+## Auth & session (MOB-2.1)
+
+Fondation auth posée par MOB-2.1 (aucun écran de login fonctionnel ici — il arrive en MOB-2.2).
+
+- **Client** : `src/lib/auth/client.ts` — `@better-auth/expo` (`expoClient`) configuré sur le scheme `ridenrest` + stockage **`expo-secure-store`** (Keychain iOS / Keystore Android). **Jamais** `AsyncStorage` pour l'auth. Persistance + restauration de session au cold start **automatiques**.
+- **Versions** : `better-auth` **1.5.5** + `@better-auth/expo` **1.5.5** côté mobile, **alignées exactement** sur le serveur Better Auth (`apps/web`, `better-auth@1.5.5`). Pin exact (pas de `^`) — le plugin a un peer `better-auth: 1.5.5` strict, et monter le serveur en 1.6.x casserait les sessions web en prod.
+- **Serveur** (`apps/web/src/lib/auth/auth.ts`) : ajout **additif** du plugin `expo()` + `trustedOrigins: ['ridenrest://', 'ridenrest://*']` (autorise le retour deep-link OAuth). Le web continue d'utiliser les cookies de session — comportement inchangé.
+- **Client API** : `src/lib/api/api-client.ts` — `apiFetch()` (wrapper `fetch`, jamais axios/ky) injecte `Authorization: Bearer <JWT>`, cache le JWT (~13 min, buffer 2 min) et gère `401 → refresh → 1 retry`. Le JWT vient de `GET {BETTER_AUTH_URL}/api/auth/token` (cookie de session via `authClient.getCookie()`).
+- **Routes & guard** : groupes `(auth)` / `(app)` ; le **guard centralisé** vit dans `src/app/(app)/_layout.tsx` (un seul point, jamais par écran) — non connecté → `(auth)/login`, connecté → enfants, session non résolue → loader (pas de flash). Guard inverse dans `(auth)/_layout.tsx`.
+- **Socle data** : `QueryClientProvider` (TanStack Query v5) + un **unique** listener `AppState`/netinfo (`src/lib/query/use-app-state-refetch.ts`) monté au root — refocus/refetch de la session au retour foreground.
+
+> 🔐 **Secret partagé** : `BETTER_AUTH_SECRET` **identique** entre `apps/web`, `apps/api` et le serveur — **ne jamais régénérer** (casserait toutes les sessions web existantes). Jamais exposé au client mobile.
+
+## Scripts
+
+| Script | Action |
+|---|---|
+| `pnpm dev` / `pnpm start` | Serveur Expo (Metro) |
+| `pnpm ios` / `pnpm android` | Serveur Expo + ouverture simulateur/émulateur |
+| `pnpm build` | `expo export -p ios -p android` (bundles JS iOS+Android, utilisé par Turbo — **web hors cible**, cf. AGENTS.md) |
+| `pnpm lint` | ESLint (config Expo flat) |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm test` | Jest + React Native Testing Library (preset `jest-expo`) |
+
+## Tests (MOB-1.4)
+
+### Unitaires — Jest + RNTL
+
+- Preset **`jest-expo`** (`jest.config.js`), setup global `jest.setup.ts`. Tests **co-localisés** `*.test.ts(x)` à côté du code.
+- Mocks des libs natives dans **`__mocks__/`** (racine `apps/mobile/`) : `expo-localization`, `expo-location`, `expo-secure-store` (variantes sync `setItem`/`getItem` pour le client Better Auth), `expo-web-browser`, `@maplibre/maplibre-react-native` — placeholders étoffés au fil des epics MOB-2+.
+
+> ⚠️ **Tests de routes : jamais sous `src/app/`.** Expo Router bundle via `require.context` **tout** `.tsx` sous `src/app` (y compris les `*.test.tsx`) → `expo export` casserait sur l'import de `@testing-library/react-native`. Les tests qui doivent importer un fichier de route vivent sous **`src/__tests__/`** (ex. `app-group-guard.test.tsx`) ; les tests de logique/composants restent co-localisés ailleurs (`src/lib/**`, `src/components/**`).
+
+```bash
+pnpm --dir apps/mobile test          # suite Jest/RNTL
+```
+
+### E2E — Maestro (smoke, **pré-release uniquement**)
+
+- Flow : `.maestro/launch.yaml` — « l'app se lance et affiche l'écran d'accueil ».
+- ⚠️ **Cadence pré-release** (avant soumission stores), **jamais** sur les PR CI : émulateur lent/coûteux + flakiness E2E. Volontairement absent du job GitHub Actions.
+- Maestro est un **CLI système** (hors `package.json`) : `curl -fsSL https://get.maestro.mobile.dev | bash`. Nécessite un simulateur/émulateur avec l'app installée (`npx expo run:ios` / `run:android`, ou un build dev-client EAS).
+
+```bash
+maestro test apps/mobile/.maestro/launch.yaml
+```
+
+## Gate CI (MOB-1.4)
+
+`apps/mobile` expose les tâches turbo `lint` / `test` / `typecheck`, **captées automatiquement** par le `--filter='*'` existant de `.github/workflows/ci.yml` — aucune modification du YAML. Le lint + les tests unitaires mobile tournent donc sur **chaque PR vers `main`** et **bloquent** le merge en cas d'échec.
+
+> 🚫 **Aucun build natif en GitHub Actions** : la tâche `build` mobile = `expo export -p ios -p android` (bundles JS iOS+Android, léger). Le **web est volontairement exclu** : `expo export` sans `-p` pré-rend les routes côté Node (`web.output: 'static'`) et des modules **natif-only** chargés au niveau module (`expo-notifications` → `localStorage`, `expo-file-system` `Paths.cache` → `this.validatePath`, `expo-task-manager`…) crashent en SSR Node. Le web n'étant **pas une cible de shipping** (native-first), on gate le build sur le natif plutôt que de stubber toute la surface native (détail : AGENTS.md §« `expo export` : gate CI natif-only »). La compilation native iOS/Android reste **exclusivement sur EAS Build (cloud)** — cf. section CI/CD → EAS ci-dessus (FR-MOB-003).
+
+## i18n (MOB-1.4)
+
+Scaffold `i18next` + `react-i18next` + `expo-localization` dans `src/lib/i18n/` :
+
+- `i18n.config.ts` : init, détection de la locale device, **locale par défaut + fallback = `fr`** (jamais `en`).
+- `locales/{fr,en}.json` ; provider `I18nextProvider` monté au root (`app/_layout.tsx`).
+- Toutes les chaînes des écrans placeholder sont résolues via `t('…')` (preuve de câblage). L'externalisation **complète** des chaînes est déférée à **MOB-6.3**.
+
+### Vérifier le deep link `ridenrest://` (manuel, simulateur)
+
+```bash
+npx uri-scheme open ridenrest://oauth-callback --ios       # ou --android
+# → ouvre l'app sur l'écran oauth-callback (routé par Expo Router)
+```
+
+## Conformité stores & liens légaux (MOB-6.4)
+
+**App native pure** (guideline App Store 4.2) : 0 WebView (`react-native-webview` absent).
+Les liens sortants passent par `Linking.openURL` (navigateur système). Aucun contenu légal
+n'est dupliqué en natif — la section « Légal » des Paramètres pointe vers le web.
+
+**URLs légales** (routes web `(marketing)`, SSG indexables) :
+
+- Politique de confidentialité : `https://ridenrest.app/privacy`
+- CGU : `https://ridenrest.app/terms`
+- Mentions légales (historique) : `https://ridenrest.app/mentions-legales`
+
+> ⚠️ Le contenu des **CGU** (`/terms`) est un premier jet rédigé pour le MVP — **à faire valider
+> juridiquement** avant publication (décision story MOB-6.4).
+
+### Données réellement collectées (source de vérité — labels & Data Safety)
+
+| Donnée | Détail | iOS (Nutrition Label) | Android (Data Safety) |
+|---|---|---|---|
+| Géoloc (GPS précis) | On-device uniquement, jamais envoyée au serveur (scrub Sentry, aucun POST GPS) | Location → App Functionality → **Not Linked**, **Not Tracking** | Location → traitée sur l'appareil, non partagée |
+| Compte / identité | Better Auth : email + Google/Strava OAuth ; tokens en `expo-secure-store` | Email + User ID → Linked → App Functionality | Personal info (Email) + App activity |
+| Analytics produit | PostHog **EU**, `distinct_id` AsyncStorage, **zéro cookie**, **pas d'IDFA/ATT**, `identify(user.id)` | Product Interaction/Usage → **Not Tracking** → Linked to User ID | App activity |
+| Crash / diagnostics | Sentry `sendDefaultPii:false`, scrub GPS, key-gated, **EU** | Crash/Performance → App Functionality → **Not Tracking** | Crash logs + Diagnostics |
+
+**Invariant clé** : pas d'IDFA / pas de suivi cross-app → **ATT non requise**, toutes les catégories
+iOS marquées **« Not Used for Tracking »**. Hébergement **EU (Francfort)**.
+
+### Checklist App Store Connect — Privacy Nutrition Labels (à recopier au submit)
+
+1. **Location** → *Precise Location* : collecté. Usage = **App Functionality** uniquement.
+   Linked to user = **No**. Used for tracking = **No**.
+2. **Contact Info** → *Email Address* : collecté. Usage = App Functionality + Account.
+   Linked = **Yes**. Tracking = **No**.
+3. **Identifiers** → *User ID* : collecté. Usage = App Functionality + Analytics.
+   Linked = **Yes**. Tracking = **No**. *(Pas de Device ID / IDFA.)*
+4. **Usage Data** → *Product Interaction* : collecté. Usage = Analytics + App Functionality.
+   Linked = **Yes**. Tracking = **No**.
+5. **Diagnostics** → *Crash Data* + *Performance Data* : collecté. Usage = App Functionality.
+   Linked = **No**. Tracking = **No**.
+6. **Tracking** (section globale) : **No, we do not track**. Aucun ATT prompt.
+7. Vérifier après `expo prebuild` la présence de `ios/RidenRest/PrivacyInfo.xcprivacy`
+   (Apple Privacy Manifest, requis au submit depuis 2024 ; `NSPrivacyTracking = false`,
+   raisons d'API d'accès générées par Expo/SDK). ✅ présent.
+
+### Checklist Google Play Console — Data Safety (à recopier au submit)
+
+- **Location** → *Approximate/Precise location* : collectée mais **traitée sur l'appareil,
+  non partagée, non envoyée** → cocher « traitée de façon éphémère / sur l'appareil » ;
+  non transmise à des tiers. Aucune finalité publicitaire.
+- **Personal info** → *Email address* : collectée, chiffrée en transit, finalité = gestion de
+  compte / authentification. Non partagée. Suppression possible (compte supprimable in-app).
+- **App activity** → *App interactions* : collectée (analytics PostHog EU), finalité =
+  Analytics. Non partagée à des fins publicitaires.
+- **App info & performance** → *Crash logs* + *Diagnostics* : collectés (Sentry EU), finalité =
+  Analytics / prévention des bugs.
+- **Data is encrypted in transit** : Oui (HTTPS). **Users can request deletion** : Oui
+  (suppression de compte in-app + `contact@ridenrest.app`).
+- **Age / content rating (IARC)** : app utilitaire de planification d'itinéraires, **aucun**
+  contenu violent/sexuel/jeu d'argent/substances → catégorie « Tout public » (PEGI 3 /
+  ESRB Everyone / IARC 3+). Pas d'UGC partagé publiquement (les aventures restent privées).

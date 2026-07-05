@@ -1,0 +1,58 @@
+appId: app.ridenrest
+---
+# MOB-5.6 — Météo en mode Live. Vérifie : Live actif → panneau → tiroir filtres →
+# activation météo + dimension « Vent » → fermeture → l'overlay carte (ligne colorée +
+# flèches de vent) ET le strip résumé (`live-weather-strip`) du panneau sont rendus.
+# Le canvas MapLibre (GL natif) n'est PAS introspectable par les asserts → revue VISUELLE
+# par SCREENSHOTS (ligne colorée AC4 + flèches vent proportionnelles).
+#
+# PRÉ-REQUIS (idem live-profile.yaml, setup par device-test.sh) :
+#   1. App rebuildée (BUILD=1 / pnpm sim) — MOB-5.6 est all-JS, bundle embarqué.
+#   2. Permission localisation pré-accordée + position GPS simulée (sinon pas de fix → pas
+#      de panneau). 3. Session connectée (clearState:false). 4. Backend up (météo).
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# Consentement (conditionnel : returning user auto-démarre sans dialog).
+- runFlow:
+    when:
+      visible: "Activer la géolocalisation"
+    commands:
+      - tapOn: "Activer"
+
+# Fix GPS reçu → `currentKmOnRoute` connu → panneau Live visible.
+- extendedWaitUntil:
+    visible: "Mon hôtel dans"
+    timeout: 20000
+
+# Ouvrir le tiroir filtres → atteindre la section Météo (bas du tiroir).
+- tapOn: "Ouvrir les filtres"
+- extendedWaitUntil:
+    visible: "Filtres"
+    timeout: 8000
+- scrollUntilVisible:
+    element:
+      id: "weather-toggle"
+    direction: DOWN
+    timeout: 8000
+# Activer la météo (dimension Température par défaut) puis basculer en « Vent ».
+- tapOn:
+    id: "weather-toggle"
+- tapOn:
+    id: "weather-dim-wind"
+# Fermer le tiroir (✕).
+- tapOn:
+    id: "filters-close-btn"
+- waitForAnimationToEnd:
+    timeout: 8000
+
+# Le strip météo du panneau Live est monté quand la météo est active (AC4).
+- extendedWaitUntil:
+    visible:
+      id: "live-weather-strip"
+    timeout: 12000
+- takeScreenshot: screenshots/live-weather-wind   # overlay flèches vent + strip panneau

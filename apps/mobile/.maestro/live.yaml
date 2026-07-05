@@ -1,0 +1,36 @@
+appId: app.ridenrest
+---
+# MOB-5.1 — Activation du mode Live : consentement RGPD + permission foreground.
+# Le consentement est un **overlay RN absolu** (pas un Modal → introspectable par Maestro
+# sur iOS, cf. geolocation-consent.tsx). Le fond de carte (GL natif) n'est pas
+# introspectable → screenshots.
+#
+# Pré-requis : session connectée préservée (cf. README — NE PAS clearState) + locale FR.
+# ⚠️ Le prompt OS de permission (« Lorsque l'app est active ») est une alerte SYSTÈME iOS,
+# hors arbre de l'app → non couvert ici de façon déterministe (validation visuelle manuelle).
+- launchApp
+- extendedWaitUntil:
+    visible: "Démarrer en Live"
+    timeout: 25000
+- tapOn: "Démarrer en Live"
+
+# AC1 : consentement explicite AVANT toute activation / prompt OS.
+- extendedWaitUntil:
+    visible: "Activer la géolocalisation"
+    timeout: 15000
+- assertVisible: "Activer"
+- assertVisible: "Refuser"
+- takeScreenshot: screenshots/live-consent
+
+# AC1 : non-dismissible — un tap sur le fond assombri (hors carte du dialog) NE ferme PAS
+# (la View de fond est inerte, aucun Pressable).
+- tapOn:
+    point: 50%,8%
+- assertVisible: "Activer la géolocalisation"
+
+# Refus → message AC1 (la géoloc est nécessaire), le mode Live n'est PAS activé.
+- tapOn: "Refuser"
+- extendedWaitUntil:
+    visible: "La géolocalisation est nécessaire pour le mode Live. Activez-la pour démarrer."
+    timeout: 8000
+- takeScreenshot: screenshots/live-refused
