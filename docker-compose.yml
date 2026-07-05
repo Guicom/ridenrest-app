@@ -10,7 +10,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # SECURITY (incident 2026-07-05) : loopback host UNIQUEMENT — Postgres ne doit
+      # jamais être exposé sur internet. Le PM2 host y accède via localhost:5432.
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -23,7 +25,13 @@ services:
     volumes:
       - redisdata:/data
     ports:
-      - "6379:6379"
+      # 🔴 SECURITY (incident 2026-07-05) : Redis était exposé public SANS mot de passe
+      # → un attaquant a lancé REPLICAOF 109.244.159.27 (Redis en read-only replica →
+      # BullMQ KO → parsing GPX KO → 0 POI). Bind loopback host UNIQUEMENT ; le PM2 host
+      # accède via localhost:6379. ⚠️ `ufw deny 6379` NE SUFFIT PAS : Docker publie via
+      # ses propres règles iptables et contourne ufw → le bind 127.0.0.1 EST la protection.
+      # Durcissement complémentaire recommandé : `--requirepass` (nécessite MAJ REDIS_URL/.env).
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

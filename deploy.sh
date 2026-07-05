@@ -41,8 +41,11 @@ pnpm turbo build --filter=@ridenrest/web --filter=@ridenrest/api
 # only if the image is absent or its tag changed. The health-gate blocks the rest
 # of the deploy (migrations, pm2 reload) until BRouter is healthy, so the API never
 # reloads ahead of its routing dependency.
-echo "==> [4/7] BRouter start + health-gate"
-docker compose up -d brouter
+echo "==> [4/7] Infra (db/redis config sync) + BRouter start + health-gate"
+# SECURITY (incident 2026-07-05) : réasserte la config des conteneurs db/redis à chaque
+# deploy — notamment le bind loopback `127.0.0.1` (Redis/Postgres jamais exposés public).
+# `up -d` est idempotent : no-op si la config n'a pas changé, recrée seulement si besoin.
+docker compose up -d db redis brouter
 if ! timeout 300 sh -c 'until docker inspect --format="{{.State.Health.Status}}" ridenrest-brouter | grep -q healthy; do sleep 5; done'; then
   echo "ERROR: BRouter failed to become healthy within 5 min" >&2
   exit 1
