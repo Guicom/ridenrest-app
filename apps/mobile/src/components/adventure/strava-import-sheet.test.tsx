@@ -69,9 +69,14 @@ async function renderSheet(props: {
   // `useStravaRoutes` force `retry: 1` (override du défaut client) ; on annule le
   // BACKOFF (`retryDelay: 0`) pour que l'unique retry échoue instantanément en test
   // → l'erreur surface dans le timeout de `findBy`.
+  // `gcTime: 0` : les tests de chargement utilisent des promesses jamais résolues
+  // (`new Promise(() => {})`). Sans ça, chaque QueryClient abandonné garde un timer
+  // gc (défaut 5 min) → handle ouvert → jest hang en local, et en CI l'accumulation
+  // de timers fait flaky-timeout un test (« Exceeded timeout of 5000 ms »). gcTime 0
+  // → la query est libérée dès l'unmount, aucun timer résiduel. (Fix flaky 2026-07-05.)
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, retryDelay: 0 },
+      queries: { retry: false, retryDelay: 0, gcTime: 0 },
       mutations: { retry: false },
     },
   });
@@ -99,6 +104,13 @@ async function renderSheet(props: {
   );
   return { ...utils, onClose };
 }
+
+// Ce fichier est userEvent-heavy (RNTL v14, délais réels) + rend un vrai
+// QueryClientProvider. En local chaque test passe en <400 ms, mais sur un runner CI
+// partagé (lent) un test a dépassé le défaut Jest de 5 s (« Exceeded timeout of
+// 5000 ms ») → flaky-fail bloquant. Marge portée à 15 s (les tests restent rapides
+// quand la machine suit). (Fix flaky CI 2026-07-05.)
+jest.setTimeout(15000);
 
 beforeEach(() => {
   jest.clearAllMocks();
