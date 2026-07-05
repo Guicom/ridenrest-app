@@ -168,7 +168,7 @@ Fondation auth posée par MOB-2.1 (aucun écran de login fonctionnel ici — il 
 |---|---|
 | `pnpm dev` / `pnpm start` | Serveur Expo (Metro) |
 | `pnpm ios` / `pnpm android` | Serveur Expo + ouverture simulateur/émulateur |
-| `pnpm build` | `expo export` (bundle JS, utilisé par Turbo) |
+| `pnpm build` | `expo export -p ios -p android` (bundles JS iOS+Android, utilisé par Turbo — **web hors cible**, cf. AGENTS.md) |
 | `pnpm lint` | ESLint (config Expo flat) |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm test` | Jest + React Native Testing Library (preset `jest-expo`) |
@@ -200,7 +200,7 @@ maestro test apps/mobile/.maestro/launch.yaml
 
 `apps/mobile` expose les tâches turbo `lint` / `test` / `typecheck`, **captées automatiquement** par le `--filter='*'` existant de `.github/workflows/ci.yml` — aucune modification du YAML. Le lint + les tests unitaires mobile tournent donc sur **chaque PR vers `main`** et **bloquent** le merge en cas d'échec.
 
-> 🚫 **Aucun build natif en GitHub Actions** : la tâche `build` mobile = `expo export` (bundle JS, léger). La compilation native iOS/Android reste **exclusivement sur EAS Build (cloud)** — cf. section CI/CD → EAS ci-dessus (FR-MOB-003).
+> 🚫 **Aucun build natif en GitHub Actions** : la tâche `build` mobile = `expo export -p ios -p android` (bundles JS iOS+Android, léger). Le **web est volontairement exclu** : `expo export` sans `-p` pré-rend les routes côté Node (`web.output: 'static'`) et des modules **natif-only** chargés au niveau module (`expo-notifications` → `localStorage`, `expo-file-system` `Paths.cache` → `this.validatePath`, `expo-task-manager`…) crashent en SSR Node. Le web n'étant **pas une cible de shipping** (native-first), on gate le build sur le natif plutôt que de stubber toute la surface native (détail : AGENTS.md §« `expo export` : gate CI natif-only »). La compilation native iOS/Android reste **exclusivement sur EAS Build (cloud)** — cf. section CI/CD → EAS ci-dessus (FR-MOB-003).
 
 ## i18n (MOB-1.4)
 

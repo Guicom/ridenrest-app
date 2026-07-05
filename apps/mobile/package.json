@@ -86,7 +86,7 @@
   "scripts": {
     "start": "expo start",
     "dev": "expo start",
-    "build": "expo export",
+    "build": "expo export -p ios -p android",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "sim": "bash scripts/sim-build.sh",

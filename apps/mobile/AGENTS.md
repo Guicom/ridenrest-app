@@ -92,6 +92,39 @@ xcodebuild exited with error code 65
 Vérifier avant tout build local : `xcodebuild -version` → doit afficher `Xcode 26.4`.
 Mettre à jour via l'App Store si besoin, puis `sudo xcodebuild -runFirstLaunch`.
 
+## `expo export` : gate CI **natif-only** (`-p ios -p android`) — le web est hors cible (CRITIQUE)
+
+Ride'n'Rest est **native-first** : le **web n'est PAS une cible de shipping**. Le script `build`
+(`package.json`) est donc **`expo export -p ios -p android`** — **jamais** `expo export` tout court
+(qui exporterait aussi le web).
+
+Pourquoi : `web.output: 'static'` (`app.config.ts`) fait **pré-rendre chaque route côté Node**
+(`getBuildTimeServerManifestAsync`). Or l'app charge, **au niveau module** (à l'import, AVANT tout
+effet React — les `useEffect` ne s'exécutent pas au pré-rendu SSR), des modules **natif-only** qui
+appellent une API native immédiatement et **crashent** sous Node :
+
+- **`expo-notifications`** — son entrée web lit `localStorage` (`getRegistrationInfoAsync`) →
+  `TypeError: localStorage.getItem is not a function` (MOB-6.2, via `_layout` → `use-notification-observer`).
+- **`expo-file-system`** (API `File`/`Directory`/`Paths`) — `src/lib/cache/cache-manager.ts` fait
+  `export const CACHE_ROOT = Paths.cache.uri` **à l'import** (atteint depuis `_layout` via
+  `useAppStateRefetch` → couche de cache offline) → `this.validatePath is not a function`
+  (« expo-file-system is not supported on web »).
+- **`expo-task-manager`** — `src/lib/live/location-task.ts` fait `TaskManager.defineTask(...)` à
+  l'import. Et ainsi de suite (MapLibre, expo-location…).
+
+Ces crashs surviennent **à l'import**, pas dans un effet → un garde runtime `Platform.OS !== 'web'`
+dans le corps d'une fonction **ne suffit pas** (le module est déjà évalué). Gater un module en
+révèle un autre : c'est une **cascade** accumulée sur MOB-3→6 (la CI ne tourne que sur `main`/PR
+vers `main`, donc `expo export` complet n'a jamais été exercé pendant le dev de la branche). Comme
+le web n'est pas livré, on **exclut le web du build** plutôt que de maintenir des stubs `.web.ts`
+pour toute la surface native.
+
+> **CI alignée automatiquement** : `.github/workflows/ci.yml` exécute `pnpm turbo run build --filter='*'`,
+> qui appelle ce même script `build` → il n'y a plus de web à pré-rendre. `-p ios -p android`
+> **bundle** le JS par plateforme (smoke-test de bundling), **sans** compiler du natif — la
+> compilation native réelle reste sur EAS Build (cloud). Pour un besoin web ponctuel (Storybook web
+> reste OK), il faudrait d'abord rendre la surface native web-SSR-safe (`.web.ts`) — hors périmètre.
+
 ## `expo start` vs `expo run:ios` vs EAS Build (ne pas confondre)
 
 | Commande | Ce que ça fait | Compile du natif ? |
