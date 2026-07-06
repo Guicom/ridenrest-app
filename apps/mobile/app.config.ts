@@ -50,10 +50,14 @@ const config: ExpoConfig = {
     // l'app au 1er fix GPS en mode Live. Découvert lors de la validation device Android
     // MOB-5.3 (le crash bloquait l'écran Live). Permission Android-only (no-op iOS).
     permissions: ['android.permission.RECEIVE_BOOT_COMPLETED'],
+    // Icône adaptive : marque route verte Ride'n'Rest (foreground transparent, zone de
+    // sûreté ~62%) sur fond gris clair brand `#E8EBE9` (couleur solide, pas d'image de
+    // fond). Régénérée le 2026-07-06 depuis la vraie icône (`apps/web/public/icons/
+    // icon-512.png`) — l'ancien jeu (chevron bleu, fond `#E6F4FE`) était un résidu du
+    // template Expo, pas la marque.
     adaptiveIcon: {
-      backgroundColor: '#E6F4FE',
+      backgroundColor: '#E8EBE9',
       foregroundImage: './assets/images/android-icon-foreground.png',
-      backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
