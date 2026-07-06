@@ -92,6 +92,30 @@ xcodebuild exited with error code 65
 Vérifier avant tout build local : `xcodebuild -version` → doit afficher `Xcode 26.4`.
 Mettre à jour via l'App Store si besoin, puis `sudo xcodebuild -runFirstLaunch`.
 
+## Icône iOS 26 : format Icon Composer `.icon` OBLIGATOIRE via `ios.icon` (CRITIQUE)
+
+Sur **iOS 26** (Xcode 26, « Liquid Glass »), l'icône d'app DOIT être fournie en format
+**Icon Composer `.icon`** (un dossier `xxx.icon/` = `icon.json` + `Assets/`). Un simple PNG
+top-level (`icon: './assets/images/icon.png'` **sans** `ios.icon`) compile en catalogue
+d'assets « single-size » `App-Icon-1024x1024@1x` idiom `phone` @1x — que **iOS 26 ne sait pas
+rendre** : l'app s'installe et se lance, mais l'écran d'accueil affiche l'**icône générique**
+(carré gris). Le `.icon`, lui, compile en `IconGroup`/`IconImageStack` **et** pré-génère les
+tailles home-screen (`60x60@2x`, `76x76@2x~ipad`) → rendu correct.
+
+- Config : `app.config.ts` → `ios.icon: './assets/ridenrest.icon'` (override le top-level
+  `icon`, qui reste utilisé pour Android/web). Bundle : `assets/ridenrest.icon/icon.json`
+  (une couche full-bleed pointant `Assets/icon.png` = la vraie icône **opaque, sans alpha**).
+- ⚠️ **Ne JAMAIS retirer `ios.icon` au profit d'un PNG plat** en croyant « nettoyer un résidu
+  de template » — c'est exactement la régression du 2026-07-05 (#8/#9 = icône générique).
+- **Diagnostic par autopsie du `.ipa`** (le plus fiable, sans device) : télécharger l'artefact
+  EAS, `unzip` → `Payload/*.app/Assets.car`, puis
+  `xcrun assetutil --info Assets.car` → doit contenir `IconGroup`/`IconImageStack` (bon), PAS
+  seulement `App-Icon-1024x1024@1x` (cassé). Vérif locale **sans build** :
+  `xcrun actool assets/ridenrest.icon --compile <out> --app-icon ridenrest --platform iphoneos --minimum-deployment-target 16.4 --output-partial-info-plist <out>/p.plist`
+  → inspecter le `Assets.car` produit. L'icône source doit être **opaque** (`sips -g hasAlpha`
+  = no) : l'alpha casse l'icône iOS indépendamment (Apple aplatit l'icône *marketing* mais pas
+  la *home-screen*). (Régression + fix 2026-07-06.)
+
 ## `expo export` : gate CI **natif-only** (`-p ios -p android`) — le web est hors cible (CRITIQUE)
 
 Ride'n'Rest est **native-first** : le **web n'est PAS une cible de shipping**. Le script `build`

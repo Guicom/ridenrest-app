@@ -18,10 +18,15 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'app.ridenrest',
-    // Pas d'override `icon` iOS : on utilise l'icône top-level `./assets/images/icon.png`
-    // (vraie icône Ride'n'Rest, full-bleed 1024²). L'ancien `./assets/expo.icon` était le
-    // template Icon Composer Expo par défaut (logo Expo générique, resté depuis l'init
-    // MOB-1.1) → il écrasait la vraie icône côté iOS (« pas d'icône »). (Fix 2026-07-05.)
+    // iOS 26 exige le format **Icon Composer `.icon`** (Liquid Glass) pour l'icône d'app.
+    // Un PNG « single-size 1024 » (top-level `icon` seul) compile en catalogue d'assets
+    // `App-Icon-1024x1024@1x` idiom phone → iOS 26 ne sait PAS le rendre → **icône
+    // générique** sur l'appareil (prouvé par autopsie des .ipa : #7 en `.icon` rend, #8/#9
+    // en PNG single-size = générique). On fournit donc un bundle `.icon` (icon.json +
+    // Assets/) contenant la vraie icône Ride'n'Rest en couche full-bleed. `ios.icon`
+    // override le top-level `icon` (qui reste utilisé pour Android/web).
+    // (Régression 2026-07-05 en retirant l'ancien override → fix `.icon` 2026-07-06.)
+    icon: './assets/ridenrest.icon',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       // ATS : autorise le HTTP cleartext vers `localhost`/`*.local` (API NestJS
