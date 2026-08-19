@@ -137,12 +137,14 @@ src/{feature}/
 ['adventures']                              // list
 ['adventures', adventureId]                 // single item
 ['adventures', adventureId, 'segments']     // sub-resource
-['pois', { segmentId, fromKm, toKm, layer }]  // per-layer — stable cache entry per layer
+['pois', { segmentId, fromKm, toKm, layer, overpassEnabled, source }]  // per-layer ET per-source
 ['weather', segmentId]
 ['density', adventureId]
 ```
 
 NEVER invent query keys like `['getAdventure', id]` or `['adventure-list']`.
+
+`source` (`'google' | 'overpass'`) est une dimension à part entière depuis la story 17.14 : les deux sources d'une même recherche sont deux requêtes indépendantes, chacune avec son entrée de cache et son état de chargement. Voir la règle 10 ci-dessous.
 
 ---
 
@@ -677,6 +679,18 @@ Règle : exposer un helper `useOverpassEnabled(): { overpassEnabled, ready }` et
 - Les 4 points concernés : web `use-pois` / `use-live-poi-search`, mobile `map/[id].tsx` / `use-live-poi-search`. Les usages d'affichage seul gardent `?? false`.
 
 Vaut pour tout futur flag de profil (unités, devise, tier) consommé par une requête.
+
+#### 10. Deux sources de latences incomparables ⇒ deux flux, jamais une attente commune
+
+Google Places répond en ~200 ms (bbox déjà prefetchée) à ~2 s (froide) ; Overpass a été mesuré entre **1 s et 31 s** sur les instances publiques, avec des 504 et des instances mortes — et il n'existe aucun plan B en ligne fiable. Les attendre ensemble fait payer à chaque utilisateur le pire des deux.
+
+- L'API accepte `source=google|overpass` : une requête par source, `resolveSourcePlan()` décide de ce qu'on interroge **et** de ce qu'on masque à la lecture. Sans le paramètre, comportement combiné historique (contrat du mobile, non découplé).
+- Côté client, **`isPending` ne suit que la source primaire**. Overpass ne doit retenir ni le premier affichage, ni l'auto-zoom, ni les squelettes de calque. Idem `hasError` : un échec Overpass donne des résultats *partiels*, pas une recherche en erreur.
+- Corollaires à ne pas oublier quand on touche à cette zone :
+  - l'**auto-zoom** se déclenche sur la source primaire uniquement — le rejouer à l'arrivée d'Overpass ferait sauter la carte sous les doigts de l'utilisateur ;
+  - la bannière **« Aucun résultat »** exige `!overpassPending` : Google peut renvoyer 0 alors qu'Overpass va en ramener 50 ;
+  - une source lente qui travaille en silence est un piège UX (c'est ce silence qui a masqué 5 mois de panne Overpass) → `ExtendedSearchStatus` annonce l'attente, la lenteur au-delà de 5 s, et l'échec.
+- **Ne pas raccourcir les timeouts** pour compenser une UI bloquante : régler l'UI, puis laisser la source lente prendre son temps. Le budget global (`OVERPASS_TOTAL_BUDGET_MS`) protège le serveur (connexions tenues), pas l'utilisateur.
 
 ---
 
