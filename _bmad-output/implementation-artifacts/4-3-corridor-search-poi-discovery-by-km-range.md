@@ -987,3 +987,12 @@ claude-sonnet-4-6
 - `apps/web/src/app/(app)/map/[id]/_components/map-view.tsx`
 - `apps/web/src/app/(app)/map/[id]/_components/search-range-slider.test.tsx`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+---
+
+## ⚠️ Doc Sync 2026-08-19 — superseded par la story 17.13
+
+Deux contrats décrits ici ont changé (RCA bugs POI prod, voir `17-13-poi-search-overpass-user-agent-and-cache-coverage.md`) :
+
+1. **Plage max : 30 km → 50 km.** Les AC #2 et les tests cités (« Plage maximale : 30 km », cap à 30 km) valent pour la valeur historique. La valeur vivante est `MAX_SEARCH_RANGE_KM` (= 50 depuis MOB-4.3, 2026-06-14) — jamais de valeur en dur.
+2. **`findCachedPois` filtre désormais aussi le corridor** : `dist_from_trace_m <= CORRIDOR_WIDTH_M` (3000 m), en plus de la plage km. La zone interrogée auprès d'Overpass/Google reste le **rectangle englobant** de la plage (+ 3 km de marge) ; sans filtre à la lecture, des POI à 4+ km de la trace étaient affichés et le jeu de résultats dépendait de la forme du rectangle.

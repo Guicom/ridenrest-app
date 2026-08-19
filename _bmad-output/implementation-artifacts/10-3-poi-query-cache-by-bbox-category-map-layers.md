@@ -269,3 +269,13 @@ claude-sonnet-4-6
 - `_bmad-output/project-context.md`
 - `_bmad-output/implementation-artifacts/10-3-poi-query-cache-by-bbox-category-map-layers.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+
+---
+
+## ⚠️ Doc Sync 2026-08-19 — superseded par la story 17.13
+
+La stratégie de cache décrite ici a été corrigée (RCA bugs POI prod, voir `17-13-poi-search-overpass-user-agent-and-cache-coverage.md`) :
+
+- **Supprimé** : le court-circuit `const dbCached = await findCachedPois(...); if (dbCached.length > 0) return dbCached` (chemin Overpass OFF, corridor **et** live). Il posait la question « ai-je un résultat à afficher ? » au lieu de « ai-je déjà cherché cette zone ? » → une première recherche sur une fenêtre étroite figeait un jeu partiel pour toute la TTL (7 j) sur **toutes** les fenêtres englobantes. C'est la cause du « même trace GPX, résultats différents entre prod et local ».
+- **Ajouté** : marqueur de couverture Redis `pois:google:seg:{segmentId}:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}` (TTL `GOOGLE_PLACES_CACHE_TTL`), **scopé par segment** (les lignes `accommodations_cache` sont insérées par `segment_id`) et **non posé** si un layer du prefetch a échoué.
+- La clé bbox Overpass (`pois:bbox:…`) est inchangée et reste cross-user ; les deux clés sont indépendantes — un HIT Overpass ne dispense pas du prefetch Google pour ce segment.
