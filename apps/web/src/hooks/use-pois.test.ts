@@ -21,8 +21,12 @@ vi.mock('@/stores/map.store', () => ({
 }))
 
 // Mock useProfile — default overpassEnabled=false so tests control it explicitly
+// `ready: true` = profil déjà résolu (le cas nominal). Le cas `ready: false` est couvert
+// par un test dédié : la recherche ne doit PAS partir tant que le flag Overpass est inconnu.
+let mockProfile = { overpassEnabled: false, ready: true }
 vi.mock('./use-profile', () => ({
-  useProfile: () => ({ data: { overpassEnabled: false } }),
+  useProfile: () => ({ data: { overpassEnabled: mockProfile.overpassEnabled } }),
+  useOverpassEnabled: () => mockProfile,
 }))
 
 // Mock getPois
@@ -70,6 +74,7 @@ describe('usePois', () => {
     mockFromKm = 0
     mockToKm = 30
     mockSearchCommitted = true
+    mockProfile = { overpassEnabled: false, ready: true }
     mockGetPois.mockReset()
     mockUseQueries.mockReset()
     mockUseQueries.mockReturnValue([])
@@ -101,6 +106,35 @@ describe('usePois', () => {
     const { queries } = lastCall![0]
     // activeLayers = [] → queries array is empty, nothing passed to useQueries
     expect(queries).toHaveLength(0)
+  })
+
+  it('fires NO query while the Overpass opt-in is still unknown', () => {
+    // Régression 2026-08-19 : `profile?.overpassEnabled ?? false` faisait partir une 1re
+    // requête en OFF pendant le chargement du profil (prefetch Google complet, coûteux),
+    // puis une 2e en ON — travail serveur doublé, résultat OFF affiché d'abord, et toggle
+    // perçu comme sans effet. Prouvé par les logs API : requête OFF à 12:24:40, ON à 12:24:42.
+    mockProfile = { overpassEnabled: true, ready: false }
+    mockVisibleLayers = new Set(['accommodations'])
+    mockUseQueries.mockReturnValue([])
+
+    const { result } = renderHook(() => usePois([makeSegment()]))
+
+    const { queries } = mockUseQueries.mock.calls.at(-1)![0]
+    expect(queries).toHaveLength(0)
+    // …et l'écran reste en chargement plutôt que d'annoncer « aucun résultat »
+    expect(result.current.isPending).toBe(true)
+  })
+
+  it('fires queries with overpassEnabled=true once the profile has resolved', () => {
+    mockProfile = { overpassEnabled: true, ready: true }
+    mockVisibleLayers = new Set(['accommodations'])
+    mockUseQueries.mockReturnValue([{ data: [], isPending: false, isError: false }])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    const { queries } = mockUseQueries.mock.calls.at(-1)![0]
+    expect(queries).toHaveLength(1)
+    expect(queries[0].queryKey[1]).toMatchObject({ overpassEnabled: true })
   })
 
   it('fires queries when visibleLayers has active layers', () => {

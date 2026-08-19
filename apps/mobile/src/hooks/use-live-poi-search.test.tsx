@@ -29,6 +29,7 @@ jest.mock('@/hooks/use-network-status', () => ({
 }));
 jest.mock('@/hooks/use-profile', () => ({
   useProfile: jest.fn(),
+  useOverpassEnabled: jest.fn(),
 }));
 
 const mockGetLivePois = poisApi.getLivePois as jest.Mock;
@@ -36,6 +37,7 @@ const mockGetCached = poiCache.getCachedPois as jest.Mock;
 const mockSetCached = poiCache.setCachedPois as jest.Mock;
 const mockNetwork = networkStatus.useNetworkStatus as jest.Mock;
 const mockProfile = profileHook.useProfile as jest.Mock;
+const mockOverpassEnabled = profileHook.useOverpassEnabled as jest.Mock;
 
 function makePoi(id: string): Poi {
   return {
@@ -74,6 +76,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockSetCached.mockResolvedValue(undefined);
   mockProfile.mockReturnValue({ data: { overpassEnabled: false } });
+    // `ready: true` = profil résolu. La garde `ready` empêche RECHERCHER de partir avec le
+    // flag Overpass par défaut (OFF) pendant le chargement du profil (bug 2026-08-19).
+    mockOverpassEnabled.mockReturnValue({ overpassEnabled: false, ready: true });
   mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
   // Reset des stores aux valeurs Live « actif, calage GPS connu ».
   useLiveStore.setState({
@@ -148,6 +153,15 @@ describe('useLivePoiSearch — targetKm (AC1)', () => {
     useLiveStore.setState({ currentKmOnRoute: null });
     const hook = await mountHook(makeClient());
     expect(hook.current.targetKm).toBeNull();
+    expect(hook.current.canSearch).toBe(false);
+  });
+
+  it('canSearch faux tant que le flag Overpass est inconnu (profil en cours de chargement)', async () => {
+    // Régression 2026-08-19 (parité web) : sans cette garde, RECHERCHER partait avec
+    // `overpassEnabled=false` par défaut, puis une 2e requête partait en ON à l'arrivée du
+    // profil → travail serveur doublé et option perçue comme sans effet.
+    mockOverpassEnabled.mockReturnValue({ overpassEnabled: true, ready: false });
+    const hook = await mountHook(makeClient());
     expect(hook.current.canSearch).toBe(false);
   });
 

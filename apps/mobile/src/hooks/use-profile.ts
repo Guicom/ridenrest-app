@@ -15,6 +15,25 @@ export function useProfile(enabled = true) {
   });
 }
 
+/**
+ * Flag Overpass + fiabilité de la valeur (parité web `useOverpassEnabled`).
+ *
+ * `profile?.overpassEnabled ?? false` est un piège pour tout ce qui DÉCLENCHE une requête :
+ * pendant le chargement du profil le flag vaut `false`, la recherche POI part donc en OFF puis
+ * repart en ON à l'arrivée du profil → travail serveur doublé et résultat OFF affiché en
+ * premier, d'où l'impression que l'option n'a aucun effet (bug 2026-08-19).
+ *
+ * `ready` est vrai dès que la valeur est arrêtée, y compris en erreur (repli sur OFF) et en
+ * `paused` (hors-ligne sans profil en cache) — ne JAMAIS bloquer la recherche indéfiniment.
+ */
+export function useOverpassEnabled(): { overpassEnabled: boolean; ready: boolean } {
+  const query = useProfile();
+  return {
+    overpassEnabled: query.data?.overpassEnabled ?? false,
+    ready: query.isSuccess || query.isError || query.fetchStatus === 'paused',
+  };
+}
+
 /** Mutation du flag Overpass (toggle réglages) — invalide `['profile']` (parité web). */
 export function useUpdateOverpass() {
   const queryClient = useQueryClient();

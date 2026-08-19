@@ -174,6 +174,12 @@ export function useLivePoiLayers(
           map.off('mouseleave', pointLayerId, resetCursor)
         })
       }
+
+      // Force a render pass — same reason as planning mode (see use-poi-layers.ts): this effect
+      // resolves while a camera animation (GPS follow / auto-zoom) is running, and symbol
+      // placement happens during the render cycle. Without it the pins stay unpainted until the
+      // next user interaction, which in live mode may never come (hands on the handlebars).
+      map.triggerRepaint()
     })
 
     return () => {

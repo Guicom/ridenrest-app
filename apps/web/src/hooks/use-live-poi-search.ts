@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useLiveStore } from '@/stores/live.store'
 import { useMapStore } from '@/stores/map.store'
 import { getLivePois } from '@/lib/api-client'
-import { useProfile } from './use-profile'
+import { useOverpassEnabled } from './use-profile'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import type { Poi } from '@ridenrest/shared'
 
@@ -13,8 +13,7 @@ export function useLivePoisSearch(segmentId: string | undefined) {
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm)
   const visibleLayers = useMapStore((s) => s.visibleLayers)
   const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes)
-  const { data: profile } = useProfile()
-  const overpassEnabled = profile?.overpassEnabled ?? false
+  const { overpassEnabled, ready: profileReady } = useOverpassEnabled()
 
   // Convert visible layers → flat list of PoiCategory for the API
   // For accommodations, only include the active sub-types (e.g. hotel only by default)
@@ -51,7 +50,8 @@ export function useLivePoisSearch(segmentId: string | undefined) {
   const pois = poisData ?? []
   const hasFetched = poisData !== undefined
 
-  const canSearch = isLiveModeActive && targetKm !== null && !!segmentId
+  // profileReady : RECHERCHER doit partir avec le bon flag Overpass, pas avec le défaut OFF
+  const canSearch = isLiveModeActive && targetKm !== null && !!segmentId && profileReady
 
   return { pois, hasFetched, isFetching, targetKm, isError, refetch, canSearch }
 }

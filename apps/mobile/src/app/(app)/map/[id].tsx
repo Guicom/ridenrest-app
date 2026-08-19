@@ -44,7 +44,7 @@ import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
 import { useDensity } from '@/hooks/use-density';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { usePois } from '@/hooks/use-pois';
-import { useProfile } from '@/hooks/use-profile';
+import { useOverpassEnabled } from '@/hooks/use-profile';
 import { useStages } from '@/hooks/use-stages';
 import { useWeather } from '@/hooks/use-weather';
 import { computeAccessBounds } from '@/lib/map/access-features';
@@ -137,8 +137,8 @@ export default function MapScreen() {
 
   // Flag Overpass opt-in (profil) — parité web : sans lui, la recherche tournait
   // toujours en `overpassEnabled=false` → 0 résultat hors cache Google.
-  const { data: profile } = useProfile();
-  const overpassEnabled = profile?.overpassEnabled ?? false;
+  // `ready` : sans cette garde la 1re requête part en OFF puis une 2e en ON (parité web)
+  const { overpassEnabled, ready: profileReady } = useOverpassEnabled();
 
   const { poisByLayer, isFetching, isError, isEmpty } = usePois({
     adventureId: id,
@@ -147,7 +147,7 @@ export default function MapScreen() {
     fromKm,
     toKm,
     overpassEnabled,
-    enabled: traceReady && searchCommitted,
+    enabled: traceReady && searchCommitted && profileReady,
   });
 
   // Densité (statut + coverage gaps pour l'overlay)

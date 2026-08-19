@@ -27,8 +27,12 @@ vi.mock('@tanstack/react-query', () => ({
 }))
 
 // Mock useProfile
+// `ready: true` = profil déjà résolu (le cas nominal). Le cas `ready: false` est couvert
+// par un test dédié : la recherche ne doit PAS partir tant que le flag Overpass est inconnu.
+const mockProfile = { overpassEnabled: false, ready: true }
 vi.mock('./use-profile', () => ({
-  useProfile: () => ({ data: { overpassEnabled: false } }),
+  useProfile: () => ({ data: { overpassEnabled: mockProfile.overpassEnabled } }),
+  useOverpassEnabled: () => mockProfile,
 }))
 
 describe('useLivePoisSearch', () => {

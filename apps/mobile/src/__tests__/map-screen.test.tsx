@@ -78,6 +78,9 @@ jest.mock('@/lib/auth/client', () => ({
 }));
 jest.mock('@/hooks/use-profile', () => ({
   useProfile: jest.fn(() => ({ data: null })),
+  // `ready: true` = profil résolu (cas nominal). La garde `ready` empêche la recherche de
+  // partir en `overpassEnabled=false` pendant le chargement du profil (bug 2026-08-19).
+  useOverpassEnabled: jest.fn(() => ({ overpassEnabled: false, ready: true })),
 }));
 jest.mock('@ridenrest/analytics', () => ({
   trackBookingClick: jest.fn(),

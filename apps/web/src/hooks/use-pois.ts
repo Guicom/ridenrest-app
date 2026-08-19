@@ -2,7 +2,7 @@ import { useQueries } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useMapStore } from '@/stores/map.store'
 import { getPois } from '@/lib/api-client'
-import { useProfile } from './use-profile'
+import { useOverpassEnabled } from './use-profile'
 import { POI_BBOX_CACHE_TTL, LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import type { Poi, MapLayer } from '@ridenrest/shared'
@@ -17,8 +17,9 @@ const DEBOUNCE_MS = 400
 
 export function usePois(segments: MapSegmentData[]): UsePoisResult {
   const { visibleLayers, fromKm: storeFromKm, toKm: storeToKm, searchCommitted } = useMapStore()
-  const { data: profile } = useProfile()
-  const overpassEnabled = profile?.overpassEnabled ?? false
+  // `ready` gate obligatoire : sans elle, la 1re requête part en OFF pendant le chargement du
+  // profil, puis une 2e part en ON → travail serveur doublé et résultat OFF affiché d'abord.
+  const { overpassEnabled, ready: profileReady } = useOverpassEnabled()
 
   // Debounce km range to avoid firing a query on every 1km slider step
   const [debouncedFromKm, setDebouncedFromKm] = useState(storeFromKm)
@@ -40,8 +41,9 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
   const activeLayers = [...visibleLayers] as MapLayer[]
 
   // Map adventure-wide [debouncedFromKm, debouncedToKm] to per-segment local km ranges
-  // Empty while sliding or before user explicitly commits the search
-  const segmentRanges = (isSliding || !searchCommitted) ? [] : readySegments.flatMap((segment) => {
+  // Empty while sliding, before the user explicitly commits the search, or while the Overpass
+  // opt-in is still unknown (firing early would search with the wrong flag)
+  const segmentRanges = (isSliding || !searchCommitted || !profileReady) ? [] : readySegments.flatMap((segment) => {
     // Compute overlap of [debouncedFromKm, debouncedToKm] with this segment's km range
     const segStart = segment.cumulativeStartKm
     const segEnd = segStart + segment.distanceKm
@@ -104,7 +106,9 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
 
   // isPending = true only when HTTP queries are actually in-flight — NOT when merely sliding
   // (isSliding clears the map pins immediately, but shouldn't trigger the layer button spinner)
-  const isPending = results.some((r) => r.isPending)
+  // Awaiting the profile counts as pending: otherwise a committed search briefly reports
+  // "0 result, not loading" and the no-results banner flashes.
+  const isPending = (searchCommitted && !profileReady) || results.some((r) => r.isPending)
   const hasError = results.some((r) => r.isError)
 
   return { poisByLayer, isPending, hasError }

@@ -3,7 +3,7 @@ import { LAYER_CATEGORIES, type Poi, type PoiCategory } from '@ridenrest/shared'
 import { useEffect, useRef, useState } from 'react';
 
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { useProfile } from '@/hooks/use-profile';
+import { useOverpassEnabled } from '@/hooks/use-profile';
 import { getLivePois } from '@/lib/api/pois';
 import { getCachedPois, setCachedPois } from '@/lib/cache/poi-cache';
 import { useLiveStore } from '@/lib/stores/live.store';
@@ -76,8 +76,7 @@ export function useLivePoiSearch({
   const searchRadiusKm = useLiveStore((s) => s.searchRadiusKm);
   const visibleLayers = useMapStore((s) => s.visibleLayers);
   const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes);
-  const { data: profile } = useProfile();
-  const overpassEnabled = profile?.overpassEnabled ?? false;
+  const { overpassEnabled, ready: profileReady } = useOverpassEnabled();
 
   // Calques visibles → liste plate de PoiCategory pour l'API. Pour les hébergements,
   // seuls les sous-types actifs (ex. hotel par défaut). Hors queryKey (cf. en-tête).
@@ -123,7 +122,9 @@ export function useLivePoiSearch({
 
   const fetchedPois = poisData ?? EMPTY_POIS;
   const hasFetched = poisData !== undefined;
-  const canSearch = isLiveModeActive && targetKm !== null && !!segmentId && isOnline;
+  // profileReady : RECHERCHER doit partir avec le bon flag Overpass, pas le défaut OFF
+  const canSearch =
+    isLiveModeActive && targetKm !== null && !!segmentId && isOnline && profileReady;
 
   // Write-through N3 (online + succès + non vide). Clé Live dédiée. Skip si vide (évite
   // d'écraser un cache offline valide avec une zone sans POI). Signature anti-doublon.
