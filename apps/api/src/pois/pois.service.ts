@@ -381,17 +381,20 @@ export class PoisService {
             return null
           }
 
-          // Fetch Place Details — use Redis cache to avoid redundant API calls
-          const detailsKey = `google_place_details:${placeId}`
+          // Le prefetch ne pose qu'un pin : nom, position, types suffisent → SKU Essentials.
+          // Clé Redis distincte : écrire une charge Essentials sous `google_place_details:` (lue
+          // par la fiche POI) priverait la fiche de note/horaires/téléphone.
+          const basicKey = `google_place_basic:${placeId}`
+          const proKey = `google_place_details:${placeId}`
           let details: GooglePlaceDetails
-          const cachedDetails = await redis.get(detailsKey)
+          // Une charge Pro déjà en cache fait l'affaire — elle contient les champs Essentials.
+          const cachedDetails = (await redis.get(proKey)) ?? (await redis.get(basicKey))
           if (cachedDetails) {
             details = JSON.parse(cachedDetails) as GooglePlaceDetails
             this.logger.debug(`[Google prefetch] ${placeId} details from Redis cache`)
           } else {
-            // Fetch from Google API (uses 10k/month free quota)
             try {
-              details = await this.googlePlacesProvider.getPlaceDetails(placeId)
+              details = await this.googlePlacesProvider.getPlaceDetails(placeId, 'essentials')
               this.logger.debug(`[Google prefetch] ${placeId} details fetched: ${details.displayName} at ${details.lat},${details.lng}`)
             } catch (err) {
               this.logger.warn(`[Google prefetch] Place Details failed for ${placeId}: ${String(err)}`)
@@ -412,8 +415,8 @@ export class PoisService {
           )
           const duplicate = neighbours.find((n) => isLikelySamePlace(n.name, details.displayName ?? ''))
 
-          // Always cache Place Details in Redis (enrichment for any matching pin, OSM or Google)
-          await redis.setex(detailsKey, GOOGLE_PLACES_CACHE_TTL, JSON.stringify(details))
+          // Cache Essentials sous sa propre clé — la fiche POI ira chercher le Pro à l'ouverture
+          await redis.setex(basicKey, GOOGLE_PLACES_CACHE_TTL, JSON.stringify(details))
           await redis.setex(`google_place_id:${placeId}`, GOOGLE_PLACES_CACHE_TTL, placeId)
 
           if (duplicate) {

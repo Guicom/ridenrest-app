@@ -324,6 +324,65 @@ describe('PoisService', () => {
       expect(mockPoisRepository.updatePoiDistances).toHaveBeenCalled()
     })
 
+    it('le prefetch demande le SKU Essentials, pas Pro (le pin n’a besoin que du nom et de la position)', async () => {
+      // Google facture au SKU le plus élevé des champs demandés : réclamer note/horaires/
+      // téléphone/site pour CHAQUE POI inséré faisait payer du Place Details Pro (~17 $/1000
+      // au-delà de 5 000/mois) pour des champs jamais lus tant que la fiche n'est pas ouverte.
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue(['ChIJABC'])
+      mockRedisClient.get.mockResolvedValue(null)
+      mockGooglePlacesProvider.getPlaceDetails.mockResolvedValue({
+        placeId: 'ChIJABC', displayName: 'Hôtel Essentiel', lat: 43.2, lng: 1.2,
+        formattedAddress: null, rating: null, isOpenNow: null, phone: null, website: null, types: ['lodging'],
+      })
+
+      await service.findPois(baseDto, userId)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(mockGooglePlacesProvider.getPlaceDetails).toHaveBeenCalledWith('ChIJABC', 'essentials')
+    })
+
+    it('le prefetch écrit sous google_place_basic, jamais sous google_place_details', async () => {
+      // Écrire une charge Essentials sous la clé lue par la fiche POI la priverait de la note,
+      // des horaires et du téléphone jusqu'à l'expiration du cache (7 jours).
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue(['ChIJABC'])
+      mockRedisClient.get.mockResolvedValue(null)
+      mockGooglePlacesProvider.getPlaceDetails.mockResolvedValue({
+        placeId: 'ChIJABC', displayName: 'Hôtel Essentiel', lat: 43.2, lng: 1.2,
+        formattedAddress: null, rating: null, isOpenNow: null, phone: null, website: null, types: ['lodging'],
+      })
+
+      await service.findPois(baseDto, userId)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      const writtenKeys = (mockRedisClient.setex.mock.calls as string[][]).map((c) => c[0])
+      expect(writtenKeys).toContain('google_place_basic:ChIJABC')
+      expect(writtenKeys).not.toContain('google_place_details:ChIJABC')
+    })
+
+    it('réutilise une charge Pro déjà en cache plutôt que de rappeler Google', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue(['ChIJABC'])
+      // 1er get = clé Pro : renvoie une charge complète
+      mockRedisClient.get.mockImplementation((key: string) =>
+        Promise.resolve(key === 'google_place_details:ChIJABC'
+          ? JSON.stringify({ placeId: 'ChIJABC', displayName: 'Déjà en cache', lat: 43.2, lng: 1.2, types: ['lodging'] })
+          : null),
+      )
+
+      await service.findPois(baseDto, userId)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      expect(mockGooglePlacesProvider.getPlaceDetails).not.toHaveBeenCalled()
+    })
+
     it('skips Google POI when a nearby OSM POI has a matching name', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])

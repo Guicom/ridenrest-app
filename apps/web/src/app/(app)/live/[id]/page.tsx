@@ -7,6 +7,7 @@ import { snapToTrace, computeElevationGain, computeElevationLoss } from '@ridenr
 import type { KmWaypoint } from '@ridenrest/gpx'
 import { useLiveMode } from '@/hooks/use-live-mode'
 import { useLivePoisSearch } from '@/hooks/use-live-poi-search'
+import { ExtendedSearchStatus } from '@/app/(app)/map/[id]/_components/extended-search-status'
 import { useNetworkStatus } from '@/hooks/use-network-status'
 import { useLiveWeather } from '@/hooks/use-live-weather'
 import { useDensity } from '@/hooks/use-density'
@@ -96,7 +97,11 @@ export default function LivePage() {
   const { isOnline } = useNetworkStatus()
 
   // Live POI search
-  const { pois, hasFetched: poisHasFetched, isFetching: poisFetching, targetKm, isError: poisError, refetch: refetchPois, canSearch } = useLivePoisSearch(segmentId)
+  const {
+    pois, hasFetched: poisHasFetched, isFetching: poisFetching, targetKm,
+    isError: poisError, refetch: refetchPois, canSearch,
+    overpassPending, overpassError,
+  } = useLivePoisSearch(segmentId)
 
   // Always-current ref to refetchPois — queryKey changes when store state changes (radius, targetKm),
   // so we must call the *latest* refetch (post-re-render) to avoid fetching with a stale key.
@@ -119,7 +124,9 @@ export default function LivePage() {
   // Banner state
   const showOfflineBanner = !isOnline && isLiveModeActive
   const showErrorBanner = isOnline && poisError && isLiveModeActive && !poisFetching
-  const showNoResultsBanner = isLiveModeActive && !poisFetching && !poisError && poisHasFetched && pois.length === 0
+  // `!overpassPending` : Google peut renvoyer 0 alors qu'Overpass va en ramener — ne pas
+  // annoncer « aucun résultat » tant que la recherche étendue est en vol (story 17.14).
+  const showNoResultsBanner = isLiveModeActive && !poisFetching && !overpassPending && !poisError && poisHasFetched && pois.length === 0
 
   // Stages for live map layer + updateStage mutation
   const { stages, updateStage: updateStageMutation } = useStages(adventureId)
@@ -418,6 +425,15 @@ export default function LivePage() {
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-40 whitespace-nowrap rounded-lg bg-orange-500/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
             Aucun résultat dans cette zone
           </div>
+        )}
+
+        {/* Statut de la recherche étendue — non bloquant (story 17.14) */}
+        {mounted && !showOfflineBanner && !showErrorBanner && (
+          <ExtendedSearchStatus
+            pending={isLiveModeActive && overpassPending}
+            error={isLiveModeActive && !overpassPending && overpassError}
+            className="absolute top-16 left-1/2 -translate-x-1/2 z-40"
+          />
         )}
 
         {/* Bottom overlay — z-30 (only render after mount to avoid hydration mismatch) */}

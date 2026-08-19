@@ -37,9 +37,13 @@ Le 31 s provient d'un `504 Gateway Timeout` sur `overpass-api.de` (~12 s) suivi 
 
 8. **Given** Google renvoie zéro POI alors qu'Overpass est encore en vol, **When** la carte s'affiche, **Then** la bannière « Aucun résultat dans cette zone » **n'est pas** affichée (Overpass peut encore en ramener).
 
-9. **Given** la liste d'instances Overpass, **When** le provider effectue sa rotation, **Then** `overpass.osm.ch` n'y figure plus (extrait régional suisse — perte de données silencieuse hors de Suisse) et `kumi.systems` est remplacée par `private.coffee` (même opérateur, URL renommée).
+9. **Given** la liste d'instances Overpass, **When** le provider effectue sa rotation, **Then** `overpass.osm.ch` n'y figure plus (extrait régional suisse — perte de données silencieuse hors de Suisse), `kumi.systems` est remplacée par `private.coffee` (même opérateur, URL renommée), et `maps.mail.ru` figure en dernier recours.
 
 10. **Given** un appel Overpass qui enchaîne rotations et attentes 429, **When** le budget global est dépassé, **Then** l'appel est abandonné — sans quoi une seule recherche pouvait tenir une connexion plusieurs minutes.
+
+11. **Given** un prefetch Google, **When** les Place Details sont résolus, **Then** ils le sont au SKU **Essentials** (identité, position, types — tout ce qu'exige un pin) et mis en cache sous `google_place_basic:{placeId}` ; les champs Pro (note, horaires, téléphone, site) ne sont demandés qu'à l'**ouverture d'une fiche**, via `getPoiGoogleDetails` et sa clé `google_place_details:{placeId}`. Une charge Pro déjà en cache est réutilisée telle quelle par le prefetch.
+
+12. **Given** le mode live, **When** une recherche est lancée, **Then** les deux flux sont découplés comme en planning : `isFetching` ne suit que la source primaire, `overpassPending`/`overpassError` sont exposés, la bannière « Aucun résultat » attend la fin des deux flux et le statut de recherche étendue s'affiche.
 
 ## Tasks / Subtasks
 
@@ -50,6 +54,9 @@ Le 31 s provient d'un `504 Gateway Timeout` sur `overpass-api.de` (~12 s) suivi 
 - [x] **T5** — UI : composant `ExtendedSearchStatus` (`pointer-events-none`, `role="status"`, seuil de lenteur à 5 s, priorité à l'erreur) ; bannière « Aucun résultat » conditionnée par `!overpassPending`.
 - [x] **T6** — Tests : API +5 (les 4 combinaisons de `source` + non-écriture de la clé Redis en `source=google`) ; web +5 sur `usePois` (deux requêtes en ON, une seule en OFF, `isPending` insensible à Overpass, erreur Overpass non bloquante, fusion des deux sources) ; +6 sur `ExtendedSearchStatus`.
 - [x] **T7** — Correctif du harnais de test provider : `mockClear()` ne purge pas les implémentations `mockResolvedValueOnce` non consommées — elles fuyaient dans le test suivant, ce qui masquait le nombre réel d'instances. Passé à `mockReset()`, et les tests référencent désormais `OVERPASS_INSTANCES.length` au lieu de coder 3 en dur.
+- [x] **T9b** — Liste d'instances : `maps.mail.ru` réintégrée en **dernier** recours (décision Guillaume) — ~50 % d'échecs et 10-14 s de plancher mesurés, mais un repli à moitié fiable vaut mieux que pas de repli maintenant que l'UI n'attend plus. Constat qui a motivé la décision : le 2026-08-19 à 19:27, `private.coffee` est tombée en `fetch failed` alors qu'elle répondait (lentement) le matin même — sans troisième instance, un incident sur `overpass-api.de` ne laisse aucune issue.
+- [x] **T10** — Coût Google : `getPlaceDetails(placeId, tier)` avec deux field masks (`ESSENTIALS_FIELDS` / `PRO_FIELDS`). Le prefetch passe en Essentials et écrit sous `google_place_basic:` ; la fiche POI garde le Pro sous `google_place_details:`. Mesure qui a déclenché ce changement : sur une recherche froide, 37 `place_id` trouvés → 14 appels Place Details **facturés au SKU Pro**, dont ~8 pour le calque « restaurants » que l'utilisateur n'avait pas activé. Google facture au SKU le plus élevé des champs demandés ; note/horaires/téléphone/site ne servent qu'à l'ouverture d'une fiche.
+- [x] **T11** — Mode live découplé : `useLivePoisSearch` émet deux `useQuery` (`enabled: false`), `refetch()` déclenche les deux (Overpass seulement si l'option est active), `isFetching`/`isError` ne suivent que la source primaire, `pois` fusionne les deux. Page live : bannière « Aucun résultat » conditionnée par `!overpassPending`, `ExtendedSearchStatus` monté. En live c'est encore plus critique qu'en planning : l'utilisateur est sur son vélo.
 - [x] **T8** — Doc Sync : `project-context.md` (clé de query étendue à `source`, règles de découplage), `sprint-status.yaml`, cette story.
 - [ ] **T9** — Validation par Guillaume : parcours complet en conditions réelles (voir « Reste à valider »).
 
@@ -70,12 +77,20 @@ Le 31 s provient d'un `504 Gateway Timeout` sur `overpass-api.de` (~12 s) suivi 
 
 ### Hors scope
 
-- Le **mobile** reste sur le comportement combiné : il n'envoie pas `source`, et l'API le lui rend inchangé (AC4). Découplage mobile à traiter séparément.
-- Le **live mode** dispose du support serveur (`source` géré aussi dans `findLiveModePois`) mais son client n'est pas découplé.
+- Le **mobile** reste sur le comportement combiné : il n'envoie pas `source`, et l'API le lui rend inchangé (AC4). Il bénéficie en revanche **gratuitement** de tout le travail serveur : Overpass réparé, liste d'instances assainie, coût Google divisé, dédoublonnage, filtre corridor. Seul l'affichage progressif lui manque — découplage mobile à traiter séparément si besoin.
 
 ## Testing
 
-Gate du 2026-08-19 : **API 200/200** sur `src/pois` (454+ au total), **web 1170/1170** (100 fichiers), `tsc` 0 sur l'API, ESLint 0 erreur (2 warnings préexistants sur `map-view.tsx`, identiques avec les modifications remisées). Web `tsc` : baseline de 56 erreurs préexistantes dans des fichiers de test, inchangée.
+Gate complète du 2026-08-19, monorepo entier :
+
+| | résultat |
+|---|---|
+| API (Jest) | **462/462**, 39 suites · `tsc` 0 · ESLint 0 |
+| Web (Vitest) | **1173/1173**, 100 fichiers · ESLint 0 erreur (3 warnings préexistants, vérifiés identiques avec les modifications remisées) |
+| Mobile (Jest) | **632/632**, 95 suites · `tsc` 0 |
+| Packages (shared, gpx, analytics) | **89/89** |
+
+Web `tsc` : baseline de 56 erreurs préexistantes dans des fichiers de test, inchangée (vérifiée par `git stash`).
 
 ### Validation end-to-end (navigateur connecté, logs API)
 

@@ -294,6 +294,8 @@ export interface GetLivePoisParams {
   radiusKm: number
   categories?: PoiCategory[]
   overpassEnabled?: boolean
+  /** Voir `GetPoisParams.source` — même découplage en mode live. */
+  source?: 'google' | 'overpass'
 }
 
 export async function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
@@ -307,6 +309,9 @@ export async function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
   }
   if (params.overpassEnabled) {
     searchParams.set('overpassEnabled', 'true')
+  }
+  if (params.source) {
+    searchParams.set('source', params.source)
   }
   return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
 }

@@ -73,29 +73,47 @@ export class GooglePlacesProvider {
     return !!this.API_KEY
   }
 
-  async getPlaceDetails(placeId: string): Promise<GooglePlaceDetails> {
+  /**
+   * Champs strictement nécessaires pour POSER UN PIN : identité, position, types (catégorie et
+   * dédoublonnage). SKU Place Details Essentials — quota gratuit deux fois plus large que Pro.
+   */
+  private static readonly ESSENTIALS_FIELDS = ['id', 'displayName', 'location', 'types']
+
+  /**
+   * Champs de la fiche POI : note, horaires, téléphone, site, adresse. Google facture au SKU le
+   * plus élevé des champs demandés, donc dès qu'un seul de ceux-ci est présent, tout l'appel
+   * bascule en Place Details Pro (~17 $/1000 au-delà du quota gratuit).
+   */
+  private static readonly PRO_FIELDS = [
+    ...GooglePlacesProvider.ESSENTIALS_FIELDS,
+    'formattedAddress',
+    'addressComponents',
+    'rating',
+    'regularOpeningHours.openNow',
+    'regularOpeningHours.weekdayDescriptions',
+    'regularOpeningHours.periods',
+    'internationalPhoneNumber',
+    'websiteUri',
+  ]
+
+  /**
+   * @param tier `essentials` pour l'affichage carte (prefetch), `pro` pour l'ouverture d'une
+   * fiche. Le prefetch demandait Pro pour CHAQUE POI inséré alors qu'il n'en affiche qu'un pin :
+   * on payait le SKU cher pour des champs jamais lus (relevé 2026-08-19).
+   */
+  async getPlaceDetails(placeId: string, tier: 'essentials' | 'pro' = 'pro'): Promise<GooglePlaceDetails> {
     if (!this.API_KEY) throw new Error('GOOGLE_PLACES_API_KEY not configured')
 
     const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=fr`
-    const fieldMask = [
-      'id',
-      'displayName',
-      'formattedAddress',
-      'addressComponents',
-      'location',
-      'rating',
-      'regularOpeningHours.openNow',
-      'regularOpeningHours.weekdayDescriptions',
-      'regularOpeningHours.periods',
-      'internationalPhoneNumber',
-      'websiteUri',
-      'types',
-    ].join(',')
+    const fieldMask = (tier === 'essentials'
+      ? GooglePlacesProvider.ESSENTIALS_FIELDS
+      : GooglePlacesProvider.PRO_FIELDS
+    ).join(',')
 
     const response = await fetch(url, {
       headers: {
         'X-Goog-Api-Key': this.API_KEY,
-        'X-Goog-FieldMask': fieldMask,  // Pro tier (regularOpeningHours, phone, rating, website) — ~$5/1000 req
+        'X-Goog-FieldMask': fieldMask,
       },
       signal: AbortSignal.timeout(8_000),
     })

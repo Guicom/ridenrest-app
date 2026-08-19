@@ -67,12 +67,16 @@ const CATEGORY_FILTERS: Record<string, string[][]> = {
  *   indiscernable de « il n'y a pas de POI ici ». C'est une perte de données silencieuse.
  * - `kumi.systems` est REMPLACÉE par `private.coffee` : même opérateur, l'ancienne URL ne
  *   répond plus (« Previously known as overpass.kumi.systems »).
- * - `maps.mail.ru` écartée : ~50 % d'échecs mesurés et ~10-14 s de plancher, y compris sur une
- *   requête triviale (le 504 vient de son nginx frontal, pas d'Overpass).
+ * - `maps.mail.ru` gardée en DERNIER recours (décision Guillaume, 2026-08-19) : ~50 % d'échecs
+ *   mesurés et ~10-14 s de plancher même sur une requête triviale (son 504 vient de son nginx
+ *   frontal, pas d'Overpass) — mais un repli à moitié fiable vaut mieux que pas de repli, l'UI
+ *   n'attendant plus (flux découplés, story 17.14). Infra VK : aucune donnée personnelle n'y
+ *   transite, uniquement une bbox.
  */
 export const OVERPASS_INSTANCES = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ]
 
 /**

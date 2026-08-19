@@ -680,12 +680,21 @@ Règle : exposer un helper `useOverpassEnabled(): { overpassEnabled, ready }` et
 
 Vaut pour tout futur flag de profil (unités, devise, tier) consommé par une requête.
 
+#### 11. Google Places : SKU Essentials pour la carte, Pro seulement à l'ouverture d'une fiche
+
+Google facture **au SKU le plus élevé des champs demandés**. Réclamer note, horaires, téléphone et site web pour *chaque* POI inséré fait basculer tout l'appel en **Place Details Pro** (5 000 gratuits/mois puis ~17 $/1000) alors que poser un pin ne demande que nom, position et types (**Essentials**, 10 000 gratuits/mois).
+
+- `getPlaceDetails(placeId, tier)` : `'essentials'` pour le prefetch (`ESSENTIALS_FIELDS`), `'pro'` pour la fiche POI (`PRO_FIELDS`).
+- **Clés Redis distinctes** : `google_place_basic:{placeId}` (Essentials, écrite par le prefetch) et `google_place_details:{placeId}` (Pro, écrite par `getPoiGoogleDetails`). Écrire une charge Essentials sous la clé Pro priverait la fiche de ses champs riches pendant 7 jours. Le prefetch réutilise une charge Pro déjà en cache — elle contient les champs Essentials.
+- Rappel de volumétrie (mesuré) : une recherche froide produit ~37 `place_id`, dont ~14 nouveaux → 14 appels facturés. Le prefetch couvre **les 4 calques** (le marqueur de couverture est par bbox, pas par calque), donc environ la moitié partait dans des calques que l'utilisateur n'avait pas activés. Text Search reste gratuit (`places.id` seul = Essentials IDs Only, illimité) : ce ne sont **jamais** les 20 Text Search qui coûtent, ce sont les Place Details.
+
 #### 10. Deux sources de latences incomparables ⇒ deux flux, jamais une attente commune
 
 Google Places répond en ~200 ms (bbox déjà prefetchée) à ~2 s (froide) ; Overpass a été mesuré entre **1 s et 31 s** sur les instances publiques, avec des 504 et des instances mortes — et il n'existe aucun plan B en ligne fiable. Les attendre ensemble fait payer à chaque utilisateur le pire des deux.
 
 - L'API accepte `source=google|overpass` : une requête par source, `resolveSourcePlan()` décide de ce qu'on interroge **et** de ce qu'on masque à la lecture. Sans le paramètre, comportement combiné historique (contrat du mobile, non découplé).
 - Côté client, **`isPending` ne suit que la source primaire**. Overpass ne doit retenir ni le premier affichage, ni l'auto-zoom, ni les squelettes de calque. Idem `hasError` : un échec Overpass donne des résultats *partiels*, pas une recherche en erreur.
+- **Parité planning / live obligatoire.** Les deux écrans consomment les mêmes sources : le live a exactement le même découplage (`useLivePoisSearch` émet deux `useQuery`, `refetch()` déclenche les deux). En live c'est même plus critique — l'utilisateur est sur son vélo et n'attendra pas 30 s devant un écran figé.
 - Corollaires à ne pas oublier quand on touche à cette zone :
   - l'**auto-zoom** se déclenche sur la source primaire uniquement — le rejouer à l'arrivée d'Overpass ferait sauter la carte sous les doigts de l'utilisateur ;
   - la bannière **« Aucun résultat »** exige `!overpassPending` : Google peut renvoyer 0 alors qu'Overpass va en ramener 50 ;
