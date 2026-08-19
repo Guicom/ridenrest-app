@@ -1,17 +1,28 @@
 import { Injectable } from '@nestjs/common'
 import { db, accommodationsCache, adventureSegments, adventures } from '@ridenrest/database'
-import { eq, and, gte, lte, sql, inArray } from 'drizzle-orm'
+import { eq, and, gte, lte, sql, inArray, notInArray } from 'drizzle-orm'
 import type { OverpassNode } from './providers/overpass.provider.js'
 import type { Poi } from '@ridenrest/shared'
+import { CORRIDOR_WIDTH_M } from '@ridenrest/shared'
 
 @Injectable()
 export class PoisRepository {
-  /** Retrieve cached POIs for a segment from accommodations_cache, filtered by categories and km range. */
+  /**
+   * Retrieve cached POIs for a segment from accommodations_cache, filtered by categories,
+   * km range AND corridor width.
+   *
+   * The corridor filter matters: the Overpass/Google search area is the *bounding box* of the
+   * requested km range (+ CORRIDOR_WIDTH_M of padding), so a rectangle always contains POIs
+   * far outside the corridor the UI advertises — up to 4+ km off-trace in practice. Filtering
+   * on read keeps the displayed set consistent with the announced corridor, and independent
+   * from the rectangle's shape (which varies with the requested window).
+   */
   async findCachedPois(
     segmentId: string,
     categories: string[],
     fromKm: number,
     toKm: number,
+    excludeSources: string[] = [],
   ): Promise<Poi[]> {
     const now = new Date()
     const rows = await db
@@ -24,6 +35,12 @@ export class PoisRepository {
           inArray(accommodationsCache.category, categories),
           gte(accommodationsCache.distAlongRouteKm, fromKm),
           lte(accommodationsCache.distAlongRouteKm, toKm),
+          lte(accommodationsCache.distFromTraceM, CORRIDOR_WIDTH_M),
+          // Le toggle « recherche étendue » masque aussi à la lecture : sans ça, les POI
+          // Overpass déjà en cache (TTL 30 j) restaient visibles une fois l'option coupée.
+          ...(excludeSources.length > 0
+            ? [notInArray(accommodationsCache.source, excludeSources)]
+            : []),
         ),
       )
     return rows.map((r) => ({
@@ -137,23 +154,38 @@ export class PoisRepository {
     return rows.length > 0
   }
 
-  /** Check if any POI already exists within radiusM meters of (lat, lng) for the given segment. */
-  async hasNearbyPoi(lat: number, lng: number, radiusM: number, segmentId: string): Promise<boolean> {
+  /**
+   * List the POIs of OTHER sources within radiusM meters of (lat, lng) for the given segment.
+   *
+   * Used to dedup an incoming Google POI against an already-cached OSM/Overpass POI describing
+   * the same place. Names are returned so the caller can require a name match: proximity alone
+   * suppressed genuinely distinct establishments (two hotels 80 m apart in a village).
+   *
+   * `excludeSource` filters out same-source neighbours — two POIs from the same provider are
+   * never duplicates of each other (their external ids are unique per source).
+   */
+  async findNearbyPoisFromOtherSources(
+    lat: number,
+    lng: number,
+    radiusM: number,
+    segmentId: string,
+    excludeSource: string,
+  ): Promise<Array<{ name: string; source: string }>> {
     // Dedup only against LIVE POIs — an expired neighbour must not suppress the
     // insertion of a fresh POI (else the area stays empty after the TTL lapses).
     const now = new Date()
     const result = await db.execute(sql`
-      SELECT 1 FROM accommodations_cache
+      SELECT name, source FROM accommodations_cache
       WHERE segment_id = ${segmentId}
+        AND source <> ${excludeSource}
         AND expires_at >= ${now}
         AND ST_DWithin(
           ST_SetSRID(ST_MakePoint(accommodations_cache.lng, accommodations_cache.lat), 4326)::geography,
           ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
           ${radiusM}
         )
-      LIMIT 1
     `)
-    return result.rows.length > 0
+    return result.rows.map((r) => ({ name: r.name as string, source: r.source as string }))
   }
 
   /** Insert Google Places POIs into accommodations_cache (upsert on conflict). */
@@ -276,6 +308,7 @@ export class PoisRepository {
     targetLng: number,
     radiusM: number,
     categories: string[],
+    excludeSources: string[] = [],
   ): Promise<Poi[]> {
     const now = new Date()
     const rows = await db.execute(sql`
@@ -298,6 +331,9 @@ export class PoisRepository {
       WHERE ac.segment_id = ${segmentId}
         AND ac.category = ANY(ARRAY[${sql.join(categories.map((c) => sql`${c}`), sql.raw(', '))}])
         AND ac.expires_at > ${now}
+        ${excludeSources.length > 0
+          ? sql`AND ac.source <> ALL(ARRAY[${sql.join(excludeSources.map((src) => sql`${src}`), sql.raw(', '))}])`
+          : sql``}
         AND ST_DWithin(
           ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,
           ST_SetSRID(ST_MakePoint(${targetLng}, ${targetLat}), 4326)::geography,
