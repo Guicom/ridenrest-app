@@ -49,11 +49,30 @@ const CATEGORY_FILTERS: Record<string, string[][]> = {
   bike_repair:  [['"amenity"="bicycle_repair_station"']],
 }
 
-// Public Overpass instances — tried in order, rotate on any non-200 status
-const OVERPASS_INSTANCES = [
+/**
+ * Instances publiques, essayées dans l'ordre. Mesures du 2026-08-19 (requête « hébergements »
+ * réelle, une bbox DE/CH et une bbox France) :
+ *
+ * | instance                | France          | DE/CH           |
+ * |-------------------------|-----------------|-----------------|
+ * | overpass-api.de         | 154 POI / 4,7 s | 15 POI / 1,0 s  |
+ * | overpass.private.coffee | timeout 45 s    | 15 POI / 35,6 s |
+ * | overpass.kumi.systems   | timeout         | timeout         |
+ * | maps.mail.ru (VK)       | 154 POI / 14,9 s| HTTP 504        |
+ * | overpass.osm.ch         | **0 POI** / 0,4s| 2 POI / 0,1 s   |
+ *
+ * D'où cette liste :
+ * - `overpass.osm.ch` est RETIRÉE : le wiki OSM la classe dans « instances with data only for a
+ *   specific region » (Suisse). Elle répond HTTP 200 avec zéro résultat hors de Suisse —
+ *   indiscernable de « il n'y a pas de POI ici ». C'est une perte de données silencieuse.
+ * - `kumi.systems` est REMPLACÉE par `private.coffee` : même opérateur, l'ancienne URL ne
+ *   répond plus (« Previously known as overpass.kumi.systems »).
+ * - `maps.mail.ru` écartée : ~50 % d'échecs mesurés et ~10-14 s de plancher, y compris sur une
+ *   requête triviale (le 504 vient de son nginx frontal, pas d'Overpass).
+ */
+export const OVERPASS_INSTANCES = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.osm.ch/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
 ]
 
 /**
@@ -70,10 +89,18 @@ const DEFAULT_USER_AGENT = "Ride'n'Rest/1.0 (bikepacking trip planner; +https://
 @Injectable()
 export class OverpassProvider {
   private readonly logger = new Logger(OverpassProvider.name)
-  private readonly TIMEOUT_S = 25
   private readonly userAgent = process.env['OVERPASS_USER_AGENT'] ?? DEFAULT_USER_AGENT
   // 429 = request queued server-side; the queue clears within ~20s. Overridable for tests.
-  private readonly retryDelayMs = Number(process.env['OVERPASS_RETRY_DELAY_MS'] ?? 20_000)
+  // La politique d'usage d'overpass-api.de demande explicitement 30 s de pause après un 429.
+  private readonly retryDelayMs = Number(process.env['OVERPASS_RETRY_DELAY_MS'] ?? 30_000)
+  /** Timeout d'un appel isolé. Généreux : l'UI n'attend plus Overpass (flux découplé). */
+  private readonly instanceTimeoutMs = Number(process.env['OVERPASS_INSTANCE_TIMEOUT_MS'] ?? 20_000)
+  /**
+   * Plafond de l'appel COMPLET, rotation et attentes 429 comprises. Sans lui, 2 instances ×
+   * (20 s + 2 × 30 s d'attente 429) = plusieurs minutes de connexion tenue par recherche.
+   * Il ne protège pas l'utilisateur (il n'attend plus) mais le serveur.
+   */
+  private readonly totalBudgetMs = Number(process.env['OVERPASS_TOTAL_BUDGET_MS'] ?? 45_000)
 
   async queryPois(
     bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
@@ -89,7 +116,7 @@ export class OverpassProvider {
     const nodeQueries = tagSelectors.map((sel) => `node${sel}(${bboxStr});`)
     const wayQueries  = tagSelectors.map((sel) => `way${sel}(${bboxStr});`)
 
-    const query = `[out:json][timeout:${this.TIMEOUT_S}];
+    const query = `[out:json][timeout:${Math.ceil(this.instanceTimeoutMs / 1000)}];
 (
 ${nodeQueries.join('\n')}
 ${wayQueries.join('\n')}
@@ -104,9 +131,14 @@ out center;`
     // NEVER propagate a per-instance failure: every instance must get its chance before we
     // give up, otherwise a single misbehaving instance disables Overpass entirely.
     const MAX_RETRIES_PER_INSTANCE = 2
+    const deadline = Date.now() + this.totalBudgetMs
 
     for (const url of OVERPASS_INSTANCES) {
       for (let attempt = 0; attempt <= MAX_RETRIES_PER_INSTANCE; attempt++) {
+        if (Date.now() >= deadline) {
+          this.logger.warn(`Overpass total budget (${this.totalBudgetMs}ms) exhausted — giving up`)
+          throw new Error('All Overpass instances unavailable')
+        }
         let response: Response
         try {
           response = await fetch(url, {
@@ -116,7 +148,8 @@ out center;`
               'User-Agent': this.userAgent,
             },
             body: `data=${encodeURIComponent(query)}`,
-            signal: AbortSignal.timeout(20_000), // > 15s server queue window
+            // Jamais au-delà de ce qu'il reste du budget global
+            signal: AbortSignal.timeout(Math.max(1_000, Math.min(this.instanceTimeoutMs, deadline - Date.now()))),
           })
         } catch (err) {
           const { name, message } = err as Error
@@ -134,7 +167,10 @@ out center;`
           }
         }
 
-        if (response.status === 429 && attempt < MAX_RETRIES_PER_INSTANCE) {
+        // 429 : la politique demande 30 s de pause. On ne la tient que si le budget le permet,
+        // sinon on abandonne — dormir 30 s dans une requête HTTP n'a pas de sens.
+        if (response.status === 429 && attempt < MAX_RETRIES_PER_INSTANCE
+            && Date.now() + this.retryDelayMs < deadline) {
           this.logger.warn(`Overpass 429 on ${url} — server busy, waiting ${this.retryDelayMs}ms (attempt ${attempt + 1}/${MAX_RETRIES_PER_INSTANCE})`)
           await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs))
           continue

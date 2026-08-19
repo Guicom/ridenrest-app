@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing'
 // Must be set BEFORE the provider module is imported: the delay is read at field init.
 process.env['OVERPASS_RETRY_DELAY_MS'] = '0'
 
-import { OverpassProvider, SLEEPABLE_SHELTER_TYPES } from './overpass.provider.js'
+import { OverpassProvider, SLEEPABLE_SHELTER_TYPES, OVERPASS_INSTANCES } from './overpass.provider.js'
 
 // Mock global fetch
 const mockFetch = jest.fn()
@@ -19,7 +19,9 @@ describe('OverpassProvider', () => {
     }).compile()
 
     provider = module.get<OverpassProvider>(OverpassProvider)
-    mockFetch.mockClear()
+    // mockReset() et pas mockClear() : ce dernier ne purge pas les implémentations
+    // `mockResolvedValueOnce` non consommées, qui fuient alors dans le test suivant.
+    mockFetch.mockReset()
   })
 
   const bbox = { minLat: 43.0, maxLat: 43.5, minLng: 1.0, maxLng: 1.5 }
@@ -176,21 +178,21 @@ describe('OverpassProvider', () => {
     // 3 attempts on instance #1 (initial + 2 retries), then instance #2 succeeds
     expect(mockFetch).toHaveBeenCalledTimes(4)
     const urls = (mockFetch.mock.calls as [string, RequestInit][]).map(([url]) => url)
-    expect(urls.slice(0, 3)).toEqual(Array(3).fill('https://overpass-api.de/api/interpreter'))
-    expect(urls[3]).toBe('https://overpass.kumi.systems/api/interpreter')
+    expect(urls.slice(0, 3)).toEqual(Array(3).fill(OVERPASS_INSTANCES[0]))
+    expect(urls[3]).toBe(OVERPASS_INSTANCES[1])
   })
 
   it('switches to next instance on 403 Forbidden (instance blocked)', async () => {
-    // First two instances return 403 → try third, which succeeds
+    // Toutes les instances sauf la dernière renvoient 403 → la dernière répond
     const successElements = [{ type: 'node', id: 1, lat: 43.1, lon: 1.1, tags: {} }]
-    mockFetch
-      .mockResolvedValueOnce({ ok: false, status: 403, statusText: 'Forbidden' })
-      .mockResolvedValueOnce({ ok: false, status: 403, statusText: 'Forbidden' })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ elements: successElements }) })
+    for (let i = 0; i < OVERPASS_INSTANCES.length - 1; i++) {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 403, statusText: 'Forbidden' })
+    }
+    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ elements: successElements }) })
 
     const result = await provider.queryPois(bbox, ['hotel'])
     expect(result).toEqual(successElements)
-    expect(mockFetch).toHaveBeenCalledTimes(3)
+    expect(mockFetch).toHaveBeenCalledTimes(OVERPASS_INSTANCES.length)
   })
 
   it('switches to next instance on 504 Gateway Timeout', async () => {

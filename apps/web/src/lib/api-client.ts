@@ -263,6 +263,11 @@ export interface GetPoisParams {
   toKm: number
   categories?: PoiCategory[]
   overpassEnabled?: boolean
+  /**
+   * Restreint la requête à une source. Permet d'afficher Google sans attendre Overpass.
+   * Omis = les deux sources dans une seule réponse (comportement historique).
+   */
+  source?: 'google' | 'overpass'
 }
 
 export async function getPois(params: GetPoisParams): Promise<Poi[]> {
@@ -276,6 +281,9 @@ export async function getPois(params: GetPoisParams): Promise<Poi[]> {
   }
   if (params.overpassEnabled) {
     searchParams.set('overpassEnabled', 'true')
+  }
+  if (params.source) {
+    searchParams.set('source', params.source)
   }
   return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
 }

@@ -27,6 +27,7 @@ import { MapStylePicker } from './map-style-picker'
 import { ResetZoomButton } from './reset-zoom-button'
 import { TraceClickCta } from './trace-click-cta'
 import { MapSearchOverlay } from './map-search-overlay'
+import { ExtendedSearchStatus } from './extended-search-status'
 import { SidebarStagesSection } from './sidebar-stages-section'
 import { NoResultsSubTypeBanner } from './no-results-sub-type-banner'
 import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
@@ -132,7 +133,15 @@ export function MapView({ adventureId }: MapViewProps) {
     return () => { mapOpenedTrackedRef.current = false }
   }, [readySegments, adventureId])
 
-  const { poisByLayer, isPending: poisPending, hasError: poisError } = usePois(readySegments)
+  // `poisPending` = source primaire (Google) uniquement : Overpass ne doit retenir ni le premier
+  // affichage, ni l'auto-zoom, ni les squelettes — il complète la carte quand il arrive.
+  const {
+    poisByLayer,
+    isPending: poisPending,
+    hasError: poisError,
+    overpassPending,
+    overpassError,
+  } = usePois(readySegments)
   const { coverageGaps, densityStatus } = useDensity(adventureId)
 
   // Fetch weather for all ready segments as soon as layer is active.
@@ -604,11 +613,20 @@ export function MapView({ adventureId }: MapViewProps) {
           )}
 
           {/* No-results banner — orange, centered, shown after a committed search returns nothing */}
-          {!hasUnfilteredResults && searchCommitted && !poisPending && !poisError && allPois.length === 0 && readySegments.length > 0 && visibleLayers.size > 0 && (
+          {/* `!overpassPending` : Google peut renvoyer 0 alors qu'Overpass va en ramener — ne pas
+              annoncer « aucun résultat » tant que la recherche étendue est en vol. */}
+          {!hasUnfilteredResults && searchCommitted && !poisPending && !overpassPending && !poisError && allPois.length === 0 && readySegments.length > 0 && visibleLayers.size > 0 && (
             <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 whitespace-nowrap rounded-lg bg-orange-500/90 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
               Aucun résultat dans cette zone
             </div>
           )}
+
+          {/* Statut de la recherche étendue — non bloquant, sous les contrôles de la carte */}
+          <ExtendedSearchStatus
+            pending={searchCommitted && overpassPending}
+            error={searchCommitted && !overpassPending && overpassError}
+            className="absolute top-14 left-1/2 -translate-x-1/2 z-30"
+          />
 
           {/* Trace click CTA — centered above elevation profile (AC #3, Story 16.3) */}
           <TraceClickCta />

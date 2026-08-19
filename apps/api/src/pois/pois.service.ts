@@ -39,6 +39,35 @@ const GOOGLE_DETAILS_CONCURRENCY = 6
  */
 const OVERPASS_SOURCES = ['overpass']
 
+/** Sources « Google » au sens large (`amadeus` est un reliquat historique du schéma). */
+const GOOGLE_SOURCES = ['google', 'amadeus']
+
+/**
+ * Quelles sources interroger et lesquelles masquer à la lecture, à partir du DTO.
+ *
+ * `source` permet au client de dissocier les deux flux d'une même recherche : les POI Google
+ * s'affichent en ~200 ms (tièdes) pendant qu'Overpass, mesuré entre 1 et 31 s sur les instances
+ * publiques, arrive quand il peut. Sans le paramètre, comportement historique (les deux dans
+ * une seule réponse) — c'est encore ce que fait le mobile.
+ */
+function resolveSourcePlan(dto: { source?: string; overpassEnabled?: boolean }): {
+  wantsGoogle: boolean
+  wantsOverpass: boolean
+  excludeSources: string[]
+} {
+  const wantsGoogle = dto.source !== 'overpass'
+  // Le toggle reste maître : `source=overpass` avec l'option coupée ne doit rien interroger.
+  const wantsOverpass = dto.source !== 'google' && Boolean(dto.overpassEnabled)
+  return {
+    wantsGoogle,
+    wantsOverpass,
+    excludeSources: [
+      ...(wantsOverpass ? [] : OVERPASS_SOURCES),
+      ...(wantsGoogle ? [] : GOOGLE_SOURCES),
+    ],
+  }
+}
+
 // Stripped POI format stored in Redis — no segment-specific distances (Option A)
 type RawCacheablePoi = {
   externalId: string
@@ -104,64 +133,52 @@ export class PoisService {
     const bbox = { minLat, maxLat, minLng, maxLng }
     const redis = this.redisProvider.getClient()
 
-    // Overpass OFF ⇒ ses POI sont aussi masqués à la lecture (sinon le toggle est sans effet
-    // visible dès qu'une recherche ON a peuplé la zone : TTL Overpass 30 j).
-    const excludeSources = dto.overpassEnabled ? [] : OVERPASS_SOURCES
+    const { wantsGoogle, wantsOverpass, excludeSources } = resolveSourcePlan(dto)
 
-    // 4. Overpass opt-in gate — when disabled, Google Places is the only source
-    if (!dto.overpassEnabled) {
-      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
-      return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm, excludeSources)
-    }
-
-    // 5. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
+    // 4. Overpass (si demandé) — best effort, il ne fait que COMPLÉTER Google Places
+    let overpassSucceeded = false
     const cacheKey = `pois:bbox:${round3(minLat)}:${round3(minLng)}:${round3(maxLat)}:${round3(maxLng)}:${sortedCategories}`
 
-    // 6. Redis cache check
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      this.logger.debug(`Cache HIT: ${cacheKey}`)
-      // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
-      const rawPois = JSON.parse(cached) as RawCacheablePoi[]
-      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
-      await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
-      await this.poisRepository.updatePoiDistances(segmentId)
-      // Google Places is the primary source and its Redis key is independent from the Overpass
-      // one: an Overpass HIT must not skip a bbox never prefetched from Google for this segment.
-      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
-      return this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm, excludeSources)
-    }
+    if (wantsOverpass) {
+      const cached = await redis.get(cacheKey)
+      if (cached) {
+        this.logger.debug(`Cache HIT: ${cacheKey}`)
+        // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
+        const rawPois = JSON.parse(cached) as RawCacheablePoi[]
+        const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
+        await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
+        await this.poisRepository.updatePoiDistances(segmentId)
+      } else {
+        this.logger.debug(`Cache MISS: ${cacheKey}`)
+        try {
+          const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
 
-    this.logger.debug(`Cache MISS: ${cacheKey}`)
+          // Build node→category lookup
+          const categoryMap: Record<number, string> = {}
+          for (const node of nodes) {
+            categoryMap[node.id] = resolveCategory(node.tags)
+          }
 
-    // 7. Query Overpass API — best effort, it only COMPLEMENTS Google Places
-    let overpassSucceeded = false
-    try {
-      const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
-
-      // Build node→category lookup
-      const categoryMap: Record<number, string> = {}
-      for (const node of nodes) {
-        categoryMap[node.id] = resolveCategory(node.tags)
+          const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
+          await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
+          await this.poisRepository.updatePoiDistances(segmentId)
+          overpassSucceeded = true
+        } catch (error) {
+          this.logger.error('Overpass API failed — Google Places results are still returned', error)
+        }
       }
-
-      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
-      await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
-      await this.poisRepository.updatePoiDistances(segmentId)
-      overpassSucceeded = true
-    } catch (error) {
-      this.logger.error('Overpass API failed — Google Places results are still returned', error)
     }
 
-    // 8. Google Places (primary source) — ALWAYS runs, including when Overpass just failed.
-    // Keeping this inside the try above meant an Overpass failure also cancelled Google:
-    // "Overpass ON" returned 0 POI on a cold segment while "Overpass OFF" returned results.
-    await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
+    // 5. Google Places (source primaire) — indépendant du sort d'Overpass. Le garder dans le
+    // `try` ci-dessus signifiait qu'un échec Overpass annulait aussi la source primaire.
+    if (wantsGoogle) {
+      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
+    }
 
-    // 9. Read back from DB — Google Places + Overpass POIs with PostGIS distances
+    // 6. Lecture unique, filtrée sur les sources demandées
     const pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm, excludeSources)
 
-    // 10. Store in Redis only after a fresh Overpass fetch — never cache stale fallback data
+    // 7. Redis seulement après un fetch Overpass frais — ne jamais cacher un fallback périmé.
     // Option A: strip segment-specific distances — geo-scoped key is cross-user, distances are not
     if (overpassSucceeded) {
       const rawPois: RawCacheablePoi[] = pois.map(({ externalId, source, name, lat, lng, category, rawData }) => ({
@@ -241,48 +258,42 @@ export class PoisService {
     }
     const redis = this.redisProvider.getClient()
 
-    // Overpass OFF ⇒ masqué aussi à la lecture (voir le chemin corridor)
-    const excludeSources = overpassEnabled ? [] : OVERPASS_SOURCES
+    const { wantsGoogle, wantsOverpass, excludeSources } = resolveSourcePlan({ source: dto.source, overpassEnabled })
 
-    // 3. Overpass opt-in gate — when disabled, Google Places is the only source
-    if (!overpassEnabled) {
-      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
-      return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories, excludeSources)
-    }
-
-    // 4. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
+    // 3. Geographic cache key — cross-user sharing via bbox (rounded to 3 decimal places ≈ 111m)
     const cacheKey = `pois:live:bbox:${round3(bbox.minLat)}:${round3(bbox.minLng)}:${round3(bbox.maxLat)}:${round3(bbox.maxLng)}:${sortedCategories}`
 
-    const cached = await redis.get(cacheKey)
-    if (cached) {
-      this.logger.debug(`Live cache HIT: ${cacheKey}`)
-      // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
-      const rawPois = JSON.parse(cached) as RawCacheablePoi[]
-      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
-      await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
-      await this.poisRepository.updatePoiDistances(segmentId)
-      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
-      return this.poisRepository.findPoisNearPoint(segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories, excludeSources)
-    }
-
-    this.logger.debug(`Live cache MISS: ${cacheKey}`)
-
     let overpassSucceeded = false
-    try {
-      const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
-      const categoryMap: Record<number, string> = {}
-      for (const node of nodes) categoryMap[node.id] = resolveCategory(node.tags)
-      const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
-      await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
-      await this.poisRepository.updatePoiDistances(segmentId)
-      overpassSucceeded = true
-    } catch (err) {
-      this.logger.warn(`Overpass failed in live mode: ${String(err)}`)
-      // Fall through — Google Places below still runs, and a previous fetch may be cached
+    if (wantsOverpass) {
+      const cached = await redis.get(cacheKey)
+      if (cached) {
+        this.logger.debug(`Live cache HIT: ${cacheKey}`)
+        // Option A: re-insert raw POIs for this segment + recompute PostGIS distances
+        const rawPois = JSON.parse(cached) as RawCacheablePoi[]
+        const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
+        await this.poisRepository.insertRawPoisForSegment(segmentId, rawPois, expiresAt)
+        await this.poisRepository.updatePoiDistances(segmentId)
+      } else {
+        this.logger.debug(`Live cache MISS: ${cacheKey}`)
+        try {
+          const nodes = await this.overpassProvider.queryPois(bbox, activeCategories)
+          const categoryMap: Record<number, string> = {}
+          for (const node of nodes) categoryMap[node.id] = resolveCategory(node.tags)
+          const expiresAt = new Date(Date.now() + POI_BBOX_CACHE_TTL * 1000)
+          await this.poisRepository.insertOverpassPois(segmentId, nodes, categoryMap, expiresAt)
+          await this.poisRepository.updatePoiDistances(segmentId)
+          overpassSucceeded = true
+        } catch (err) {
+          this.logger.warn(`Overpass failed in live mode: ${String(err)}`)
+          // Fall through — Google Places below still runs, and a previous fetch may be cached
+        }
+      }
     }
 
-    // Google Places (primary source) — ALWAYS runs, including when Overpass just failed
-    await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
+    // Google Places (primary source) — independent from Overpass's fate
+    if (wantsGoogle) {
+      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis)
+    }
 
     const pois = await this.poisRepository.findPoisNearPoint(
       segmentId, targetPoint.lat, targetPoint.lng, radiusM, activeCategories, excludeSources,

@@ -430,6 +430,74 @@ describe('PoisService', () => {
       expect(mockGooglePlacesProvider.searchLayerPlaceIds).toHaveBeenCalled()
     })
 
+    describe('source= (flux découplés Google / Overpass)', () => {
+      // Le client affiche les POI Google en ~200 ms pendant qu'Overpass, mesuré entre 1 et 31 s
+      // sur les instances publiques, arrive quand il peut.
+      it('source=google : aucun appel Overpass, lecture sans les POI overpass', async () => {
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+
+        await service.findPois({ ...baseDto, source: 'google' }, userId)
+
+        expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).toHaveBeenCalled()
+        expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['overpass'],
+        )
+      })
+
+      it('source=overpass : aucun appel Google, lecture sans les POI google', async () => {
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+        mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+
+        await service.findPois({ ...baseDto, source: 'overpass' }, userId)
+
+        expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).not.toHaveBeenCalled()
+        expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['google', 'amadeus'],
+        )
+      })
+
+      it('source=overpass avec l’option coupée : rien n’est interrogé (le toggle reste maître)', async () => {
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+
+        const result = await service.findPois({ ...baseDto, source: 'overpass', overpassEnabled: false }, userId)
+
+        expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).not.toHaveBeenCalled()
+        expect(result).toEqual([])
+      })
+
+      it('sans source : comportement historique, les deux sources dans une réponse (mobile)', async () => {
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockGooglePlacesProvider.searchLayerPlaceIds.mockResolvedValue([])
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+        mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
+
+        await service.findPois(baseDto, userId)
+
+        expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
+        expect(mockGooglePlacesProvider.searchLayerPlaceIds).toHaveBeenCalled()
+        expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [],
+        )
+      })
+
+      it('source=google n’écrit pas la clé Redis Overpass', async () => {
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+
+        await service.findPois({ ...baseDto, source: 'google' }, userId)
+
+        expect(mockRedisClient.setex).not.toHaveBeenCalled()
+      })
+    })
+
     it('hides Overpass-sourced POIs on read when overpassEnabled=false', async () => {
       // The toggle used to gate COLLECTION only: cached Overpass POIs (30-day TTL) stayed
       // visible, so ON and OFF returned the exact same set once a zone had been searched with
