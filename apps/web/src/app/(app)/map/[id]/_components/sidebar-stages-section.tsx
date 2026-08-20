@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { MapPin, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, X, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -54,6 +54,11 @@ interface SidebarStagesSectionProps {
   departureTime?: string
   speedKmh?: number
   defaultSpeedKmh?: number
+  /** Ouvre le formulaire de génération automatique (story 17.18). */
+  onOpenGenerate?: () => void
+  /** Désactive le CTA tant que la génération est impossible (aucun segment parsé, profil en vol). */
+  canGenerate?: boolean
+  isGenerating?: boolean
 }
 
 export function SidebarStagesSection({
@@ -74,6 +79,9 @@ export function SidebarStagesSection({
   departureTime,
   speedKmh,
   defaultSpeedKmh = 15,
+  onOpenGenerate,
+  canGenerate = false,
+  isGenerating = false,
 }: SidebarStagesSectionProps) {
 
   const [expanded, setExpanded] = useState(false)
@@ -209,6 +217,23 @@ export function SidebarStagesSection({
                 data-testid="add-stage-btn"
               >
                 + Ajouter une étape
+              </Button>
+            </OfflineTooltipWrapper>
+          )}
+
+          {/* Génération automatique — story 17.18 */}
+          {onOpenGenerate && (
+            <OfflineTooltipWrapper>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onOpenGenerate() }}
+                disabled={!canGenerate || isGenerating}
+                className="w-full h-8 text-xs"
+                data-testid="generate-stages-btn"
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                {isGenerating ? 'Génération…' : 'Générer les étapes'}
               </Button>
             </OfflineTooltipWrapper>
           )}

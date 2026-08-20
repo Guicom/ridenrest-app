@@ -588,6 +588,22 @@ export default function MapScreen() {
             onUpdate={stagesApi.updateStage}
             onDelete={stagesApi.deleteStage}
             isOnline={isOnline}
+            activeAccommodationTypes={activeAccommodationTypes}
+            searchRadiusKm={searchRadiusKm}
+            adventureStartDate={adventure.data?.startDate ?? null}
+            overpassEnabled={overpassEnabled}
+            profileReady={profileReady}
+            canGenerate={allSegmentsParsed && profileReady}
+            isGenerating={stagesApi.isGenerating}
+            onGenerate={async (input) => {
+              try {
+                const result = await stagesApi.generateStages(input);
+                return result.warnings;
+              } catch {
+                // Les étapes créées avant l'échec restent en base : le refetch les montre.
+                return [{ code: 'provider_unavailable', fromKm: null, toKm: null }];
+              }
+            }}
           />
           <SidebarWeatherSection
             departureTime={departureInput}

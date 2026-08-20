@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdventureStageResponse } from '@ridenrest/shared';
+import type {
+  AdventureStageResponse,
+  GenerateStagesInput,
+  GenerateStagesResponse,
+} from '@ridenrest/shared';
 
 import {
   createStage,
   deleteStage,
+  generateStages,
   getStages,
   updateStage,
   type CreateStageInput,
@@ -25,6 +30,8 @@ export interface UseStagesResult {
   createStage: (input: CreateStageInput) => Promise<void>;
   updateStage: (stageId: string, input: UpdateStageInput) => Promise<void>;
   deleteStage: (stageId: string) => Promise<void>;
+  generateStages: (input: GenerateStagesInput) => Promise<GenerateStagesResponse>;
+  isGenerating: boolean;
 }
 
 export function useStages(
@@ -59,6 +66,11 @@ export function useStages(
     mutationFn: (stageId: string) => deleteStage(adventureId, stageId),
     onSuccess: invalidate,
   });
+  // Les étapes générées portent un `departureTime` : `onAfterChange` reste donc pertinent.
+  const generateMutation = useMutation({
+    mutationFn: (input: GenerateStagesInput) => generateStages(adventureId, input),
+    onSuccess: invalidate,
+  });
 
   return {
     stages: data ?? [],
@@ -69,5 +81,7 @@ export function useStages(
       updateMutation.mutateAsync({ stageId, input }).then(() => undefined),
     deleteStage: (stageId) =>
       deleteMutation.mutateAsync(stageId).then(() => undefined),
+    generateStages: (input) => generateMutation.mutateAsync(input),
+    isGenerating: generateMutation.isPending,
   };
 }

@@ -1,6 +1,7 @@
 // Types
 export type { AdventureResponse, AdventureSegmentResponse, AdventureStageResponse, AdventureStatus, ParseStatus, DensityStatus, DensityStatusResponse, CoverageGapSummary, MapWaypoint, MapSegmentData, AdventureMapResponse, DensityAccommodationCategory } from './types/adventure.types'
 export { DENSITY_ACCOMMODATION_CATEGORIES } from './types/adventure.types'
+export type { StageGenerationWarningCode, StageGenerationWarning, GenerateStagesResponse } from './types/adventure.types'
 export type { RoutingProfile } from './types/routing-profile'
 export { ROUTING_PROFILE_VALUES, ROUTING_PROFILE_LABELS, ROUTING_PROFILE_TOOLTIPS } from './types/routing-profile'
 export type { Poi, PoiCategory, PoiSearchResponse, MapLayer } from './types/poi.types'
@@ -18,6 +19,9 @@ export type { CreateSegmentInput, ReplaceSegmentInput } from './schemas/segment.
 
 export { createStageSchema, updateStageSchema } from './schemas/stage.schema'
 export type { CreateStageInput, UpdateStageInput } from './schemas/stage.schema'
+
+export { generateStagesSchema, ACCOMMODATION_CATEGORIES } from './schemas/generate-stages.schema'
+export type { GenerateStagesInput } from './schemas/generate-stages.schema'
 
 export { poiSearchSchema } from './schemas/poi-search.schema'
 export type { PoiSearchInput } from './schemas/poi-search.schema'
@@ -46,5 +50,10 @@ export type { AccessRequest, AccessResponse, AccessVariant, AccessOrigin, Broute
 export * from './constants/gpx.constants'
 export * from './constants/api.constants'
 export * from './constants/weather.constants'
-export { STAGE_COLORS } from './constants/stages.constants'
+export * from './constants/stages.constants'
 export { POI_CATEGORY_COLORS, POI_CLUSTER_COLOR, POI_LAYER_COLORS } from './constants/poi-colors'
+
+// Utils
+export { addDaysPreservingWallClock, isValidTimeZone, resolveTimeZone, wallClockToInstant } from './utils/date-tz'
+export { computeStageArrival, formatDuration } from './utils/stage-timing'
+export type { StageArrival } from './utils/stage-timing'

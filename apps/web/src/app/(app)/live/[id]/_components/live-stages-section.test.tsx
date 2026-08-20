@@ -90,7 +90,8 @@ describe('LiveStagesSection', () => {
     render(<LiveStagesSection stages={stages} currentKmOnRoute={50} speedKmh={15} />)
     fireEvent.click(screen.getByTestId('live-stages-header'))
 
-    expect(screen.getByText('~2h00')).toBeInTheDocument()
+    // Durée restante, désormais préfixée « dans » — « ~2h00 » se lisait comme une heure.
+    expect(screen.getByText('dans ~2h00')).toBeInTheDocument()
   })
 
   it('does not show edit/delete buttons in live mode', () => {

@@ -207,7 +207,13 @@ export type { AdventureMapResponse, MapSegmentData, MapWaypoint }
 
 // ── Stages ────────────────────────────────────────────────────────────────────
 
-import type { AdventureStageResponse, CreateStageInput, UpdateStageInput } from '@ridenrest/shared'
+import type {
+  AdventureStageResponse,
+  CreateStageInput,
+  UpdateStageInput,
+  GenerateStagesInput,
+  GenerateStagesResponse,
+} from '@ridenrest/shared'
 
 export async function getStages(adventureId: string): Promise<AdventureStageResponse[]> {
   return apiFetch<AdventureStageResponse[]>(`/api/adventures/${adventureId}/stages`)
@@ -237,6 +243,22 @@ export async function updateStage(
 export async function deleteStage(adventureId: string, stageId: string): Promise<void> {
   await apiFetch<{ deleted: boolean }>(`/api/adventures/${adventureId}/stages/${stageId}`, {
     method: 'DELETE',
+  })
+}
+
+/**
+ * Génération automatique des étapes (story 17.18).
+ *
+ * Requête synchrone : le serveur boucle sur les points candidats et crée les étapes. Comptez
+ * quelques secondes sur une zone déjà vue, davantage sur une zone neuve.
+ */
+export async function generateStages(
+  adventureId: string,
+  data: GenerateStagesInput,
+): Promise<GenerateStagesResponse> {
+  return apiFetch<GenerateStagesResponse>(`/api/adventures/${adventureId}/stages/generate`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   })
 }
 

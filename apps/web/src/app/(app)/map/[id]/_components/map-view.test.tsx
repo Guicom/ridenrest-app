@@ -131,6 +131,17 @@ vi.mock('./sidebar-density-section', () => ({
 }))
 
 // Mock useStages
+// `useOverpassEnabled` gate la génération d'étapes (règle 9). Non mocké, `useProfile` part
+// chercher un QueryClient absent du harnais.
+vi.mock('@/hooks/use-profile', () => ({
+  useProfile: () => ({ data: { overpassEnabled: false }, isSuccess: true, isError: false, fetchStatus: 'idle' }),
+  useOverpassEnabled: () => ({ overpassEnabled: false, ready: true }),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}))
+
 vi.mock('@/hooks/use-stages', () => ({
   useStages: () => ({
     stages: [
@@ -140,6 +151,8 @@ vi.mock('@/hooks/use-stages', () => ({
     createStage: vi.fn(),
     updateStage: vi.fn(),
     deleteStage: vi.fn(),
+    generateStages: vi.fn().mockResolvedValue({ stages: [], created: 0, warnings: [], stoppedAtKm: null }),
+    isGenerating: false,
   }),
 }))
 

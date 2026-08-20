@@ -2,6 +2,7 @@
 
 import { Pencil, Trash2 } from 'lucide-react'
 import type { AdventureStageResponse } from '@ridenrest/shared'
+import { computeStageArrival, formatDuration } from '@ridenrest/shared'
 import { StageWeatherBadge } from '@/app/(app)/map/[id]/_components/stage-weather-badge'
 import { OfflineTooltipWrapper } from '@/components/shared/offline-tooltip-wrapper'
 
@@ -16,7 +17,14 @@ function formatStageDeparture(iso: string): string {
   return `${weekday} ${day} ${month} · ${time}`
 }
 
-/** Format ETA minutes → "~2h15" or "~45 min" */
+/**
+ * Durée en `~2h15` / `~45 min`.
+ *
+ * ⚠️ C'est une **durée**, pas une heure d'arrivée. Le cartouche l'affichait sous le label
+ * « ETA » au format `~13h00`, qui se lit comme 13:00 — d'où la confusion signalée le
+ * 2026-08-20 (195 km partant à 08:00 arrivent à 21:00, pas à 13:00). L'heure d'arrivée passe
+ * désormais par `computeStageArrival`.
+ */
 function formatEta(minutes: number): string {
   if (!Number.isFinite(minutes) || minutes < 0) return '—'
   if (minutes >= 60) {
@@ -25,6 +33,17 @@ function formatEta(minutes: number): string {
     return `~${h}h${String(m).padStart(2, '0')}`
   }
   return `~${minutes} min`
+}
+
+/** "21:00", ou "ven. 21 août · 01:00" quand l'arrivée tombe le lendemain. */
+function formatArrival(iso: string, nextDay: boolean): string {
+  const d = new Date(iso)
+  const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  if (!nextDay) return time
+  const weekday = d.toLocaleDateString('fr-FR', { weekday: 'short' })
+  const day = d.getDate()
+  const month = d.toLocaleDateString('fr-FR', { month: 'long' })
+  return `${weekday} ${day} ${month} · ${time}`
 }
 
 interface StageCardProps {
@@ -63,6 +82,9 @@ export function StageCard({
   onDelete,
 }: StageCardProps) {
   const isPlanning = mode === 'planning'
+  // `etaMinutes` est une DURÉE (roulage + pause) : l'heure d'arrivée s'en déduit, elle n'est
+  // pas stockée. Sans départ renseigné, seule la durée est connaissable.
+  const arrival = computeStageArrival(stage.departureTime, stage.etaMinutes)
 
   // Container classes — live mode conditional styles
   let containerClass = 'flex flex-col gap-1 rounded-md border p-2'
@@ -136,7 +158,7 @@ export function StageCard({
             <span>{formatStageDeparture(stage.departureTime!)}</span>
           )}
           {showEta && (
-            <span>{formatEta(etaFromCurrentMinutes!)}</span>
+            <span>dans {formatEta(etaFromCurrentMinutes!)}</span>
           )}
           {showWeather && (
             <StageWeatherBadge
@@ -149,13 +171,15 @@ export function StageCard({
         </div>
       )}
 
-      {/* Line 4: ETA (planning mode) */}
+      {/* Line 4: heure d'arrivée (si le départ est connu) + durée */}
       {isPlanning && stage.etaMinutes != null && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground pl-5">
           <span>
-            ETA {formatEta(stage.etaMinutes)}
+            {arrival
+              ? `Arrivée ${formatArrival(arrival.iso, arrival.nextDay)} · ${formatDuration(stage.etaMinutes)} de trajet`
+              : `Durée ${formatDuration(stage.etaMinutes)}`}
             {stage.pauseHours != null && stage.pauseHours > 0 && (
-              <> (dont {formatEta(stage.pauseHours * 60)} pause)</>
+              <> (dont {formatDuration(stage.pauseHours * 60)} de pause)</>
             )}
           </span>
         </div>

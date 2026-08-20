@@ -29,14 +29,16 @@ function makeStage(over: Partial<AdventureStageResponse> = {}): AdventureStageRe
 }
 
 describe('StageCard', () => {
-  it('affiche nom, distance, D+/D− et ETA', async () => {
+  // `etaMinutes` est une DURÉE : « ETA 5h » se lisait comme une heure d'horloge (retour
+  // utilisateur 2026-08-20). Sans départ renseigné, on n'affiche que la durée.
+  it('affiche nom, distance, D+/D− et durée', async () => {
     await render(
       <StageCard stage={makeStage()} onEdit={jest.fn()} onDelete={jest.fn()} />,
     );
     expect(screen.getByText('Jour 1')).toBeOnTheScreen();
     expect(screen.getByText('↑ 1200 m')).toBeOnTheScreen();
     expect(screen.getByText('↓ 900 m')).toBeOnTheScreen();
-    expect(screen.getByText('ETA 5h')).toBeOnTheScreen();
+    expect(screen.getByText('Durée 5h')).toBeOnTheScreen();
   });
 
   it('boutons edit / delete déclenchent les callbacks', async () => {

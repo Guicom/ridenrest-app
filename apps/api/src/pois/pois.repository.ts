@@ -427,4 +427,49 @@ export class PoisRepository {
       distKm: wp.distKm ?? wp.dist_km ?? 0,
     }))
   }
+
+  /**
+   * Nombre d'hébergements en cache autour d'un point, **au niveau AVENTURE**.
+   *
+   * Deux raisons de ne pas se limiter au segment du point (story 17.18) :
+   * - les lignes sont insérées par `segment_id`, donc un point proche d'une frontière de segment
+   *   raterait les hébergements enregistrés sous le segment voisin ;
+   * - le même établissement peut exister sous deux `segment_id` — d'où le `DISTINCT` sur
+   *   `(external_id, source)`, sans quoi il compterait deux fois.
+   *
+   * Sert de complément **gratuit** au comptage Google IDs Only : c'est ce qui garde `shelter`
+   * (OSM uniquement, aucun type Google) exploitable, et ce qui fait compter les lignes Overpass
+   * déjà en base sans en payer la latence.
+   */
+  async countAccommodationsNearPoint(
+    adventureId: string,
+    lat: number,
+    lng: number,
+    radiusM: number,
+    categories: string[],
+    excludeSources: string[] = [],
+  ): Promise<number> {
+    if (categories.length === 0) return 0
+    const now = new Date()
+
+    const rows = await db.execute(sql`
+      SELECT COUNT(DISTINCT (ac.external_id, ac.source)) AS count
+      FROM accommodations_cache ac
+      INNER JOIN adventure_segments seg ON seg.id = ac.segment_id
+      WHERE seg.adventure_id = ${adventureId}
+        AND ac.category = ANY(ARRAY[${sql.join(categories.map((c) => sql`${c}`), sql.raw(', '))}])
+        AND ac.expires_at > ${now}
+        ${excludeSources.length > 0
+          ? sql`AND ac.source <> ALL(ARRAY[${sql.join(excludeSources.map((src) => sql`${src}`), sql.raw(', '))}])`
+          : sql``}
+        AND ST_DWithin(
+          ST_SetSRID(ST_MakePoint(ac.lng, ac.lat), 4326)::geography,
+          ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
+          ${radiusM}
+        )
+    `)
+
+    return Number(rows.rows[0]?.['count'] ?? 0)
+  }
+
 }

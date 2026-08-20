@@ -104,3 +104,36 @@ export interface AdventureSegmentResponse {
   createdAt: string
   updatedAt: string
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Génération automatique d'étapes (story 17.18)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Codes de statut d'une génération. `no_accommodation` et `provider_unavailable` sont
+ * volontairement distincts : confondre « il n'y a rien ici » avec « je n'ai pas pu vérifier »
+ * est exactement ce qui a masqué cinq mois de panne Overpass (story 17.13).
+ */
+export type StageGenerationWarningCode =
+  | 'no_accommodation'
+  | 'provider_unavailable'
+  | 'no_elevation_data'
+  | 'sparse_final_stage'
+  | 'truncated'
+  | 'request_budget_reached'
+  | 'unexpected_billing'
+
+export interface StageGenerationWarning {
+  code: StageGenerationWarningCode
+  fromKm: number | null
+  toKm: number | null
+}
+
+export interface GenerateStagesResponse {
+  /** Liste complète des étapes après génération (pas seulement les nouvelles). */
+  stages: AdventureStageResponse[]
+  created: number
+  warnings: StageGenerationWarning[]
+  /** km atteint quand la génération s'est arrêtée avant la fin de la trace. */
+  stoppedAtKm: number | null
+}

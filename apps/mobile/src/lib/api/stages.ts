@@ -1,5 +1,9 @@
 import { apiFetch } from '@/lib/api/api-client';
-import type { AdventureStageResponse } from '@ridenrest/shared';
+import type {
+  AdventureStageResponse,
+  GenerateStagesInput,
+  GenerateStagesResponse,
+} from '@ridenrest/shared';
 
 // Façade API étapes (stages) — port iso du web. ⚠️ Paths SANS `/api` (ajouté par
 // `apiFetch`). Contrôleur serveur monté sous `/adventures/:adventureId/stages`.
@@ -63,5 +67,21 @@ export function deleteStage(
   return apiFetch<{ deleted: boolean }>(
     `/adventures/${adventureId}/stages/${stageId}`,
     { method: 'DELETE' },
+  );
+}
+
+/**
+ * POST /adventures/:id/stages/generate → génération automatique (story 17.18).
+ *
+ * Requête synchrone : le serveur boucle sur les points candidats. Le comptage passe par le
+ * masque Google IDs Only, donc gratuit.
+ */
+export function generateStages(
+  adventureId: string,
+  data: GenerateStagesInput,
+): Promise<GenerateStagesResponse> {
+  return apiFetch<GenerateStagesResponse>(
+    `/adventures/${adventureId}/stages/generate`,
+    { method: 'POST', body: JSON.stringify(data) },
   );
 }
