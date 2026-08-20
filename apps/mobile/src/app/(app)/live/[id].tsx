@@ -29,6 +29,7 @@ import { useAdventure } from '@/hooks/use-adventures';
 import { isMapParsing, useAdventureMap } from '@/hooks/use-adventure-map';
 import { useAdventureWaypoints } from '@/hooks/use-adventure-waypoints';
 import { useLiveMode } from '@/hooks/use-live-mode';
+import { ExtendedSearchStatus } from '@/components/map/extended-search-status';
 import { useLivePoiSearch } from '@/hooks/use-live-poi-search';
 import { useLiveWeather } from '@/hooks/use-live-weather';
 import { useNetworkStatus } from '@/hooks/use-network-status';
@@ -127,6 +128,8 @@ export default function LiveScreen() {
     isFetching: poisFetching,
     targetKm,
     isError: poisError,
+    overpassPending,
+    overpassError,
     refetch: refetchPois,
     canSearch,
   } = useLivePoiSearch({ adventureId: id, segmentId });
@@ -378,9 +381,12 @@ export default function LiveScreen() {
   const showOffline = !isOnline && isLiveModeActive;
   const showUnstable =
     isOnline && isLiveModeActive && poisError && !poisFetching;
+  // `!overpassPending` obligatoire : Google peut renvoyer 0 alors qu'Overpass va en ramener
+  // 50. Annoncer « aucun résultat » avant la fin du second flux serait faux à l'écran.
   const showNoResults =
     isLiveModeActive &&
     !poisFetching &&
+    !overpassPending &&
     !poisError &&
     hasFetched &&
     allPois.length === 0 &&
@@ -544,6 +550,12 @@ export default function LiveScreen() {
             </Text>
           </View>
         </View>
+      ) : null}
+
+      {/* Statut recherche étendue — non bloquant : l'utilisateur roule, la carte reste
+          manipulable pendant qu'Overpass travaille (1 à 31 s mesurés). */}
+      {isLiveModeActive ? (
+        <ExtendedSearchStatus pending={overpassPending} error={overpassError} bottom={220} />
       ) : null}
 
       {/* Bannière « Aucun résultat » (AC5) — gate `hasFetched`, jamais `length===0` seul. */}

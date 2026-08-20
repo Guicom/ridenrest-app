@@ -17,11 +17,21 @@ Convention de porteur : **[dev]** = agent, **[Guillaume]** = ne peut venir que d
 
 ---
 
-## A. Recherche POI — lot prêt à démarrer
+## A. Recherche POI — ✅ FAIT le 2026-08-20 (story 17.15)
+
+> Livré en **un seul lot** api+mobile, conformément à la section G. Résultats mesurés et
+> déviation assumée (pas de filtre corridor avant insertion) : voir
+> [`17-15-google-textsearch-pro-mobile-parity.md`](./17-15-google-textsearch-pro-mobile-parity.md).
+> Reste **T8** : validation par Guillaume sur une zone froide.
+>
+> Piège de coût rencontré et évité : `searchLayerPlaceIds` a un second consommateur, l'analyse
+> de densité — 84 tronçons × 16 types = **1 344 requêtes par analyse**. Le basculer en SKU Pro
+> aurait coûté ~43 $ et 27 % du quota gratuit mensuel **par analyse**. Deux méthodes distinctes
+> désormais, avec un test qui verrouille la gratuité du chemin densité.
 
 Priorité la plus haute : corrige un défaut visible par l'utilisateur, périmètre fermé, gain mesuré.
 
-### A1. Option B — Google Places [dev]
+### A1. Option B — Google Places [dev] ✅
 
 Aujourd'hui, sur une trace en Alsace, `campground` renvoie **0** résultat et `motel` **0**. Pour une app de bikepacking, ce n'est pas une lenteur, c'est un défaut fonctionnel.
 
@@ -39,7 +49,7 @@ Mesures de référence (bbox `48.197,7.536 → 48.608,7.778`, plage 0-50 km) :
 
 Tarifs : Text Search Pro 32 $/1000 (5 000 gratuits/mois) ; Place Details Essentials 5 $/1000 (10 000/mois) ; Text Search IDs Only gratuit et illimité. La fiche POI garde son Place Details **Pro** à l'ouverture — inchangé.
 
-### A2. Parité mobile du découplage [dev]
+### A2. Parité mobile du découplage [dev] ✅
 
 Écart mesuré le 2026-08-20 : **6 fichiers web** portent le découplage, **0 fichier mobile**.
 
@@ -50,7 +60,7 @@ Tarifs : Text Search Pro 32 $/1000 (5 000 gratuits/mois) ; Place Details Essenti
 
 Historique à ne pas perdre : ce travail avait été proposé en option le 2026-08-19 (« dis-moi si tu veux que je l'y applique aussi ») et la question est restée sans réponse. C'est le mécanisme exact de la divergence — voir section G.
 
-### A3. Réécrire la règle 10 [dev]
+### A3. Réécrire la règle 10 [dev] ✅
 
 `project-context.md` dit « **Parité planning / live obligatoire** ». Formulation ambiguë : elle a été lue comme « web-planning contre web-live » et n'a pas empêché la divergence web/mobile. À remplacer par les **points d'application nommés**, sur le modèle de la règle 9 qui cite ses quatre fichiers.
 
@@ -158,4 +168,5 @@ Ordre de grandeur du symptôme : **64 stories** ont différé du travail, **139 
 
 | Date | Auteur | Changement |
 |---|---|---|
+| 2026-08-20 | Claude Opus 5 (dev) | Section A livrée (story 17.15) : A1, A2 et A3 faits, T8 en attente de Guillaume. |
 | 2026-08-20 | Claude Opus 5 (dev) | Fichier créé à la demande de Guillaume, pour consolider les chantiers issus des stories 17.13/17.14 et des échanges du jour, sans vider `deferred-work.md` dont une partie reste légitime. |

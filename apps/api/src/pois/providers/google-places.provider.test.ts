@@ -32,7 +32,7 @@ describe('GooglePlacesProvider', () => {
       expect(result).toEqual([])
     })
 
-    it('calls correct URL with X-Goog-FieldMask: places.id header', async () => {
+    it('calls correct URL with the free IDs-Only field mask', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
         providers: [GooglePlacesProvider],
@@ -52,7 +52,9 @@ describe('GooglePlacesProvider', () => {
           method: 'POST',
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           headers: expect.objectContaining({
-            'X-Goog-FieldMask': 'places.id',
+            // IDs Only + nextPageToken : le token seul ne change pas de SKU (il fait
+            // partie du palier Essentials IDs Only), donc l'appel reste gratuit.
+            'X-Goog-FieldMask': 'places.id,nextPageToken',
           }),
         }),
       )
@@ -147,6 +149,128 @@ describe('GooglePlacesProvider', () => {
     it('returns empty array for unknown layer', async () => {
       const result = await provider.searchLayerPlaceIds(mockBbox, 'unknown-layer')
       expect(result).toEqual([])
+    })
+  })
+
+  describe('searchLayerPlaces (SKU Pro — chemin d’affichage)', () => {
+    const withKey = async () => {
+      process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
+      const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider] }).compile()
+      return mod.get<GooglePlacesProvider>(GooglePlacesProvider)
+    }
+    const page = (places: unknown[], nextPageToken?: string) => ({
+      ok: true,
+      json: () => Promise.resolve({ places, ...(nextPageToken ? { nextPageToken } : {}) }),
+    } as Response)
+    const place = (id: string, over: Record<string, unknown> = {}) => ({
+      id, displayName: { text: `Lieu ${id}` },
+      location: { latitude: 43.2, longitude: 1.2 }, types: ['lodging'], ...over,
+    })
+
+    it('demande identité, position et types — le masque qui rend Place Details inutile', async () => {
+      const provider = await withKey()
+      const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue(page([]))
+
+      await provider.searchLayerPlaces(mockBbox, 'bike')
+
+      const headers = (mockFetch.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+      expect(headers['X-Goog-FieldMask']).toBe(
+        'places.id,places.displayName,places.location,places.types,nextPageToken',
+      )
+    })
+
+    it('suit le nextPageToken jusqu’au plafond Google de 3 pages', async () => {
+      const provider = await withKey()
+      // `bike` n'a qu'un seul type → on isole la pagination d'une requête
+      jest.spyOn(global, 'fetch')
+        .mockResolvedValueOnce(page([place('a1')], 'tok-1'))
+        .mockResolvedValueOnce(page([place('a2')], 'tok-2'))
+        .mockResolvedValueOnce(page([place('a3')], 'tok-3'))  // token présent mais plafond atteint
+        .mockResolvedValue(page([place('a4')]))
+
+      const result = await provider.searchLayerPlaces(mockBbox, 'bike')
+
+      expect(result.map((p) => p.placeId)).toEqual(['a1', 'a2', 'a3'])
+    })
+
+    it('renvoie le pageToken dans le corps de la requête suivante', async () => {
+      const provider = await withKey()
+      const mockFetch = jest.spyOn(global, 'fetch')
+        .mockResolvedValueOnce(page([place('a1')], 'tok-1'))
+        .mockResolvedValue(page([]))
+
+      await provider.searchLayerPlaces(mockBbox, 'bike')
+
+      const secondBody = JSON.parse((mockFetch.mock.calls[1][1] as RequestInit).body as string) as { pageToken?: string }
+      expect(secondBody.pageToken).toBe('tok-1')
+    })
+
+    it('utilise une requête textuelle propre au type, pas une requête de calque', async () => {
+      // `includedType` ne filtre pas : Google score par pertinence textuelle. Avec le
+      // `textQuery` unique « accommodation », campground et motel renvoyaient 0 résultat.
+      const provider = await withKey()
+      const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue(page([]))
+
+      await provider.searchLayerPlaces(mockBbox, 'accommodations')
+
+      const sent = mockFetch.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string) as { includedType: string; textQuery: string })
+      expect(sent.find((b) => b.includedType === 'campground')?.textQuery).toBe('camping')
+      expect(sent.find((b) => b.includedType === 'motel')?.textQuery).toBe('motel')
+      expect(sent.find((b) => b.includedType === 'hostel')?.textQuery).toBe('auberge de jeunesse')
+    })
+
+    it('écarte un lieu sans coordonnées — impossible à placer sur la carte', async () => {
+      const provider = await withKey()
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        page([place('ok'), { id: 'sans-position', displayName: { text: 'X' }, types: [] }]),
+      )
+
+      const result = await provider.searchLayerPlaces(mockBbox, 'bike')
+
+      expect(result.map((p) => p.placeId)).toEqual(['ok'])
+    })
+
+    it('dédoublonne un même place_id rapporté par plusieurs types', async () => {
+      const provider = await withKey()
+      jest.spyOn(global, 'fetch').mockResolvedValue(page([place('partage')]))
+
+      const result = await provider.searchLayerPlaces(mockBbox, 'accommodations')
+
+      expect(result).toHaveLength(1)
+    })
+
+    it('remonte une erreur quand TOUS les types échouent (le calque ne doit pas être marqué couvert)', async () => {
+      const provider = await withKey()
+      jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 429, statusText: 'Too Many Requests' } as Response)
+
+      await expect(provider.searchLayerPlaces(mockBbox, 'bike')).rejects.toThrow(/all 1 type searches failed/)
+    })
+  })
+
+  describe('garde-fou de coût : le chemin densité reste gratuit', () => {
+    it('searchLayerPlaceIds n’envoie JAMAIS de champ facturé et ne pagine pas', async () => {
+      // L'analyse de densité découpe l'aventure en tronçons de 10 km et appelle une fois par
+      // tronçon et par type : 837 km = 84 tronçons × 16 types = 1 344 requêtes pour UNE analyse.
+      // En SKU Pro ce serait ~43 $ et 27 % du quota gratuit mensuel — pour une donnée dont le
+      // processeur ne lit que « 0, 1, ou ≥ 2 ».
+      process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
+      const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider] }).compile()
+      const provider = mod.get<GooglePlacesProvider>(GooglePlacesProvider)
+
+      const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ places: [{ id: 'a1' }], nextPageToken: 'tok-1' }),
+      } as Response)
+
+      await provider.searchLayerPlaceIds(mockBbox, 'bike')
+
+      const headers = (mockFetch.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+      expect(headers['X-Goog-FieldMask']).toBe('places.id,nextPageToken')
+      expect(headers['X-Goog-FieldMask']).not.toContain('location')
+      expect(headers['X-Goog-FieldMask']).not.toContain('displayName')
+      expect(headers['X-Goog-FieldMask']).not.toContain('types')
+      // un seul type dans le calque `bike`, et malgré le nextPageToken : une seule requête
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
   })
 

@@ -406,7 +406,10 @@
       "searchOn": "Rechercher sur",
       "searchOnA11y": "Rechercher sur Booking.com ou Airbnb",
       "bookingCom": "Rechercher sur Booking.com",
-      "airbnb": "Rechercher sur Airbnb"
+      "airbnb": "Rechercher sur Airbnb",
+      "extendedPending": "Recherche étendue en cours…",
+      "extendedSlow": "Recherche étendue plus longue que prévu — les résultats s’ajouteront",
+      "extendedError": "Recherche étendue indisponible — résultats partiels"
     }
   },
   "settings": {

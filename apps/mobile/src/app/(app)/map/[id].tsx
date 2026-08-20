@@ -21,6 +21,7 @@ import { CorridorHighlightLayer } from '@/components/map/corridor-highlight-laye
 import { CorridorPill } from '@/components/map/corridor-pill';
 import { DensityLayer } from '@/components/map/density-layer';
 import { MapCanvas, type MapCanvasHandle } from '@/components/map/map-canvas';
+import { ExtendedSearchStatus } from '@/components/map/extended-search-status';
 import { MapSearchFeedback } from '@/components/map/map-search-feedback';
 import { PlanningSidebar } from '@/components/map/planning-sidebar';
 import { PoiLayer } from '@/components/map/poi-layer';
@@ -140,7 +141,7 @@ export default function MapScreen() {
   // `ready` : sans cette garde la 1re requête part en OFF puis une 2e en ON (parité web)
   const { overpassEnabled, ready: profileReady } = useOverpassEnabled();
 
-  const { poisByLayer, isFetching, isError, isEmpty } = usePois({
+  const { poisByLayer, isFetching, isError, isEmpty, overpassPending, overpassError } = usePois({
     adventureId: id,
     segments,
     visibleLayers,
@@ -511,12 +512,21 @@ export default function MapScreen() {
       {header}
 
       {traceReady ? (
-        <MapSearchFeedback
-          isFetching={isFetching}
-          isError={isError}
-          isEmpty={isEmpty}
-          onRetry={() => useMapStore.getState().setSearchCommitted(true)}
-        />
+        <>
+          {/* Statut de la recherche étendue — s'affiche PENDANT que les POI Google sont déjà
+              sur la carte. Placé au-dessus du feedback principal pour ne pas se superposer. */}
+          <ExtendedSearchStatus
+            pending={overpassPending}
+            error={overpassError}
+            bottom={140}
+          />
+          <MapSearchFeedback
+            isFetching={isFetching}
+            isError={isError}
+            isEmpty={isEmpty}
+            onRetry={() => useMapStore.getState().setSearchCommitted(true)}
+          />
+        </>
       ) : null}
 
       {traceReady && searchRangeInteracted ? (
