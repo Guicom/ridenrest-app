@@ -2,7 +2,9 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query } from '@nestj
 import { ParseUUIDPipe } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { StagesService } from './stages.service.js'
+import { StageGeneratorService } from './stage-generator.service.js'
 import { CreateStageDto } from './dto/create-stage.dto.js'
+import { GenerateStagesDto } from './dto/generate-stages.dto.js'
 import { UpdateStageDto } from './dto/update-stage.dto.js'
 import { GetStageWeatherDto } from './dto/get-stage-weather.dto.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
@@ -11,7 +13,10 @@ import type { CurrentUserPayload } from '../common/decorators/current-user.decor
 @ApiTags('stages')
 @Controller('adventures/:adventureId/stages')
 export class StagesController {
-  constructor(private readonly stagesService: StagesService) {}
+  constructor(
+    private readonly stagesService: StagesService,
+    private readonly stageGenerator: StageGeneratorService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List stages for an adventure' })
@@ -30,6 +35,22 @@ export class StagesController {
     @Body() dto: CreateStageDto,
   ) {
     return this.stagesService.createStage(adventureId, user.id, dto)
+  }
+
+  /**
+   * Génération automatique des étapes (story 17.18).
+   *
+   * Chemin de comptage **gratuit** (masque Google IDs Only) : voir `StageGeneratorService`. Un
+   * appel facturable pendant cette requête est une anomalie, loguée et remontée en warning.
+   */
+  @Post('generate')
+  @ApiOperation({ summary: 'Generate stages automatically from km/day, max D+ and accommodation types' })
+  async generate(
+    @CurrentUser() user: CurrentUserPayload,
+    @Param('adventureId') adventureId: string,
+    @Body() dto: GenerateStagesDto,
+  ) {
+    return this.stageGenerator.generate(adventureId, user.id, dto)
   }
 
   @Patch(':stageId')

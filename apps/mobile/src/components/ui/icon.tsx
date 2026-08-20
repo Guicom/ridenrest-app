@@ -26,17 +26,18 @@ import {
   Shield,
   ShoppingBasket,
   SlidersHorizontal,
+  Sparkles,
   Thermometer,
   Trash2,
   TrendingDown,
   TrendingUp,
   TriangleAlert,
+  type LucideIcon,
   Umbrella,
   Upload,
   Utensils,
   Wind,
   X,
-  type LucideIcon,
 } from 'lucide-react-native';
 
 // Icônes lucide (MOB-3.1) — MÊME jeu d'icônes que le web (`lucide-react`), ici la
@@ -79,6 +80,7 @@ export const PencilIcon = enableClassName(Pencil);
 export const PhoneIcon = enableClassName(Phone);
 export const PlusIcon = enableClassName(Plus);
 export const RefreshCwIcon = enableClassName(RefreshCw);
+export const SparklesIcon = enableClassName(Sparkles);
 export const RouteIcon = enableClassName(Route);
 export const SearchIcon = enableClassName(Search);
 export const SettingsIcon = enableClassName(Settings);

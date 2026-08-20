@@ -177,4 +177,25 @@ export class StagesRepository {
       ),
     )
   }
+
+  /** Supprime toutes les étapes d'une aventure (mode « remplacer » de la génération). */
+  async deleteAllByAdventureId(adventureId: string): Promise<number> {
+    const deleted = await db
+      .delete(adventureStages)
+      .where(eq(adventureStages.adventureId, adventureId))
+      .returning({ id: adventureStages.id })
+    return deleted.length
+  }
+
+  /**
+   * Insertion batchée — un seul aller-retour, dans l'ordre des `orderIndex` fournis.
+   *
+   * La génération produit jusqu'à 14 étapes : les insérer une par une multiplierait les
+   * allers-retours DB pour un résultat que l'appelant a déjà entièrement calculé.
+   */
+  async createMany(rows: NewAdventureStage[]): Promise<AdventureStage[]> {
+    if (rows.length === 0) return []
+    return db.insert(adventureStages).values(rows).returning()
+  }
+
 }

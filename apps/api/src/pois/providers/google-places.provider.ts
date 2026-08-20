@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
 import type { GooglePlaceDetails, PoiCategory, MapLayer } from '@ridenrest/shared'
+import { GoogleBillingCounter, resolveTextSearchSku } from './google-billing-counter.js'
+import { mapWithConcurrency } from '../../common/utils/map-with-concurrency.js'
 
 /**
  * **Source de vérité** : les types Google interrogés pour une `PoiCategory`.
@@ -202,6 +204,8 @@ export class GooglePlacesProvider {
   private readonly BASE_URL = 'https://places.googleapis.com/v1/places:searchText'
   private readonly API_KEY = process.env['GOOGLE_PLACES_API_KEY']
 
+  constructor(private readonly billing: GoogleBillingCounter) {}
+
   isConfigured(): boolean {
     return !!this.API_KEY
   }
@@ -243,6 +247,8 @@ export class GooglePlacesProvider {
 
     const url = `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=fr`
     const fieldMask = GooglePlacesProvider.PRO_FIELDS.join(',')
+
+    this.billing.record('place_details_pro')
 
     const response = await fetch(url, {
       headers: {
@@ -388,6 +394,9 @@ export class GooglePlacesProvider {
         ...(pageToken ? { pageToken } : {}),
       }
 
+      // Point de décision UNIQUE de la facturation — d'où le comptage ici et nulle part ailleurs.
+      this.billing.record(resolveTextSearchSku(mask))
+
       const response = await fetch(this.BASE_URL, {
         method: 'POST',
         headers: {
@@ -461,6 +470,59 @@ export class GooglePlacesProvider {
       else this.logger.warn(`Google Places type search failed: ${result.reason}`)
     }
     return [...allIds]
+  }
+
+  /**
+   * COMPTAGE d'une bbox pour un ensemble de types — masque IDs Only, une page, **GRATUIT**.
+   *
+   * Consommateur : la génération automatique d'étapes (story 17.18), qui n'a besoin de savoir
+   * qu'une chose de chaque point candidat — « y a-t-il au moins 3 hébergements ici ? ». Ni nom,
+   * ni position, ni horaires.
+   *
+   * ⚠️ **Ne JAMAIS faire basculer cette méthode sur `MASK_PRO`**, et ne jamais exposer le masque
+   * en paramètre. Le comptage émet une requête par type **et par candidat** : jusqu'à 17
+   * candidats pour une seule étape, soit ~102 requêtes. En SKU Pro ce serait 3,26 $ par étape.
+   * La pagination est inutile pour la même raison qu'en densité : le seuil est à 3, une page en
+   * ramène jusqu'à 20.
+   *
+   * Contrairement à `searchLayerPlaceIds`, cette méthode :
+   * - prend une liste de **types** (et non un calque), pour n'interroger que les catégories
+   *   demandées — sinon l'économie de la story 17.17 serait annulée ;
+   * - remonte `anySucceeded`. Un échec fournisseur ne doit **pas** se lire comme « zéro
+   *   hébergement » : c'est ce raccourci qui a masqué cinq mois de panne Overpass. L'appelant a
+   *   besoin de distinguer « la zone est vide » de « je n'ai pas pu vérifier ».
+   */
+  async countPlaceIdsForTypes(
+    bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+    googleTypes: string[],
+    concurrency = 6,
+  ): Promise<{ ids: Set<string>; anySucceeded: boolean; requests: number }> {
+    const ids = new Set<string>()
+    if (googleTypes.length === 0) return { ids, anySucceeded: false, requests: 0 }
+    if (!this.API_KEY) {
+      this.logger.warn('GOOGLE_PLACES_API_KEY not set — skipping Google count')
+      return { ids, anySucceeded: false, requests: 0 }
+    }
+
+    // Borné (règle 8) : gratuit ne veut pas dire exempt de quota de débit.
+    const outcomes = await mapWithConcurrency(googleTypes, concurrency, async (type) => {
+      try {
+        const places = await this.textSearch(bbox, type, this.resolveTextQuery(type), MASK_IDS_ONLY, false)
+        return { ok: true as const, ids: places.map((p) => p.id).filter(Boolean) }
+      } catch (error) {
+        this.logger.warn(`Google count failed for type=${type}: ${String(error)}`)
+        return { ok: false as const, ids: [] as string[] }
+      }
+    })
+
+    let anySucceeded = false
+    for (const outcome of outcomes) {
+      if (!outcome.ok) continue
+      anySucceeded = true
+      for (const id of outcome.ids) ids.add(id)
+    }
+
+    return { ids, anySucceeded, requests: googleTypes.length }
   }
 
   /**

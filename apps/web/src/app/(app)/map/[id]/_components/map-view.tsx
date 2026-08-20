@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useQueries, useQueryClient, useMutation } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Pencil, X } from 'lucide-react'
 import { getAdventure, getAdventureMapData, getWeatherForecast, updateAdventureAvgSpeedKmh } from '@/lib/api-client'
 import { WEATHER_CACHE_TTL } from '@ridenrest/shared'
 import { MapCanvas } from './map-canvas'
@@ -29,6 +29,10 @@ import { TraceClickCta } from './trace-click-cta'
 import { MapSearchOverlay } from './map-search-overlay'
 import { ExtendedSearchStatus } from './extended-search-status'
 import { SidebarStagesSection } from './sidebar-stages-section'
+import { GenerateStagesDialog, stageGenerationMessage } from './generate-stages-dialog'
+import { toast } from 'sonner'
+import { useOverpassEnabled } from '@/hooks/use-profile'
+import type { GenerateStagesInput, StageGenerationWarning } from '@ridenrest/shared'
 import { NoResultsSubTypeBanner } from './no-results-sub-type-banner'
 import { ACCOMMODATION_SUB_TYPES } from './accommodation-sub-types'
 import { useStages } from '@/hooks/use-stages'
@@ -76,7 +80,7 @@ export function MapView({ adventureId }: MapViewProps) {
   const [paceParams, setPaceParams] = useState<{ departureTime: string | null }>(() => ({
     departureTime: savedPace.departureTime ? new Date(savedPace.departureTime).toISOString() : null,
   }))
-  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers, activeAccommodationTypes, visibleAccessPoiId, setVisibleAccessPoiId } = useMapStore()
+  const { weatherActive, setWeatherActive, searchRangeInteracted, fromKm: mapFromKm, toKm: mapToKm, selectedStageId, setSelectedStageId, setSearchCommitted, searchCommitted, setTraceClickedKm, visibleLayers, activeAccommodationTypes, searchRadiusKm, visibleAccessPoiId, setVisibleAccessPoiId } = useMapStore()
 
   // Reset transient map state when leaving the map (SPA navigation keeps Zustand alive)
   useEffect(() => {
@@ -186,7 +190,30 @@ export function MapView({ adventureId }: MapViewProps) {
       })?.id ?? null
     : null
 
-  const { stages, createStage, updateStage, deleteStage } = useStages(adventureId, { onAfterChange: triggerCheck })
+  const { stages, createStage, updateStage, deleteStage, generateStages, isGenerating } =
+    useStages(adventureId, { onAfterChange: triggerCheck })
+
+  // ── Génération automatique des étapes (story 17.18) ──────────────────────────
+  // Gate sur `ready` (règle 9) : sans elle, la génération partirait avec le mauvais flag Overpass.
+  const { overpassEnabled, ready: profileReady } = useOverpassEnabled()
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false)
+  const [generationWarnings, setGenerationWarnings] = useState<StageGenerationWarning[]>([])
+
+  const handleGenerateStages = async (input: GenerateStagesInput) => {
+    try {
+      const result = await generateStages(input)
+      setGenerationWarnings(result.warnings)
+      setShowGenerateDialog(false)
+      toast.success(
+        result.created > 0
+          ? `${result.created} étape${result.created > 1 ? 's' : ''} générée${result.created > 1 ? 's' : ''}`
+          : 'Aucune étape générée',
+      )
+    } catch (error) {
+      // Les étapes créées avant l'échec restent en base : le refetch les montrera.
+      toast.error(error instanceof Error ? error.message : 'La génération a échoué')
+    }
+  }
 
   // ── Access route polyline (Story POI-Access 2.5) ─────────────────────────────
   // Origine identique à PoiPopup/PoiDetailSheet : point de la trace le plus proche du POI
@@ -450,7 +477,49 @@ export function MapView({ adventureId }: MapViewProps) {
         departureTime={stagePace.departureTime}
         speedKmh={stagePace.speedKmh ?? adventure?.avgSpeedKmh ?? 15}
         defaultSpeedKmh={adventure?.avgSpeedKmh ?? 15}
+        onOpenGenerate={() => setShowGenerateDialog(true)}
+        canGenerate={readySegments.length > 0 && profileReady}
+        isGenerating={isGenerating}
       />
+
+      <GenerateStagesDialog
+        open={showGenerateDialog}
+        onClose={() => setShowGenerateDialog(false)}
+        stages={stages}
+        activeAccommodationTypes={activeAccommodationTypes}
+        searchRadiusKm={searchRadiusKm}
+        adventureStartDate={adventure?.startDate ?? null}
+        overpassEnabled={overpassEnabled}
+        profileReady={profileReady}
+        isGenerating={isGenerating}
+        onGenerate={handleGenerateStages}
+      />
+
+      {/* Statuts de la dernière génération — cf. AC #9/#10/#12/#14 de la story 17.18 */}
+      {generationWarnings.length > 0 && (
+        <div className="mx-4 mb-3 rounded-lg border border-orange-400/60 bg-orange-50 p-3 dark:bg-orange-950/40">
+          <div className="mb-1 flex items-start justify-between gap-2">
+            <span className="text-xs font-medium text-orange-900 dark:text-orange-200">
+              Génération des étapes
+            </span>
+            <button
+              type="button"
+              onClick={() => setGenerationWarnings([])}
+              aria-label="Masquer les messages de génération"
+              className="text-orange-900/70 hover:text-orange-900 dark:text-orange-200/70"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <ul className="space-y-1">
+            {generationWarnings.map((warning, i) => (
+              <li key={`${warning.code}-${i}`} className="text-xs text-orange-900 dark:text-orange-200">
+                {stageGenerationMessage(warning)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Météo section — collapsible accordion (Story 8.4 correction) */}
       <SidebarWeatherSection

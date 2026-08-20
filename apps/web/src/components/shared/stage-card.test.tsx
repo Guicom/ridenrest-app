@@ -126,36 +126,72 @@ describe('StageCard', () => {
       expect(screen.queryByTestId('weather-badge-s1')).not.toBeInTheDocument()
     })
 
-    it('shows ETA on line 4 when etaMinutes is set (planning)', () => {
-      render(<StageCard stage={makeStage({ etaMinutes: 390 })} mode="planning" />)
+    // `etaMinutes` est une DURÉE : le cartouche affichait « ETA ~13h00 » pour 13 h de trajet,
+    // qui se lit comme 13:00 (retour utilisateur 2026-08-20). On affiche désormais l'heure
+    // d'arrivée quand le départ est connu, et le mot « Durée » sinon.
 
-      expect(screen.getByText(/ETA ~6h30/)).toBeInTheDocument()
-    })
+    it('affiche l’heure d’arrivée quand le départ est connu (planning)', () => {
+      render(
+        <StageCard
+          stage={makeStage({
+            departureTime: new Date('2026-08-20T08:00').toISOString(),
+            etaMinutes: 390,
+          })}
+          mode="planning"
+        />,
+      )
 
-    it('does not show line 4 ETA when etaMinutes is null', () => {
-      render(<StageCard stage={makeStage({ etaMinutes: null })} mode="planning" />)
-
+      expect(screen.getByText(/Arrivée 14:30/)).toBeInTheDocument()
+      expect(screen.getByText(/6h30 de trajet/)).toBeInTheDocument()
       expect(screen.queryByText(/ETA/)).not.toBeInTheDocument()
     })
 
-    it('shows pause info in ETA when pauseHours > 0', () => {
-      render(<StageCard stage={makeStage({ etaMinutes: 390, pauseHours: 1 })} mode="planning" />)
+    it('datte l’arrivée quand elle tombe le lendemain', () => {
+      render(
+        <StageCard
+          stage={makeStage({
+            departureTime: new Date('2026-08-20T18:00').toISOString(),
+            etaMinutes: 10 * 60,
+          })}
+          mode="planning"
+        />,
+      )
 
-      expect(screen.getByText(/ETA ~6h30/)).toBeInTheDocument()
-      expect(screen.getByText(/dont ~1h00 pause/)).toBeInTheDocument()
+      expect(screen.getByText(/Arrivée ven\. 21 août · 04:00/)).toBeInTheDocument()
     })
 
-    it('does not show pause info when pauseHours is 0', () => {
+    it('n’affiche que la durée quand le départ n’est pas renseigné', () => {
+      render(<StageCard stage={makeStage({ departureTime: null, etaMinutes: 390 })} mode="planning" />)
+
+      expect(screen.getByText(/Durée 6h30/)).toBeInTheDocument()
+      expect(screen.queryByText(/Arrivée/)).not.toBeInTheDocument()
+    })
+
+    it('n’affiche ni durée ni arrivée quand etaMinutes est null', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: null })} mode="planning" />)
+
+      expect(screen.queryByText(/Durée/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Arrivée/)).not.toBeInTheDocument()
+    })
+
+    it('mentionne la pause quand pauseHours > 0', () => {
+      render(<StageCard stage={makeStage({ etaMinutes: 390, pauseHours: 1 })} mode="planning" />)
+
+      expect(screen.getByText(/Durée 6h30/)).toBeInTheDocument()
+      expect(screen.getByText(/dont 1h de pause/)).toBeInTheDocument()
+    })
+
+    it('ne mentionne pas la pause quand pauseHours est 0', () => {
       render(<StageCard stage={makeStage({ etaMinutes: 300, pauseHours: 0 })} mode="planning" />)
 
-      expect(screen.getByText(/ETA ~5h00/)).toBeInTheDocument()
+      expect(screen.getByText(/Durée 5h/)).toBeInTheDocument()
       expect(screen.queryByText(/pause/)).not.toBeInTheDocument()
     })
 
-    it('does not show pause info when pauseHours is null', () => {
+    it('ne mentionne pas la pause quand pauseHours est null', () => {
       render(<StageCard stage={makeStage({ etaMinutes: 300, pauseHours: null })} mode="planning" />)
 
-      expect(screen.getByText(/ETA ~5h00/)).toBeInTheDocument()
+      expect(screen.getByText(/Durée 5h/)).toBeInTheDocument()
       expect(screen.queryByText(/pause/)).not.toBeInTheDocument()
     })
   })
@@ -186,13 +222,13 @@ describe('StageCard', () => {
     it('shows formatted ETA when etaFromCurrentMinutes is provided (short)', () => {
       render(<StageCard stage={makeStage()} mode="live" etaFromCurrentMinutes={45} />)
 
-      expect(screen.getByText('~45 min')).toBeInTheDocument()
+      expect(screen.getByText('dans ~45 min')).toBeInTheDocument()
     })
 
     it('shows formatted ETA with hours when >= 60 min', () => {
       render(<StageCard stage={makeStage()} mode="live" etaFromCurrentMinutes={135} />)
 
-      expect(screen.getByText('~2h15')).toBeInTheDocument()
+      expect(screen.getByText('dans ~2h15')).toBeInTheDocument()
     })
 
     it('does not show departure time in live mode even if set', () => {

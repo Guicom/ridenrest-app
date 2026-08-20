@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
 import { GooglePlacesProvider, mapGoogleTypesToCategory, LAYER_GOOGLE_TYPES, CATEGORY_GOOGLE_TYPES, TYPE_TEXT_QUERY, googleTypesForCategories } from './google-places.provider.js'
+import { GoogleBillingCounter } from './google-billing-counter.js'
 
 const mockBbox = { minLat: 43.0, maxLat: 43.5, minLng: 1.0, maxLng: 1.5 }
 
@@ -9,7 +10,7 @@ describe('GooglePlacesProvider', () => {
 
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      providers: [GooglePlacesProvider],
+      providers: [GooglePlacesProvider, GoogleBillingCounter],
     }).compile()
 
     provider = module.get<GooglePlacesProvider>(GooglePlacesProvider)
@@ -25,7 +26,7 @@ describe('GooglePlacesProvider', () => {
       delete process.env['GOOGLE_PLACES_API_KEY']
       // Re-instantiate without API key
       const moduleWithoutKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerNoKey = moduleWithoutKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -36,7 +37,7 @@ describe('GooglePlacesProvider', () => {
     it('calls correct URL with the free IDs-Only field mask', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -64,7 +65,7 @@ describe('GooglePlacesProvider', () => {
     it('parses response and returns place_id array', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -80,7 +81,7 @@ describe('GooglePlacesProvider', () => {
     it('throws on non-200 response', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -99,7 +100,7 @@ describe('GooglePlacesProvider', () => {
     it('deduplicates place_ids across multiple types', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -126,7 +127,7 @@ describe('GooglePlacesProvider', () => {
     it('returns successful type results when one type fails (partial failure)', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -156,7 +157,7 @@ describe('GooglePlacesProvider', () => {
   describe('searchPlacesByType (SKU Pro — chemin d’affichage)', () => {
     const withKey = async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
-      const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider] }).compile()
+      const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider, GoogleBillingCounter] }).compile()
       return mod.get<GooglePlacesProvider>(GooglePlacesProvider)
     }
     const page = (places: unknown[], nextPageToken?: string) => ({
@@ -307,7 +308,7 @@ describe('GooglePlacesProvider', () => {
       // En SKU Pro ce serait ~43 $ et 27 % du quota gratuit mensuel — pour une donnée dont le
       // processeur ne lit que « 0, 1, ou ≥ 2 ».
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
-      const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider] }).compile()
+      const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider, GoogleBillingCounter] }).compile()
       const provider = mod.get<GooglePlacesProvider>(GooglePlacesProvider)
 
       const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue({
@@ -331,7 +332,7 @@ describe('GooglePlacesProvider', () => {
     it('returns null when API_KEY not set', async () => {
       delete process.env['GOOGLE_PLACES_API_KEY']
       const moduleNoKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerNoKey = moduleNoKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -342,7 +343,7 @@ describe('GooglePlacesProvider', () => {
     it('calls Text Search with X-Goog-FieldMask: places.id and correct locationBias', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -378,7 +379,7 @@ describe('GooglePlacesProvider', () => {
     it('returns place_id from first result', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -394,7 +395,7 @@ describe('GooglePlacesProvider', () => {
     it('returns null when API returns no results', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -410,7 +411,7 @@ describe('GooglePlacesProvider', () => {
     it('returns null on non-200 response (soft fail)', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -501,7 +502,7 @@ describe('GooglePlacesProvider', () => {
     it('throws when API_KEY not set', async () => {
       delete process.env['GOOGLE_PLACES_API_KEY']
       const moduleNoKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerNoKey = moduleNoKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -512,7 +513,7 @@ describe('GooglePlacesProvider', () => {
     it('calls correct URL with Essentials FieldMask (no photos)', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -554,7 +555,7 @@ describe('GooglePlacesProvider', () => {
     it('maps response correctly to GooglePlaceDetails type', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -606,7 +607,7 @@ describe('GooglePlacesProvider', () => {
     it('handles null/missing optional fields gracefully', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 
@@ -633,7 +634,7 @@ describe('GooglePlacesProvider', () => {
     it('throws on non-200 response', async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const moduleWithKey = await Test.createTestingModule({
-        providers: [GooglePlacesProvider],
+        providers: [GooglePlacesProvider, GoogleBillingCounter],
       }).compile()
       const providerWithKey = moduleWithKey.get<GooglePlacesProvider>(GooglePlacesProvider)
 

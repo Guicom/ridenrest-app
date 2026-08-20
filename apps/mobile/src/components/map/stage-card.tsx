@@ -1,9 +1,10 @@
 import type { AdventureStageResponse } from '@ridenrest/shared';
+import { computeStageArrival, formatDuration } from '@ridenrest/shared';
 import { Pressable, Text, View } from 'react-native';
 
 import { PencilIcon, Trash2Icon } from '@/components/ui/icon';
 import { formatKm } from '@/lib/format/distance';
-import { formatEta, formatStageDeparture } from '@/lib/format/stage';
+import { formatArrival, formatStageDeparture } from '@/lib/format/stage';
 import { useTranslation } from '@/lib/i18n';
 
 // Ligne d'étape (mode planning) — port iso de `stage-card.tsx` web. Pastille couleur +
@@ -19,6 +20,8 @@ export function StageCard({ stage, onEdit, onDelete }: StageCardProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const departure = formatStageDeparture(stage.departureTime, locale);
+  // `etaMinutes` est une DURÉE (roulage + pause) : l'heure d'arrivée s'en déduit.
+  const arrival = computeStageArrival(stage.departureTime, stage.etaMinutes);
 
   return (
     <View className="rounded-lg border border-border bg-card p-2.5">
@@ -73,10 +76,17 @@ export function StageCard({ stage, onEdit, onDelete }: StageCardProps) {
 
       {stage.etaMinutes != null ? (
         <Text className="pl-5 text-xs font-montserrat text-text-muted">
-          ETA {formatEta(stage.etaMinutes)}
+          {arrival
+            ? t('map.stages.arrivalWithDuration', {
+                time: formatArrival(arrival.iso, arrival.nextDay, locale),
+                duration: formatDuration(stage.etaMinutes),
+              })
+            : t('map.stages.duration', {
+                duration: formatDuration(stage.etaMinutes),
+              })}
           {stage.pauseHours != null && stage.pauseHours > 0
-            ? ` ${t('map.stages.pauseSuffix', {
-                pause: formatEta(stage.pauseHours * 60),
+            ? ` ${t('map.stages.pauseSuffix2', {
+                pause: formatDuration(stage.pauseHours * 60),
               })}`
             : ''}
         </Text>
