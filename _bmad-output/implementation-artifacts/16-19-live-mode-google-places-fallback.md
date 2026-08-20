@@ -128,3 +128,13 @@ Applied the same corridor-mode pattern (lines 90–106) to the `findLiveModePois
 
 - 2026-04-05: Fixed live mode POI search to call Google Places (primary source) when `overpassEnabled=false` and DB cache is empty — Story 16.19
 - 2026-04-05: Code review fixes — added `.catch()` error path test, strengthened `isConfigured` assertion on early-return test — Review 16.19
+
+---
+
+## ⚠️ Doc Sync 2026-08-19 — superseded par la story 17.13
+
+Le correctif de cette story (appeler Google Places quand `overpassEnabled=false` **et** que le cache DB est vide) a été généralisé : la condition « cache DB vide » était elle-même le bug. Voir `17-13-poi-search-overpass-user-agent-and-cache-coverage.md`.
+
+- Le chemin live ne court-circuite plus sur `dbCached.length > 0` : la bbox est calculée avant le gate, le prefetch Google tourne au plus une fois par (segment, bbox) via marqueur Redis, puis `findPoisNearPoint` est lu **une seule fois**.
+- Le prefetch Google est également sorti du `try` Overpass en live : un échec Overpass n'annule plus la source primaire.
+- Tests de cette story réécrits en conséquence (`returns DB cache directly when non-empty` → `skips Overpass and reads the DB after the prefetch`, + gate de couverture live).

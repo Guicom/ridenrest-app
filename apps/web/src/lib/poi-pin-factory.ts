@@ -39,6 +39,7 @@ export async function registerPoiPinImages(map: maplibregl.Map): Promise<void> {
   const physH = Math.round(PIN_CSS_HEIGHT * pixelRatio)
 
   const categories = Object.keys(CATEGORY_PIN_FILE) as PoiCategory[]
+  let added = false
 
   await Promise.allSettled(
     categories.map(async (category) => {
@@ -50,12 +51,17 @@ export async function registerPoiPinImages(map: maplibregl.Map): Promise<void> {
         const imageData = await loadSvgAsImageData(`/images/poi-icons/${file}.svg`, physW, physH)
         if (!map.hasImage(imageKey)) {
           map.addImage(imageKey, imageData, { pixelRatio })
+          added = true
         }
       } catch {
         console.warn(`[poi-pin-factory] Failed to load pin SVG for ${category}`)
       }
     })
   )
+
+  // A symbol layer that rendered while its `icon-image` was still missing does not re-render
+  // by itself once the image lands — ask for one render pass. No-op when nothing was added.
+  if (added) map.triggerRepaint()
 }
 
 /**

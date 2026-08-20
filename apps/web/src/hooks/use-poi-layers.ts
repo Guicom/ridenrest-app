@@ -187,6 +187,14 @@ export function usePoiLayers(
           map.off('mouseleave', pointLayerId, handlePoiMouseLeave)
         })
       }
+
+      // Force a render pass: symbol placement is computed during the render cycle, and this
+      // effect resolves (async image registration) while the post-search auto-zoom
+      // (`fitToCorridorRange`) camera animation is still running. Without this, the source and
+      // layers hold the right data but nothing is painted until the user pans or zooms —
+      // indistinguishable from "the search returned nothing" (bug observed 2026-08-19: sidebar
+      // counters showed 51 hotels, map showed zero pins, one zoom tick painted them all).
+      map.triggerRepaint()
     })
 
     return () => {

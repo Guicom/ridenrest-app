@@ -137,12 +137,14 @@ src/{feature}/
 ['adventures']                              // list
 ['adventures', adventureId]                 // single item
 ['adventures', adventureId, 'segments']     // sub-resource
-['pois', { segmentId, fromKm, toKm, layer }]  // per-layer — stable cache entry per layer
+['pois', { segmentId, fromKm, toKm, layer, overpassEnabled, source }]  // per-layer ET per-source
 ['weather', segmentId]
 ['density', adventureId]
 ```
 
 NEVER invent query keys like `['getAdventure', id]` or `['adventure-list']`.
+
+`source` (`'google' | 'overpass'`) est une dimension à part entière depuis la story 17.14 : les deux sources d'une même recherche sont deux requêtes indépendantes, chacune avec son entrée de cache et son état de chargement. Voir la règle 10 ci-dessous.
 
 ---
 
@@ -564,6 +566,14 @@ Positioned `absolute top-16 left-1/2 -translate-x-1/2 z-40` — above LiveContro
 
 **NEVER use `pois.length === 0` alone as a no-results indicator in live mode** — it's true before the first search too.
 
+#### Repaint obligatoire après ajout de calques/images POI (règle durable, 2026-08-19)
+
+Le placement des symboles MapLibre est calculé **dans le cycle de rendu**. Les hooks de calques POI (`use-poi-layers.ts`, `use-live-poi-layers.ts`) construisent leurs calques dans un `.then()` (l'enregistrement des images de pins est async) — donc **pendant** l'animation de caméra de l'auto-zoom post-recherche (`fitToCorridorRange`). Sans repaint explicite, la source et les calques contiennent les bons POI mais **rien n'est peint jusqu'à ce que l'utilisateur pan/zoome** : compteurs sidebar corrects, carte vide, indiscernable de « la recherche n'a rien trouvé ».
+
+- **Terminer toute construction/mise à jour de calques POI par `map.triggerRepaint()`** (planning ET live).
+- **`registerPoiPinImages` demande un repaint si au moins une image a été ajoutée** : un calque symbole qui a déjà rendu avec un `icon-image` manquant ne se redessine pas tout seul quand l'image arrive (cf. la dégradation silencieuse « pin invisible, pas d'erreur »).
+- Symptôme à reconnaître : **un seul cran de zoom fait apparaître tous les pins d'un coup** → ce n'est pas un problème de données, c'est un repaint manquant.
+
 #### Icons — lucide-react usage in map controls
 
 | Element | Icon |
@@ -585,15 +595,111 @@ Positioned `absolute top-16 left-1/2 -translate-x-1/2 z-40` — above LiveContro
 
 ---
 
-### Corridor Search — 30 km Max Range
+### Corridor Search — 50 km Max Range
 
-POI search range is capped at **30 km max** (`toKm - fromKm ≤ 30`).
+POI search range is capped at **50 km max** (`toKm - fromKm ≤ 50`).
+
+**Source de vérité unique : `MAX_SEARCH_RANGE_KM` dans `packages/shared/src/constants/gpx.constants.ts`.** Ne jamais redéclarer la valeur ailleurs — web (`search-range-control.tsx`, `search-range-slider.tsx`), mobile (`search-range-control.tsx`) et l'API (`find-pois.dto.ts` + validation service) l'importent tous.
 
 Enforced at two levels:
-1. **API**: DTO validation in `search-pois.dto.ts` rejects ranges > 30 km with HTTP 400
-2. **UI**: `<SearchRangeSlider />` caps the range programmatically
+1. **API**: DTO validation in `find-pois.dto.ts` + `PoisService.findPois` reject ranges > `MAX_SEARCH_RANGE_KM` with HTTP 400
+2. **UI**: `<SearchRangeSlider />` / `<SearchRangeControl />` cap the range programmatically
 
-**Why 30 km**: beyond this, Overpass bbox becomes too large (OOM/timeout risk on fair-use), Redis cache covers too wide a zone (stale at 24h), and planning UX loses precision. 30 km matches a realistic bikepacking daily stage.
+**Historique** : la valeur était 30 km au design initial (2026-03), portée à 50 km en MOB-4.3 (2026-06-14) sans mise à jour de ce document — dérive corrigée le 2026-08-19. La justification d'origine (bbox Overpass trop large au-delà) reste un vrai risque : **la zone de recherche est le rectangle englobant** les waypoints de la plage, pas un couloir. Sur une plage de 50 km à trace sinueuse, ce rectangle peut couvrir plusieurs centaines de km² — d'où le filtre corridor à la lecture (voir ci-dessous). Si Overpass se remet à timeouter sur les grandes plages, réduire `MAX_SEARCH_RANGE_KM` est le premier levier.
+
+---
+
+### POI Search — Sources, Cache & Dédoublonnage (règles durables, 2026-08-19)
+
+Quatre règles issues du RCA « mêmes résultats en ON/OFF, 0 résultat avec Overpass activé, local ≠ prod » (story 17.13). Toute évolution de `PoisService` doit les préserver.
+
+#### 1. Overpass exige un `User-Agent` explicite
+
+Le `fetch` global de Node (undici) **n'envoie aucun `User-Agent`**. Sans en-tête : `overpass-api.de` → **406 Not Acceptable**, `overpass.kumi.systems` → **429 « Please include a meaningful User-Agent string »**. Overpass était donc injoignable depuis l'API du 2026-03-29 au 2026-08-19 (dernier POI `source='overpass'` inséré : 29/03).
+
+- `OverpassProvider` envoie toujours un UA identifiant (surchargeable via `OVERPASS_USER_AGENT`).
+- **Toute rotation d'instance doit être exhaustive** : ne JAMAIS `throw` sur un statut inattendu depuis la boucle — un seul statut non prévu (406) suffisait à sauter les instances saines. Statut inconnu / erreur réseau / corps illisible → instance suivante. `429` → attente puis retry de la MÊME instance (file d'attente serveur), puis rotation.
+- La même règle vaut pour toute autre API publique appelée en `fetch` depuis NestJS.
+
+#### 2. Google Places est la source primaire — jamais conditionnée à Overpass
+
+Overpass **complète** Google Places, il ne le précède pas. Le prefetch Google doit rester **en dehors** du `try` Overpass : quand il était dedans, un échec Overpass annulait aussi Google → « Overpass ON » renvoyait 0 POI sur un segment froid alors que « Overpass OFF » renvoyait des résultats (symptôme utilisateur : bandeau « Aucun résultat dans cette zone » uniquement quand l'option est activée).
+
+#### 3. Le cache se gate sur la COUVERTURE, pas sur « ai-je un résultat à afficher ? »
+
+Interdit : `const cached = await findCachedPois(...); if (cached.length > 0) return cached`. Cette condition gèle un jeu partiel pour toute la TTL (7 j) : en prod, une première recherche sur `[86,89]` km a inséré des POI se projetant à 89–93 km (la bbox est un rectangle, la trace y revient), et **toutes** les fenêtres suivantes contenant une de ces lignes — `[80,95]`, `[83,93]`… — ont renvoyé ces 8 résultats sans jamais rappeler Google. D'où « même trace, résultats différents » entre environnements : c'est la première fenêtre recherchée qui décide.
+
+Règle : marqueur Redis `pois:google:seg:{segmentId}:bbox:{minLat}:{minLng}:{maxLat}:{maxLng}` (TTL = `GOOGLE_PLACES_CACHE_TTL`), posé **après** un prefetch complet.
+- **Scope par segment obligatoire** : les lignes sont insérées par `segment_id`, une clé bbox seule ferait hériter « déjà cherché » au segment d'un autre user, qui resterait vide.
+- **Marqueur non posé si un layer a échoué** (`{ complete: false }`) → la zone retente au lieu d'être verrouillée 7 jours.
+
+#### 4. Dédoublonnage cross-source uniquement + correspondance de nom
+
+`findNearbyPoisFromOtherSources(lat, lng, POI_DEDUP_RADIUS_M, segmentId, 'google')` + `isLikelySamePlace(nom, nom)` (`poi-dedup.ts`).
+
+L'ancien garde-fou (`hasNearbyPoi`, 100 m, agnostique de la source) supprimait des établissements bel et bien distincts : les 4 layers du prefetch tournant en `Promise.allSettled`, il dédoublonnait les POI Google **entre eux** (8 hébergements sur 10 jetés dans un village suisse, le survivant dépendant de l'ordre d'exécution → non déterminisme entre environnements). Deux POI Google ne peuvent pas être doublons : `place_id` unique + index `uq_accommodations_cache_segment_external_source`.
+
+#### 5. Filtre corridor à la lecture
+
+`findCachedPois` filtre `dist_from_trace_m <= CORRIDOR_WIDTH_M` (3000 m) en plus de la plage km. Sans ce filtre, l'affichage héritait de la forme du **rectangle** de recherche : des POI à 4+ km de la trace apparaissaient, et le jeu résultant variait avec la fenêtre demandée. `findPoisNearPoint` (live) n'est PAS concerné — sa sémantique est un rayon autour d'un point, pas un couloir.
+
+#### 6. Les filtres de tags OSM doivent être restrictifs par défaut
+
+`CATEGORY_FILTERS` (`overpass.provider.ts`) est un `Record<string, string[][]>` : chaque variante est une **liste de prédicats ANDés** (`node["a"="b"]["c"~"d"](bbox);`). C'est ce qui permet de qualifier un tag trop générique.
+
+Cas de référence : `amenity=shelter` seul renvoyait **241 abribus sur 294 éléments** (`shelter_type=public_transport`, 237 sans nom) → « Refuge / Abri (189) » sans presque aucun abri exploitable. On exige donc un `shelter_type` dans `SLEEPABLE_SHELTER_TYPES` ; les refuges de montagne passent par `tourism=alpine_hut|wilderness_hut`.
+
+Deux règles qui en découlent :
+- **`resolveCategory` (`pois.service.ts`) doit rester aligné sur `CATEGORY_FILTERS`.** Sinon un élément remonté via un autre tag est reclassé dans la catégorie qu'on vient d'exclure — ou, pire, tombe dans le `return 'hotel'` final.
+- **Avant d'élargir un filtre OSM, mesurer la composition réelle des tags** sur une bbox représentative (`select raw_data->>'…', count(*) … group by 1`). Un tag OSM générique est presque toujours dominé par un usage qui n'est pas le nôtre.
+
+⚠️ **En cas de changement d'un filtre de tags, purger les clés Redis `pois:bbox:*` / `pois:live:bbox:*`** : elles stockent les POI **bruts** de l'ancienne requête (TTL 30 j) et les ré-insèrent au prochain cache HIT, annulant le nouveau filtre. Purger aussi les lignes `accommodations_cache` devenues hors-critère.
+
+#### 7. Une option « source de données » doit filtrer À LA LECTURE, pas seulement à la collecte
+
+`overpassEnabled=false` ne faisait que sauter l'appel Overpass. Les POI `source='overpass'` déjà en cache (TTL **30 j**, contre 7 j pour Google) continuaient d'être renvoyés → dès qu'une zone avait été cherchée une fois avec l'option active, ON et OFF donnaient **exactement** le même jeu, et l'option paraissait ignorée (retour utilisateur 2026-08-19).
+
+Règle : `findCachedPois` / `findPoisNearPoint` prennent un `excludeSources: string[]`, et le service passe `OVERPASS_SOURCES` quand l'option est OFF. Toute future option de source (Amadeus, autre fournisseur) doit suivre le même schéma : **gate sur la collecte + filtre sur la lecture**. Ordre de grandeur mesuré sur une fenêtre de 15 km : ON = 66 POI, OFF = 16.
+
+#### 8. I/O externes en lot : concurrence bornée, jamais de série ni de `Promise.all` nu
+
+Le prefetch Google enchaînait ses Place Details un par un (`for … await`) : 50 à 90 allers-retours HTTP séquentiels sur une bbox froide, soit 10-25 s — la vraie raison de la lenteur de la première recherche d'une zone (les 4 calques étaient parallèles, pas les POI à l'intérieur).
+
+Utiliser `mapWithConcurrency(items, limit, fn)` (`apps/api/src/common/utils/`) : ordre d'entrée préservé, limite clampée à ≥ 1. Un `Promise.all` non borné est aussi à éviter (quotas fournisseur + chaque item fait ici une requête PostGIS). Limite actuelle : `GOOGLE_DETAILS_CONCURRENCY = 6`. Corollaire : préférer **une insertion batchée** par lot à un INSERT par élément.
+
+⚠️ Prérequis à toute parallélisation de ce prefetch : le dédoublonnage doit être **indépendant de l'ordre** (cf. règle 4, cross-source uniquement). Avec l'ancien dédoublonnage par simple proximité, paralléliser aurait rendu le résultat encore plus aléatoire.
+
+#### 9. Un flag de profil qui pilote une requête doit gater sur `ready`, jamais se replier sur une valeur par défaut
+
+`const overpassEnabled = profile?.overpassEnabled ?? false` est correct pour **afficher** un toggle, et faux pour **déclencher une requête** : pendant le chargement du profil le flag vaut `false`, donc une 1re requête part avec la mauvaise valeur, puis une 2e part avec la bonne (nouvelle clé TanStack Query). Coût constaté le 2026-08-19 : prefetch Google complet inutile, résultat OFF rendu en premier, et après un toggle le jeu OFF déjà en cache client réaffiché **instantanément à l'identique** → option perçue comme totalement inopérante.
+
+Règle : exposer un helper `useOverpassEnabled(): { overpassEnabled, ready }` et gater le déclencheur (`enabled`, `canSearch`, construction des queries) sur `ready`.
+- `ready = isSuccess || isError || fetchStatus === 'paused'` — inclure **error** (repli explicite) et **paused** (hors-ligne sans profil en cache), sinon la recherche est bloquée indéfiniment.
+- Faire porter l'attente par l'indicateur de chargement (`isPending`), sinon l'écran annonce « aucun résultat » le temps que le profil arrive.
+- Les 4 points concernés : web `use-pois` / `use-live-poi-search`, mobile `map/[id].tsx` / `use-live-poi-search`. Les usages d'affichage seul gardent `?? false`.
+
+Vaut pour tout futur flag de profil (unités, devise, tier) consommé par une requête.
+
+#### 11. Google Places : SKU Essentials pour la carte, Pro seulement à l'ouverture d'une fiche
+
+Google facture **au SKU le plus élevé des champs demandés**. Réclamer note, horaires, téléphone et site web pour *chaque* POI inséré fait basculer tout l'appel en **Place Details Pro** (5 000 gratuits/mois puis ~17 $/1000) alors que poser un pin ne demande que nom, position et types (**Essentials**, 10 000 gratuits/mois).
+
+- `getPlaceDetails(placeId, tier)` : `'essentials'` pour le prefetch (`ESSENTIALS_FIELDS`), `'pro'` pour la fiche POI (`PRO_FIELDS`).
+- **Clés Redis distinctes** : `google_place_basic:{placeId}` (Essentials, écrite par le prefetch) et `google_place_details:{placeId}` (Pro, écrite par `getPoiGoogleDetails`). Écrire une charge Essentials sous la clé Pro priverait la fiche de ses champs riches pendant 7 jours. Le prefetch réutilise une charge Pro déjà en cache — elle contient les champs Essentials.
+- Rappel de volumétrie (mesuré) : une recherche froide produit ~37 `place_id`, dont ~14 nouveaux → 14 appels facturés. Le prefetch couvre **les 4 calques** (le marqueur de couverture est par bbox, pas par calque), donc environ la moitié partait dans des calques que l'utilisateur n'avait pas activés. Text Search reste gratuit (`places.id` seul = Essentials IDs Only, illimité) : ce ne sont **jamais** les 20 Text Search qui coûtent, ce sont les Place Details.
+
+#### 10. Deux sources de latences incomparables ⇒ deux flux, jamais une attente commune
+
+Google Places répond en ~200 ms (bbox déjà prefetchée) à ~2 s (froide) ; Overpass a été mesuré entre **1 s et 31 s** sur les instances publiques, avec des 504 et des instances mortes — et il n'existe aucun plan B en ligne fiable. Les attendre ensemble fait payer à chaque utilisateur le pire des deux.
+
+- L'API accepte `source=google|overpass` : une requête par source, `resolveSourcePlan()` décide de ce qu'on interroge **et** de ce qu'on masque à la lecture. Sans le paramètre, comportement combiné historique (contrat du mobile, non découplé).
+- Côté client, **`isPending` ne suit que la source primaire**. Overpass ne doit retenir ni le premier affichage, ni l'auto-zoom, ni les squelettes de calque. Idem `hasError` : un échec Overpass donne des résultats *partiels*, pas une recherche en erreur.
+- **Parité planning / live obligatoire.** Les deux écrans consomment les mêmes sources : le live a exactement le même découplage (`useLivePoisSearch` émet deux `useQuery`, `refetch()` déclenche les deux). En live c'est même plus critique — l'utilisateur est sur son vélo et n'attendra pas 30 s devant un écran figé.
+- Corollaires à ne pas oublier quand on touche à cette zone :
+  - l'**auto-zoom** se déclenche sur la source primaire uniquement — le rejouer à l'arrivée d'Overpass ferait sauter la carte sous les doigts de l'utilisateur ;
+  - la bannière **« Aucun résultat »** exige `!overpassPending` : Google peut renvoyer 0 alors qu'Overpass va en ramener 50 ;
+  - une source lente qui travaille en silence est un piège UX (c'est ce silence qui a masqué 5 mois de panne Overpass) → `ExtendedSearchStatus` annonce l'attente, la lenteur au-delà de 5 s, et l'échec.
+- **Ne pas raccourcir les timeouts** pour compenser une UI bloquante : régler l'UI, puis laisser la source lente prendre son temps. Le budget global (`OVERPASS_TOTAL_BUDGET_MS`) protège le serveur (connexions tenues), pas l'utilisateur.
 
 ---
 
@@ -753,4 +859,4 @@ crash sur iOS** » à l'ouverture de *certaines* aventures. Signature du crash r
 - Garder ce fichier lean et focalisé sur les besoins des agents.
 - Mettre à jour quand la stack ou les patterns changent ; revoir périodiquement pour retirer les règles devenues évidentes.
 
-Last Updated: 2026-06-27
+Last Updated: 2026-08-19

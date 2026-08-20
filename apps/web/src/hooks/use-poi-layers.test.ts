@@ -52,6 +52,7 @@ interface MockMap {
   setPaintProperty: ReturnType<typeof vi.fn>
   setLayoutProperty: ReturnType<typeof vi.fn>
   setFilter: ReturnType<typeof vi.fn>
+  triggerRepaint: ReturnType<typeof vi.fn>
   on: ReturnType<typeof vi.fn>
   off: ReturnType<typeof vi.fn>
   _handlers: Map<string, EventHandler>
@@ -75,6 +76,7 @@ function createMockMap(): MockMap {
     setPaintProperty: vi.fn(),
     setLayoutProperty: vi.fn(),
     setFilter: vi.fn(),
+    triggerRepaint: vi.fn(),
     on: vi.fn((event: string, layerId: string, handler: EventHandler) => {
       handlers.set(`${event}:${layerId}`, handler)
     }),
@@ -118,6 +120,31 @@ describe('usePoiLayers', () => {
     mockVisibleLayers = new Set(['accommodations'])
     mockSetSelectedPoi.mockClear()
     mockSetSelectedPoiId.mockClear()
+  })
+
+  it('triggers a repaint after building the layers', async () => {
+    // Symbol placement happens during the render cycle, and this effect resolves (async image
+    // registration) while the post-search auto-zoom animation is still running. Without an
+    // explicit repaint the source holds the POIs but nothing is painted until the user pans or
+    // zooms — the user reads it as "the search found nothing" (bug observed 2026-08-19).
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [makePoi('accommodations')] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1))
+    await flushPromises()
+
+    expect(mockMap.triggerRepaint).toHaveBeenCalled()
+  })
+
+  it('does NOT trigger a repaint when the effect bails out on an unloaded style', async () => {
+    mockMap.isStyleLoaded.mockReturnValue(false)
+    const mapRef = { current: mockMap } as unknown as React.RefObject<ReturnType<typeof createMockMap>>
+    const poisByLayer = { ...emptyPoisByLayer, accommodations: [makePoi('accommodations')] }
+
+    renderHook(() => usePoiLayers(mapRef as never, poisByLayer, 1))
+    await flushPromises()
+
+    expect(mockMap.triggerRepaint).not.toHaveBeenCalled()
   })
 
   it('registers click handler on pointLayerId for visible layer', async () => {

@@ -3,6 +3,9 @@ import { Type, Transform } from 'class-transformer'
 import { MAX_SEARCH_RANGE_KM, MAX_LIVE_RADIUS_KM } from '@ridenrest/shared'
 import type { PoiCategory } from '@ridenrest/shared'
 
+export const POI_SOURCES = ['google', 'overpass'] as const
+export type PoiSource = (typeof POI_SOURCES)[number]
+
 export const POI_CATEGORIES = ['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse', 'restaurant', 'supermarket', 'convenience', 'bike_shop', 'bike_repair'] as const
 
 export class FindPoisDto {
@@ -46,6 +49,19 @@ export class FindPoisDto {
   @Transform(({ value }: { value: unknown }) => value === 'true' || value === true)
   @IsBoolean()
   overpassEnabled?: boolean
+
+  /**
+   * Restreint la recherche à UNE source, pour permettre au client d'afficher les résultats
+   * Google (rapides) sans attendre Overpass (1 à 31 s mesurés sur les instances publiques).
+   *
+   * - `google`   : prefetch Google uniquement, aucune requête Overpass, lecture filtrée google.
+   * - `overpass` : requête Overpass uniquement, aucun appel Google, lecture filtrée overpass.
+   * - absent     : comportement historique (les deux sources dans une seule réponse) —
+   *                conservé pour le mobile, qui n'est pas encore découplé.
+   */
+  @IsOptional()
+  @IsIn(POI_SOURCES)
+  source?: PoiSource
 }
 
 // Export the constant for use in service validation

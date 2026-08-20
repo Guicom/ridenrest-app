@@ -275,3 +275,13 @@ None.
 - `apps/web/src/app/(app)/map/[id]/_components/map-view.test.tsx`
 - `apps/web/src/hooks/use-live-poi-search.ts`
 - `apps/web/src/hooks/use-live-poi-search.test.ts`
+
+---
+
+## ⚠️ Doc Sync 2026-08-19 — superseded par la story 17.13
+
+L'opt-in Overpass introduit ici (`profiles.overpass_enabled`, `ProfileModule`, `OverpassToggle`, gate dans `PoisService`) est resté en place, mais il masquait une panne : **`c3c66ca` est le dernier commit avant lequel Overpass a inséré des POI** (prod 2026-03-29, local 2026-03-30). Le `fetch` de Node n'envoyant aucun `User-Agent`, `overpass-api.de` répondait **406** et le provider — qui ne gérait la rotation que sur 403/503/504 — remontait l'erreur hors de la boucle sans essayer les instances saines. L'option étant OFF par défaut, personne ne l'a vu pendant 5 mois.
+
+Corrections apportées en 17.13 : `User-Agent` obligatoire, rotation exhaustive (aucun `throw` depuis la boucle), et prefetch Google Places sorti du `try` Overpass (un échec Overpass ne doit plus annuler la source primaire).
+
+À noter aussi : la ligne « `MAX_RANGE_KM = 50` → aligné sur `MAX_SEARCH_RANGE_KM` (30 km) » de cette story est obsolète — la valeur partagée est **50 km** depuis MOB-4.3.
