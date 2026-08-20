@@ -3531,3 +3531,58 @@ So that I can quickly review my stages while adjusting my search settings, witho
 - Transformer la section Étapes (toggle) en accordéon dépliable dans `live-filters-drawer.tsx`
 - Passer `stages`, `currentKmOnRoute`, `speedKmh` depuis `page.tsx`
 - Dépend de 17.5 (StageCard composant)
+
+---
+
+### Story 17.18: Génération automatique des étapes (mode planning)
+
+As a **cyclist planning a multi-day adventure**,
+I want to generate my stages automatically from a km/day target, a max D+ and my accommodation preferences,
+So that I don't place a dozen stages by hand and each stage actually ends somewhere I can sleep.
+
+**Acceptance Criteria:**
+
+**Given** une aventure avec au moins un segment parsé,
+**When** l'utilisateur ouvre la section « Étapes » (planning, web et mobile),
+**Then** un bouton « Générer les étapes » ouvre un formulaire : km par jour (requis), D+ max par étape (optionnel), types d'hébergement (≥ 1, parmi `LAYER_CATEGORIES.accommodations`), et — seulement si des étapes existent déjà — le choix « Remplacer les étapes existantes » / « Compléter à partir du km N ».
+
+**Given** le formulaire validé,
+**When** la génération s'exécute,
+**Then** `POST /adventures/:id/stages/generate` découpe la trace : pour chaque étape le candidat nominal est `prevEndKm + kmParJour`, retenu si au moins **3** hébergements des types demandés sont détectés autour du point (zone dérivée de `searchRadiusKm`, réglable 1–20 km depuis 17.16) et si le D+ de l'étape respecte le maximum.
+
+**Given** un candidat qui ne satisfait pas les contraintes,
+**When** l'algorithme cherche une alternative,
+**Then** il essaie `−5, +5, −10, +10 … −40, +40` km et retient le premier candidat valide. L'objectif km/jour est donc une **cible à ±40 km** ; le D+ max reste une **contrainte dure dans les deux sens**.
+
+**Given** aucun des candidats de la tranche ±40 km ne convient alors que les comptages ont abouti,
+**When** l'algorithme abandonne,
+**Then** la génération s'arrête, les étapes déjà créées sont conservées, et un message de statut nomme la tranche kilométrique sans hébergement.
+
+**Given** aucun type Google n'a répondu pour un candidat (quota, 5xx, timeout),
+**When** l'algorithme traite ce candidat,
+**Then** il est écarté sans compter comme un refus, et si tous les candidats sont dans ce cas le message est « vérification impossible, réessayez » — **jamais** « aucun hébergement ».
+
+**Given** la distance restante est inférieure à l'objectif km/jour,
+**When** l'algorithme continue,
+**Then** une dernière étape est créée jusqu'à la fin de la trace sans vérification (la destination n'est pas déplaçable).
+
+**Given** un GPX sans données d'élévation et un D+ max renseigné,
+**When** la génération s'exécute,
+**Then** la contrainte est ignorée avec un avertissement — la génération n'échoue pas.
+
+**Given** le mode « Remplacer »,
+**When** l'utilisateur confirme,
+**Then** une `AlertDialog` annonce le nombre d'étapes supprimées avant toute suppression.
+
+**Technical notes:**
+- Endpoint synchrone dédié (décision 2026-08-20) — pas de logique de génération côté client, pas de job BullMQ en v1. Bascule BullMQ prévue si le p95 mesuré dépasse 30 s.
+- **Détection par `MASK_IDS_ONLY`** (Text Search Essentials, `places.id` seul) : **gratuit et illimité**, puisqu'on n'a besoin que de savoir s'il y a des hébergements. `searchPlaceIds` existe déjà avec ce masque et passe par `resolveTextQuery`, donc le `textQuery` calibré par type (règle 11b) s'applique. **Interdit de basculer ce chemin sur `MASK_PRO`** — même garde-fou que l'analyse de densité : jusqu'à 102 requêtes par étape, soit 3,26 $ l'étape en SKU Pro.
+- **Invariant outillé « zéro requête facturée »** (exigence 2026-08-20) : point de facturation unique (`textSearch`), compteur injectable `GoogleBillingCounter` par SKU incrémenté aussi dans `getPlaceDetails`, garde d'exécution dans le générateur (log `error` + warning `unexpected_billing`, `throw` hors production), verrou de test sur `X-Goog-FieldMask`, et verrou statique interdisant `PoisService` / `getPlaceDetails` / `searchPlacesByType` / `MASK_PRO` dans `stage-generator.service.ts`. Plafond dur `MAX_COUNT_REQUESTS_PER_GENERATION = 600`.
+- **Conséquence géométrique** : IDs Only ne renvoie pas de coordonnées, donc le test est une **bbox carrée** (côté 2r) et non un disque `ST_DWithin` — un coin à 4,24 km pour un rayon de 3. Libellés « autour du point », jamais « dans un rayon de ».
+- **Un échec fournisseur n'est pas un zéro** (leçon 17.13) : le comptage retourne `{ count, determinate }` ; un 429 produit « vérification impossible », pas « aucun hébergement », et n'est jamais mis en cache.
+- Complément gratuit lu en base : `count = max(place_id Google, lignes d'accommodations_cache dans le rayon)` — `max` et non somme, les ensembles se recoupent (même logique que `density-analyze.processor.ts`). C'est ce qui garde `shelter` (OSM uniquement) fonctionnel et honore `overpassEnabled` (règle 7).
+- **Les étapes forment une chaîne contiguë depuis km 0** (append ou split, cascade sur delete) : « compléter » = prolonger après la dernière étape. Aucun trou au milieu n'est représentable.
+- **Overpass exclu de la collecte** (1–31 s par requête, règle 10) ; ses lignes déjà en cache comptent à la lecture.
+- La génération **ne préchauffe pas** la carte : rien n'est persisté. « 3 hébergements détectés » puis 2 pins affichés n'est pas un bug (bbox + `place_id` d'un côté, couloir + dédoublonnage cross-source de l'autre).
+- Garde-fou `MAX_GENERATED_STAGES_PER_CALL = 14` + warning `truncated` et action « Générer la suite ».
+- Lot unique API + web + mobile (parité règle 10). Détail complet : `_bmad-output/implementation-artifacts/17-18-auto-generate-stages.md`.

@@ -692,21 +692,27 @@ Pro** (32 $/1000, 5 000 gratuits/mois) — soit exactement les quatre champs né
 pour jusqu'à 20 POI par appel facturé. Un Place Details n'en amortit qu'un : l'ancien chemin
 payait 114 appels pour 114 POI.
 
-**Le coût est dans la question, pas dans la réponse.** Un appel part **par type Google**, donc
-une bbox froide coûte le nombre de types interrogés, même si la zone est vide :
+**Le coût est dans la question, pas dans la réponse.** Un appel part **par type Google**, et il
+est facturé qu'il ramène 20 lieux ou zéro. Les types qui saturent paginent (3 pages, plafond
+Google), donc le coût réel d'une bbox froide dépasse le simple nombre de types. **Mesuré le
+2026-08-20** sur 4 bboxes contrastées (DE Bade-Wurtemberg, FR Alsace/Vosges, FR Chamonix,
+ES Girona) :
 
-| sélection | types = appels facturés | coût / bbox froide | bboxes froides gratuites/mois |
-|---|---|---|---|
-| `hotel` (**le défaut produit**) | 6 | 0,19 $ | ~833 |
-| `hotel` + `camp_site` | 10 | 0,32 $ | ~500 |
-| les 5 catégories d'hébergement | 16 | 0,51 $ | ~312 |
-| les 4 calques | 20 | 0,64 $ | ~250 |
-| `shelter` seul (aucun type Google) | 0 | 0 $ | — |
+| sélection | types | appels / bbox froide | coût | bboxes froides gratuites/mois |
+|---|---|---|---|---|
+| `hotel` (**le défaut produit**) | 6 | **~9,5** | 0,30 $ | ~525 |
+| `hotel` + `camp_site` | 10 | ~13,5 | 0,43 $ | ~370 |
+| les 5 catégories d'hébergement | 16 | ~20,5 | 0,66 $ | ~245 |
+| `shelter` seul (aucun type Google) | 0 | 0 | 0 $ | — |
 
-⚠️ Une version antérieure de ce tableau annonçait « 10 appels / 0,32 $ » pour une bbox froide :
-c'était une **estimation d'amortissement** (114 POI ÷ 20 par page), pas un décompte de requêtes.
-Le plancher réel est le nombre de types. Toute évaluation de coût sur ce chemin doit se compter
-en **types interrogés**.
+Soit **54 % d'économie** entre le défaut et le calque complet. (Le compte d'appels est déduit du
+nombre de résultats — `ceil(n/20)` — et non d'un compteur de requêtes ; c'est un ordre de
+grandeur mesuré, pas une facture.)
+
+⚠️ Ce tableau a été faux deux fois. Il a d'abord annoncé « 10 appels / 0,32 $ », une **estimation
+d'amortissement** (114 POI ÷ 20 par page) prise pour un décompte. Il a ensuite annoncé « 6 appels »
+pour le défaut, en oubliant que `lodging` et `hotel` paginent. **Le coût de ce chemin se mesure,
+il ne se déduit pas.**
 
 D'où la règle : **n'interroger que les types des catégories demandées**
 (`googleTypesForCategories`, story 17.17). `CATEGORY_GOOGLE_TYPES` est la source de vérité ;
@@ -753,6 +759,24 @@ Google score d'abord par **pertinence textuelle** : un `textQuery` qui ne colle 
 | `hostel` | 1 | 2 (`"auberge de jeunesse"`) |
 
 Zéro camping et zéro motel sur 50 km, pour une app de bikepacking — et le même défaut faussait l'**analyse de densité**, qui signalait « gap critique » un tronçon ne contenant que des campings. Source de vérité : `TYPE_TEXT_QUERY` dans `google-places.provider.ts`.
+
+**Retirer un type se mesure aussi — et la mesure a dit non.** Sonde du 2026-08-20 (masque
+IDs Only, gratuit) sur les 4 bboxes ci-dessus, comptant pour chaque type les `place_id` qu'il
+apporte *en exclusivité* :
+
+- L'hypothèse « `lodging` étant générique, il absorbe `hotel`, `inn`, `resort_hotel` » est
+  **fausse** : `lodging` apporte 150 identifiants exclusifs, `hotel` 147. Deux questions
+  réellement différentes pour Google, pas un type et son sous-ensemble.
+- Tous les types contribuent, y compris les marginaux (`farmstay` : 1 exclusif — très
+  probablement une ferme-auberge, exactement la cible d'une app de bikepacking).
+- Seul `private_guest_room` renvoie 0 partout. **Conservé quand même** (décision Guillaume) :
+  c'est de l'hébergement chez l'habitant, que Google indexe très inégalement selon les marchés,
+  et 4 bboxes européennes ne suffisent pas à conclure. Il ne coûte un appel que si
+  « Chambre d'hôte » est cochée, ce qui n'est pas le défaut.
+
+**Plafond dur à connaître** : `lodging` et `hotel` saturent à **60 résultats** (3 pages × 20)
+dans 3 zones sur 4. En zone dense on ne voit donc pas tout ce qui existe, quel que soit le
+réglage — limite du fournisseur, pas du code.
 
 L'inverse est vrai aussi : **trop spécifique tue le résultat** (`"camping caravaneige"` → 0). Il faut une requête courte et naturelle, proche de ce qu'un humain taperait. Avant d'ajouter un type, mesurer sa réponse réelle sur une bbox représentative — le Text Search en IDs Only est gratuit et illimité, donc la sonde ne coûte rien.
 

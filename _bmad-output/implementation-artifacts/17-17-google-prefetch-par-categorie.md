@@ -125,6 +125,25 @@ Correctifs (parité web + mobile, les 2 points de planning de la règle 10) :
 - [x] T8 — **validé par Guillaume** (2026-08-20) : recherche conforme en local, plus de
       compteur sur les sous-types non cochés.
 
+## Sonde de redondance des types (2026-08-20, post-livraison)
+
+Mesure gratuite (masque IDs Only) sur 4 bboxes contrastées — DE Bade-Wurtemberg, FR
+Alsace/Vosges, FR Chamonix, ES Girona — comptant les `place_id` exclusifs de chaque type.
+
+**Aucun type supprimé.** L'hypothèse de départ (« `lodging` absorbe les autres types
+d'hôtellerie ») est fausse : `lodging` apporte 150 identifiants exclusifs, `hotel` 147. Seul
+`private_guest_room` renvoie 0 partout, et il est conservé — hébergement chez l'habitant,
+indexation Google très inégale selon les marchés, 4 bboxes européennes ne tranchent pas.
+
+Deux retombées :
+
+- **Le coût réel dépasse le plancher annoncé.** `lodging` et `hotel` paginent : le défaut
+  « Hôtel seul » coûte **~9,5 appels** par bbox froide, pas 6 — soit 0,30 $ et non 0,19 $.
+  L'économie face au calque complet (~20,5 appels) reste de **54 %**. Règle 11 corrigée avec
+  les valeurs mesurées.
+- **Plafond Google à 60 résultats** (3 pages × 20) atteint par `lodging` et `hotel` dans 3 zones
+  sur 4 : en zone dense, la couverture est tronquée quel que soit le réglage.
+
 ## Vérifications
 
 | | résultat |
