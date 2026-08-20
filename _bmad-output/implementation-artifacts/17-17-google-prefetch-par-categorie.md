@@ -1,6 +1,6 @@
 # Story 17.17 — Prefetch Google par catégorie demandée (marqueurs par type)
 
-**Statut** : review — 2026-08-20
+**Statut** : done — 2026-08-20 (validé par Guillaume)
 **Épopée** : 17 (recherche POI)
 **Suite de** : 17.15 (Text Search Pro sans Place Details)
 
@@ -122,10 +122,8 @@ Correctifs (parité web + mobile, les 2 points de planning de la règle 10) :
       par type, échec isolé retentable, shim hérité (12 tests ajoutés/réécrits)
 - [x] T7 — lot 2 : `categories` = sous-types cochés (web + mobile), signature dans la clé,
       `onlyCountActive` en planning, reset de `searchCommitted`, 5 tests ajoutés
-- [ ] T8 — **validation Guillaume** : sur une zone neuve, vérifier dans les logs
-      `[Google prefetch] ... types: lodging,hotel,motel,inn,extended_stay_hotel,resort_hotel`
-      (6 types, pas 16) ; puis cocher « camping » et vérifier qu'un nouveau prefetch part avec
-      les 4 types de `camp_site` au lieu de rien.
+- [x] T8 — **validé par Guillaume** (2026-08-20) : recherche conforme en local, plus de
+      compteur sur les sous-types non cochés.
 
 ## Vérifications
 
