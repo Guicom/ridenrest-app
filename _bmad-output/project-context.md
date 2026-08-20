@@ -680,20 +680,56 @@ Règle : exposer un helper `useOverpassEnabled(): { overpassEnabled, ready }` et
 
 Vaut pour tout futur flag de profil (unités, devise, tier) consommé par une requête.
 
-#### 11. Google Places : le SKU se décide dans le field mask, et un appel Text Search amortit 20 POI
+#### 11. Google Places : le coût suit le NOMBRE DE TYPES interrogés, pas les POI rapportés
 
-Google facture **au SKU le plus élevé des champs demandés**. Deux conséquences structurantes.
+Google facture **au SKU le plus élevé des champs demandés**, et **par requête** — un appel qui
+renvoie zéro résultat est facturé comme un appel qui en renvoie vingt. Trois conséquences
+structurantes.
 
-**Le prefetch carte n'appelle plus Place Details du tout.** `searchLayerPlaces` demande `places.id,places.displayName,places.location,places.types,nextPageToken` — SKU **Text Search Pro** (32 $/1000, 5 000 gratuits/mois) — soit exactement les quatre champs nécessaires à un pin, pour 20 POI par appel facturé. Un Place Details, lui, n'en amortit qu'un. Mesuré sur une bbox froide réelle :
+**Le prefetch carte n'appelle plus Place Details du tout.** `searchPlacesByType` demande
+`places.id,places.displayName,places.location,places.types,nextPageToken` — SKU **Text Search
+Pro** (32 $/1000, 5 000 gratuits/mois) — soit exactement les quatre champs nécessaires à un pin,
+pour jusqu'à 20 POI par appel facturé. Un Place Details n'en amortit qu'un : l'ancien chemin
+payait 114 appels pour 114 POI.
 
-| | appels facturés | coût | POI | coût/POI | bboxes froides gratuites/mois |
-|---|---|---|---|---|---|
-| avant (IDs Only + un Place Details par POI) | 32 | 0,16 $ | 32 | 0,0050 $ | ~312 |
-| après (Text Search Pro paginé) | 10 | 0,32 $ | 114 | **0,0028 $** | **~500** |
+**Le coût est dans la question, pas dans la réponse.** Un appel part **par type Google**, donc
+une bbox froide coûte le nombre de types interrogés, même si la zone est vide :
 
-`getPlaceDetails` (SKU **Place Details Pro**) ne sert plus qu'à **l'ouverture d'une fiche POI** : note, horaires, téléphone, site. Clé Redis `google_place_details:{placeId}`.
+| sélection | types = appels facturés | coût / bbox froide | bboxes froides gratuites/mois |
+|---|---|---|---|
+| `hotel` (**le défaut produit**) | 6 | 0,19 $ | ~833 |
+| `hotel` + `camp_site` | 10 | 0,32 $ | ~500 |
+| les 5 catégories d'hébergement | 16 | 0,51 $ | ~312 |
+| les 4 calques | 20 | 0,64 $ | ~250 |
+| `shelter` seul (aucun type Google) | 0 | 0 $ | — |
 
-**⚠️ Le chemin « comptage » doit rester en IDs Only, gratuit.** `searchLayerPlaceIds` (masque `places.id,nextPageToken`) est consommé par l'analyse de densité, qui découpe l'aventure en tronçons de 10 km et appelle une fois par tronçon **et par type** : une aventure de 837 km = 84 tronçons × 16 types = **1 344 requêtes pour une seule analyse**. Basculer cette méthode sur le masque Pro coûterait ~43 $ et 27 % du quota gratuit mensuel par analyse — pour une donnée dont le processeur ne lit que « 0, 1, ou ≥ 2 ». Ne jamais ajouter `location`, `displayName` ou `types` à ce masque, et ne pas y activer la pagination.
+⚠️ Une version antérieure de ce tableau annonçait « 10 appels / 0,32 $ » pour une bbox froide :
+c'était une **estimation d'amortissement** (114 POI ÷ 20 par page), pas un décompte de requêtes.
+Le plancher réel est le nombre de types. Toute évaluation de coût sur ce chemin doit se compter
+en **types interrogés**.
+
+D'où la règle : **n'interroger que les types des catégories demandées**
+(`googleTypesForCategories`, story 17.17). `CATEGORY_GOOGLE_TYPES` est la source de vérité ;
+`LAYER_GOOGLE_TYPES` en est dérivée et un test verrouille la partition — les deux tables ont
+déjà coexisté et divergé en silence.
+
+**Les résultats vides sont mis en cache, les échecs non.** Le marqueur de couverture est posé
+au grain **type** (`pois:google:seg:{segmentId}:type:{googleType}:bbox:{bboxKey}`, TTL 7 j), et
+seulement pour les types dont la requête a abouti. Un type qui répond légitimement zéro est donc
+payé une fois par 7 jours ; un type en échec reste non marqué et retente. Descendre au grain type
+est **obligatoire** dès lors qu'on n'interroge qu'un sous-ensemble : marquer le calque après
+n'avoir cherché que « hôtel » gèlerait « camping » à zéro résultat pendant une semaine.
+
+`getPlaceDetails` (SKU **Place Details Pro**) ne sert plus qu'à **l'ouverture d'une fiche POI** :
+note, horaires, téléphone, site. Clé Redis `google_place_details:{placeId}`.
+
+**⚠️ Le chemin « comptage » doit rester en IDs Only, gratuit.** `searchLayerPlaceIds` (masque
+`places.id,nextPageToken`) est consommé par l'analyse de densité, qui découpe l'aventure en
+tronçons de 10 km et appelle une fois par tronçon **et par type** : une aventure de 837 km =
+84 tronçons × 16 types = **1 344 requêtes pour une seule analyse**. Basculer cette méthode sur le
+masque Pro coûterait ~43 $ et 27 % du quota gratuit mensuel par analyse — pour une donnée dont le
+processeur ne lit que « 0, 1, ou ≥ 2 ». Ne jamais ajouter `location`, `displayName` ou `types` à
+ce masque, et ne pas y activer la pagination.
 
 #### 11b. `includedType` ne filtre pas — le `textQuery` décide, et il se calibre par type
 

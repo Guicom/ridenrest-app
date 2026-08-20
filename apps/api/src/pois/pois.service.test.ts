@@ -6,7 +6,7 @@ import { OverpassProvider } from './providers/overpass.provider.js'
 import { GooglePlacesProvider } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi } from '@ridenrest/shared'
-import { POI_BBOX_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL } from '@ridenrest/shared'
+import { POI_BBOX_CACHE_TTL } from '@ridenrest/shared'
 
 const mockRedisClient = {
   get: jest.fn(),
@@ -39,13 +39,20 @@ const mockOverpassProvider = {
 const mockGooglePlacesProvider = {
   isConfigured: jest.fn(),
   searchLayerPlaceIds: jest.fn(),
-  searchLayerPlaces: jest.fn(),
+  searchPlacesByType: jest.fn(),
   findPlaceId: jest.fn(),
   getPlaceDetails: jest.fn(),
 }
 
 /**
- * Un lieu tel que `searchLayerPlaces` le rapporte : le prefetch n'appelle plus Place Details,
+ * Le provider rapporte désormais l'issue de CHAQUE type Google interrogé, pas une liste
+ * fusionnée : le service en a besoin pour poser un marqueur de couverture par type et laisser
+ * un type en échec réessayable. Ce helper monte le cas nominal « un type, tout va bien ».
+ */
+const okOutcome = (places: unknown[], type = 'lodging') => [{ type, places, ok: true }]
+
+/**
+ * Un lieu tel que `searchPlacesByType` le rapporte : le prefetch n'appelle plus Place Details,
  * les quatre champs nécessaires à un pin viennent directement du Text Search Pro.
  */
 const googlePlace = (over: Partial<{ placeId: string; name: string; lat: number; lng: number; types: string[] }> = {}) => ({
@@ -121,7 +128,7 @@ describe('PoisService', () => {
     mockOverpassProvider.queryPois.mockReset()
     mockGooglePlacesProvider.isConfigured.mockReset()
     mockGooglePlacesProvider.searchLayerPlaceIds.mockReset()
-    mockGooglePlacesProvider.searchLayerPlaces.mockReset()
+    mockGooglePlacesProvider.searchPlacesByType.mockReset()
     mockGooglePlacesProvider.findPlaceId.mockReset()
     mockGooglePlacesProvider.getPlaceDetails.mockReset()
     mockPoisRepository.findByExternalId.mockReset()
@@ -276,7 +283,7 @@ describe('PoisService', () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
 
       await service.findPois(baseDto, userId)
 
@@ -290,7 +297,7 @@ describe('PoisService', () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockRejectedValue(new Error('Network error'))
+      mockGooglePlacesProvider.searchPlacesByType.mockRejectedValue(new Error('Network error'))
 
       // findPois must NOT throw even if prefetch fails (error is caught + logged)
       await expect(service.findPois(baseDto, userId)).resolves.not.toThrow()
@@ -300,7 +307,7 @@ describe('PoisService', () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([googlePlace({ placeId: 'ChIJABC' })])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([googlePlace({ placeId: 'ChIJABC' })]))
       mockPoisRepository.googlePoiExistsInSegment.mockResolvedValue(false)  // not in DB yet
       mockRedisClient.get.mockResolvedValue(null)  // not in Redis cache
       mockPoisRepository.findNearbyPoisFromOtherSources.mockResolvedValue([])
@@ -316,7 +323,7 @@ describe('PoisService', () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([googlePlace({ placeId: 'ChIJABC' })])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([googlePlace({ placeId: 'ChIJABC' })]))
       mockPoisRepository.googlePoiExistsInSegment.mockResolvedValue(false)  // expired → treated as absent
       mockRedisClient.get.mockResolvedValue(null)
       mockPoisRepository.findNearbyPoisFromOtherSources.mockResolvedValue([])
@@ -331,59 +338,79 @@ describe('PoisService', () => {
 
     it('le prefetch n’appelle plus Place Details du tout (les champs viennent du Text Search)', async () => {
       // Google facture au SKU le plus élevé des champs demandés, et un Place Details n'amortit
-      // qu'UN POI. `searchLayerPlaces` rapporte identité + position + types pour 20 POI par appel
+      // qu'UN POI. `searchPlacesByType` rapporte identité + position + types pour 20 POI par appel
       // facturé : mesuré 0,0028 $/POI contre 0,0050 $, et ~500 bboxes froides dans le quota
       // gratuit mensuel contre ~312.
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([googlePlace({ placeId: 'ChIJABC' })])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([googlePlace({ placeId: 'ChIJABC' })]))
       mockRedisClient.get.mockResolvedValue(null)
 
       await service.findPois(baseDto, userId)
       await new Promise((resolve) => setTimeout(resolve, 10))
 
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
       expect(mockGooglePlacesProvider.getPlaceDetails).not.toHaveBeenCalled()
     })
 
-    it('n’interroge que les calques déduits des catégories demandées', async () => {
-      // Le prefetch traitait les 4 calques quel que soit celui affiché : ~8 des 14 appels
-      // facturés d'une recherche froide partaient dans « restaurants » non coché. Tolérable en
-      // Place Details Essentials, plus du tout en Text Search Pro.
+    it('n’interroge que les types Google des catégories demandées', async () => {
+      // Le coût suit le NOMBRE DE TYPES interrogés, pas le nombre de POI rapportés : un Text
+      // Search Pro est facturé qu'il ramène 20 lieux ou zéro. Interroger les 16 types
+      // d'`accommodations` quand seul « hôtel » est coché coûtait 0,51 $ par bbox froide au lieu
+      // de 0,19 $, pour des résultats que la lecture filtrait ensuite.
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
       mockRedisClient.get.mockResolvedValue(null)
 
       await service.findPois({ ...baseDto, categories: ['hotel'] }, userId)
 
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalledTimes(1)
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalledWith(expect.anything(), 'accommodations')
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalledTimes(1)
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalledWith(
+        expect.anything(),
+        ['lodging', 'hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel'],
+      )
     })
 
-    it('interroge les 4 calques quand la requête ne précise aucune catégorie (contrat historique)', async () => {
+    it('n’appelle pas Google du tout pour une catégorie sans type Google (shelter)', async () => {
+      // Les refuges viennent d'OSM. L'ancienne table faisait pointer `shelter` sur `lodging` :
+      // un appel facturé dont les résultats étaient classés `hotel`, donc jamais affichés
+      // sous la catégorie demandée.
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockRedisClient.get.mockResolvedValue(null)
+
+      await service.findPois({ ...baseDto, categories: ['shelter'] }, userId)
+
+      expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
+    })
+
+    it('interroge tous les types quand la requête ne précise aucune catégorie (contrat historique)', async () => {
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
       mockRedisClient.get.mockResolvedValue(null)
 
       const noCategories = { ...baseDto, categories: undefined }
       await service.findPois(noCategories, userId)
 
-      const layers = (mockGooglePlacesProvider.searchLayerPlaces.mock.calls as unknown[][]).map((c) => c[1])
-      expect(new Set(layers)).toEqual(new Set(['accommodations', 'restaurants', 'supplies', 'bike']))
+      const types = (mockGooglePlacesProvider.searchPlacesByType.mock.calls as unknown[][])[0][1] as string[]
+      expect(types).toEqual(expect.arrayContaining(['lodging', 'campground', 'hostel', 'restaurant', 'convenience_store', 'bicycle_store']))
+      // Union dédoublonnée : `bicycle_store` est partagé par `bike_shop` et `bike_repair`.
+      expect(new Set(types).size).toBe(types.length)
     })
 
     it('skips Google POI when a nearby OSM POI has a matching name', async () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([
         googlePlace({ placeId: 'ChIJABC', name: 'Hotel Bellevue', lat: 43.1, lng: 1.1 }),
-      ])
+      ]))
       mockPoisRepository.googlePoiExistsInSegment.mockResolvedValue(false)
       mockRedisClient.get.mockResolvedValue(null)
       mockPoisRepository.findNearbyPoisFromOtherSources.mockResolvedValue([
@@ -405,7 +432,7 @@ describe('PoisService', () => {
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([googlePlace({ placeId: 'ChIJABC' })])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([googlePlace({ placeId: 'ChIJABC' })]))
       mockPoisRepository.googlePoiExistsInSegment.mockResolvedValue(false)
       mockRedisClient.get.mockResolvedValue(null)
       mockPoisRepository.findNearbyPoisFromOtherSources.mockResolvedValue([
@@ -466,13 +493,13 @@ describe('PoisService', () => {
       // Overpass failure also cancelled Google → "Overpass ON" returned 0 POI on a cold segment
       // while "Overpass OFF" returned results.
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockOverpassProvider.queryPois.mockRejectedValueOnce(new Error('All Overpass instances unavailable'))
 
       await service.findPois(baseDto, userId)
 
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
     })
 
     describe('radiusKm — rayon de recherche choisi par l’utilisateur', () => {
@@ -513,7 +540,7 @@ describe('PoisService', () => {
 
       it('un rayon plus large produit une bbox plus large (donc un autre marqueur de couverture)', async () => {
         mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-        mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+        mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
         mockPoisRepository.getSegmentWaypoints.mockResolvedValue(mockWaypoints)
         mockRedisClient.get.mockResolvedValue(null)
 
@@ -533,13 +560,13 @@ describe('PoisService', () => {
       // sur les instances publiques, arrive quand il peut.
       it('source=google : aucun appel Overpass, lecture sans les POI overpass', async () => {
         mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-        mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+        mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
         mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
 
         await service.findPois({ ...baseDto, source: 'google' }, userId)
 
         expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-        expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
         expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
           baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['overpass'], 3000,
         )
@@ -547,14 +574,14 @@ describe('PoisService', () => {
 
       it('source=overpass : aucun appel Google, lecture sans les POI google', async () => {
         mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-        mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+        mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
         mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
         mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
 
         await service.findPois({ ...baseDto, source: 'overpass' }, userId)
 
         expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
-        expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
         expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
           baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['google', 'amadeus'], 3000,
         )
@@ -567,20 +594,20 @@ describe('PoisService', () => {
         const result = await service.findPois({ ...baseDto, source: 'overpass', overpassEnabled: false }, userId)
 
         expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-        expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
         expect(result).toEqual([])
       })
 
       it('sans source : comportement historique, les deux sources dans une réponse (mobile)', async () => {
         mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-        mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+        mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
         mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
         mockOverpassProvider.queryPois.mockResolvedValueOnce([overpassNode])
 
         await service.findPois(baseDto, userId)
 
         expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
-        expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
         expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
           baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [], 3000,
         )
@@ -634,12 +661,12 @@ describe('PoisService', () => {
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockPoisRepository.findCachedPois.mockResolvedValueOnce([mockPoi])
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
 
       const result = await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
 
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
       // Single read: the DB is read AFTER the prefetch, never before as a short-circuit
       expect(mockPoisRepository.findCachedPois).toHaveBeenCalledTimes(1)
       expect(result).toEqual([mockPoi])
@@ -650,65 +677,86 @@ describe('PoisService', () => {
       // The old short-circuit froze a partial set for the whole 7-day TTL: a first search on
       // [86,89] km locked every wider window ([80,95]…) onto its 8 results.
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockPoisRepository.findCachedPois.mockResolvedValue([mockPoi])  // window is NOT empty
 
       await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
 
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
     })
 
-    it('skips the Google prefetch when this segment+bbox was already fetched, and marks it otherwise', async () => {
+    it('skips the Google prefetch when this segment+bbox+type was already fetched, and marks it otherwise', async () => {
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockImplementation((_bbox: unknown, types: string[]) =>
+        Promise.resolve(types.map((type) => ({ type, places: [], ok: true }))),
+      )
       mockPoisRepository.getSegmentWaypoints.mockResolvedValue(mockWaypoints)
 
-      // 1st call: no marker → prefetch runs → marker written (segment-scoped, 7-day TTL)
-      mockRedisClient.get.mockResolvedValueOnce(null)
-      await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
+      // 1er appel : aucun marqueur → prefetch → un marqueur PAR TYPE (segment-scoped, TTL 7 j)
+      mockRedisClient.get.mockResolvedValue(null)
+      await service.findPois({ ...baseDto, categories: ['hotel'], overpassEnabled: false }, userId)
 
-      const markerKey = (mockRedisClient.get.mock.calls as string[][])[0][0]
-      // Marqueur porté par (segment, CALQUE, bbox) : sans la dimension calque, un calque non
-      // demandé serait marqué couvert sans avoir été interrogé, et resterait vide 7 jours.
-      expect(markerKey).toBe(`pois:google:seg:${baseDto.segmentId}:layer:accommodations:bbox:42.973:0.973:43.527:1.527`)
-      expect(mockRedisClient.setex).toHaveBeenCalledWith(markerKey, GOOGLE_PLACES_CACHE_TTL, '1')
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalledTimes(1)  // baseDto → calque accommodations seul
+      const marked = (mockRedisClient.setex.mock.calls as string[][]).map((c) => c[0])
+      // Marqueur porté par (segment, TYPE, bbox). Sans la dimension segment, « déjà cherché »
+      // serait hérité par le segment d'un autre utilisateur, qui resterait vide.
+      expect(marked).toContain(`pois:google:seg:${baseDto.segmentId}:type:lodging:bbox:42.973:0.973:43.527:1.527`)
+      expect(marked).toHaveLength(6)  // les 6 types de la catégorie `hotel`
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalledTimes(1)
 
-      // 2nd call: marker present → no Google traffic at all
-      mockGooglePlacesProvider.searchLayerPlaces.mockClear()
-      mockRedisClient.get.mockResolvedValueOnce('1')
-      await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
+      // 2e appel : tous les types marqués → plus aucun trafic Google
+      mockGooglePlacesProvider.searchPlacesByType.mockClear()
+      mockRedisClient.get.mockImplementation((key: string) =>
+        Promise.resolve(key.includes(':type:') ? '1' : null),
+      )
+      await service.findPois({ ...baseDto, categories: ['hotel'], overpassEnabled: false }, userId)
 
-      expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
     })
 
-    it('ne marque PAS un calque dont la requête a échoué (il doit retenter)', async () => {
+    it('ne marque rien quand l’appel Google échoue en bloc (la zone doit retenter)', async () => {
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
-      mockGooglePlacesProvider.searchLayerPlaces.mockRejectedValueOnce(new Error('Google 429'))
+      mockGooglePlacesProvider.searchPlacesByType.mockRejectedValueOnce(new Error('Google 429'))
 
       await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
 
       expect(mockRedisClient.setex).not.toHaveBeenCalled()
     })
 
-    it('marque les calques réussis et laisse le calque en échec retentable', async () => {
-      // Le marquage est par calque : un échec sur « bike » ne doit pas empêcher
-      // « accommodations » d'être marqué, ni verrouiller « bike » pendant 7 jours.
+    it('marque les types réussis et laisse le type en échec retentable', async () => {
+      // Granularité par TYPE : 15 types morts sur 16 laissaient auparavant tout le calque
+      // marqué couvert pour 7 jours, avec le symptôme « 0 résultat » figé sur une zone qui en
+      // contient.
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
       mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
       mockRedisClient.get.mockResolvedValue(null)
-      mockGooglePlacesProvider.searchLayerPlaces.mockImplementation(
-        (_bbox: unknown, layer: string) =>
-          layer === 'bike' ? Promise.reject(new Error('Google 429')) : Promise.resolve([]),
+      mockGooglePlacesProvider.searchPlacesByType.mockImplementation((_bbox: unknown, types: string[]) =>
+        Promise.resolve(
+          types.map((type) => ({ type, places: [], ok: type !== 'bicycle_store' })),
+        ),
       )
 
       await service.findPois({ ...baseDto, categories: ['hotel', 'bike_shop'], overpassEnabled: false }, userId)
 
       const marked = (mockRedisClient.setex.mock.calls as string[][]).map((c) => c[0])
-      expect(marked.some((k) => k.includes(':layer:accommodations:'))).toBe(true)
-      expect(marked.some((k) => k.includes(':layer:bike:'))).toBe(false)
+      expect(marked.some((k) => k.includes(':type:lodging:'))).toBe(true)
+      expect(marked.some((k) => k.includes(':type:bicycle_store:'))).toBe(false)
+    })
+
+    it('réutilise un marqueur de calque hérité plutôt que de re-payer le prefetch', async () => {
+      // Les marqueurs `…:layer:{layer}:…` posés avant le passage au grain type signifiaient
+      // « tous les types de ce calque ont été interrogés ». On les lit pendant leur TTL
+      // résiduelle (7 j max) pour ne pas re-payer toutes les zones déjà couvertes.
+      mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+      mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+      mockRedisClient.get.mockImplementation((key: string) =>
+        Promise.resolve(key.includes(':layer:accommodations:') ? '1' : null),
+      )
+
+      await service.findPois({ ...baseDto, categories: ['hotel'], overpassEnabled: false }, userId)
+
+      expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
     })
 
     it('returns empty when overpassEnabled=false, DB cache empty, and Google Places not configured', async () => {
@@ -719,7 +767,7 @@ describe('PoisService', () => {
       const result = await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
 
       expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-      expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
       expect(result).toEqual([])
     })
 
@@ -857,12 +905,12 @@ describe('PoisService', () => {
       mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
       mockOverpassProvider.queryPois.mockRejectedValueOnce(new Error('All Overpass instances unavailable'))
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
       mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
 
       await service.findPois(liveDto, userId)
 
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
     })
 
     it('stores raw POIs without segment-specific distances in Redis on live mode MISS (Option A)', async () => {
@@ -889,12 +937,12 @@ describe('PoisService', () => {
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+      mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
 
       await service.findPois(liveDto, userId)
 
       expect(mockGooglePlacesProvider.isConfigured).toHaveBeenCalled()
-      expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+      expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
     })
 
     it('Google Places failure does NOT reject live mode findPois', async () => {
@@ -902,7 +950,7 @@ describe('PoisService', () => {
       mockOverpassProvider.queryPois.mockResolvedValueOnce([])
       mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
       mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-      mockGooglePlacesProvider.searchLayerPlaces.mockRejectedValue(new Error('Google API error'))
+      mockGooglePlacesProvider.searchPlacesByType.mockRejectedValue(new Error('Google API error'))
 
       await expect(service.findPois(liveDto, userId)).resolves.not.toThrow()
     })
@@ -934,28 +982,28 @@ describe('PoisService', () => {
 
         expect(result).toEqual([mockLivePoi])
         expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-        expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()  // not configured
+        expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()  // not configured
         expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledTimes(1)
       })
 
       it('calls Google Places even when the radius ALREADY holds cached POIs (coverage gate)', async () => {
         mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
         mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-        mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+        mockGooglePlacesProvider.searchPlacesByType.mockResolvedValue(okOutcome([]))
         mockPoisRepository.findPoisNearPoint.mockResolvedValue([mockLivePoi])
 
         const result = await service.findPois(liveDtoNoOverpass, userId)
 
         expect(result).toEqual([mockLivePoi])
         expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-        expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchPlacesByType).toHaveBeenCalled()
         expect(mockPoisRepository.findPoisNearPoint).toHaveBeenCalledTimes(1)
       })
 
       it('does not throw when Google Places fails (catch path)', async () => {
         mockPoisRepository.getWaypointAtKm.mockResolvedValueOnce({ lat: 43.3, lng: 1.3 })
         mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
-        mockGooglePlacesProvider.searchLayerPlaces.mockRejectedValue(new Error('Google API error'))
+        mockGooglePlacesProvider.searchPlacesByType.mockRejectedValue(new Error('Google API error'))
         mockPoisRepository.findPoisNearPoint.mockResolvedValueOnce([])
 
         const result = await service.findPois(liveDtoNoOverpass, userId)
@@ -973,7 +1021,7 @@ describe('PoisService', () => {
 
         expect(result).toEqual([])
         expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
-        expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()
+        expect(mockGooglePlacesProvider.searchPlacesByType).not.toHaveBeenCalled()
       })
     })
   })

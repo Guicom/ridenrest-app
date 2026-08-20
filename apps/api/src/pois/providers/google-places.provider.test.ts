@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing'
-import { GooglePlacesProvider, mapGoogleTypesToCategory, LAYER_GOOGLE_TYPES } from './google-places.provider.js'
+import { LAYER_CATEGORIES } from '@ridenrest/shared'
+import { GooglePlacesProvider, mapGoogleTypesToCategory, LAYER_GOOGLE_TYPES, CATEGORY_GOOGLE_TYPES, TYPE_TEXT_QUERY, googleTypesForCategories } from './google-places.provider.js'
 
 const mockBbox = { minLat: 43.0, maxLat: 43.5, minLng: 1.0, maxLng: 1.5 }
 
@@ -152,7 +153,7 @@ describe('GooglePlacesProvider', () => {
     })
   })
 
-  describe('searchLayerPlaces (SKU Pro — chemin d’affichage)', () => {
+  describe('searchPlacesByType (SKU Pro — chemin d’affichage)', () => {
     const withKey = async () => {
       process.env['GOOGLE_PLACES_API_KEY'] = 'test-api-key'
       const mod = await Test.createTestingModule({ providers: [GooglePlacesProvider] }).compile()
@@ -171,7 +172,7 @@ describe('GooglePlacesProvider', () => {
       const provider = await withKey()
       const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue(page([]))
 
-      await provider.searchLayerPlaces(mockBbox, 'bike')
+      await provider.searchPlacesByType(mockBbox, ['bicycle_store'])
 
       const headers = (mockFetch.mock.calls[0][1] as RequestInit).headers as Record<string, string>
       expect(headers['X-Goog-FieldMask']).toBe(
@@ -179,18 +180,26 @@ describe('GooglePlacesProvider', () => {
       )
     })
 
+    it('émet un appel facturé PAR TYPE — c’est ce qui rend le filtrage par catégorie rentable', async () => {
+      const provider = await withKey()
+      const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue(page([]))
+
+      await provider.searchPlacesByType(mockBbox, ['campground', 'rv_park', 'hostel'])
+
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
     it('suit le nextPageToken jusqu’au plafond Google de 3 pages', async () => {
       const provider = await withKey()
-      // `bike` n'a qu'un seul type → on isole la pagination d'une requête
       jest.spyOn(global, 'fetch')
         .mockResolvedValueOnce(page([place('a1')], 'tok-1'))
         .mockResolvedValueOnce(page([place('a2')], 'tok-2'))
         .mockResolvedValueOnce(page([place('a3')], 'tok-3'))  // token présent mais plafond atteint
         .mockResolvedValue(page([place('a4')]))
 
-      const result = await provider.searchLayerPlaces(mockBbox, 'bike')
+      const [outcome] = await provider.searchPlacesByType(mockBbox, ['bicycle_store'])
 
-      expect(result.map((p) => p.placeId)).toEqual(['a1', 'a2', 'a3'])
+      expect(outcome.places.map((p) => p.placeId)).toEqual(['a1', 'a2', 'a3'])
     })
 
     it('renvoie le pageToken dans le corps de la requête suivante', async () => {
@@ -199,7 +208,7 @@ describe('GooglePlacesProvider', () => {
         .mockResolvedValueOnce(page([place('a1')], 'tok-1'))
         .mockResolvedValue(page([]))
 
-      await provider.searchLayerPlaces(mockBbox, 'bike')
+      await provider.searchPlacesByType(mockBbox, ['bicycle_store'])
 
       const secondBody = JSON.parse((mockFetch.mock.calls[1][1] as RequestInit).body as string) as { pageToken?: string }
       expect(secondBody.pageToken).toBe('tok-1')
@@ -211,7 +220,7 @@ describe('GooglePlacesProvider', () => {
       const provider = await withKey()
       const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue(page([]))
 
-      await provider.searchLayerPlaces(mockBbox, 'accommodations')
+      await provider.searchPlacesByType(mockBbox, ['campground', 'motel', 'hostel'])
 
       const sent = mockFetch.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string) as { includedType: string; textQuery: string })
       expect(sent.find((b) => b.includedType === 'campground')?.textQuery).toBe('camping')
@@ -225,25 +234,69 @@ describe('GooglePlacesProvider', () => {
         page([place('ok'), { id: 'sans-position', displayName: { text: 'X' }, types: [] }]),
       )
 
-      const result = await provider.searchLayerPlaces(mockBbox, 'bike')
+      const [outcome] = await provider.searchPlacesByType(mockBbox, ['bicycle_store'])
 
-      expect(result.map((p) => p.placeId)).toEqual(['ok'])
+      expect(outcome.places.map((p) => p.placeId)).toEqual(['ok'])
     })
 
-    it('dédoublonne un même place_id rapporté par plusieurs types', async () => {
+    it('rapporte l’issue de CHAQUE type — un échec isolé n’emporte pas les autres', async () => {
+      // Le service pose un marqueur de couverture par type : un type en échec doit rester
+      // non marqué pour être réessayé, au lieu de verrouiller la zone 7 jours.
+      const provider = await withKey()
+      jest.spyOn(global, 'fetch')
+        .mockResolvedValueOnce(page([place('trouve')]))
+        .mockResolvedValue({ ok: false, status: 429, statusText: 'Too Many Requests' } as Response)
+
+      const outcomes = await provider.searchPlacesByType(mockBbox, ['campground', 'rv_park'])
+
+      expect(outcomes.map((o) => [o.type, o.ok])).toEqual([['campground', true], ['rv_park', false]])
+      expect(outcomes[0].places).toHaveLength(1)
+    })
+
+    it('ne dédoublonne PAS entre types — le service le fait à travers tout le lot', async () => {
+      // `lodging` et `hotel` rapportent largement les mêmes établissements ; le dédoublonnage
+      // par place_id vit dans le service, qui voit tous les types à la fois.
       const provider = await withKey()
       jest.spyOn(global, 'fetch').mockResolvedValue(page([place('partage')]))
 
-      const result = await provider.searchLayerPlaces(mockBbox, 'accommodations')
+      const outcomes = await provider.searchPlacesByType(mockBbox, ['lodging', 'hotel'])
 
-      expect(result).toHaveLength(1)
+      expect(outcomes.flatMap((o) => o.places.map((p) => p.placeId))).toEqual(['partage', 'partage'])
     })
 
-    it('remonte une erreur quand TOUS les types échouent (le calque ne doit pas être marqué couvert)', async () => {
+    it('ne fait aucun appel quand aucune catégorie demandée n’a de type Google', async () => {
       const provider = await withKey()
-      jest.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 429, statusText: 'Too Many Requests' } as Response)
+      const mockFetch = jest.spyOn(global, 'fetch').mockResolvedValue(page([]))
 
-      await expect(provider.searchLayerPlaces(mockBbox, 'bike')).rejects.toThrow(/all 1 type searches failed/)
+      const outcomes = await provider.searchPlacesByType(mockBbox, [])
+
+      expect(outcomes).toEqual([])
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('CATEGORY_GOOGLE_TYPES ↔ LAYER_GOOGLE_TYPES', () => {
+    it('les types d’un calque sont exactement l’union de ses catégories', () => {
+      // Deux tables ont coexisté et divergé en silence : l'ancienne `GOOGLE_PLACE_TYPES`
+      // (jamais utilisée) contenait `food` et `supermarket`, absents de `LAYER_GOOGLE_TYPES`.
+      // `LAYER_GOOGLE_TYPES` est désormais dérivée — ce test verrouille la dérivation.
+      for (const [layer, categories] of Object.entries(LAYER_CATEGORIES)) {
+        const union = [...new Set(categories.flatMap((c) => CATEGORY_GOOGLE_TYPES[c]))]
+        expect(new Set(LAYER_GOOGLE_TYPES[layer])).toEqual(new Set(union))
+      }
+    })
+
+    it('chaque type Google a une requête textuelle dédiée', () => {
+      // Sans entrée dans TYPE_TEXT_QUERY, le type retombe sur la requête générique du calque —
+      // ce qui renvoyait 0 camping et 0 motel avant la story 17.15.
+      const allTypes = [...new Set(Object.values(CATEGORY_GOOGLE_TYPES).flat())]
+      expect(allTypes.filter((t) => !TYPE_TEXT_QUERY[t])).toEqual([])
+    })
+
+    it('googleTypesForCategories dédoublonne l’union et ignore les catégories sans type', () => {
+      expect(googleTypesForCategories(['bike_shop', 'bike_repair'])).toEqual(['bicycle_store'])
+      expect(googleTypesForCategories(['shelter'])).toEqual([])
+      expect(googleTypesForCategories(['hotel'])).toHaveLength(6)
     })
   })
 

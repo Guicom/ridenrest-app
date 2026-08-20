@@ -1,11 +1,11 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider, SLEEPABLE_SHELTER_TYPES } from './providers/overpass.provider.js'
-import { GooglePlacesProvider, mapGoogleTypesToCategory } from './providers/google-places.provider.js'
+import { GooglePlacesProvider, mapGoogleTypesToCategory, TYPE_TO_LAYER, googleTypesForCategories } from './providers/google-places.provider.js'
 import type { GooglePlaceSummary } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi, GooglePlaceDetails } from '@ridenrest/shared'
-import { MAX_SEARCH_RANGE_KM, POI_BBOX_BUFFER_M, CORRIDOR_WIDTH_M, POI_BBOX_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL, CATEGORY_TO_LAYER } from '@ridenrest/shared'
+import { MAX_SEARCH_RANGE_KM, POI_BBOX_BUFFER_M, CORRIDOR_WIDTH_M, POI_BBOX_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL } from '@ridenrest/shared'
 import type { FindPoisDto } from './dto/find-pois.dto.js'
 import type { Redis } from 'ioredis'
 import { isLikelySamePlace, POI_DEDUP_RADIUS_M } from './poi-dedup.js'
@@ -27,27 +27,7 @@ const CATEGORY_TO_OVERPASS_TAGS: Record<string, string[]> = {
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000
 
-/**
- * Calques Google à prefetcher, déduits des catégories demandées.
- *
- * Le prefetch traitait les 4 calques quel que soit celui affiché : sur une recherche froide,
- * ~8 des 14 appels facturés partaient dans « restaurants » alors que l'utilisateur n'avait coché
- * qu'« hébergements ». Tolérable quand un POI coûtait un Place Details Essentials ; plus du tout
- * depuis que la collecte passe en Text Search Pro.
- *
- * Sans `categories` dans la requête, `activeCategories` vaut toutes les catégories → les 4
- * calques, donc comportement historique préservé.
- */
-function resolveRequestedLayers(activeCategories: string[]): string[] {
-  const layers = new Set<string>()
-  for (const category of activeCategories) {
-    const layer = CATEGORY_TO_LAYER[category as keyof typeof CATEGORY_TO_LAYER]
-    if (layer) layers.add(layer)
-  }
-  return [...layers]
-}
-
-/** Place Details en vol simultanément par calque. Borné : quotas Google + charge PostGIS. */
+/** POI candidats traités en parallèle. Borné : chacun fait deux requêtes PostGIS. */
 const GOOGLE_DETAILS_CONCURRENCY = 6
 
 /**
@@ -201,7 +181,7 @@ export class PoisService {
     // 5. Google Places (source primaire) — indépendant du sort d'Overpass. Le garder dans le
     // `try` ci-dessus signifiait qu'un échec Overpass annulait aussi la source primaire.
     if (wantsGoogle) {
-      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis, resolveRequestedLayers(activeCategories))
+      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis, googleTypesForCategories(activeCategories))
     }
 
     // 6. Lecture unique, filtrée sur les sources demandées
@@ -321,7 +301,7 @@ export class PoisService {
 
     // Google Places (primary source) — independent from Overpass's fate
     if (wantsGoogle) {
-      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis, resolveRequestedLayers(activeCategories))
+      await this.prefetchGooglePoisOncePerBbox(bbox, segmentId, redis, googleTypesForCategories(activeCategories))
     }
 
     const pois = await this.poisRepository.findPoisNearPoint(
@@ -340,54 +320,71 @@ export class PoisService {
   }
 
   /**
-   * Prefetch Google Places, au plus une fois par (segment, bbox, **calque**) — gate de couverture.
+   * Prefetch Google Places, au plus une fois par (segment, bbox, **type Google**) — gate de
+   * couverture.
    *
    * Remplace l'ancien court-circuit `if (dbCached.length > 0) return dbCached`, qui demandait
    * « ai-je au moins un POI à montrer ? » au lieu de « ai-je déjà cherché cette zone ? ».
    * Conséquence en prod : une 1re recherche sur [86,89] km insérait des POI se projetant à
    * 89-93 km (la bbox est un rectangle, la trace y revient), et toute fenêtre ultérieure
    * contenant une de ces lignes — [80,95], [83,93]… — renvoyait ce jeu partiel pendant 7 jours
-   * sans jamais rappeler Google. Même GPX, résultats différents selon l'environnement, décidés
-   * par la première fenêtre cherchée.
+   * sans jamais rappeler Google.
    *
-   * Le marqueur est porté par (segment, calque) :
+   * Granularité du marqueur, du plus grossier au plus fin :
    * - **par segment** : les lignes sont insérées par `segment_id`, une clé bbox seule ferait
    *   hériter « déjà cherché » au segment d'un autre utilisateur, qui resterait vide ;
    * - **par calque** (2026-08-20) : sinon un calque non demandé serait marqué couvert sans
-   *   avoir été interrogé, et un calque demandé plus tard resterait vide 7 jours.
+   *   avoir été interrogé, et un calque demandé plus tard resterait vide 7 jours ;
+   * - **par type** (2026-08-20, ce lot) : on n'interroge plus que les types des catégories
+   *   demandées. Marquer le calque entier après n'avoir cherché que « hôtel » gèlerait
+   *   « camping » à zéro résultat pendant 7 jours — le même piège, un cran plus bas. Ça règle
+   *   aussi l'échec partiel : 15 types morts sur 16 laissaient le calque marqué couvert.
    *
-   * Un calque dont la requête a échoué n'est PAS marqué → il retente au lieu de verrouiller.
+   * Un type dont la requête a échoué n'est PAS marqué → il retente au lieu de verrouiller.
+   *
+   * **Compatibilité** : les marqueurs `…:layer:{layer}:…` posés avant ce lot signifiaient
+   * « tous les types de ce calque ont été interrogés ». On continue de les lire pendant leur
+   * TTL résiduelle (7 j max) pour ne pas re-payer un prefetch complet sur toutes les zones déjà
+   * couvertes. On n'en écrit plus.
    */
   private async prefetchGooglePoisOncePerBbox(
     bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
     segmentId: string,
     redis: Redis,
-    layers: string[],
+    googleTypes: string[],
   ): Promise<void> {
     if (!this.googlePlacesProvider.isConfigured()) return
-    if (layers.length === 0) return
+    if (googleTypes.length === 0) return
 
     const bboxKey = `${round3(bbox.minLat)}:${round3(bbox.minLng)}:${round3(bbox.maxLat)}:${round3(bbox.maxLng)}`
-    const markerKey = (layer: string) => `pois:google:seg:${segmentId}:layer:${layer}:bbox:${bboxKey}`
+    const typeMarker = (type: string) => `pois:google:seg:${segmentId}:type:${type}:bbox:${bboxKey}`
+    const legacyLayerMarker = (layer: string) => `pois:google:seg:${segmentId}:layer:${layer}:bbox:${bboxKey}`
+
+    const legacyCovered = new Set<string>()
+    for (const layer of new Set(googleTypes.map((t) => TYPE_TO_LAYER[t]).filter(Boolean))) {
+      if (await redis.get(legacyLayerMarker(layer))) legacyCovered.add(layer)
+    }
 
     const pending: string[] = []
-    for (const layer of layers) {
-      if (await redis.get(markerKey(layer))) {
-        this.logger.debug(`[Google prefetch] layer=${layer} already fetched for this segment/bbox — skip`)
+    for (const type of googleTypes) {
+      if (await redis.get(typeMarker(type))) continue
+      const layer = TYPE_TO_LAYER[type]
+      if (layer && legacyCovered.has(layer)) {
+        this.logger.debug(`[Google prefetch] type=${type} couvert par le marqueur de calque hérité — skip`)
         continue
       }
-      pending.push(layer)
+      pending.push(type)
     }
     if (pending.length === 0) return
 
     try {
-      const { succeededLayers } = await this.prefetchAndInsertGooglePois(bbox, segmentId, pending)
-      for (const layer of succeededLayers) {
-        await redis.setex(markerKey(layer), GOOGLE_PLACES_CACHE_TTL, '1')
+      const { succeededTypes } = await this.prefetchAndInsertGooglePois(bbox, segmentId, pending)
+      for (const type of succeededTypes) {
+        await redis.setex(typeMarker(type), GOOGLE_PLACES_CACHE_TTL, '1')
       }
-      const failed = pending.filter((l) => !succeededLayers.includes(l))
+      const failed = pending.filter((t) => !succeededTypes.includes(t))
       if (failed.length > 0) {
-        this.logger.warn(`[Google prefetch] layer(s) left unmarked for retry: ${failed.join(', ')}`)
+        this.logger.warn(`[Google prefetch] type(s) left unmarked for retry: ${failed.join(', ')}`)
       }
     } catch (err) {
       this.logger.warn(`[Google prefetch] failed, bbox left unmarked for retry: ${String(err)}`)
@@ -395,86 +392,86 @@ export class PoisService {
   }
 
   /**
-   * Collecte et insère les POI Google d'une bbox, calque par calque.
+   * Collecte et insère les POI Google d'une bbox, **type par type**.
    *
-   * **Aucun Place Details ici** : `searchLayerPlaces` rapporte identité, position et types en un
-   * seul appel Text Search Pro pour 20 POI. L'ancien enchaînement « IDs Only puis un Place
-   * Details par place_id » coûtait un appel facturé PAR POI et, séquentiel jusqu'au 2026-08-19,
-   * 50 à 90 allers-retours HTTP sur une bbox froide.
+   * **Aucun Place Details ici** : le Text Search Pro rapporte identité, position et types en un
+   * seul appel pour 20 POI. L'ancien enchaînement « IDs Only puis un Place Details par
+   * place_id » coûtait un appel facturé PAR POI et, séquentiel jusqu'au 2026-08-19, 50 à 90
+   * allers-retours HTTP sur une bbox froide.
    *
    * `mapWithConcurrency` reste nécessaire : chaque POI candidat déclenche deux requêtes PostGIS
    * (présence en base, voisins d'une autre source pour le dédoublonnage).
+   *
+   * Le dédoublonnage par `place_id` est fait ici, à travers TOUS les types : `lodging` et
+   * `hotel` rapportent largement les mêmes établissements.
    */
   private async prefetchAndInsertGooglePois(
     bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
     segmentId: string,
-    layers: string[],
-  ): Promise<{ succeededLayers: string[]; inserted: number }> {
-    if (!this.googlePlacesProvider.isConfigured()) return { succeededLayers: [], inserted: 0 }
+    googleTypes: string[],
+  ): Promise<{ succeededTypes: string[]; inserted: number }> {
+    if (!this.googlePlacesProvider.isConfigured()) return { succeededTypes: [], inserted: 0 }
 
     const expiresAt = new Date(Date.now() + GOOGLE_PLACES_CACHE_TTL * 1000)
-    let newPoiCount = 0
 
-    this.logger.log(`[Google prefetch] bbox: ${JSON.stringify(bbox)}, segment: ${segmentId}, layers: ${layers.join(',')}`)
+    this.logger.log(`[Google prefetch] bbox: ${JSON.stringify(bbox)}, segment: ${segmentId}, types: ${googleTypes.join(',')}`)
 
-    const layerResults = await Promise.allSettled(
-      layers.map(async (layer) => {
-        const places: GooglePlaceSummary[] = await this.googlePlacesProvider.searchLayerPlaces(bbox, layer)
-        this.logger.log(`[Google prefetch] layer=${layer} → ${places.length} lieux (Text Search Pro, paginé)`)
+    const outcomes = await this.googlePlacesProvider.searchPlacesByType(bbox, googleTypes)
 
-        const candidates = await mapWithConcurrency(places, GOOGLE_DETAILS_CONCURRENCY, async (place) => {
-          const alreadyInDb = await this.poisRepository.googlePoiExistsInSegment(place.placeId, segmentId)
-          if (alreadyInDb) {
-            this.logger.debug(`[Google prefetch] ${place.placeId} already in DB for segment — skip`)
-            return null
-          }
+    const succeededTypes: string[] = []
+    const byPlaceId = new Map<string, { place: GooglePlaceSummary; layer: string }>()
+    for (const outcome of outcomes) {
+      this.logger.log(`[Google prefetch] type=${outcome.type} → ${outcome.places.length} lieux (Text Search Pro, paginé)${outcome.ok ? '' : ' [ÉCHEC]'}`)
+      if (!outcome.ok) continue
+      succeededTypes.push(outcome.type)
+      const layer = TYPE_TO_LAYER[outcome.type] ?? 'accommodations'
+      for (const place of outcome.places) {
+        if (!byPlaceId.has(place.placeId)) byPlaceId.set(place.placeId, { place, layer })
+      }
+    }
 
-          // Dédoublonnage cross-source UNIQUEMENT, et avec correspondance de nom. La simple
-          // proximité supprimait des établissements bel et bien distincts — et, les calques
-          // tournant en parallèle, dédoublonnait les POI Google entre eux (ordre-dépendant).
-          const neighbours = await this.poisRepository.findNearbyPoisFromOtherSources(
-            place.lat, place.lng, POI_DEDUP_RADIUS_M, segmentId, 'google',
-          )
-          const duplicate = neighbours.find((n) => isLikelySamePlace(n.name, place.name))
+    const candidates = await mapWithConcurrency([...byPlaceId.values()], GOOGLE_DETAILS_CONCURRENCY, async ({ place, layer }) => {
+      const alreadyInDb = await this.poisRepository.googlePoiExistsInSegment(place.placeId, segmentId)
+      if (alreadyInDb) {
+        this.logger.debug(`[Google prefetch] ${place.placeId} already in DB for segment — skip`)
+        return null
+      }
 
-          if (duplicate) {
-            this.logger.log(`[Google prefetch] ${place.placeId} (${place.name}) deduped — ${duplicate.source} POI "${duplicate.name}" within ${POI_DEDUP_RADIUS_M}m`)
-            return null
-          }
+      // Dédoublonnage cross-source UNIQUEMENT, et avec correspondance de nom. La simple
+      // proximité supprimait des établissements bel et bien distincts — et, les calques
+      // tournant en parallèle, dédoublonnait les POI Google entre eux (ordre-dépendant).
+      const neighbours = await this.poisRepository.findNearbyPoisFromOtherSources(
+        place.lat, place.lng, POI_DEDUP_RADIUS_M, segmentId, 'google',
+      )
+      const duplicate = neighbours.find((n) => isLikelySamePlace(n.name, place.name))
 
-          return {
-            placeId: place.placeId,
-            name: place.name,
-            lat: place.lat,
-            lng: place.lng,
-            category: mapGoogleTypesToCategory(place.types, layer),
-            rawData: { types: place.types } as Record<string, unknown>,
-          }
-        })
+      if (duplicate) {
+        this.logger.log(`[Google prefetch] ${place.placeId} (${place.name}) deduped — ${duplicate.source} POI "${duplicate.name}" within ${POI_DEDUP_RADIUS_M}m`)
+        return null
+      }
 
-        const toInsert = candidates.filter((c): c is NonNullable<typeof c> => c !== null)
-        if (toInsert.length > 0) {
-          await this.poisRepository.insertGooglePois(segmentId, toInsert, expiresAt)
-          this.logger.log(`[Google prefetch] layer=${layer} → inserted ${toInsert.length} POIs: ${toInsert.map((p) => p.name).join(', ')}`)
-          newPoiCount += toInsert.length
-        }
-        return layer
-      }),
-    )
+      return {
+        placeId: place.placeId,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        category: mapGoogleTypesToCategory(place.types, layer),
+        rawData: { types: place.types } as Record<string, unknown>,
+      }
+    })
 
-    if (newPoiCount > 0) {
+    const toInsert = candidates.filter((c): c is NonNullable<typeof c> => c !== null)
+    if (toInsert.length > 0) {
+      await this.poisRepository.insertGooglePois(segmentId, toInsert, expiresAt)
       await this.poisRepository.updatePoiDistances(segmentId)
-      this.logger.debug(`Inserted ${newPoiCount} Google POIs for segment ${segmentId}`)
+      this.logger.log(`[Google prefetch] inserted ${toInsert.length} POIs: ${toInsert.map((p) => p.name).join(', ')}`)
     }
 
-    const succeededLayers = layerResults
-      .filter((r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled')
-      .map((r) => r.value)
-    const failedLayers = layerResults.length - succeededLayers.length
-    if (failedLayers > 0) {
-      this.logger.warn(`[Google prefetch] ${failedLayers}/${layers.length} layer(s) failed for segment ${segmentId}`)
+    const failedTypes = googleTypes.filter((t) => !succeededTypes.includes(t))
+    if (failedTypes.length > 0) {
+      this.logger.warn(`[Google prefetch] ${failedTypes.length}/${googleTypes.length} type(s) failed for segment ${segmentId}`)
     }
-    return { succeededLayers, inserted: newPoiCount }
+    return { succeededTypes, inserted: toInsert.length }
   }
 }
 

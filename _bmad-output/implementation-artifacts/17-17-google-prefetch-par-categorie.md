@@ -1,0 +1,113 @@
+# Story 17.17 — Prefetch Google par catégorie demandée (marqueurs par type)
+
+**Statut** : review — 2026-08-20
+**Épopée** : 17 (recherche POI)
+**Suite de** : 17.15 (Text Search Pro sans Place Details)
+
+---
+
+## Problème
+
+Le coût d'une recherche Google suit le **nombre de types interrogés**, pas le nombre de POI
+rapportés : `searchPlacesByType` émet un Text Search Pro **par type Google**, facturé qu'il
+ramène 20 lieux ou zéro (32 $/1000, 5 000 gratuits/mois).
+
+Or la sélection de catégories de l'utilisateur était honorée **à la lecture**
+(`findCachedPois(segmentId, activeCategories, …)`) et **ignorée à la collecte** : le prefetch
+prenait le calque et interrogeait `LAYER_GOOGLE_TYPES[layer]` en entier.
+
+Le défaut du produit est `visibleLayers = {accommodations}` + `activeAccommodationTypes = {hotel}`
+(identique web et mobile). Le cas nominal payait donc **16 appels pour une demande qui en
+justifiait 6**.
+
+## Décision
+
+N'interroger que les types Google des catégories demandées.
+
+| sélection | appels / bbox froide | coût | bboxes gratuites / mois |
+|---|---|---|---|
+| `hotel` (**le défaut**) | 6 au lieu de 16 | 0,19 $ | **833** au lieu de 312 |
+| `hotel` + `camp_site` | 10 | 0,32 $ | 500 |
+| les 5 catégories | 16 | 0,51 $ | 312 |
+| `shelter` seul | **0** | 0 $ | — |
+
+Changement **serveur uniquement** : web et mobile envoient déjà `categories`.
+
+## Conséquences assumées
+
+**Le filtre devient réellement filtrant.** Avant, cocher « hôtel » affichait aussi les
+établissements que les 10 autres requêtes avaient ramenés et que `mapGoogleTypesToCategory`
+reclassait en `hotel`. Ces requêtes ne partent plus, donc le jeu « hôtel seul » peut légèrement
+rétrécir. C'est le comportement conforme à la case cochée — décision validée par Guillaume le
+2026-08-20.
+
+## Implémentation
+
+### 1. Source de vérité des types (`google-places.provider.ts`)
+
+`CATEGORY_GOOGLE_TYPES: Record<PoiCategory, string[]>` remplace `GOOGLE_PLACE_TYPES` (exporté,
+**jamais utilisé**, et divergent : il contenait `food` et `supermarket` absents de
+`LAYER_GOOGLE_TYPES`, et faisait pointer `shelter` sur `lodging`).
+
+`LAYER_GOOGLE_TYPES` en est désormais **dérivée** via `LAYER_CATEGORIES`, et un test verrouille
+l'égalité des deux vues. Seul consommateur restant : `searchLayerPlaceIds` (densité, IDs Only).
+
+`shelter` n'a **aucun** type Google : les refuges viennent d'OSM
+(`tourism=alpine_hut|wilderness_hut`). L'ancien `['lodging']` était doublement inutile —
+`lodging` appartient déjà à `hotel`, et ses résultats sont classés `hotel`, donc jamais affichés
+sous `shelter`.
+
+### 2. `searchLayerPlaces` → `searchPlacesByType`
+
+Prend une liste de types, retourne `TypeSearchOutcome[]` (`{ type, places, ok }`) au lieu d'une
+liste fusionnée : l'appelant a besoin de l'issue **par type** pour poser ses marqueurs. Le
+dédoublonnage par `place_id` remonte dans le service, qui voit tous les types d'un coup.
+
+### 3. Marqueurs de couverture par type (`pois.service.ts`)
+
+```
+pois:google:seg:{segmentId}:type:{googleType}:bbox:{bboxKey}     TTL 7 j
+```
+
+Sans ce grain, marquer le calque entier après n'avoir cherché que « hôtel » gèlerait « camping »
+à zéro résultat pendant 7 jours — le piège de la règle 3 du contexte projet, un cran plus bas.
+
+**Corrige aussi un bug d'échec partiel préexistant** : `searchLayerPlaces` ne levait que si
+**tous** les types du calque échouaient. 15 types morts sur 16 laissaient donc le calque marqué
+couvert 7 jours, avec le symptôme « 0 résultat » figé sur une zone qui en contient.
+
+**Compatibilité** : les marqueurs `…:layer:{layer}:…` sont encore **lus** pendant leur TTL
+résiduelle (7 j max) comme « tous les types de ce calque ont été interrogés », pour ne pas
+re-payer un prefetch complet sur toutes les zones déjà couvertes. On n'en écrit plus.
+
+## Tâches
+
+- [x] T1 — `CATEGORY_GOOGLE_TYPES` source de vérité ; `LAYER_GOOGLE_TYPES` dérivée
+- [x] T2 — `googleTypesForCategories()` (union dédoublonnée, `[]` si aucun type)
+- [x] T3 — `searchPlacesByType` : issue par type, plus de fusion ni de `throw` global
+- [x] T4 — dédoublonnage `place_id` cross-types remonté dans le service
+- [x] T5 — marqueurs par type + shim de lecture des marqueurs de calque hérités
+- [x] T6 — tests : partition verrouillée, un appel par type, `shelter` → 0 appel, marquage
+      par type, échec isolé retentable, shim hérité (12 tests ajoutés/réécrits)
+- [ ] T7 — **validation Guillaume** : sur une zone neuve, vérifier dans les logs
+      `[Google prefetch] ... types: lodging,hotel,motel,inn,extended_stay_hotel,resort_hotel`
+      (6 types, pas 16) ; puis cocher « camping » et vérifier qu'un nouveau prefetch part avec
+      les 4 types de `camp_site` au lieu de rien.
+
+## Vérifications
+
+- `tsc --noEmit` : 0 erreur
+- `eslint src/pois/` : 0 issue
+- `jest` (API complet) : **481 tests, 39 suites, 0 échec**
+
+## Signature de log
+
+Conformément à la règle 13, le nouveau chemin est reconnaissable :
+
+```
+[Google prefetch] bbox: {...}, segment: {id}, types: lodging,hotel,motel,...
+[Google prefetch] type=campground → 10 lieux (Text Search Pro, paginé)
+```
+
+L'ancien loguait `layers: accommodations` et `layer=accommodations → N lieux`.
+Second signal : les clés Redis passent de `:layer:` à `:type:`.

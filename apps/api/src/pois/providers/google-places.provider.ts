@@ -1,33 +1,71 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { GooglePlaceDetails } from '@ridenrest/shared'
+import { LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
+import type { GooglePlaceDetails, PoiCategory, MapLayer } from '@ridenrest/shared'
 
-// Google place types mapped to our MapLayer categories
-// Using includedType for accurate category filtering
-export const GOOGLE_PLACE_TYPES: Record<string, string[]> = {
+/**
+ * **Source de vérité** : les types Google interrogés pour une `PoiCategory`.
+ *
+ * Le coût d'une recherche est proportionnel au NOMBRE DE TYPES interrogés, pas au nombre de
+ * POI rapportés : `searchPlacesByType` émet un Text Search Pro **par type**, facturé qu'il
+ * ramène 20 lieux ou zéro (32 $/1000, 5 000 gratuits/mois). Interroger les 16 types
+ * d'`accommodations` quand l'utilisateur n'a coché que « hôtel » coûtait donc 0,51 $ par bbox
+ * froide au lieu de 0,19 $ — pour des résultats que la lecture filtrait ensuite.
+ *
+ * D'où le découpage par catégorie : on n'interroge que les types des catégories demandées.
+ *
+ * `shelter` n'a **aucun** type Google — les refuges et abris de montagne viennent d'OSM
+ * (`tourism=alpine_hut|wilderness_hut`, cf. règle 6 du contexte projet). L'ancienne valeur
+ * `['lodging']` était doublement inutile : `lodging` appartient déjà à `hotel`, et
+ * `mapGoogleTypesToCategory` classe ses résultats en `hotel`, donc jamais en `shelter`.
+ */
+export const CATEGORY_GOOGLE_TYPES: Record<PoiCategory, string[]> = {
   hotel:        ['lodging', 'hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel'],
   hostel:       ['hostel'],
   guesthouse:   ['bed_and_breakfast', 'guest_house', 'private_guest_room', 'cottage', 'farmstay'],
   camp_site:    ['campground', 'camping_cabin', 'rv_park', 'mobile_home_park'],
-  shelter:      ['lodging'],
-  restaurant:   ['restaurant', 'food'],
-  supermarket:  ['grocery_or_supermarket', 'supermarket'],
+  shelter:      [],
+  restaurant:   ['restaurant'],
+  supermarket:  ['grocery_or_supermarket'],
   convenience:  ['convenience_store'],
   bike_shop:    ['bicycle_store'],
   bike_repair:  ['bicycle_store'],
 }
 
-// Deduplicated Google types per MapLayer (for batching queries by layer)
-// Google Places API (New) types — each becomes a separate Text Search query (IDs Only)
-export const LAYER_GOOGLE_TYPES: Record<string, string[]> = {
-  accommodations: [
-    'lodging', 'hotel', 'motel', 'inn', 'extended_stay_hotel', 'resort_hotel',
-    'campground', 'camping_cabin', 'rv_park', 'mobile_home_park',
-    'bed_and_breakfast', 'guest_house', 'private_guest_room', 'cottage', 'farmstay',
-    'hostel',
-  ],
-  restaurants:    ['restaurant'],
-  supplies:       ['grocery_or_supermarket', 'convenience_store'],
-  bike:           ['bicycle_store'],
+/**
+ * Types dédoublonnés par calque — **dérivé** de `CATEGORY_GOOGLE_TYPES`, jamais saisi à la main.
+ *
+ * Les deux tables ont coexisté et divergé silencieusement (l'ancienne `GOOGLE_PLACE_TYPES`,
+ * jamais utilisée, contenait `food` et `supermarket` absents d'ici). Un test verrouille
+ * désormais l'égalité des deux vues.
+ *
+ * Seul consommateur restant : `searchLayerPlaceIds` (analyse de densité, masque IDs Only).
+ */
+export const LAYER_GOOGLE_TYPES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(LAYER_CATEGORIES).map(([layer, categories]) => [
+    layer,
+    [...new Set(categories.flatMap((c) => CATEGORY_GOOGLE_TYPES[c]))],
+  ]),
+)
+
+/** Repli de calque pour `resolveTextQuery` — un type appartient à une seule catégorie. */
+export const TYPE_TO_LAYER: Record<string, MapLayer> = Object.fromEntries(
+  (Object.entries(CATEGORY_GOOGLE_TYPES) as [PoiCategory, string[]][]).flatMap(
+    ([category, types]) => types.map((t) => [t, CATEGORY_TO_LAYER[category]] as const),
+  ),
+)
+
+/**
+ * Union dédoublonnée des types Google à interroger pour un ensemble de catégories.
+ *
+ * Retourne `[]` si aucune catégorie demandée n'a de type Google (ex. `shelter` seul) — dans ce
+ * cas le prefetch Google est intégralement sauté, zéro appel facturé.
+ */
+export function googleTypesForCategories(categories: string[]): string[] {
+  const types = new Set<string>()
+  for (const category of categories) {
+    for (const t of CATEGORY_GOOGLE_TYPES[category as PoiCategory] ?? []) types.add(t)
+  }
+  return [...types]
 }
 
 /**
@@ -109,6 +147,13 @@ export interface GooglePlaceSummary {
   types: string[]
 }
 
+/** Issue d'un Text Search pour UN type — `ok: false` laisse le type non marqué, donc réessayable. */
+export interface TypeSearchOutcome {
+  type: string
+  places: GooglePlaceSummary[]
+  ok: boolean
+}
+
 interface GoogleTextSearchRequest {
   textQuery: string
   includedType?: string
@@ -164,7 +209,7 @@ export class GooglePlacesProvider {
   /**
    * Socle d'identité d'un lieu. Ces champs seuls relèveraient du SKU Place Details Essentials,
    * mais on ne les demande plus jamais isolément : le prefetch les obtient via Text Search Pro
-   * (cf. `searchLayerPlaces`). Conservés comme base de composition de `PRO_FIELDS`.
+   * (cf. `searchPlacesByType`). Conservés comme base de composition de `PRO_FIELDS`.
    */
   private static readonly ESSENTIALS_FIELDS = ['id', 'displayName', 'location', 'types']
 
@@ -188,7 +233,7 @@ export class GooglePlacesProvider {
   /**
    * Fiche POI uniquement — SKU **Place Details Pro** (17 $/1000, 5 000 gratuits/mois).
    *
-   * Le prefetch carte n'appelle plus cette méthode du tout : `searchLayerPlaces` rapporte déjà
+   * Le prefetch carte n'appelle plus cette méthode du tout : `searchPlacesByType` rapporte déjà
    * identité, position et types en un seul appel Text Search Pro pour 20 POI. Un palier
    * `essentials` avait été introduit le 2026-08-19 pour le prefetch ; il est devenu inutile le
    * 2026-08-20 et a été retiré plutôt que laissé en place sans appelant.
@@ -367,8 +412,9 @@ export class GooglePlacesProvider {
     return collected
   }
 
-  private resolveTextQuery(googleType: string, layer: string): string {
-    return TYPE_TEXT_QUERY[googleType] ?? LAYER_TEXT_QUERY_FALLBACK[layer] ?? layer
+  private resolveTextQuery(googleType: string): string {
+    const layer = TYPE_TO_LAYER[googleType]
+    return TYPE_TEXT_QUERY[googleType] ?? (layer && LAYER_TEXT_QUERY_FALLBACK[layer]) ?? googleType
   }
 
   /**
@@ -405,7 +451,7 @@ export class GooglePlacesProvider {
 
     const results = await Promise.allSettled(
       googleTypes.map((type) =>
-        this.searchPlaceIds(bbox, type, this.resolveTextQuery(type, layer)),
+        this.searchPlaceIds(bbox, type, this.resolveTextQuery(type)),
       ),
     )
 
@@ -423,36 +469,41 @@ export class GooglePlacesProvider {
    * Remplace l'ancien enchaînement « IDs Only puis un Place Details par place_id » : les quatre
    * champs nécessaires à un pin arrivent déjà ici, 20 POI par appel facturé.
    *
+   * **Un appel facturé par type**, qu'il ramène 20 lieux ou zéro — d'où l'intérêt de ne passer
+   * que les types des catégories réellement demandées (`googleTypesForCategories`).
+   *
+   * Retourne l'issue de CHAQUE type plutôt qu'une liste fusionnée : l'appelant pose un marqueur
+   * de couverture par type, et un type en échec doit rester non marqué pour être réessayé. Une
+   * fusion masquerait un échec partiel — 15 types morts sur 16 verrouillaient auparavant tout le
+   * calque pour 7 jours, avec le symptôme « 0 résultat » figé sur une zone qui en contient.
+   *
    * Un lieu sans coordonnées est écarté — on ne peut pas le placer sur la carte.
    */
-  async searchLayerPlaces(
+  async searchPlacesByType(
     bbox: { minLat: number; maxLat: number; minLng: number; maxLng: number },
-    layer: string,
-  ): Promise<GooglePlaceSummary[]> {
-    const googleTypes = LAYER_GOOGLE_TYPES[layer] ?? []
+    googleTypes: string[],
+  ): Promise<TypeSearchOutcome[]> {
     if (googleTypes.length === 0) return []
     if (!this.API_KEY) return []
 
-    const results = await Promise.allSettled(
+    const settled = await Promise.allSettled(
       googleTypes.map((type) =>
-        this.textSearch(bbox, type, this.resolveTextQuery(type, layer), MASK_PRO, true),
+        this.textSearch(bbox, type, this.resolveTextQuery(type), MASK_PRO, true),
       ),
     )
 
-    const byPlaceId = new Map<string, GooglePlaceSummary>()
-    let failed = 0
-    for (const result of results) {
+    return settled.map((result, i) => {
+      const type = googleTypes[i]
       if (result.status === 'rejected') {
-        failed += 1
-        this.logger.warn(`Google Places type search failed: ${result.reason}`)
-        continue
+        this.logger.warn(`Google Places search failed for type=${type}: ${result.reason}`)
+        return { type, places: [], ok: false }
       }
+      const places: GooglePlaceSummary[] = []
       for (const p of result.value) {
         const lat = p.location?.latitude
         const lng = p.location?.longitude
         if (!p.id || typeof lat !== 'number' || typeof lng !== 'number') continue
-        if (byPlaceId.has(p.id)) continue
-        byPlaceId.set(p.id, {
+        places.push({
           placeId: p.id,
           name: p.displayName?.text ?? 'Unknown',
           lat,
@@ -460,11 +511,7 @@ export class GooglePlacesProvider {
           types: p.types ?? [],
         })
       }
-    }
-
-    if (failed === results.length && results.length > 0) {
-      throw new Error(`Google Places: all ${failed} type searches failed for layer ${layer}`)
-    }
-    return [...byPlaceId.values()]
+      return { type, places, ok: true }
+    })
   }
 }
