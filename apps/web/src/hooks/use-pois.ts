@@ -1,9 +1,9 @@
 import { useQueries } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { useMapStore } from '@/stores/map.store'
-import { getPois } from '@/lib/api-client'
+import { getPois, getNearMissCount } from '@/lib/api-client'
 import { useOverpassEnabled } from './use-profile'
-import { POI_BBOX_CACHE_TTL, LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
+import { POI_BBOX_CACHE_TTL, LAYER_CATEGORIES, CATEGORY_TO_LAYER, CORRIDOR_WIDTH_M } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
 import type { Poi, MapLayer } from '@ridenrest/shared'
 
@@ -18,6 +18,12 @@ interface UsePoisResult {
   overpassError: boolean
   /** Une recherche étendue est attendue pour cette recherche (option active + recherche lancée). */
   overpassExpected: boolean
+  /**
+   * POI écartés par le filtre corridor, juste au-delà de la limite. Le filtre est correct mais
+   * il coupait en silence : un camping à 3 263 m écarté pour 263 m, et « Camping (0) » à
+   * l'écran, indiscernable d'une absence réelle.
+   */
+  nearMiss: { count: number; nearestM: number | null; corridorWidthM: number }
 }
 
 /**
@@ -133,6 +139,42 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
     poisByLayer[layer].sort((a, b) => a.distAlongRouteKm - b.distAlongRouteKm)
   }
 
+  // Compteur des quasi-manqués corridor : UNE requête par segment (pas par calque ni par
+  // source), sur les mêmes catégories que l'affichage, avec les mêmes gardes de déclenchement.
+  // Non bloquante : elle n'entre dans aucun état de chargement.
+  // Sans calque visible, PAS de requête : `categories: []` serait interprété par l'API comme
+  // « toutes les catégories » et on compterait des masqués que l'utilisateur ne cherchait pas.
+  const nearMissCategories = activeLayers.flatMap((layer) => LAYER_CATEGORIES[layer] ?? [])
+  const nearMissRanges = nearMissCategories.length > 0 ? segmentRanges : []
+  const nearMissResults = useQueries({
+    queries: nearMissRanges.map(({ segment, segLocalFrom, segLocalTo }) => ({
+      queryKey: ['pois', 'near-miss', {
+        segmentId: segment.id,
+        fromKm: segLocalFrom,
+        toKm: segLocalTo,
+        categories: [...nearMissCategories].sort().join(','),
+        overpassEnabled,
+      }] as const,
+      queryFn: () => getNearMissCount({
+        segmentId: segment.id,
+        fromKm: segLocalFrom,
+        toKm: segLocalTo,
+        categories: nearMissCategories,
+        overpassEnabled,
+      }),
+      staleTime: POI_BBOX_CACHE_TTL * 1000,
+      gcTime: POI_BBOX_CACHE_TTL * 1000,
+    })),
+  })
+
+  const nearMissData = nearMissResults.map((r) => r.data).filter((d): d is NonNullable<typeof d> => Boolean(d))
+  const nearMissDistances = nearMissData.map((d) => d.nearestM).filter((m): m is number => m !== null)
+  const nearMiss = {
+    count: nearMissData.reduce((sum, d) => sum + d.count, 0),
+    nearestM: nearMissDistances.length > 0 ? Math.min(...nearMissDistances) : null,
+    corridorWidthM: nearMissData[0]?.corridorWidthM ?? CORRIDOR_WIDTH_M,
+  }
+
   // isPending = source primaire seulement. Overpass ne doit ni retenir le premier affichage,
   // ni l'auto-zoom, ni faire tourner les squelettes pendant 30 s.
   // Attendre le profil compte comme un chargement : sinon une recherche lancée annonce
@@ -144,5 +186,5 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
   const overpassPending = overpassResults.some((r) => r.isPending)
   const overpassError = overpassResults.some((r) => r.isError)
 
-  return { poisByLayer, isPending, hasError, overpassPending, overpassError, overpassExpected }
+  return { poisByLayer, isPending, hasError, overpassPending, overpassError, overpassExpected, nearMiss }
 }

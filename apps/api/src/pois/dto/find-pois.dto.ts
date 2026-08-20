@@ -57,7 +57,9 @@ export class FindPoisDto {
    * - `google`   : prefetch Google uniquement, aucune requête Overpass, lecture filtrée google.
    * - `overpass` : requête Overpass uniquement, aucun appel Google, lecture filtrée overpass.
    * - absent     : comportement historique (les deux sources dans une seule réponse) —
-   *                conservé pour le mobile, qui n'est pas encore découplé.
+   *                conservé pour les binaires mobiles déjà distribués, qui parlent à l'API de
+   *                prod sans ce paramètre. Le code mobile actuel, lui, est découplé
+   *                (2026-08-20) et envoie toujours `source`.
    */
   @IsOptional()
   @IsIn(POI_SOURCES)

@@ -409,7 +409,10 @@
       "airbnb": "Search on Airbnb",
       "extendedPending": "Extended search in progress…",
       "extendedSlow": "Extended search taking longer than expected — results will be added",
-      "extendedError": "Extended search unavailable — partial results"
+      "extendedError": "Extended search unavailable — partial results",
+      "nearMissOne": "{{count}} result beyond {{corridor}} from the route is not shown",
+      "nearMissMany": "{{count}} results beyond {{corridor}} from the route are not shown",
+      "nearMissNearest": "nearest at {{distance}}"
     }
   },
   "settings": {

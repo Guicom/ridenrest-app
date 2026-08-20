@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { AccommodationSubTypes } from '@/components/map/accommodation-sub-types';
+import { NearMissNotice } from '@/components/map/near-miss-notice';
 import { PoiLayerGrid } from '@/components/map/poi-layer-grid';
 import { SearchOnDropdown } from '@/components/map/search-on-dropdown';
 import { Button } from '@/components/ui/button';
@@ -165,6 +166,8 @@ export interface SearchRangeControlProps {
   waypoints: MapWaypoint[] | null;
   isPoisPending: boolean;
   accommodationPois?: Poi[];
+  /** POI écartés par le filtre corridor — affiché sous les compteurs, purement informatif. */
+  nearMiss?: { count: number; nearestM: number | null; corridorWidthM: number };
   stages?: AdventureStageResponse[];
   isOnline: boolean;
 }
@@ -174,6 +177,7 @@ export function SearchRangeControl({
   waypoints,
   isPoisPending,
   accommodationPois,
+  nearMiss,
   stages,
   isOnline,
 }: SearchRangeControlProps) {
@@ -397,7 +401,17 @@ export function SearchRangeControl({
 
           {/* Sous-types hébergement (si calque actif) */}
           {visibleLayers.has('accommodations') ? (
-            <AccommodationSubTypes accommodationPois={accommodationPois} />
+            <>
+              <AccommodationSubTypes accommodationPois={accommodationPois} />
+              {/* Juste sous les compteurs : c'est là que l'utilisateur lit « Camping (0) ». */}
+              {nearMiss ? (
+                <NearMissNotice
+                  count={nearMiss.count}
+                  nearestM={nearMiss.nearestM}
+                  corridorWidthM={nearMiss.corridorWidthM}
+                />
+              ) : null}
+            </>
           ) : null}
 
           {/* Largeur de recherche */}

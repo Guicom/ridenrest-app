@@ -3,7 +3,7 @@ import { db, accommodationsCache, adventureSegments, adventures } from '@ridenre
 import { eq, and, gte, lte, sql, inArray, notInArray } from 'drizzle-orm'
 import type { OverpassNode } from './providers/overpass.provider.js'
 import type { Poi } from '@ridenrest/shared'
-import { CORRIDOR_WIDTH_M } from '@ridenrest/shared'
+import { CORRIDOR_WIDTH_M, POI_NEAR_MISS_MAX_M } from '@ridenrest/shared'
 
 @Injectable()
 export class PoisRepository {
@@ -55,6 +55,68 @@ export class PoisRepository {
       distAlongRouteKm: r.distAlongRouteKm,
       rawData: r.rawData as Record<string, unknown> | undefined,
     }))
+  }
+
+  /**
+   * POI qui satisfont TOUS les critères d'une recherche sauf le corridor, et qui restent dans
+   * la bande `]CORRIDOR_WIDTH_M, POI_NEAR_MISS_MAX_M]`.
+   *
+   * Raison d'être : le filtre corridor coupe **en silence**. Un camping à 3 263 m a été écarté
+   * pour 263 m, l'écran affichait « Camping (0) », et rien ne permettait de distinguer « il n'y
+   * a rien » de « il y a quelque chose juste au-delà de la limite ». C'est la même forme de
+   * défaut que la panne Overpass restée invisible cinq mois.
+   *
+   * La borne haute est indispensable : sans elle le message compterait des POI d'une autre
+   * vallée (le plus lointain en base est à 10 444 m) et ne voudrait plus rien dire.
+   */
+  /**
+   * Le segment appartient-il à cet utilisateur ? Requête EXISTS, sans charger les waypoints.
+   *
+   * `getSegmentWaypoints` sert aussi de contrôle de propriété, mais il rapatrie la totalité du
+   * tracé — inutilement coûteux pour un endpoint qui ne renvoie qu'un compteur.
+   */
+  async segmentBelongsToUser(segmentId: string, userId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ id: adventureSegments.id })
+      .from(adventureSegments)
+      .innerJoin(adventures, eq(adventureSegments.adventureId, adventures.id))
+      .where(and(eq(adventureSegments.id, segmentId), eq(adventures.userId, userId)))
+      .limit(1)
+    return Boolean(row)
+  }
+
+  async countNearMissPois(
+    segmentId: string,
+    categories: string[],
+    fromKm: number,
+    toKm: number,
+    excludeSources: string[] = [],
+  ): Promise<{ count: number; nearestM: number | null }> {
+    const now = new Date()
+    const [row] = await db
+      .select({
+        count: sql<number>`count(*)::int`,
+        nearestM: sql<number | null>`min(${accommodationsCache.distFromTraceM})`,
+      })
+      .from(accommodationsCache)
+      .where(
+        and(
+          eq(accommodationsCache.segmentId, segmentId),
+          gte(accommodationsCache.expiresAt, now),
+          inArray(accommodationsCache.category, categories),
+          gte(accommodationsCache.distAlongRouteKm, fromKm),
+          lte(accommodationsCache.distAlongRouteKm, toKm),
+          sql`${accommodationsCache.distFromTraceM} > ${CORRIDOR_WIDTH_M}`,
+          lte(accommodationsCache.distFromTraceM, POI_NEAR_MISS_MAX_M),
+          ...(excludeSources.length > 0
+            ? [notInArray(accommodationsCache.source, excludeSources)]
+            : []),
+        ),
+      )
+    return {
+      count: row?.count ?? 0,
+      nearestM: row?.nearestM ?? null,
+    }
   }
 
   /** Insert Overpass results into accommodations_cache (upsert on conflict). */

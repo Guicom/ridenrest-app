@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { PoisService } from './pois.service.js'
 import { FindPoisDto } from './dto/find-pois.dto.js'
+import { CountNearMissDto } from './dto/count-near-miss.dto.js'
 import { GetGoogleDetailsDto } from './dto/get-google-details.dto.js'
 import { accessRequestValidationPipe } from './dto/access-request.dto.js'
 import type { AccessRequestDto } from './dto/access-request.dto.js'
@@ -28,6 +29,21 @@ export class PoisController {
   @ApiOperation({ summary: 'Get POIs for a segment corridor' })
   async findPois(@Query() dto: FindPoisDto, @CurrentUser() user: CurrentUserPayload) {
     return this.poisService.findPois(dto, user.id)
+  }
+
+  /**
+   * Compteur des POI écartés par le filtre corridor, juste au-delà de la limite.
+   *
+   * Endpoint SÉPARÉ volontairement : le `ResponseInterceptor` enveloppe tout dans `{ data }`,
+   * donc ajouter un champ à `/pois` transformerait `data` d'un tableau en objet et casserait
+   * les binaires mobiles déjà distribués.
+   */
+  // IMPORTANT: Must be declared BEFORE @Get(':id') to avoid NestJS route conflicts
+  @Get('near-miss-count')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Count POIs just beyond the display corridor' })
+  async countNearMissPois(@Query() dto: CountNearMissDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.poisService.countNearMissPois(dto, user.id)
   }
 
   // IMPORTANT: Must be declared BEFORE @Get(':id') to avoid NestJS route conflicts

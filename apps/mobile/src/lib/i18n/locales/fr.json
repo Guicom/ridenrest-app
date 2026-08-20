@@ -409,7 +409,10 @@
       "airbnb": "Rechercher sur Airbnb",
       "extendedPending": "Recherche étendue en cours…",
       "extendedSlow": "Recherche étendue plus longue que prévu — les résultats s’ajouteront",
-      "extendedError": "Recherche étendue indisponible — résultats partiels"
+      "extendedError": "Recherche étendue indisponible — résultats partiels",
+      "nearMissOne": "{{count}} résultat au-delà de {{corridor}} de la trace n’est pas affiché",
+      "nearMissMany": "{{count}} résultats au-delà de {{corridor}} de la trace ne sont pas affichés",
+      "nearMissNearest": "le plus proche à {{distance}}"
     }
   },
   "settings": {

@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
+import { NearMissNotice } from './near-miss-notice'
 import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 const MAX_RANGE_KM = MAX_SEARCH_RANGE_KM
@@ -22,6 +23,8 @@ interface SearchRangeControlProps {
   isPoisPending: boolean
   accommodationPois?: Poi[]
   stages?: AdventureStageResponse[]
+  /** POI écartés par le filtre corridor — affiché sous les compteurs, purement informatif. */
+  nearMiss?: { count: number; nearestM: number | null; corridorWidthM: number }
 }
 
 // D+ cumulé de km 0 jusqu'au point fromKm
@@ -55,7 +58,7 @@ function computeLossInRange(waypoints: MapWaypoint[], fromKm: number, toKm: numb
 }
 
 export function SearchRangeControl({
-  totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages,
+  totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages, nearMiss,
 }: SearchRangeControlProps) {
   const [expanded, setExpanded] = useState(true)
   const {
@@ -276,6 +279,14 @@ export function SearchRangeControl({
 
           {/* Accommodation sub-types — visible uniquement si Hébergements actif */}
           {visibleLayers.has('accommodations') && <AccommodationSubTypes accommodationPois={accommodationPois} />}
+          {/* Juste sous les compteurs : c'est là que l'utilisateur lit « Camping (0) ». */}
+          {nearMiss ? (
+            <NearMissNotice
+              count={nearMiss.count}
+              nearestM={nearMiss.nearestM}
+              corridorWidthM={nearMiss.corridorWidthM}
+            />
+          ) : null}
 
           {/* Range stepper + input */}
           <div className="flex items-center justify-between">

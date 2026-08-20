@@ -66,6 +66,24 @@ Le filtre corridor à la **lecture** (`findCachedPois`, `dist_from_trace_m <= CO
 | campings Google sur la plage | 0 | 10 |
 | fichiers mobile portant le découplage | 0 | 6 |
 
+## Validation partielle — mesure du 2026-08-20 (segment `Test DE`, fenêtre 144-159 km)
+
+Sonde directe sur la bbox réelle de cette fenêtre, `campground` + `"camping"` :
+
+| POI | distance à la trace | position | affiché ? |
+|---|---|---|---|
+| **Zeltplatz für Radfahrer** | 197 m | km 151,8 | ✅ dans la fenêtre |
+| **Pension und Camping** | 2 058 m | km 157,8 | ✅ dans la fenêtre |
+| Radler-Zeltplatz « Donauversickerung » | 79 m | km 142,3 | juste avant la fenêtre |
+
+Avec l'ancienne requête (`"accommodation"`), la même sonde renvoie **0**. Les noms sont éloquents :
+*Zeltplatz für Radfahrer* et *Radler-Zeltplatz* — « camping pour cyclistes », à 79 et 197 mètres
+de la trace, invisibles jusqu'ici.
+
+⚠️ Le premier test local a conclu à tort à une régression : le serveur exécutait encore le code
+de la veille (`nest start --watch` n'avait pas repris les modifications). Voir la règle 13 de
+`project-context.md`.
+
 ## Gate
 
 | | |

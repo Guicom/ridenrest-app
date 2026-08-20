@@ -711,6 +711,67 @@ L'inverse est vrai aussi : **trop spécifique tue le résultat** (`"camping cara
 
 **Suivre le `nextPageToken`** sur le chemin d'affichage : `lodging` sature à 20 résultats en renvoyant un token, ignoré pendant 5 mois. Union des 16 types sur une page = 32 `place_id` ; avec pagination = 114. Plafond Google : 20 par page, 60 par type, et `maxResultCount` est plafonné à 20 côté serveur quoi qu'on demande.
 
+#### 13. Avant de conclure qu'un correctif ne marche pas, vérifier que c'est bien lui qui tourne
+
+Le 2026-08-20, une régression a été diagnostiquée à tort : « le nouveau code trouve moins de
+campings que l'ancien ». En réalité le serveur local exécutait le code de la veille —
+`nest start --watch` n'avait pas repris les modifications et le process tournait depuis 16 h.
+Le test ne mesurait donc rien du correctif, et la conclusion était inversée.
+
+Trois signaux, à vérifier **avant** d'ouvrir un RCA, et non après :
+
+1. **Une signature de log propre au nouveau code.** Ici l'ancien loguait `layer=X → N place_ids`,
+   le nouveau `layer=X → N lieux (Text Search Pro, paginé)`. Écrire cette différence
+   intentionnellement dans tout changement de chemin critique rend la vérification triviale.
+2. **Un effet de bord observable côté état.** Le format des marqueurs Redis avait changé
+   (`:layer:` ajouté) : `0` clé au nouveau format prouvait qu'aucun prefetch récent n'était passé
+   par le nouveau code.
+3. **L'ancienneté du process** (`ps -eo pid,etime`). Un uptime antérieur à la modification
+   suffit à invalider le test.
+
+Corollaire : les mesures faites dans le navigateur ou l'app ne valent que si l'on sait quel
+binaire répond. Sur ce projet, `pnpm sim` (mobile) et le redémarrage explicite de l'API sont
+plus fiables que le rechargement à chaud.
+
+---
+
+#### 12. Un filtre qui exclut doit le dire, et une constante ne doit gouverner qu'une décision
+
+Deux règles issues du même incident : un camping à **3 263 m** de la trace, écarté par le filtre
+corridor à 3 000 m — pour 263 mètres — avec « Camping (0) » à l'écran, indiscernable d'une
+absence réelle.
+
+**Une exclusion silencieuse est un défaut, pas une optimisation.** C'est la même forme que la
+panne Overpass restée invisible cinq mois : l'utilisateur ne peut pas distinguer « il n'y a
+rien » de « quelque chose a été écarté juste au-delà de la limite ». Volumétrie mesurée :
+**599 POI** en base au-delà de 3 000 m (469 Google, 130 Overpass), collectés puis masqués sans
+un mot. `GET /pois/near-miss-count` + `NearMissNotice` (web et mobile) le disent désormais.
+Toute future règle de filtrage à la lecture doit prévoir comment elle se rend visible.
+
+**Une constante par décision.** `CORRIDOR_WIDTH_M` gouvernait à la fois le tampon de la bbox
+envoyée aux fournisseurs externes et le seuil d'affichage — donc impossible d'élargir l'un sans
+l'autre. Trois constantes désormais, dans `packages/shared/src/constants/gpx.constants.ts` :
+
+| constante | décision | où |
+|---|---|---|
+| `POI_BBOX_BUFFER_M` | largeur de la zone **interrogée** chez Google/Overpass | `pois.service.ts` |
+| `CORRIDOR_WIDTH_M` | seuil d'**affichage** d'un POI | `pois.repository.ts` (`findCachedPois`) |
+| `POI_NEAR_MISS_MAX_M` | borne du **signalement** des masqués | `countNearMissPois` |
+
+Les trois valent 3 000 / 3 000 / 6 000 : la séparation n'a rien changé au comportement, elle a
+rendu les leviers indépendants.
+
+⚠️ **`findPoisNearPoint` (live) n'est PAS concerné** : sa sémantique est un **rayon autour d'un
+point**, pas un couloir le long d'une trace. La notion de quasi-manqué corridor n'y a pas de
+sens, et y appliquer le filtre supprimerait des POI que le live veut légitimement.
+
+**Corollaire d'API** : le `ResponseInterceptor` place la charge utile **directement** dans `data`.
+Ajouter un champ à une réponse existante transforme donc `data` d'un tableau en objet et casse
+les **binaires mobiles déjà distribués**, qui parlent à l'API de prod. Un nouveau besoin
+d'information passe par un **endpoint séparé**, jamais par un enrichissement en place.
+
+---
+
 #### 10. Deux sources de latences incomparables ⇒ deux flux, jamais une attente commune
 
 Google Places répond en ~200 ms (bbox déjà prefetchée) à ~2 s (froide) ; Overpass a été mesuré entre **1 s et 31 s** sur les instances publiques, avec des 504 et des instances mortes — et il n'existe aucun plan B en ligne fiable. Les attendre ensemble fait payer à chaque utilisateur le pire des deux.

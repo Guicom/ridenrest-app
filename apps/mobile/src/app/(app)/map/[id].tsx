@@ -141,7 +141,7 @@ export default function MapScreen() {
   // `ready` : sans cette garde la 1re requête part en OFF puis une 2e en ON (parité web)
   const { overpassEnabled, ready: profileReady } = useOverpassEnabled();
 
-  const { poisByLayer, isFetching, isError, isEmpty, overpassPending, overpassError } = usePois({
+  const { poisByLayer, isFetching, isError, isEmpty, overpassPending, overpassError, nearMiss } = usePois({
     adventureId: id,
     segments,
     visibleLayers,
@@ -567,6 +567,7 @@ export default function MapScreen() {
             accommodationPois={poisByLayer.accommodations}
             stages={stages}
             isOnline={isOnline}
+            nearMiss={nearMiss}
           />
           <SidebarStagesSection
             stages={stages}

@@ -141,6 +141,7 @@ export function MapView({ adventureId }: MapViewProps) {
     hasError: poisError,
     overpassPending,
     overpassError,
+    nearMiss,
   } = usePois(readySegments)
   const { coverageGaps, densityStatus } = useDensity(adventureId)
 
@@ -426,6 +427,7 @@ export function MapView({ adventureId }: MapViewProps) {
         isPoisPending={poisPending}
         accommodationPois={poisByLayer.accommodations}
         stages={stages.length > 0 ? stages : undefined}
+        nearMiss={nearMiss}
       />
 
       {/* Stages list — Epic 11 */}

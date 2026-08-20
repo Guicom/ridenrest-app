@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing'
-import { BadRequestException } from '@nestjs/common'
+import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { PoisService } from './pois.service.js'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider } from './providers/overpass.provider.js'
@@ -27,6 +27,8 @@ const mockPoisRepository = {
   updatePoiDistances: jest.fn(),
   findByExternalId: jest.fn(),
   findNearbyPoisFromOtherSources: jest.fn(),
+  countNearMissPois: jest.fn(),
+  segmentBelongsToUser: jest.fn(),
   insertGooglePois: jest.fn(),
   googlePoiExistsInSegment: jest.fn(),
   insertRawPoisForSegment: jest.fn(),
@@ -992,6 +994,57 @@ describe('PoisService', () => {
         const decimals = coord.includes('.') ? coord.split('.')[1].length : 0
         expect(decimals).toBeLessThanOrEqual(3)
       }
+    })
+  })
+
+  describe('countNearMissPois — dire ce que le corridor a masqué', () => {
+    const nearMissDto = {
+      segmentId: '00000000-0000-0000-0000-000000000001',
+      fromKm: 144,
+      toKm: 159,
+      categories: ['camp_site'] as never,
+    }
+
+    beforeEach(() => {
+      mockPoisRepository.segmentBelongsToUser.mockReset()
+      mockPoisRepository.countNearMissPois.mockReset()
+    })
+
+    it('renvoie le compte, le plus proche, et les bornes utilisées pour le message', async () => {
+      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(true)
+      mockPoisRepository.countNearMissPois.mockResolvedValue({ count: 2, nearestM: 3263 })
+
+      const result = await service.countNearMissPois(nearMissDto, userId)
+
+      // Les bornes sont renvoyées pour que le client formule le message sans les redéclarer.
+      expect(result).toEqual({ count: 2, nearestM: 3263, corridorWidthM: 3000, maxM: 6000 })
+    })
+
+    it('vérifie la propriété du segment — jamais d’accès POI sans contrôle', async () => {
+      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(false)
+
+      await expect(service.countNearMissPois(nearMissDto, userId)).rejects.toThrow(NotFoundException)
+      expect(mockPoisRepository.countNearMissPois).not.toHaveBeenCalled()
+    })
+
+    it('masque les POI overpass quand la recherche étendue est coupée', async () => {
+      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(true)
+      mockPoisRepository.countNearMissPois.mockResolvedValue({ count: 0, nearestM: null })
+
+      await service.countNearMissPois({ ...nearMissDto, overpassEnabled: false }, userId)
+
+      expect(mockPoisRepository.countNearMissPois).toHaveBeenCalledWith(
+        nearMissDto.segmentId, ['camp_site'], 144, 159, ['overpass'],
+      )
+    })
+
+    it('rejette une plage inversée ou au-delà du maximum', async () => {
+      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(true)
+
+      await expect(service.countNearMissPois({ ...nearMissDto, fromKm: 159, toKm: 144 }, userId))
+        .rejects.toThrow(BadRequestException)
+      await expect(service.countNearMissPois({ ...nearMissDto, fromKm: 0, toKm: 51 }, userId))
+        .rejects.toThrow(BadRequestException)
     })
   })
 

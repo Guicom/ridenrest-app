@@ -57,6 +57,48 @@ export function findPois(params: FindPoisParams): Promise<Poi[]> {
   return apiFetch<Poi[]>(`/pois?${search.toString()}`);
 }
 
+/** Compteur des POI écartés par le filtre corridor, juste au-delà de la limite. */
+export interface NearMissCount {
+  count: number;
+  /** Distance du plus proche des masqués, en mètres. `null` si aucun. */
+  nearestM: number | null;
+  /** Seuil d'affichage effectif côté serveur — le client n'a pas à le redéclarer. */
+  corridorWidthM: number;
+  /** Borne haute du signalement : au-delà, c'est une autre vallée. */
+  maxM: number;
+}
+
+export interface GetNearMissCountParams {
+  segmentId: string;
+  fromKm: number;
+  toKm: number;
+  categories?: PoiCategory[];
+  overpassEnabled?: boolean;
+}
+
+/**
+ * GET /pois/near-miss-count — combien de POI ont satisfait la recherche mais sont tombés juste
+ * au-delà du corridor d'affichage.
+ *
+ * Endpoint SÉPARÉ de `/pois` à dessein : le `ResponseInterceptor` place le tableau de POI
+ * directement dans `data`, donc y ajouter un champ casserait les binaires déjà distribués.
+ * Planning uniquement — le mode live raisonne en rayon, pas en couloir.
+ */
+export function getNearMissCount(params: GetNearMissCountParams): Promise<NearMissCount> {
+  const search = new URLSearchParams({
+    segmentId: params.segmentId,
+    fromKm: String(params.fromKm),
+    toKm: String(params.toKm),
+  });
+  if (params.categories && params.categories.length > 0) {
+    params.categories.forEach((c) => search.append('categories', c));
+  }
+  if (params.overpassEnabled) {
+    search.set('overpassEnabled', 'true');
+  }
+  return apiFetch<NearMissCount>(`/pois/near-miss-count?${search.toString()}`);
+}
+
 export interface GetLivePoisParams {
   segmentId: string;
   /** km **cumulé** relatif à la trace du point cible (jamais de lat/lng — RGPD). */
