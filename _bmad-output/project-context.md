@@ -742,6 +742,12 @@ choisir son rayon depuis MOB-5.3 (défaut 5 km, jusqu'à 20). L'app était plus 
 vélo qu'au bureau, et ne laissait ajuster que là où c'est le moins pratique. Corrigé le
 2026-08-20 : `radiusKm` de bout en bout, `MAX_SEARCH_RADIUS_KM = 20` partagé par les deux modes.
 
+Le défaut planning reste à **3 km** (`DEFAULT_SEARCH_RADIUS_KM`), pas aligné sur les 5 km du
+live : les marqueurs de couverture Google sont indexés sur la bbox, donc changer le défaut
+relancerait un prefetch sur toutes les zones déjà cherchées. Une fois le réglage donné à
+l'utilisateur, lui imposer ce coût n'a plus de justification. L'ajout est ainsi strictement
+additif.
+
 Symptôme qui l'a révélé : un camping à **3 263 m** de la trace, écarté pour 263 m, avec
 « Camping (0) » à l'écran — indiscernable d'une absence réelle. Le premier correctif comptait
 les exclus et l'annonçait ; **approche abandonnée** — un message qui dit qu'un résultat existe

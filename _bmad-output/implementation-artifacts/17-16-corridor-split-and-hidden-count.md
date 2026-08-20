@@ -28,7 +28,7 @@ Dès lors, le bon geste n'est pas « révéler ce qu'on a caché » mais **donne
 
 ## Acceptance Criteria
 
-1. **Given** la carte Recherche en planning, **When** l'utilisateur la déplie, **Then** un champ « Sur un rayon de » figure **sous** « Rechercher sur », avec le même stepper − / valeur / + et l'unité km.
+1. **Given** la carte Recherche en planning, **When** l'utilisateur la déplie, **Then** un champ « Sur un rayon de » figure **sous** « Rechercher sur », avec le même stepper − / valeur / + et l'unité km, à **3 km** — la valeur historique, donc aucun changement de comportement par défaut.
 2. **Given** ce champ, **When** l'utilisateur l'ajuste, **Then** la valeur est bornée à **1–20 km** — même plafond qu'en live, parce que c'est le même concept.
 3. **Given** un rayon choisi, **When** la recherche part, **Then** il pilote **à la fois** la zone interrogée chez les fournisseurs externes et le seuil d'affichage.
 4. **Given** un changement de rayon, **When** il est appliqué, **Then** `searchCommitted` retombe à `false` — sinon on afficherait le jeu de l'ancien rayon en laissant croire qu'il correspond au nouveau.
@@ -61,14 +61,17 @@ Coût de cet élargissement : quasi nul depuis la story 17.15. Un appel Text Sea
 - [x] **T7** — Tests : +3 API, +6 web, +5 mobile.
 - [ ] **T8** — Validation par Guillaume : sur la fenêtre du camping à 3 263 m, passer le rayon à 4 km doit le faire apparaître.
 
-## ⚠️ Changement de comportement à connaître avant déploiement
+## Aucun changement de comportement par défaut
 
-Le défaut passe de **3 à 5 km** pour aligner planning et live. Deux conséquences :
+`DEFAULT_SEARCH_RADIUS_KM = 3`, soit la valeur historique. Aligner sur le défaut du live (5 km)
+était tentant — **écarté par Guillaume** : les marqueurs de couverture Google étant indexés sur
+la bbox, changer le défaut aurait relancé un prefetch sur **toutes** les zones déjà cherchées.
+Le réglage étant désormais à la main de l'utilisateur, rien ne justifie de lui imposer ce coût.
 
-- Les recherches renvoient davantage de résultats qu'avant, y compris sur des zones déjà explorées.
-- Les marqueurs de couverture Google sont indexés sur la bbox : un rayon différent produit une bbox différente, donc **toutes les zones déjà cherchées referont un prefetch** au prochain passage.
-
-Si tu préfères conserver 3 km par défaut, c'est une seule valeur à changer (`DEFAULT_SEARCH_RADIUS_KM`).
+L'ajout est donc **strictement additif** : à l'ouverture, la recherche se comporte exactement
+comme avant, et c'est l'utilisateur qui décide d'élargir. Corollaire à connaître quand il le
+fait : passer de 3 à 4 km change la bbox, donc déclenche un prefetch sur la zone — normal, un
+rayon plus large exige une recherche plus large.
 
 ## Gate
 
@@ -85,4 +88,5 @@ Si tu préfères conserver 3 km par défaut, c'est une seule valeur à changer (
 | Date | Auteur | Changement |
 |---|---|---|
 | 2026-08-20 | Claude Opus 5 (dev) | 1re implémentation : comptage des « quasi-manqués » + message passif (`3e9e653`). |
+| 2026-08-20 | Claude Opus 5 (dev) | Défaut maintenu à **3 km** sur décision de Guillaume : aligner sur le live (5 km) aurait invalidé tous les marqueurs de couverture et relancé un prefetch partout. Fixtures de test alignées sur la constante plutôt que sur un nombre, pour qu'elles ne dérivent plus. |
 | 2026-08-20 | Claude Opus 5 (dev) | Conception revue avec Guillaume : le message est remplacé par le **réglage** que le live possédait déjà. Appareillage near-miss retiré, `radiusKm` ajouté de bout en bout. Deux effets de tick RNTL/RTL rencontrés dans les tests (deux `fireEvent` dans le même tick lisent la closure précédente) → cas séparés et attente explicite du rendu. |

@@ -82,7 +82,8 @@ Le planning imposait **3 km en dur et invisible**, alors que le live laissait d�
 Détail et déviation de conception dans
 [`17-16-corridor-split-and-hidden-count.md`](./17-16-corridor-split-and-hidden-count.md).
 
-⚠️ Le défaut passe de 3 à 5 km. Une seule valeur à changer si tu préfères garder 3.
+Défaut maintenu à **3 km** (valeur historique) : l'ajout est strictement additif, aucune zone
+déjà cherchée ne refait de prefetch tant que l'utilisateur n'élargit pas lui-même.
 
 ### Reste, à ton arbitrage
 

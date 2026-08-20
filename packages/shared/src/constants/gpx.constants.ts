@@ -43,13 +43,17 @@ export const MAX_SEARCH_RADIUS_KM = 20
 export const MAX_LIVE_RADIUS_KM = MAX_SEARCH_RADIUS_KM
 
 /**
- * Rayon par défaut d'une recherche planning, aligné sur le défaut du mode live.
+ * Rayon par défaut d'une recherche planning : **3 km**, soit le comportement historique.
  *
- * ⚠️ Élargit le comportement historique (3 km, cf. `CORRIDOR_WIDTH_M`) : les marqueurs de
- * couverture étant indexés sur la bbox, un rayon différent produit une bbox différente et
- * relance donc un prefetch sur les zones déjà cherchées.
+ * Le mode live part de 5 km, et aligner les deux était tentant — écarté par Guillaume le
+ * 2026-08-20 : les marqueurs de couverture Google sont indexés sur la bbox, donc changer le
+ * défaut aurait relancé un prefetch sur **toutes** les zones déjà cherchées. Le réglage étant
+ * désormais à la main de l'utilisateur, il n'y a pas de raison de lui imposer ce coût.
+ *
+ * Garder la même valeur que `CORRIDOR_WIDTH_M` n'est pas une coïncidence : c'est ce qui rend
+ * l'ajout du réglage strictement additif, sans changement de comportement par défaut.
  */
-export const DEFAULT_SEARCH_RADIUS_KM = 5
+export const DEFAULT_SEARCH_RADIUS_KM = 3
 
 /** Maximum GPX file size in bytes (10MB) */
 export const MAX_GPX_FILE_SIZE_BYTES = 10 * 1024 * 1024

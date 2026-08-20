@@ -173,7 +173,7 @@ describe('buildPoiQueryKey (T4 — parité web)', () => {
         layer: 'accommodations',
         overpassEnabled: false,
         source: 'google',
-        radiusKm: 5,
+        radiusKm: 3,
       }),
     ).toEqual([
       'pois',
@@ -184,7 +184,7 @@ describe('buildPoiQueryKey (T4 — parité web)', () => {
         layer: 'accommodations',
         overpassEnabled: false,
         source: 'google',
-        radiusKm: 5,
+        radiusKm: 3,
       },
     ]);
   });
@@ -222,7 +222,7 @@ describe('usePois (intégration)', () => {
         layer: 'accommodations',
         overpassEnabled: false,
         source: 'google',
-        radiusKm: 5,
+        radiusKm: 3,
       },
     ]);
     // Write-through N3 au succès.

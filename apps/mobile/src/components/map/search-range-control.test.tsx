@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { MapWaypoint } from '@ridenrest/shared';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { DEFAULT_SEARCH_RADIUS_KM } from '@ridenrest/shared';
 
 import { SearchRangeControl } from '@/components/map/search-range-control';
 import { i18n } from '@/lib/i18n';
@@ -28,7 +29,7 @@ beforeEach(() => {
       searchRangeInteracted: false,
       searchCommitted: false,
       selectedStageId: null,
-      searchRadiusKm: 5,
+      searchRadiusKm: DEFAULT_SEARCH_RADIUS_KM,
     },
     true,
   );
@@ -92,7 +93,7 @@ describe('SearchRangeControl', () => {
       expect(
         screen.getByText(i18n.t('pois.search.radiusLabel')),
       ).toBeOnTheScreen();
-      expect(screen.getByTestId('radius-input').props.value).toBe('5');
+      expect(screen.getByTestId('radius-input').props.value).toBe(String(DEFAULT_SEARCH_RADIUS_KM));
     });
 
     it('le + augmente le rayon d’un km et dégage la recherche committée', async () => {
@@ -103,7 +104,7 @@ describe('SearchRangeControl', () => {
         screen.getByRole('button', { name: i18n.t('pois.search.radiusIncrement') }),
       );
 
-      expect(useMapStore.getState().searchRadiusKm).toBe(6);
+      expect(useMapStore.getState().searchRadiusKm).toBe(DEFAULT_SEARCH_RADIUS_KM + 1);
       // Sinon on afficherait le jeu de l'ancien rayon en laissant croire qu'il correspond.
       expect(useMapStore.getState().searchCommitted).toBe(false);
     });
@@ -115,7 +116,7 @@ describe('SearchRangeControl', () => {
         screen.getByRole('button', { name: i18n.t('pois.search.radiusDecrement') }),
       );
 
-      expect(useMapStore.getState().searchRadiusKm).toBe(4);
+      expect(useMapStore.getState().searchRadiusKm).toBe(DEFAULT_SEARCH_RADIUS_KM - 1);
     });
 
     it('plafonne à 20 km — même limite qu’en mode live', async () => {
