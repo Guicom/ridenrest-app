@@ -1,6 +1,6 @@
 # Story 17.13: Recherche POI — réparation Overpass, couverture de cache et dédoublonnage
 
-Status: review
+Status: done
 
 > **Ajouté 2026-08-19** — Story de l'Epic 17 (Quality of Life), **bugfix backend prioritaire**. Origine : trois symptômes rapportés par Guillaume en prod (1) même trace GPX → résultats différents prod vs local, (2) le toggle Overpass ne change rien, ni en prod ni en local, (3) un utilisateur avec Overpass **activé** n'avait **aucun** résultat, et en a obtenu en le **désactivant**. Le RCA a isolé 4 bugs distincts, aucun lié à l'environnement, plus 2 dérives documentaires.
 
@@ -65,7 +65,7 @@ Status: review
 - [x] **T14** — Latence du prefetch : `mapWithConcurrency` (`src/common/utils/`, nouveau, générique, ordre d'entrée préservé, limite clampée ≥ 1) appliqué aux Place Details avec `GOOGLE_DETAILS_CONCURRENCY = 6`, et **une seule insertion batchée par calque** au lieu d'un INSERT par POI. Le dédoublonnage étant désormais cross-source uniquement, l'ordre de traitement n'a plus d'incidence sur le résultat — c'est ce qui rend la parallélisation sûre. Tests : `map-with-concurrency.test.ts` (nouveau, 6 cas dont pic de concurrence ≤ 6 et > 1, ordre préservé, chaque item traité une seule fois).
 - [x] **T12** — Repaint des pins (web) : `map.triggerRepaint()` en fin de construction des calques dans `use-poi-layers.ts` **et** `use-live-poi-layers.ts` (parité — en live l'utilisateur a les mains sur le guidon, l'interaction salvatrice peut ne jamais venir), plus un repaint dans `registerPoiPinImages` **si et seulement si** au moins une image a été ajoutée (un calque symbole qui a rendu avec un `icon-image` manquant ne se redessine pas tout seul quand l'image arrive). Tests : `use-poi-layers.test.ts` (+`triggerRepaint` au mock map, +2 cas : repaint demandé / pas de repaint si l'effet sort tôt sur style non chargé) ; `poi-pin-factory.test.ts` **nouveau** (2 cas : 10 images enregistrées en 120×150 @pixelRatio 2 + 1 repaint ; idempotence → ni `addImage` ni repaint).
 - [x] **T10a** — Validation end-to-end locale dans le navigateur connecté de Guillaume (Claude in Chrome) — voir « Validation end-to-end locale » ci-dessous.
-- [ ] **T10b** — Validation prod par Guillaume après déploiement (voir « Vérification post-déploiement »).
+- [x] **T10b** — Validation prod par Guillaume après déploiement (voir « Vérification post-déploiement »). — **validé en prod par Guillaume le 2026-08-20** : recherche étendue testée directement sur `ridenrest.app`, fonctionnelle.
 
 ## Dev Notes
 
@@ -137,3 +137,4 @@ Exécutée sur l'aventure locale « Test DE » (`segment e69d184a`), profil Guil
 |---|---|---|
 | 2026-08-19 | Claude Opus 5 (dev) | Story créée après RCA sur logs prod + DB prod/local. T1→T9 implémentés, gate verte (442 tests API). |
 | 2026-08-19 | Claude Opus 5 (dev) | T10a : validation end-to-end locale dans le navigateur connecté (Overpass réinsère 405 lignes, gate de couverture re-déclenche Google à l'élargissement, compteurs UI == SQL filtrée corridor, 0 erreur console). T10b (prod) en attente de déploiement. Relevé hors scope : `amenity=shelter` pollue « Refuge / Abri » (238 abribus sur 291) → `deferred-work.md`. |
+| 2026-08-20 | Claude Opus 5 (dev) | Déployé en prod (squash merge PR #11 → `main`, sha `822adef`). CI verte : lint 0 erreur / 7 warnings, typecheck 0, API 462/462, mobile 632/632, web 100/100 fichiers. `Deploy to VPS` success ; `api/health` 200, `ridenrest.app` 200. **T10b validé par Guillaume** : recherche étendue vérifiée en conditions réelles → story `done`. |

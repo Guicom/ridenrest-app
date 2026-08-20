@@ -1,6 +1,6 @@
 # Story 17.14: Recherche POI — flux Google et Overpass découplés, affichage progressif
 
-Status: review
+Status: done
 
 > **Ajouté 2026-08-19** — Story de l'Epic 17 (Quality of Life), suite directe de la 17.13. Une fois Overpass réparé, il restait le problème de fond : les deux sources étaient attendues **ensemble**, donc tout le monde payait le pire des deux. Conception proposée par Guillaume : afficher Google immédiatement, laisser Overpass compléter la carte, prévenir si ça traîne, et ne jamais bloquer la navigation.
 
@@ -58,7 +58,7 @@ Le 31 s provient d'un `504 Gateway Timeout` sur `overpass-api.de` (~12 s) suivi 
 - [x] **T10** — Coût Google : `getPlaceDetails(placeId, tier)` avec deux field masks (`ESSENTIALS_FIELDS` / `PRO_FIELDS`). Le prefetch passe en Essentials et écrit sous `google_place_basic:` ; la fiche POI garde le Pro sous `google_place_details:`. Mesure qui a déclenché ce changement : sur une recherche froide, 37 `place_id` trouvés → 14 appels Place Details **facturés au SKU Pro**, dont ~8 pour le calque « restaurants » que l'utilisateur n'avait pas activé. Google facture au SKU le plus élevé des champs demandés ; note/horaires/téléphone/site ne servent qu'à l'ouverture d'une fiche.
 - [x] **T11** — Mode live découplé : `useLivePoisSearch` émet deux `useQuery` (`enabled: false`), `refetch()` déclenche les deux (Overpass seulement si l'option est active), `isFetching`/`isError` ne suivent que la source primaire, `pois` fusionne les deux. Page live : bannière « Aucun résultat » conditionnée par `!overpassPending`, `ExtendedSearchStatus` monté. En live c'est encore plus critique qu'en planning : l'utilisateur est sur son vélo.
 - [x] **T8** — Doc Sync : `project-context.md` (clé de query étendue à `source`, règles de découplage), `sprint-status.yaml`, cette story.
-- [ ] **T9** — Validation par Guillaume : parcours complet en conditions réelles (voir « Reste à valider »).
+- [x] **T9** — Validation par Guillaume : parcours complet en conditions réelles (voir « Reste à valider »). — **validé par Guillaume le 2026-08-20** en prod, après déploiement.
 
 ## Dev Notes
 
@@ -115,3 +115,4 @@ Web `tsc` : baseline de 56 erreurs préexistantes dans des fichiers de test, inc
 | Date | Auteur | Changement |
 |---|---|---|
 | 2026-08-19 | Claude Opus 5 (dev) | Story créée et implémentée (T1→T8). Conception du découplage proposée par Guillaume ; proposition initiale de réduction des timeouts écartée. Validation end-to-end partielle (deux requêtes parallèles + statut de lenteur observés). T9 en attente. |
+| 2026-08-20 | Claude Opus 5 (dev) | Déployé en prod avec la 17.13 (PR #11, sha `822adef`). **T9 validé par Guillaume** : recherche étendue testée directement en prod, fonctionnelle → story `done`. |

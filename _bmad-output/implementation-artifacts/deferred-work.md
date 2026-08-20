@@ -1,5 +1,8 @@
 # Deferred Work
 
+> **2026-08-20** — Un fichier compagnon existe désormais : [`action-plan.md`](./action-plan.md). Il porte les **chantiers** (transversaux, priorisés, avec un porteur) ; ce fichier-ci garde la **mémoire des arbitrages** par story (« pourquoi ce point n'a pas été traité »). Quand un point figure ici, `action-plan.md` y renvoie au lieu de le recopier — une seule source de vérité par élément.
+
+
 ## Deferred from: code review of MOB-6-4-store-compliance-legal-links (2026-07-05)
 
 - **Error banner jamais auto-effacée** : `openError` reste `true` jusqu'au prochain tap ou unmount ; pas de timeout ni de bouton de dismiss. Comportement conforme à la spec (feedback non bloquant). `apps/mobile/src/components/shared/legal-section.tsx:80`
