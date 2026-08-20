@@ -1,57 +1,82 @@
-# Story 17.16 : Corridor — séparer collecte et affichage, et dire ce qui est masqué
+# Story 17.16 : Rayon de recherche réglable en planning
 
 Status: review
 
-> **2026-08-20** — Lot unique api + web + mobile. Origine : un camping trouvé par le nouveau prefetch Google, à **3 263 m** de la trace, écarté par le filtre corridor à 3 000 m — pour 263 mètres. L'écran affichait « Camping (0) », indiscernable d'une absence réelle.
+> **2026-08-20** — Lot unique api + web + mobile. Origine : un camping trouvé par le nouveau prefetch Google, à **3 263 m** de la trace, écarté par un filtre corridor à 3 000 m — pour 263 mètres — avec « Camping (0) » à l'écran.
 
 ## Contexte
 
-Le filtre corridor est **correct** : il garde l'affichage cohérent avec le couloir annoncé, indépendamment de la forme du rectangle de recherche (mesuré : le rectangle est 40 à 57 % plus grand que le corridor). Deux choses ne l'étaient pas.
+Le corridor de planning était de **3 km, en dur et invisible**. Alors que le mode live laissait déjà l'utilisateur choisir son rayon depuis MOB-5.3 :
 
-**Une constante pour deux décisions sans rapport.** `CORRIDOR_WIDTH_M` gouvernait à la fois le tampon de la bbox envoyée à Google et Overpass (`pois.service.ts`) et le seuil d'affichage à la lecture (`pois.repository.ts`). Impossible d'élargir l'affichage sans élargir la zone interrogée.
+| | corridor | réglable ? |
+|---|---|---|
+| Planning (avant) | 3 km en dur | non, invisible |
+| Live | **5 km par défaut**, jusqu'à 20 | oui, par pas de 0,5 km |
 
-**La coupe était silencieuse.** Même forme de défaut que la panne Overpass restée invisible cinq mois : rien ne distinguait « il n'y a rien » de « il y a quelque chose juste au-delà de la limite ». Volumétrie mesurée en base : **599 POI** au-delà de 3 000 m — 469 Google (20,3 %) et 130 Overpass (27,3 %), le plus lointain à 10 444 m.
+L'app était donc **plus généreuse sur le vélo qu'au bureau**, et ne laissait ajuster que là où c'est le moins pratique — alors que c'est en planifiant qu'on a le temps d'arbitrer un détour.
 
-## Décision de conception : endpoint séparé, pas un champ de plus
+Deuxième problème, structurel : `CORRIDOR_WIDTH_M` gouvernait **deux décisions sans rapport** — le tampon de la bbox envoyée à Google et Overpass, et le seuil d'affichage à la lecture. Impossible d'élargir l'un sans l'autre.
 
-Le `ResponseInterceptor` place le tableau de POI **directement** dans `data`. Ajouter un champ à la réponse de `/pois` transformerait `data` d'un tableau en objet et **casserait les binaires mobiles déjà distribués**, qui parlent à l'API de prod. D'où `GET /pois/near-miss-count`, séparé et non bloquant.
+## Changement de conception en cours de route
+
+La première implémentation (commit `3e9e653`) comptait les POI « juste au-delà » du corridor et l'annonçait par un message passif — `GET /pois/near-miss-count` + `NearMissNotice`. Approche **abandonnée après discussion avec Guillaume**, pour deux raisons :
+
+1. **Un message sans action est un cul-de-sac.** Annoncer qu'un résultat existe puis refuser de le montrer est plus frustrant que le silence.
+2. **La donnée était déjà là.** Les POI au-delà de 3 km sont en base (599 lignes mesurées) — le filtre corridor est une clause `WHERE` à la lecture. Les afficher ne coûte **aucun appel externe**, juste la même requête PostGIS avec un autre seuil.
+
+Dès lors, le bon geste n'est pas « révéler ce qu'on a caché » mais **donner à l'utilisateur le réglage qu'il a déjà en live**. Tout l'appareillage near-miss a été retiré dans ce lot.
 
 ## Acceptance Criteria
 
-1. **Given** la collecte et l'affichage, **When** on lit les constantes, **Then** deux valeurs distinctes les gouvernent (`POI_BBOX_BUFFER_M`, `CORRIDOR_WIDTH_M`), toutes deux à 3 000 m → **aucun changement de comportement**.
-2. **Given** une recherche, **When** des POI tombent dans `]CORRIDOR_WIDTH_M, POI_NEAR_MISS_MAX_M]`, **Then** l'API en renvoie le nombre et la distance du plus proche.
-3. **Given** un POI au-delà de `POI_NEAR_MISS_MAX_M` (6 km), **When** on compte, **Then** il est ignoré — au-delà, c'est une autre vallée et le message ne voudrait plus rien dire.
-4. **Given** un segment qui n'appartient pas à l'utilisateur, **When** il appelle l'endpoint, **Then** 404 — aucun accès POI sans contrôle de propriété.
-5. **Given** aucun calque visible, **When** le client s'apprête à compter, **Then** aucune requête ne part (`categories: []` serait interprété par l'API comme « toutes »).
-6. **Given** la recherche étendue coupée, **When** on compte, **Then** les POI Overpass sont exclus du compte comme ils le sont de l'affichage.
-7. **Given** plusieurs segments couverts, **When** on agrège, **Then** somme des comptes et minimum des distances.
-8. **Given** des POI masqués, **When** l'utilisateur regarde les compteurs, **Then** une ligne discrète le dit, avec le seuil et la distance du plus proche — **sans rien changer à ce qui est rendu sur la carte**.
-9. **Given** le web et le mobile, **When** on compare, **Then** même comportement et même message (parité).
+1. **Given** la carte Recherche en planning, **When** l'utilisateur la déplie, **Then** un champ « Sur un rayon de » figure **sous** « Rechercher sur », avec le même stepper − / valeur / + et l'unité km.
+2. **Given** ce champ, **When** l'utilisateur l'ajuste, **Then** la valeur est bornée à **1–20 km** — même plafond qu'en live, parce que c'est le même concept.
+3. **Given** un rayon choisi, **When** la recherche part, **Then** il pilote **à la fois** la zone interrogée chez les fournisseurs externes et le seuil d'affichage.
+4. **Given** un changement de rayon, **When** il est appliqué, **Then** `searchCommitted` retombe à `false` — sinon on afficherait le jeu de l'ancien rayon en laissant croire qu'il correspond au nouveau.
+5. **Given** une requête sans `radiusKm`, **When** l'API la traite, **Then** elle retombe sur 3 km — contrat des binaires mobiles déjà distribués.
+6. **Given** deux rayons différents, **When** on cherche la même fenêtre, **Then** les caches sont distincts (clé TanStack Query et clé Redis géographique).
+7. **Given** le web et le mobile, **When** on compare, **Then** même champ, même plafond, même comportement.
+
+## Pourquoi le rayon pilote AUSSI la collecte
+
+Découpler collecte et affichage afficherait un **sous-ensemble arbitraire** au-delà du tampon. La bbox est un rectangle : sa couverture lointaine dépend de la forme de la trace, pas d'un couloir régulier. Distribution mesurée en base :
+
+```
+3-4 km : 228 POI      6-7 km :  85
+4-5 km : 115          7-8 km :  29
+5-6 km : 126
+```
+
+Ça décroît — mais pas parce qu'il y a moins d'hébergements à 7 km : parce qu'on y a moins bien cherché. Offrir un curseur jusqu'à 20 km sans élargir la collecte ferait croire à l'utilisateur qu'il voit tout ce qui existe dans son rayon.
+
+Coût de cet élargissement : quasi nul depuis la story 17.15. Un appel Text Search Pro amortit 20 POI, donc agrandir la bbox ne multiplie pas la facture — elle ne bouge que si un type franchit une frontière de page.
 
 ## Tâches
 
-- [x] **T1** — `packages/shared` : `CORRIDOR_WIDTH_M` (affichage) documentée, `POI_BBOX_BUFFER_M` (collecte) et `POI_NEAR_MISS_MAX_M` (borne du signalement) ajoutées.
-- [x] **T2** — `pois.service.ts` utilise `POI_BBOX_BUFFER_M` pour la bbox ; `pois.repository.ts` garde `CORRIDOR_WIDTH_M` pour la lecture.
-- [x] **T3** — `countNearMissPois()` (repository) + `segmentBelongsToUser()` (contrôle de propriété par EXISTS, sans charger les waypoints).
-- [x] **T4** — `CountNearMissDto`, méthode de service, endpoint `GET /pois/near-miss-count` déclaré avant `@Get(':id')`.
-- [x] **T5** — Web : `getNearMissCount`, requête portée par `usePois` (une par segment), `NearMissNotice` sous les compteurs.
-- [x] **T6** — Mobile : même chose, + clés i18n FR/EN et `formatNearMissDistance` locale-aware.
-- [x] **T7** — Tests : +4 API, +10 web, +7 mobile.
-- [ ] **T8** — Validation par Guillaume : sur la fenêtre où le camping à 3 263 m a été trouvé, la ligne doit apparaître et annoncer « le plus proche à 3,3 km ».
+- [x] **T1** — Retrait de l'appareillage near-miss (endpoint, DTO, requête de comptage, composants web et mobile, clés i18n, `POI_NEAR_MISS_MAX_M`).
+- [x] **T2** — `packages/shared` : `MAX_SEARCH_RADIUS_KM` (20, planning **et** live), `DEFAULT_SEARCH_RADIUS_KM` (5), `MAX_LIVE_RADIUS_KM` déprécié en alias.
+- [x] **T3** — `FindPoisDto` : `radiusKm` devient valide en planning (0,5–20). `findCachedPois` prend un `maxDistFromTraceM` (défaut `CORRIDOR_WIDTH_M`).
+- [x] **T4** — `PoisService` : le rayon pilote le tampon de bbox et le seuil de lecture ; repli sur les valeurs historiques sans le paramètre.
+- [x] **T5** — Web : `searchRadiusKm` + `setSearchRadius` dans `useMapStore`, `radiusKm` dans la clé et la requête, stepper « Sur un rayon de » sous « Rechercher sur ».
+- [x] **T6** — Mobile : idem, + clés i18n FR/EN (`radiusLabel`, `radiusDecrement`, `radiusIncrement`).
+- [x] **T7** — Tests : +3 API, +6 web, +5 mobile.
+- [ ] **T8** — Validation par Guillaume : sur la fenêtre du camping à 3 263 m, passer le rayon à 4 km doit le faire apparaître.
 
-## Ce que ce lot ne fait PAS
+## ⚠️ Changement de comportement à connaître avant déploiement
 
-Il ne change **rien** à ce qui s'affiche. Aucun POI supplémentaire n'apparaît sur la carte, aucun seuil n'est déplacé. Il supprime uniquement la partie indéfendable : l'invisibilité de la coupe.
+Le défaut passe de **3 à 5 km** pour aligner planning et live. Deux conséquences :
 
-L'affichage différencié — pin atténué + distance d'accès **réelle** issue de BRouter, déjà calculée dans `accommodations_cache` (`access_distance_m`, `access_variants`) — reste à faire. C'est la suite naturelle : on filtre aujourd'hui sur une distance perpendiculaire à vol d'oiseau alors qu'on possède le détour routé. Voir `action-plan.md`.
+- Les recherches renvoient davantage de résultats qu'avant, y compris sur des zones déjà explorées.
+- Les marqueurs de couverture Google sont indexés sur la bbox : un rayon différent produit une bbox différente, donc **toutes les zones déjà cherchées referont un prefetch** au prochain passage.
+
+Si tu préfères conserver 3 km par défaut, c'est une seule valeur à changer (`DEFAULT_SEARCH_RADIUS_KM`).
 
 ## Gate
 
 | | |
 |---|---|
-| API | **475/475** (39 suites) — +4 |
-| Web | **1183/1183** (101 fichiers) — +10 |
-| Mobile | **657/657** (97 suites) — +7 |
+| API | **474/474** (39 suites) |
+| Web | **1179/1179** (100 fichiers) |
+| Mobile | **656/656** (96 suites) |
 | Packages | shared 41 · gpx 22 · analytics 26 |
 | `turbo lint` + `turbo typecheck` | 16/16 |
 
@@ -59,4 +84,5 @@ L'affichage différencié — pin atténué + distance d'accès **réelle** issu
 
 | Date | Auteur | Changement |
 |---|---|---|
-| 2026-08-20 | Claude Opus 5 (dev) | Story créée et implémentée (T1→T7). Défaut trouvé en cours d'implémentation et corrigé : la requête de comptage partait même sans calque visible, donc avec `categories: []` — que l'API interprète comme « toutes les catégories ». Gardée derrière `nearMissCategories.length > 0` des deux côtés. |
+| 2026-08-20 | Claude Opus 5 (dev) | 1re implémentation : comptage des « quasi-manqués » + message passif (`3e9e653`). |
+| 2026-08-20 | Claude Opus 5 (dev) | Conception revue avec Guillaume : le message est remplacé par le **réglage** que le live possédait déjà. Appareillage near-miss retiré, `radiusKm` ajouté de bout en bout. Deux effets de tick RNTL/RTL rencontrés dans les tests (deux `fireEvent` dans le même tick lisent la closure précédente) → cas séparés et attente explicite du rendu. |

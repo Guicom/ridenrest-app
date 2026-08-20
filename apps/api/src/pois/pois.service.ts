@@ -1,13 +1,12 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common'
+import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider, SLEEPABLE_SHELTER_TYPES } from './providers/overpass.provider.js'
 import { GooglePlacesProvider, mapGoogleTypesToCategory } from './providers/google-places.provider.js'
 import type { GooglePlaceSummary } from './providers/google-places.provider.js'
 import { RedisProvider } from '../common/providers/redis.provider.js'
 import type { Poi, GooglePlaceDetails } from '@ridenrest/shared'
-import { MAX_SEARCH_RANGE_KM, POI_BBOX_BUFFER_M, CORRIDOR_WIDTH_M, POI_NEAR_MISS_MAX_M, POI_BBOX_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL, CATEGORY_TO_LAYER } from '@ridenrest/shared'
+import { MAX_SEARCH_RANGE_KM, POI_BBOX_BUFFER_M, CORRIDOR_WIDTH_M, POI_BBOX_CACHE_TTL, GOOGLE_PLACES_CACHE_TTL, CATEGORY_TO_LAYER } from '@ridenrest/shared'
 import type { FindPoisDto } from './dto/find-pois.dto.js'
-import type { CountNearMissDto } from './dto/count-near-miss.dto.js'
 import type { Redis } from 'ioredis'
 import { isLikelySamePlace, POI_DEDUP_RADIUS_M } from './poi-dedup.js'
 import { mapWithConcurrency } from '../common/utils/map-with-concurrency.js'
@@ -145,10 +144,16 @@ export class PoisService {
     )
     if (rangeWaypoints.length < 2) return []
 
-    // 3. Compute bbox with buffer (POI_BBOX_BUFFER_M / 111_000 degrees ≈ 0.0045°).
-    // Tampon de COLLECTE, distinct du seuil d'affichage `CORRIDOR_WIDTH_M` depuis le
-    // 2026-08-20 — même valeur, mais deux leviers indépendants.
-    const bufferDeg = POI_BBOX_BUFFER_M / 111_000
+    // 3. Rayon de recherche : il pilote À LA FOIS la zone interrogée chez les fournisseurs
+    // externes et le seuil d'affichage. Les découpler afficherait un sous-ensemble arbitraire
+    // au-delà du tampon — la bbox est un rectangle, sa couverture lointaine dépend de la forme
+    // de la trace et pas d'un couloir régulier.
+    //
+    // Sans `radiusKm`, on retombe sur les valeurs historiques (3 km) : c'est le contrat des
+    // binaires mobiles déjà distribués.
+    const searchRadiusM = dto.radiusKm !== undefined ? dto.radiusKm * 1000 : POI_BBOX_BUFFER_M
+    const displayRadiusM = dto.radiusKm !== undefined ? dto.radiusKm * 1000 : CORRIDOR_WIDTH_M
+    const bufferDeg = searchRadiusM / 111_000
     const minLat = Math.min(...rangeWaypoints.map((wp) => wp.lat)) - bufferDeg
     const maxLat = Math.max(...rangeWaypoints.map((wp) => wp.lat)) + bufferDeg
     const minLng = Math.min(...rangeWaypoints.map((wp) => wp.lng)) - bufferDeg
@@ -200,7 +205,7 @@ export class PoisService {
     }
 
     // 6. Lecture unique, filtrée sur les sources demandées
-    const pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm, excludeSources)
+    const pois = await this.poisRepository.findCachedPois(segmentId, activeCategories, fromKm, toKm, excludeSources, displayRadiusM)
 
     // 7. Redis seulement après un fetch Overpass frais — ne jamais cacher un fallback périmé.
     // Option A: strip segment-specific distances — geo-scoped key is cross-user, distances are not
@@ -212,43 +217,6 @@ export class PoisService {
     }
 
     return pois
-  }
-
-  /**
-   * Combien de POI ont satisfait la recherche mais sont tombés juste au-delà du corridor.
-   *
-   * Le filtre corridor est correct, mais il coupait **en silence** : un camping à 3 263 m a été
-   * écarté pour 263 m et l'écran affichait « Camping (0) », indiscernable d'une absence réelle.
-   * Cet endpoint ne change rien à ce qui s'affiche — il permet juste de le dire.
-   *
-   * Endpoint séparé et non bloquant, à dessein : ajouter un champ à la réponse de `/pois`
-   * casserait les binaires mobiles déjà distribués, qui attendent un tableau dans `data`.
-   */
-  async countNearMissPois(
-    dto: CountNearMissDto,
-    userId: string,
-  ): Promise<{ count: number; nearestM: number | null; corridorWidthM: number; maxM: number }> {
-    const { segmentId, fromKm, toKm } = dto
-
-    if (toKm <= fromKm) {
-      throw new BadRequestException('toKm must be greater than fromKm')
-    }
-    if (toKm - fromKm > MAX_SEARCH_RANGE_KM) {
-      throw new BadRequestException(`Search range cannot exceed ${MAX_SEARCH_RANGE_KM} km`)
-    }
-
-    // Contrôle de propriété obligatoire — aucun accès POI sans vérification (règle sécurité).
-    const owned = await this.poisRepository.segmentBelongsToUser(segmentId, userId)
-    if (!owned) throw new NotFoundException('Segment not found')
-
-    const activeCategories = dto.categories ?? Object.keys(CATEGORY_TO_OVERPASS_TAGS)
-    const { excludeSources } = resolveSourcePlan({ overpassEnabled: dto.overpassEnabled })
-
-    const { count, nearestM } = await this.poisRepository.countNearMissPois(
-      segmentId, activeCategories, fromKm, toKm, excludeSources,
-    )
-
-    return { count, nearestM, corridorWidthM: CORRIDOR_WIDTH_M, maxM: POI_NEAR_MISS_MAX_M }
   }
 
   async getPoiGoogleDetails(externalId: string, segmentId: string): Promise<GooglePlaceDetails | null> {

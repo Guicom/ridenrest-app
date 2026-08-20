@@ -66,43 +66,35 @@ Historique à ne pas perdre : ce travail avait été proposé en option le 2026-
 
 ---
 
-## A-bis. Corridor d'affichage — ✅ 1re moitié faite le 2026-08-20 (story 17.16)
+## A-bis. Rayon de recherche réglable — ✅ FAIT le 2026-08-20 (story 17.16)
 
-Origine : un camping trouvé par le nouveau prefetch, à **3 263 m** de la trace, écarté par le
-filtre corridor à 3 000 m — pour 263 mètres — avec « Camping (0) » à l'écran.
+Le planning imposait **3 km en dur et invisible**, alors que le live laissait déjà choisir
+(défaut 5, max 20). L'app était plus généreuse sur le vélo qu'au bureau.
 
 ### Fait [dev] ✅
 
-- **Séparation des constantes** : `POI_BBOX_BUFFER_M` (collecte) / `CORRIDOR_WIDTH_M` (affichage)
-  / `POI_NEAR_MISS_MAX_M` (borne du signalement). Mêmes valeurs → **zéro changement de
-  comportement**, mais leviers indépendants. Une seule constante gouvernait auparavant deux
-  décisions sans rapport.
-- **Dire ce qui est masqué** : `GET /pois/near-miss-count` + `NearMissNotice` sous les compteurs,
-  web et mobile. Endpoint séparé et non bloquant — le `ResponseInterceptor` place la charge
-  directement dans `data`, donc un champ de plus casserait les binaires mobiles distribués.
+- Champ **« Sur un rayon de »** sous « Rechercher sur », borné 1–20 km, web et mobile.
+- Le rayon pilote **collecte et affichage** — les découpler afficherait un sous-ensemble
+  arbitraire (la bbox est un rectangle, pas un couloir régulier).
+- Constantes séparées : `POI_BBOX_BUFFER_M` / `CORRIDOR_WIDTH_M` / `MAX_SEARCH_RADIUS_KM`.
+- `radiusKm` optionnel côté API → repli sur 3 km pour les binaires mobiles distribués.
 
-Mesuré : **599 POI** en base au-delà de 3 000 m (469 Google, 130 Overpass), le plus lointain à
-10 444 m. Détail dans [`17-16-corridor-split-and-hidden-count.md`](./17-16-corridor-split-and-hidden-count.md).
+Détail et déviation de conception dans
+[`17-16-corridor-split-and-hidden-count.md`](./17-16-corridor-split-and-hidden-count.md).
 
-### Reste à faire — décision de Guillaume
+⚠️ Le défaut passe de 3 à 5 km. Une seule valeur à changer si tu préfères garder 3.
 
-**Afficher les quasi-manqués différenciés plutôt que de les compter** [Guillaume décide, dev fait]
-— pin atténué + la distance d'**accès réelle**, pas la perpendiculaire. C'est le vrai fond du
-sujet : 3 000 m est une distance à vol d'oiseau, alors que ce qui compte pour un cyclo est le
-détour par la route. Et l'app le calcule déjà — `access_distance_m`, `access_geometry`,
-`access_variants`, routés par BRouter dans l'epic `poi-access`. On filtre donc sur la mauvaise
-métrique tout en possédant la bonne. Un camping à 3 263 m à vol d'oiseau peut être à 3,4 km par
-un chemin de halage plat, ou à 8 km avec 200 m de D+ ; le filtre actuel ne sait pas faire la
-différence.
+### Reste, à ton arbitrage
+
+**Afficher la distance d'accès réelle plutôt que la perpendiculaire** [Guillaume décide] — pour
+un POI donné, « 3,3 km à vol d'oiseau » informe mal ; le détour par la route peut valoir 3,4 km
+de chemin plat ou 8 km avec 200 m de D+. L'app le calcule déjà (`access_distance_m`,
+`access_variants`, routés par BRouter dans l'epic `poi-access`) mais ne s'en sert pas pour
+l'affichage. C'est une question d'**étiquette sur la fiche**, pas de filtrage.
 
 **Un seuil par catégorie** [Guillaume décide] — la tolérance n'est pas la même pour un hôtel en
-fin de journée, une réparation de vélo à midi et un ravitaillement. N'a de sens qu'après la
-séparation des constantes, qui est faite.
-
-**Note d'économie** : jusqu'au 2026-08-20, élargir le corridor coûtait un Place Details par POI
-supplémentaire. Depuis que le prefetch est en Text Search Pro (20 POI par appel facturé),
-élargir ne coûte quasiment plus rien — sauf à franchir une frontière de page. Le principal
-argument contre l'élargissement a disparu par effet de bord.
+fin de journée, une réparation de vélo à midi et un ravitaillement. Possible maintenant que le
+rayon est une valeur choisie et non une constante.
 
 ## B. Ce qui ne dépend que de Guillaume
 
@@ -206,6 +198,6 @@ Ordre de grandeur du symptôme : **64 stories** ont différé du travail, **139 
 
 | Date | Auteur | Changement |
 |---|---|---|
-| 2026-08-20 | Claude Opus 5 (dev) | Section A-bis ajoutée et sa 1re moitié livrée (story 17.16) : constantes séparées, exclusion corridor rendue visible. Affichage différencié via BRouter et seuil par catégorie laissés à l'arbitrage. |
+| 2026-08-20 | Claude Opus 5 (dev) | Section A-bis livrée (story 17.16) : rayon de recherche réglable en planning, aligné sur le mode live. La 1re approche (compter les exclus et l'annoncer) a été remplacée par le réglage après discussion — un message sans action est un cul-de-sac. |
 | 2026-08-20 | Claude Opus 5 (dev) | Section A livrée (story 17.15) : A1, A2 et A3 faits, T8 en attente de Guillaume. |
 | 2026-08-20 | Claude Opus 5 (dev) | Fichier créé à la demande de Guillaume, pour consolider les chantiers issus des stories 17.13/17.14 et des échanges du jour, sans vider `deferred-work.md` dont une partie reste légitime. |

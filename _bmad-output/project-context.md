@@ -735,6 +735,72 @@ plus fiables que le rechargement à chaud.
 
 ---
 
+#### 12. Un réglage que l'utilisateur possède déjà ailleurs ne doit pas être une constante en dur
+
+Le corridor de planning valait **3 km, en dur et invisible**, alors que le mode live laissait
+choisir son rayon depuis MOB-5.3 (défaut 5 km, jusqu'à 20). L'app était plus généreuse sur le
+vélo qu'au bureau, et ne laissait ajuster que là où c'est le moins pratique. Corrigé le
+2026-08-20 : `radiusKm` de bout en bout, `MAX_SEARCH_RADIUS_KM = 20` partagé par les deux modes.
+
+Symptôme qui l'a révélé : un camping à **3 263 m** de la trace, écarté pour 263 m, avec
+« Camping (0) » à l'écran — indiscernable d'une absence réelle. Le premier correctif comptait
+les exclus et l'annonçait ; **approche abandonnée** — un message qui dit qu'un résultat existe
+puis refuse de le montrer est plus frustrant que le silence, surtout quand la donnée est déjà en
+base et que l'afficher ne coûte **aucun appel externe** (le filtre est une clause `WHERE`).
+
+**Une constante par décision.** Trois désormais, dans `packages/shared/src/constants/gpx.constants.ts` :
+
+| constante | décision | où |
+|---|---|---|
+| `POI_BBOX_BUFFER_M` | largeur par défaut de la zone **interrogée** | `pois.service.ts` |
+| `CORRIDOR_WIDTH_M` | seuil d'**affichage** par défaut | `pois.repository.ts` |
+| `DEFAULT_SEARCH_RADIUS_KM` / `MAX_SEARCH_RADIUS_KM` | ce que l'utilisateur **choisit** | stores web et mobile |
+
+**Le rayon pilote collecte ET affichage, jamais l'un sans l'autre.** Les découpler afficherait un
+sous-ensemble arbitraire : la bbox est un rectangle, sa couverture lointaine dépend de la forme
+de la trace et pas d'un couloir régulier. Mesuré : 228 POI entre 3 et 4 km, 29 entre 7 et 8 —
+la décroissance traduit une recherche moins bonne au loin, pas une absence d'hébergements.
+Depuis la story 17.15 cet élargissement est quasi gratuit (un appel Text Search Pro amortit
+20 POI), donc le principal argument contre a disparu.
+
+**Changer le rayon dégage `searchCommitted`.** Sinon on afficherait le jeu de l'ancien rayon en
+laissant croire qu'il correspond au nouveau.
+
+⚠️ **`findPoisNearPoint` (live) garde sa sémantique de rayon autour d'un point** — pas un couloir
+le long d'une trace. Ne pas y transposer la logique corridor.
+
+**Corollaire d'API** : le `ResponseInterceptor` place la charge utile **directement** dans `data`.
+Ajouter un champ à une réponse existante transforme donc `data` d'un tableau en objet et casse
+les **binaires mobiles déjà distribués**, qui parlent à l'API de prod. Tout nouveau besoin
+d'information passe par un **endpoint séparé** ou un **paramètre optionnel** — jamais par un
+enrichissement en place. C'est pourquoi `radiusKm` est optionnel et retombe sur 3 km.
+
+---
+
+#### 13. Avant de conclure qu'un correctif ne marche pas, vérifier que c'est bien lui qui tourne
+
+Le 2026-08-20, une régression a été diagnostiquée à tort : « le nouveau code trouve moins de
+campings que l'ancien ». En réalité le serveur local exécutait le code de la veille —
+`nest start --watch` n'avait pas repris les modifications et le process tournait depuis 16 h.
+Le test ne mesurait donc rien du correctif, et la conclusion était inversée.
+
+Trois signaux, à vérifier **avant** d'ouvrir un RCA, et non après :
+
+1. **Une signature de log propre au nouveau code.** Ici l'ancien loguait `layer=X → N place_ids`,
+   le nouveau `layer=X → N lieux (Text Search Pro, paginé)`. Écrire cette différence
+   intentionnellement dans tout changement de chemin critique rend la vérification triviale.
+2. **Un effet de bord observable côté état.** Le format des marqueurs Redis avait changé
+   (`:layer:` ajouté) : `0` clé au nouveau format prouvait qu'aucun prefetch récent n'était passé
+   par le nouveau code.
+3. **L'ancienneté du process** (`ps -eo pid,etime`). Un uptime antérieur à la modification
+   suffit à invalider le test.
+
+Corollaire : les mesures faites dans le navigateur ou l'app ne valent que si l'on sait quel
+binaire répond. Sur ce projet, `pnpm sim` (mobile) et le redémarrage explicite de l'API sont
+plus fiables que le rechargement à chaud.
+
+---
+
 #### 12. Un filtre qui exclut doit le dire, et une constante ne doit gouverner qu'une décision
 
 Deux règles issues du même incident : un camping à **3 263 m** de la trace, écarté par le filtre

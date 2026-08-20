@@ -1,6 +1,6 @@
 import { IsUUID, IsNumber, IsOptional, IsArray, IsIn, IsBoolean, Min, Max, ValidateIf } from 'class-validator'
 import { Type, Transform } from 'class-transformer'
-import { MAX_SEARCH_RANGE_KM, MAX_LIVE_RADIUS_KM } from '@ridenrest/shared'
+import { MAX_SEARCH_RANGE_KM, MAX_SEARCH_RADIUS_KM } from '@ridenrest/shared'
 import type { PoiCategory } from '@ridenrest/shared'
 
 export const POI_SOURCES = ['google', 'overpass'] as const
@@ -32,10 +32,21 @@ export class FindPoisDto {
   @Type(() => Number)
   targetKm?: number
 
-  @ValidateIf((o: FindPoisDto) => o.targetKm !== undefined)
+  /**
+   * Rayon de recherche, en km. Même concept dans les deux modes, deux géométries :
+   * - **live** : rayon autour du point cible (obligatoire avec `targetKm`) ;
+   * - **planning** : demi-largeur du couloir autour de la trace (optionnel — à défaut,
+   *   `CORRIDOR_WIDTH_M`, soit le comportement des binaires mobiles déjà distribués).
+   *
+   * En planning il pilote À LA FOIS la zone interrogée chez les fournisseurs externes et le
+   * seuil d'affichage : proposer un rayon plus large que ce qu'on a collecté afficherait un
+   * sous-ensemble arbitraire (la bbox est un rectangle, sa couverture au-delà du tampon dépend
+   * de la forme de la trace, pas d'un couloir régulier).
+   */
+  @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(MAX_LIVE_RADIUS_KM)
+  @Min(0.5)
+  @Max(MAX_SEARCH_RADIUS_KM)
   @Type(() => Number)
   radiusKm?: number
 

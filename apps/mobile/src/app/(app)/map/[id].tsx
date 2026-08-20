@@ -127,6 +127,7 @@ export default function MapScreen() {
   const visibleLayers = useMapStore((s) => s.visibleLayers);
   const fromKm = useMapStore((s) => s.fromKm);
   const toKm = useMapStore((s) => s.toKm);
+  const searchRadiusKm = useMapStore((s) => s.searchRadiusKm);
   const searchCommitted = useMapStore((s) => s.searchCommitted);
   const searchRangeInteracted = useMapStore((s) => s.searchRangeInteracted);
   const activeAccommodationTypes = useMapStore((s) => s.activeAccommodationTypes);
@@ -141,13 +142,14 @@ export default function MapScreen() {
   // `ready` : sans cette garde la 1re requête part en OFF puis une 2e en ON (parité web)
   const { overpassEnabled, ready: profileReady } = useOverpassEnabled();
 
-  const { poisByLayer, isFetching, isError, isEmpty, overpassPending, overpassError, nearMiss } = usePois({
+  const { poisByLayer, isFetching, isError, isEmpty, overpassPending, overpassError } = usePois({
     adventureId: id,
     segments,
     visibleLayers,
     fromKm,
     toKm,
     overpassEnabled,
+    radiusKm: searchRadiusKm,
     enabled: traceReady && searchCommitted && profileReady,
   });
 
@@ -567,7 +569,6 @@ export default function MapScreen() {
             accommodationPois={poisByLayer.accommodations}
             stages={stages}
             isOnline={isOnline}
-            nearMiss={nearMiss}
           />
           <SidebarStagesSection
             stages={stages}

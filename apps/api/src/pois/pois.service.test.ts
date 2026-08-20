@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing'
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+import { BadRequestException } from '@nestjs/common'
 import { PoisService } from './pois.service.js'
 import { PoisRepository } from './pois.repository.js'
 import { OverpassProvider } from './providers/overpass.provider.js'
@@ -27,8 +27,6 @@ const mockPoisRepository = {
   updatePoiDistances: jest.fn(),
   findByExternalId: jest.fn(),
   findNearbyPoisFromOtherSources: jest.fn(),
-  countNearMissPois: jest.fn(),
-  segmentBelongsToUser: jest.fn(),
   insertGooglePois: jest.fn(),
   googlePoiExistsInSegment: jest.fn(),
   insertRawPoisForSegment: jest.fn(),
@@ -427,7 +425,7 @@ describe('PoisService', () => {
 
       const result = await service.findPois(baseDto, userId)
 
-      expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [])
+      expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [], 3000)
       expect(mockRedisClient.setex).not.toHaveBeenCalled()
       expect(result).toEqual([mockPoi])
     })
@@ -477,6 +475,59 @@ describe('PoisService', () => {
       expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
     })
 
+    describe('radiusKm — rayon de recherche choisi par l’utilisateur', () => {
+      it('pilote À LA FOIS la zone interrogée et le seuil d’affichage', async () => {
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+        mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
+        mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+        await service.findPois({ ...baseDto, radiusKm: 8 }, userId)
+
+        // Seuil d'affichage = 8 km. Les découpler afficherait un sous-ensemble arbitraire
+        // au-delà du tampon : la bbox est un rectangle, pas un couloir régulier.
+        expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [], 8000,
+        )
+        // Et la zone interrogée s'élargit d'autant : 8 km ≈ 0,0721° contre 0,027° à 3 km,
+        // donc la bbox descend à 42.928 au lieu de 42.973. La clé de cache géographique le
+        // reflète — deux rayons ne partagent jamais le même cache.
+        const bboxKey = (mockRedisClient.get.mock.calls as string[][])
+          .map((c) => c[0])
+          .find((k) => k.startsWith('pois:bbox:'))
+        expect(bboxKey).toContain('42.928')
+      })
+
+      it('retombe sur 3 km sans le paramètre — contrat des binaires mobiles distribués', async () => {
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValueOnce(mockWaypoints)
+        mockOverpassProvider.queryPois.mockResolvedValueOnce([])
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(false)
+        mockPoisRepository.findCachedPois.mockResolvedValueOnce([])
+
+        await service.findPois(baseDto, userId)
+
+        expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [], 3000,
+        )
+      })
+
+      it('un rayon plus large produit une bbox plus large (donc un autre marqueur de couverture)', async () => {
+        mockGooglePlacesProvider.isConfigured.mockReturnValue(true)
+        mockGooglePlacesProvider.searchLayerPlaces.mockResolvedValue([])
+        mockPoisRepository.getSegmentWaypoints.mockResolvedValue(mockWaypoints)
+        mockRedisClient.get.mockResolvedValue(null)
+
+        await service.findPois({ ...baseDto, radiusKm: 3, overpassEnabled: false }, userId)
+        const keyAt3 = (mockRedisClient.get.mock.calls as string[][])[0][0]
+
+        mockRedisClient.get.mockClear()
+        await service.findPois({ ...baseDto, radiusKm: 10, overpassEnabled: false }, userId)
+        const keyAt10 = (mockRedisClient.get.mock.calls as string[][])[0][0]
+
+        expect(keyAt3).not.toBe(keyAt10)
+      })
+    })
+
     describe('source= (flux découplés Google / Overpass)', () => {
       // Le client affiche les POI Google en ~200 ms pendant qu'Overpass, mesuré entre 1 et 31 s
       // sur les instances publiques, arrive quand il peut.
@@ -490,7 +541,7 @@ describe('PoisService', () => {
         expect(mockOverpassProvider.queryPois).not.toHaveBeenCalled()
         expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
         expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
-          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['overpass'],
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['overpass'], 3000,
         )
       })
 
@@ -505,7 +556,7 @@ describe('PoisService', () => {
         expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
         expect(mockGooglePlacesProvider.searchLayerPlaces).not.toHaveBeenCalled()
         expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
-          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['google', 'amadeus'],
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['google', 'amadeus'], 3000,
         )
       })
 
@@ -531,7 +582,7 @@ describe('PoisService', () => {
         expect(mockOverpassProvider.queryPois).toHaveBeenCalledTimes(1)
         expect(mockGooglePlacesProvider.searchLayerPlaces).toHaveBeenCalled()
         expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
-          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [],
+          baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [], 3000,
         )
       })
 
@@ -554,7 +605,7 @@ describe('PoisService', () => {
       await service.findPois({ ...baseDto, overpassEnabled: false }, userId)
 
       expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
-        baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['overpass'],
+        baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, ['overpass'], 3000,
       )
     })
 
@@ -565,7 +616,7 @@ describe('PoisService', () => {
       await service.findPois({ ...baseDto, overpassEnabled: true }, userId)
 
       expect(mockPoisRepository.findCachedPois).toHaveBeenCalledWith(
-        baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [],
+        baseDto.segmentId, baseDto.categories, baseDto.fromKm, baseDto.toKm, [], 3000,
       )
     })
 
@@ -994,57 +1045,6 @@ describe('PoisService', () => {
         const decimals = coord.includes('.') ? coord.split('.')[1].length : 0
         expect(decimals).toBeLessThanOrEqual(3)
       }
-    })
-  })
-
-  describe('countNearMissPois — dire ce que le corridor a masqué', () => {
-    const nearMissDto = {
-      segmentId: '00000000-0000-0000-0000-000000000001',
-      fromKm: 144,
-      toKm: 159,
-      categories: ['camp_site'] as never,
-    }
-
-    beforeEach(() => {
-      mockPoisRepository.segmentBelongsToUser.mockReset()
-      mockPoisRepository.countNearMissPois.mockReset()
-    })
-
-    it('renvoie le compte, le plus proche, et les bornes utilisées pour le message', async () => {
-      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(true)
-      mockPoisRepository.countNearMissPois.mockResolvedValue({ count: 2, nearestM: 3263 })
-
-      const result = await service.countNearMissPois(nearMissDto, userId)
-
-      // Les bornes sont renvoyées pour que le client formule le message sans les redéclarer.
-      expect(result).toEqual({ count: 2, nearestM: 3263, corridorWidthM: 3000, maxM: 6000 })
-    })
-
-    it('vérifie la propriété du segment — jamais d’accès POI sans contrôle', async () => {
-      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(false)
-
-      await expect(service.countNearMissPois(nearMissDto, userId)).rejects.toThrow(NotFoundException)
-      expect(mockPoisRepository.countNearMissPois).not.toHaveBeenCalled()
-    })
-
-    it('masque les POI overpass quand la recherche étendue est coupée', async () => {
-      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(true)
-      mockPoisRepository.countNearMissPois.mockResolvedValue({ count: 0, nearestM: null })
-
-      await service.countNearMissPois({ ...nearMissDto, overpassEnabled: false }, userId)
-
-      expect(mockPoisRepository.countNearMissPois).toHaveBeenCalledWith(
-        nearMissDto.segmentId, ['camp_site'], 144, 159, ['overpass'],
-      )
-    })
-
-    it('rejette une plage inversée ou au-delà du maximum', async () => {
-      mockPoisRepository.segmentBelongsToUser.mockResolvedValue(true)
-
-      await expect(service.countNearMissPois({ ...nearMissDto, fromKm: 159, toKm: 144 }, userId))
-        .rejects.toThrow(BadRequestException)
-      await expect(service.countNearMissPois({ ...nearMissDto, fromKm: 0, toKm: 51 }, userId))
-        .rejects.toThrow(BadRequestException)
     })
   })
 

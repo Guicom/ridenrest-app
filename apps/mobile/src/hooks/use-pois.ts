@@ -1,7 +1,7 @@
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   CATEGORY_TO_LAYER,
-  CORRIDOR_WIDTH_M,
+  DEFAULT_SEARCH_RADIUS_KM,
   LAYER_CATEGORIES,
   type GooglePlaceDetails,
   type MapLayer,
@@ -16,10 +16,8 @@ import { ALL_MAP_LAYERS } from '@/hooks/use-poi-layers';
 import { getCachedPois, setCachedPois } from '@/lib/cache/poi-cache';
 import {
   findPois,
-  getNearMissCount,
   getPoiGoogleDetails,
   reverseCity,
-  type NearMissCount,
   type PoiSource,
   type ReverseCityResult,
 } from '@/lib/api/pois';
@@ -56,6 +54,8 @@ export interface PoiQueryKeyParams {
   overpassEnabled: boolean;
   /** Dimension de clé à part entière : chaque source a son entrée de cache et son état. */
   source: PoiSource;
+  /** Rayon de recherche : deux rayons donnent deux jeux de résultats, donc deux caches. */
+  radiusKm: number;
 }
 
 /**
@@ -203,24 +203,6 @@ export function combinePoiResults(
   };
 }
 
-/**
- * Agrège les compteurs de quasi-manqués de plusieurs segments : somme des comptes, minimum des
- * distances. Pur → testable hors React.
- */
-export function combineNearMiss(
-  results: Array<{ data?: NearMissCount }>,
-): { count: number; nearestM: number | null; corridorWidthM: number } {
-  const data = results.map((r) => r.data).filter((d): d is NearMissCount => Boolean(d));
-  const distances = data
-    .map((d) => d.nearestM)
-    .filter((m): m is number => m !== null);
-  return {
-    count: data.reduce((sum, d) => sum + d.count, 0),
-    nearestM: distances.length > 0 ? Math.min(...distances) : null,
-    corridorWidthM: data[0]?.corridorWidthM ?? CORRIDOR_WIDTH_M,
-  };
-}
-
 export interface UsePoisParams {
   adventureId: string;
   /** Segments de la carte (on lit `id` + km cumulés pour la résolution AC5). */
@@ -230,6 +212,8 @@ export interface UsePoisParams {
   fromKm: number;
   toKm: number;
   overpassEnabled?: boolean;
+  /** Rayon de recherche autour de la trace (km). Pilote la collecte ET l'affichage. */
+  radiusKm?: number;
   /** Gate de déclenchement (route → `searchCommitted`) : la requête ne part que committée. */
   enabled?: boolean;
 }
@@ -238,12 +222,6 @@ export interface UsePoisResult extends CombinedPoiResult {
   poisByLayer: Record<MapLayer, Poi[]>;
   /** Recherche committée terminée sans aucun POI → bannière « Aucun résultat » (AC3). */
   isEmpty: boolean;
-  /**
-   * POI écartés par le filtre corridor, juste au-delà de la limite. Le filtre est correct mais
-   * il coupait en silence : un camping à 3 263 m écarté pour 263 m, « Camping (0) » à l'écran,
-   * indiscernable d'une absence réelle.
-   */
-  nearMiss: { count: number; nearestM: number | null; corridorWidthM: number };
 }
 
 /**
@@ -256,6 +234,7 @@ export function usePois({
   fromKm,
   toKm,
   overpassEnabled = false,
+  radiusKm = DEFAULT_SEARCH_RADIUS_KM,
   enabled = true,
 }: UsePoisParams): UsePoisResult {
   const { isOnline } = useNetworkStatus();
@@ -292,6 +271,7 @@ export function usePois({
         layer,
         overpassEnabled,
         source,
+        radiusKm,
       }),
       queryFn: () =>
         findPois({
@@ -301,6 +281,7 @@ export function usePois({
           categories: [...LAYER_CATEGORIES[layer]] as PoiCategory[],
           overpassEnabled,
           source,
+          radiusKm,
         }),
       enabled: enabled && isOnline && Boolean(segmentId),
       staleTime: POI_STALE_TIME_MS,
@@ -347,47 +328,6 @@ export function usePois({
     [pois, visibleLayers],
   );
 
-  // Quasi-manqués corridor : UNE requête par segment (pas par calque ni par source), sur les
-  // mêmes catégories que l'affichage. Sans calque visible, aucune requête — `categories: []`
-  // serait interprété par l'API comme « toutes les catégories ».
-  const nearMissCategories = useMemo(
-    () =>
-      ALL_MAP_LAYERS.filter((l) => visibleLayers.has(l)).flatMap(
-        (layer) => [...LAYER_CATEGORIES[layer]] as PoiCategory[],
-      ),
-    [visibleLayers],
-  );
-  const nearMissResults = useQueries({
-    queries:
-      nearMissCategories.length > 0
-        ? segmentRanges.map(({ segmentId, fromKm: localFrom, toKm: localTo }) => ({
-            queryKey: [
-              'pois',
-              'near-miss',
-              {
-                segmentId,
-                fromKm: localFrom,
-                toKm: localTo,
-                categories: [...nearMissCategories].sort().join(','),
-                overpassEnabled,
-              },
-            ],
-            queryFn: () =>
-              getNearMissCount({
-                segmentId,
-                fromKm: localFrom,
-                toKm: localTo,
-                categories: nearMissCategories,
-                overpassEnabled,
-              }),
-            enabled: enabled && isOnline && Boolean(segmentId),
-            staleTime: POI_STALE_TIME_MS,
-            gcTime: POI_GC_TIME_MS,
-          }))
-        : [],
-    combine: combineNearMiss,
-  });
-
   // Bannière « Aucun résultat » (AC3) : recherche committée terminée (succès réseau)
   // sans aucun POI. Hors-ligne (queries `enabled:false`) `isSuccess` est faux → pas de
   // bannière (on retombe sur le message offline / le cache). Distinct d'une erreur.
@@ -397,7 +337,7 @@ export function usePois({
     enabled && combined.isSuccess && !combined.overpassPending && pois.length === 0,
   );
 
-  return { ...combined, pois, poisByLayer, isEmpty, nearMiss: nearMissResults };
+  return { ...combined, pois, poisByLayer, isEmpty };
 }
 
 /**

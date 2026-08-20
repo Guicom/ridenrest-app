@@ -31,10 +31,8 @@ vi.mock('./use-profile', () => ({
 
 // Mock getPois
 const mockGetPois = vi.fn()
-const mockGetNearMissCount = vi.fn()
 vi.mock('@/lib/api-client', () => ({
   getPois: (...args: unknown[]) => mockGetPois(...args),
-  getNearMissCount: (...args: unknown[]) => mockGetNearMissCount(...args),
 }))
 
 // Mock useQueries to control query results
@@ -525,62 +523,4 @@ describe('usePois', () => {
     expect(accomPois[1].distAlongRouteKm).toBe(10)
     expect(accomPois[2].distAlongRouteKm).toBe(15)
   })
-
-  describe('quasi-manqués corridor', () => {
-    it('émet UNE requête par segment, pas par calque ni par source', () => {
-      mockVisibleLayers = new Set(['accommodations', 'restaurants'])
-      mockProfile = { overpassEnabled: true, ready: true }
-      mockUseQueries.mockReturnValue([])
-
-      renderHook(() => usePois([makeSegment('seg-1', 50, 0)]))
-
-      // POI : 2 calques × 2 sources = 4 requêtes. Quasi-manqués : 1.
-      expect(poiCall()[0].queries).toHaveLength(4)
-      expect(nearMissCall()![0].queries).toHaveLength(1)
-    })
-
-    it('n’émet aucune requête sans calque visible (catégories vides = « toutes » côté API)', () => {
-      mockVisibleLayers = new Set()
-      mockUseQueries.mockReturnValue([])
-
-      renderHook(() => usePois([makeSegment()]))
-
-      // Aucun des deux `useQueries` ne porte de requête : ni POI, ni quasi-manqués. Un
-      // `categories: []` serait interprété comme « toutes les catégories » par l'API et
-      // ferait compter des masqués que l'utilisateur ne cherchait pas.
-      const allQueries = (mockUseQueries.mock.calls as CapturedCall[]).flatMap((c) => c[0].queries)
-      expect(allQueries).toHaveLength(0)
-    })
-
-    it('agrège les segments : somme des comptes, minimum des distances', () => {
-      mockVisibleLayers = new Set(['accommodations'])
-      mockProfile = { overpassEnabled: false, ready: true }
-      mockUseQueries.mockImplementation((arg: { queries: Array<{ queryKey: readonly unknown[] }> }) => {
-        if (arg.queries.some((q) => q.queryKey[1] === 'near-miss')) {
-          return [
-            { data: { count: 2, nearestM: 3800, corridorWidthM: 3000, maxM: 6000 } },
-            { data: { count: 1, nearestM: 3263, corridorWidthM: 3000, maxM: 6000 } },
-          ]
-        }
-        return []
-      })
-
-      const { result } = renderHook(() =>
-        usePois([makeSegment('seg-1', 50, 0), makeSegment('seg-2', 50, 50)]),
-      )
-
-      expect(result.current.nearMiss).toEqual({ count: 3, nearestM: 3263, corridorWidthM: 3000 })
-    })
-
-    it('reste neutre quand aucune donnée n’est encore arrivée', () => {
-      mockVisibleLayers = new Set(['accommodations'])
-      mockUseQueries.mockReturnValue([{ data: undefined }])
-
-      const { result } = renderHook(() => usePois([makeSegment()]))
-
-      expect(result.current.nearMiss.count).toBe(0)
-      expect(result.current.nearMiss.nearestM).toBeNull()
-    })
-  })
-
 })

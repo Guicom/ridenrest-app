@@ -3,7 +3,7 @@ import { db, accommodationsCache, adventureSegments, adventures } from '@ridenre
 import { eq, and, gte, lte, sql, inArray, notInArray } from 'drizzle-orm'
 import type { OverpassNode } from './providers/overpass.provider.js'
 import type { Poi } from '@ridenrest/shared'
-import { CORRIDOR_WIDTH_M, POI_NEAR_MISS_MAX_M } from '@ridenrest/shared'
+import { CORRIDOR_WIDTH_M } from '@ridenrest/shared'
 
 @Injectable()
 export class PoisRepository {
@@ -12,10 +12,14 @@ export class PoisRepository {
    * km range AND corridor width.
    *
    * The corridor filter matters: the Overpass/Google search area is the *bounding box* of the
-   * requested km range (+ CORRIDOR_WIDTH_M of padding), so a rectangle always contains POIs
+   * requested km range (+ the search radius as padding), so a rectangle always contains POIs
    * far outside the corridor the UI advertises — up to 4+ km off-trace in practice. Filtering
    * on read keeps the displayed set consistent with the announced corridor, and independent
    * from the rectangle's shape (which varies with the requested window).
+   *
+   * `maxDistFromTraceM` reflète le rayon choisi par l'utilisateur (2026-08-20). Le défaut
+   * `CORRIDOR_WIDTH_M` préserve le comportement des clients qui n'envoient pas `radiusKm` —
+   * dont les binaires mobiles déjà distribués.
    */
   async findCachedPois(
     segmentId: string,
@@ -23,6 +27,7 @@ export class PoisRepository {
     fromKm: number,
     toKm: number,
     excludeSources: string[] = [],
+    maxDistFromTraceM: number = CORRIDOR_WIDTH_M,
   ): Promise<Poi[]> {
     const now = new Date()
     const rows = await db
@@ -35,7 +40,7 @@ export class PoisRepository {
           inArray(accommodationsCache.category, categories),
           gte(accommodationsCache.distAlongRouteKm, fromKm),
           lte(accommodationsCache.distAlongRouteKm, toKm),
-          lte(accommodationsCache.distFromTraceM, CORRIDOR_WIDTH_M),
+          lte(accommodationsCache.distFromTraceM, maxDistFromTraceM),
           // Le toggle « recherche étendue » masque aussi à la lecture : sans ça, les POI
           // Overpass déjà en cache (TTL 30 j) restaient visibles une fois l'option coupée.
           ...(excludeSources.length > 0
@@ -69,56 +74,6 @@ export class PoisRepository {
    * La borne haute est indispensable : sans elle le message compterait des POI d'une autre
    * vallée (le plus lointain en base est à 10 444 m) et ne voudrait plus rien dire.
    */
-  /**
-   * Le segment appartient-il à cet utilisateur ? Requête EXISTS, sans charger les waypoints.
-   *
-   * `getSegmentWaypoints` sert aussi de contrôle de propriété, mais il rapatrie la totalité du
-   * tracé — inutilement coûteux pour un endpoint qui ne renvoie qu'un compteur.
-   */
-  async segmentBelongsToUser(segmentId: string, userId: string): Promise<boolean> {
-    const [row] = await db
-      .select({ id: adventureSegments.id })
-      .from(adventureSegments)
-      .innerJoin(adventures, eq(adventureSegments.adventureId, adventures.id))
-      .where(and(eq(adventureSegments.id, segmentId), eq(adventures.userId, userId)))
-      .limit(1)
-    return Boolean(row)
-  }
-
-  async countNearMissPois(
-    segmentId: string,
-    categories: string[],
-    fromKm: number,
-    toKm: number,
-    excludeSources: string[] = [],
-  ): Promise<{ count: number; nearestM: number | null }> {
-    const now = new Date()
-    const [row] = await db
-      .select({
-        count: sql<number>`count(*)::int`,
-        nearestM: sql<number | null>`min(${accommodationsCache.distFromTraceM})`,
-      })
-      .from(accommodationsCache)
-      .where(
-        and(
-          eq(accommodationsCache.segmentId, segmentId),
-          gte(accommodationsCache.expiresAt, now),
-          inArray(accommodationsCache.category, categories),
-          gte(accommodationsCache.distAlongRouteKm, fromKm),
-          lte(accommodationsCache.distAlongRouteKm, toKm),
-          sql`${accommodationsCache.distFromTraceM} > ${CORRIDOR_WIDTH_M}`,
-          lte(accommodationsCache.distFromTraceM, POI_NEAR_MISS_MAX_M),
-          ...(excludeSources.length > 0
-            ? [notInArray(accommodationsCache.source, excludeSources)]
-            : []),
-        ),
-      )
-    return {
-      count: row?.count ?? 0,
-      nearestM: row?.nearestM ?? null,
-    }
-  }
-
   /** Insert Overpass results into accommodations_cache (upsert on conflict). */
   async insertOverpassPois(
     segmentId: string,

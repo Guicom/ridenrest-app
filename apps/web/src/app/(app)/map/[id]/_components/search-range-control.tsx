@@ -6,16 +6,16 @@ import { getCorridorCenter } from '@/lib/booking-url'
 import { SearchOnDropdown } from '@/components/shared/search-on-dropdown'
 import { useReverseCity } from '@/hooks/use-reverse-city'
 import { computeElevationGain, computeElevationLoss } from '@ridenrest/gpx'
-import { MAX_SEARCH_RANGE_KM } from '@ridenrest/shared'
+import { MAX_SEARCH_RANGE_KM, MAX_SEARCH_RADIUS_KM } from '@ridenrest/shared'
 import { useOfflineGate } from '@/hooks/use-offline-ready'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { MapWaypoint, Poi, AdventureStageResponse } from '@ridenrest/shared'
 import { PoiLayerGrid } from './poi-layer-grid'
 import { AccommodationSubTypes } from './accommodation-sub-types'
-import { NearMissNotice } from './near-miss-notice'
 import { SectionTooltip } from '@/components/shared/section-tooltip'
 
 const MAX_RANGE_KM = MAX_SEARCH_RANGE_KM
+const MAX_RADIUS_KM = MAX_SEARCH_RADIUS_KM
 
 interface SearchRangeControlProps {
   totalDistanceKm: number
@@ -23,8 +23,6 @@ interface SearchRangeControlProps {
   isPoisPending: boolean
   accommodationPois?: Poi[]
   stages?: AdventureStageResponse[]
-  /** POI écartés par le filtre corridor — affiché sous les compteurs, purement informatif. */
-  nearMiss?: { count: number; nearestM: number | null; corridorWidthM: number }
 }
 
 // D+ cumulé de km 0 jusqu'au point fromKm
@@ -58,13 +56,17 @@ function computeLossInRange(waypoints: MapWaypoint[], fromKm: number, toKm: numb
 }
 
 export function SearchRangeControl({
-  totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages, nearMiss,
+  totalDistanceKm, waypoints, isPoisPending, accommodationPois, stages,
 }: SearchRangeControlProps) {
   const [expanded, setExpanded] = useState(true)
   const {
     fromKm, toKm, setSearchRange, visibleLayers, selectedStageId, setSelectedStageId,
-    setSearchCommitted, searchCommitted,
+    setSearchCommitted, searchCommitted, searchRadiusKm, setSearchRadius,
   } = useMapStore()
+
+  const applyRadius = (km: number) => {
+    setSearchRadius(Math.min(MAX_RADIUS_KM, Math.max(1, Math.round(km))))
+  }
 
   // Corridor center for reverse geocoding — only when search is committed with accommodations layer
   const corridorCenter = useMemo(
@@ -163,6 +165,34 @@ export function SearchRangeControl({
 
   const handleRangeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+  }
+
+  // Saisie du rayon — mêmes règles que la plage : on ne remonte au store qu'à la validation,
+  // et une saisie invalide est réécrite avec la valeur courante plutôt que rejetée en silence.
+  const [radiusInput, setRadiusInput] = useState(() => String(searchRadiusKm))
+
+  const handleRadiusInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRadiusInput(e.target.value)
+  }
+
+  const handleRadiusInputBlur = () => {
+    const parsed = parseInt(radiusInput, 10)
+    if (!isNaN(parsed) && parsed !== searchRadiusKm) {
+      applyRadius(parsed)
+    } else {
+      setRadiusInput(String(searchRadiusKm))
+    }
+  }
+
+  const handleRadiusInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+  }
+
+  // Le store peut borner la valeur (clamp à 1..20) : l'input doit refléter ce qui est appliqué.
+  const [lastRadius, setLastRadius] = useState(searchRadiusKm)
+  if (searchRadiusKm !== lastRadius) {
+    setLastRadius(searchRadiusKm)
+    setRadiusInput(String(searchRadiusKm))
   }
 
   // Valeurs affichées selon le mode
@@ -279,14 +309,7 @@ export function SearchRangeControl({
 
           {/* Accommodation sub-types — visible uniquement si Hébergements actif */}
           {visibleLayers.has('accommodations') && <AccommodationSubTypes accommodationPois={accommodationPois} />}
-          {/* Juste sous les compteurs : c'est là que l'utilisateur lit « Camping (0) ». */}
-          {nearMiss ? (
-            <NearMissNotice
-              count={nearMiss.count}
-              nearestM={nearMiss.nearestM}
-              corridorWidthM={nearMiss.corridorWidthM}
-            />
-          ) : null}
+
 
           {/* Range stepper + input */}
           <div className="flex items-center justify-between">
@@ -321,6 +344,47 @@ export function SearchRangeControl({
                 aria-label="Augmenter la plage"
                 className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-sm font-bold text-foreground hover:bg-muted/80 disabled:opacity-50"
                 disabled={rangeKm >= MAX_RANGE_KM}
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Rayon autour de la trace — même contrôle qu'en mode live, où il existait déjà.
+              Le planning imposait 3 km en dur et invisible : l'app était plus généreuse sur le
+              vélo qu'au bureau, et ne laissait régler que là où c'est le moins pratique. */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Sur un rayon de</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => applyRadius(searchRadiusKm - 1)}
+                data-testid="radius-decrement"
+                aria-label="Diminuer le rayon"
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-sm font-bold text-foreground hover:bg-muted/80 disabled:opacity-50"
+                disabled={searchRadiusKm <= 1}
+              >
+                —
+              </button>
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={radiusInput}
+                  onChange={handleRadiusInputChange}
+                  onBlur={handleRadiusInputBlur}
+                  onKeyDown={handleRadiusInputKeyDown}
+                  data-testid="radius-value"
+                  className="font-mono text-sm font-bold w-10 text-center bg-transparent border-b border-[--border] focus:outline-none focus:border-primary"
+                  aria-label="Rayon en km"
+                />
+                <span className="font-mono text-sm font-bold">km</span>
+              </div>
+              <button
+                onClick={() => applyRadius(searchRadiusKm + 1)}
+                data-testid="radius-increment"
+                aria-label="Augmenter le rayon"
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-sm font-bold text-foreground hover:bg-muted/80 disabled:opacity-50"
+                disabled={searchRadiusKm >= MAX_RADIUS_KM}
               >
                 +
               </button>

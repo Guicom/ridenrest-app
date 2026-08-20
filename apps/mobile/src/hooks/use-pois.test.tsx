@@ -162,7 +162,7 @@ describe('groupPoisByLayer (T4)', () => {
 });
 
 describe('buildPoiQueryKey (T4 — parité web)', () => {
-  it('clé stricte `[pois, { segmentId, fromKm, toKm, layer, overpassEnabled, source }]`', () => {
+  it('clé stricte `[pois, { segmentId, fromKm, toKm, layer, overpassEnabled, source, radiusKm }]`', () => {
     // `source` est une dimension de clé à part entière depuis le découplage : les deux flux
     // d'une même recherche sont deux requêtes indépendantes, chacune avec son cache.
     expect(
@@ -173,6 +173,7 @@ describe('buildPoiQueryKey (T4 — parité web)', () => {
         layer: 'accommodations',
         overpassEnabled: false,
         source: 'google',
+        radiusKm: 5,
       }),
     ).toEqual([
       'pois',
@@ -183,6 +184,7 @@ describe('buildPoiQueryKey (T4 — parité web)', () => {
         layer: 'accommodations',
         overpassEnabled: false,
         source: 'google',
+        radiusKm: 5,
       },
     ]);
   });
@@ -220,6 +222,7 @@ describe('usePois (intégration)', () => {
         layer: 'accommodations',
         overpassEnabled: false,
         source: 'google',
+        radiusKm: 5,
       },
     ]);
     // Write-through N3 au succès.

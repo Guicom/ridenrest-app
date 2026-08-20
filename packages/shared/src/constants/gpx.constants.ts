@@ -24,21 +24,32 @@ export const CORRIDOR_WIDTH_M = 3000
  */
 export const POI_BBOX_BUFFER_M = 3000
 
-/**
- * Borne du signalement « POI proches mais masqués ».
- *
- * Un POI entre `CORRIDOR_WIDTH_M` et cette valeur est un quasi-manqué digne d'être annoncé —
- * cas réel : un camping à 3 263 m, écarté pour 263 m, sans que rien ne l'indique à l'écran.
- * Au-delà, c'est une autre vallée : le compter dirait « 12 masqués » et ne voudrait plus rien
- * dire. Mesuré sur la base : 599 POI sont au-delà de 3 000 m, le plus lointain à 10 444 m.
- */
-export const POI_NEAR_MISS_MAX_M = 6000
+
 
 /** Maximum km range for a single POI corridor search (planning mode) */
 export const MAX_SEARCH_RANGE_KM = 50
 
-/** Maximum radius in km for live mode POI search (distance from trace) */
-export const MAX_LIVE_RADIUS_KM = 20
+/**
+ * Rayon de recherche maximal — **planning ET live**, même plafond parce que c'est le même
+ * concept côté utilisateur : « chercher dans un rayon de X km ».
+ *
+ * Le planning imposait 3 km en dur et invisible, alors que le live laissait déjà régler
+ * (défaut 5 km, jusqu'à 20). L'app était donc plus généreuse sur le vélo qu'au bureau, et ne
+ * laissait ajuster que là où c'est le moins pratique — corrigé le 2026-08-20.
+ */
+export const MAX_SEARCH_RADIUS_KM = 20
+
+/** @deprecated Utiliser `MAX_SEARCH_RADIUS_KM` — même valeur, nom devenu trop étroit. */
+export const MAX_LIVE_RADIUS_KM = MAX_SEARCH_RADIUS_KM
+
+/**
+ * Rayon par défaut d'une recherche planning, aligné sur le défaut du mode live.
+ *
+ * ⚠️ Élargit le comportement historique (3 km, cf. `CORRIDOR_WIDTH_M`) : les marqueurs de
+ * couverture étant indexés sur la bbox, un rayon différent produit une bbox différente et
+ * relance donc un prefetch sur les zones déjà cherchées.
+ */
+export const DEFAULT_SEARCH_RADIUS_KM = 5
 
 /** Maximum GPX file size in bytes (10MB) */
 export const MAX_GPX_FILE_SIZE_BYTES = 10 * 1024 * 1024

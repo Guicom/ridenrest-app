@@ -1,5 +1,5 @@
 import type { MapLayer, PoiCategory } from '@ridenrest/shared';
-import { LAYER_CATEGORIES } from '@ridenrest/shared';
+import { DEFAULT_SEARCH_RADIUS_KM, LAYER_CATEGORIES } from '@ridenrest/shared';
 import { create } from 'zustand';
 
 // Store client du mode **planning** carte (mobile) — port iso de `apps/web/src/stores/
@@ -26,6 +26,11 @@ interface MapState {
   // Plage de recherche corridor (km cumulés) + gate
   fromKm: number;
   toKm: number;
+  /**
+   * Rayon de recherche autour de la trace, en km. Réglable, comme en mode live — le planning
+   * imposait 3 km en dur et invisible alors que le live laissait déjà choisir (défaut 5, max 20).
+   */
+  searchRadiusKm: number;
   searchRangeInteracted: boolean;
   searchCommitted: boolean;
 
@@ -51,6 +56,7 @@ interface MapState {
   // Actions
   toggleLayer: (layer: MapLayer) => void;
   setSearchRange: (fromKm: number, toKm: number) => void;
+  setSearchRadius: (km: number) => void;
   setSearchCommitted: (v: boolean) => void;
   toggleAccommodationType: (type: PoiCategory) => void;
   resetAccommodationTypes: () => void;
@@ -66,6 +72,7 @@ export const useMapStore = create<MapState>((set) => ({
   visibleLayers: new Set(['accommodations'] as MapLayer[]),
   fromKm: 0,
   toKm: 15,
+  searchRadiusKm: DEFAULT_SEARCH_RADIUS_KM,
   searchRangeInteracted: false,
   searchCommitted: false,
   activeAccommodationTypes: new Set(['hotel'] as PoiCategory[]),
@@ -86,6 +93,10 @@ export const useMapStore = create<MapState>((set) => ({
 
   setSearchRange: (fromKm, toKm) =>
     set({ fromKm, toKm, searchRangeInteracted: true, searchCommitted: false }),
+
+  // Comme un déplacement de plage : changer le rayon dégage la recherche committée, sinon on
+  // afficherait le jeu de l'ancien rayon en laissant croire qu'il correspond au nouveau.
+  setSearchRadius: (km) => set({ searchRadiusKm: km, searchCommitted: false }),
 
   setSearchCommitted: (v) =>
     set(
