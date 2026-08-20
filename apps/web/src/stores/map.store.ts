@@ -124,11 +124,13 @@ export const useMapStore = create<MapState>((set) => ({
       } else {
         next.add(type)
       }
-      return { activeAccommodationTypes: next }
+      // Le jeu de sous-types pilote désormais ce qu'on DEMANDE au serveur, pas seulement ce
+      // qu'on affiche : il faut relancer une recherche, comme pour la plage ou le rayon.
+      return { activeAccommodationTypes: next, searchCommitted: false }
     }),
 
   resetAccommodationTypes: () =>
-    set({ activeAccommodationTypes: new Set(LAYER_CATEGORIES.accommodations) }),
+    set({ activeAccommodationTypes: new Set(LAYER_CATEGORIES.accommodations), searchCommitted: false }),
 
   setSelectedPoiId: (id) => set({ selectedPoiId: id }),
 

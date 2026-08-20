@@ -308,7 +308,7 @@ export function SearchRangeControl({
           <PoiLayerGrid isPending={isPoisPending} />
 
           {/* Accommodation sub-types — visible uniquement si Hébergements actif */}
-          {visibleLayers.has('accommodations') && <AccommodationSubTypes accommodationPois={accommodationPois} />}
+          {visibleLayers.has('accommodations') && <AccommodationSubTypes accommodationPois={accommodationPois} onlyCountActive />}
 
 
           {/* Range stepper + input */}

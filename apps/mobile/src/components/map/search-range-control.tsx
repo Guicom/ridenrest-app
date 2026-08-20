@@ -420,7 +420,7 @@ export function SearchRangeControl({
 
           {/* Sous-types hébergement (si calque actif) */}
           {visibleLayers.has('accommodations') ? (
-            <AccommodationSubTypes accommodationPois={accommodationPois} />
+            <AccommodationSubTypes accommodationPois={accommodationPois} onlyCountActive />
           ) : null}
 
           {/* Largeur de recherche */}

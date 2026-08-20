@@ -5,7 +5,7 @@ import { getPois } from '@/lib/api-client'
 import { useOverpassEnabled } from './use-profile'
 import { POI_BBOX_CACHE_TTL, LAYER_CATEGORIES, CATEGORY_TO_LAYER } from '@ridenrest/shared'
 import type { MapSegmentData } from '@/lib/api-client'
-import type { Poi, MapLayer } from '@ridenrest/shared'
+import type { Poi, MapLayer, PoiCategory } from '@ridenrest/shared'
 
 interface UsePoisResult {
   poisByLayer: Record<MapLayer, Poi[]>
@@ -33,7 +33,7 @@ const POI_SOURCES = ['google', 'overpass'] as const
 const DEBOUNCE_MS = 400
 
 export function usePois(segments: MapSegmentData[]): UsePoisResult {
-  const { visibleLayers, fromKm: storeFromKm, toKm: storeToKm, searchCommitted, searchRadiusKm } = useMapStore()
+  const { visibleLayers, activeAccommodationTypes, fromKm: storeFromKm, toKm: storeToKm, searchCommitted, searchRadiusKm } = useMapStore()
   // `ready` gate obligatoire : sans elle, la 1re requête part en OFF pendant le chargement du
   // profil, puis une 2e part en ON → travail serveur doublé et résultat OFF affiché d'abord.
   const { overpassEnabled, ready: profileReady } = useOverpassEnabled()
@@ -56,6 +56,22 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
 
   const readySegments = segments.filter((s) => s.parseStatus === 'done')
   const activeLayers = [...visibleLayers] as MapLayer[]
+
+  /**
+   * Catégories réellement demandées pour un calque.
+   *
+   * On envoyait `LAYER_CATEGORIES[layer]` en entier, les puces n'étant qu'un filtre d'affichage.
+   * Deux conséquences : les compteurs annonçaient des types non cherchés (« Chambre d'hôte (1) »
+   * alors que seuls Hôtel et Camping étaient cochés), et surtout le serveur interrogeait les 16
+   * types Google d'`accommodations` pour une demande qui en justifiait 6 — l'optimisation par
+   * catégorie de la story 17.17 restait donc entièrement inerte.
+   *
+   * Le live filtrait déjà ainsi (`use-live-poi-search.ts`) ; c'est la parité qui manquait.
+   */
+  const categoriesForLayer = (layer: MapLayer): PoiCategory[] => {
+    const cats = LAYER_CATEGORIES[layer] ?? []
+    return layer === 'accommodations' ? cats.filter((c) => activeAccommodationTypes.has(c)) : [...cats]
+  }
 
   // Map adventure-wide [debouncedFromKm, debouncedToKm] to per-segment local km ranges
   // Empty while sliding, before the user explicitly commits the search, or while the Overpass
@@ -80,17 +96,28 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
     }]
   })
 
+  // Un calque dont aucun sous-type n'est coché n'est pas interrogé du tout.
+  // `categoryKey` entre dans la clé de cache : sans lui, cocher « Camping » puis relancer
+  // retomberait sur l'entrée de la recherche « Hôtel seul », sans émettre de requête.
+  const requestedLayers = activeLayers
+    .map((layer) => {
+      const categories = categoriesForLayer(layer)
+      return { layer, categories, categoryKey: [...categories].sort().join(',') }
+    })
+    .filter(({ categories }) => categories.length > 0)
+
   // Une requête par (segment × calque × source). La source fait partie de la clé : chaque flux
   // a son entrée de cache et son état de chargement propres.
   const activeSources = overpassEnabled ? POI_SOURCES : (['google'] as const)
   const queries = segmentRanges.flatMap(({ segment, segLocalFrom, segLocalTo }) =>
-    activeLayers.flatMap((layer) =>
+    requestedLayers.flatMap(({ layer, categories, categoryKey }) =>
       activeSources.map((source) => ({
         queryKey: ['pois', {
           segmentId: segment.id,
           fromKm: segLocalFrom,
           toKm: segLocalTo,
           layer,
+          categories: categoryKey,
           overpassEnabled,
           source,
           // Le rayon fait partie de la clé : deux rayons donnent deux jeux de résultats.
@@ -100,7 +127,7 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
           segmentId: segment.id,
           fromKm: segLocalFrom,
           toKm: segLocalTo,
-          categories: LAYER_CATEGORIES[layer] ?? [],
+          categories,
           overpassEnabled,
           source,
           radiusKm: searchRadiusKm,

@@ -56,6 +56,12 @@ export interface PoiQueryKeyParams {
   source: PoiSource;
   /** Rayon de recherche : deux rayons donnent deux jeux de résultats, donc deux caches. */
   radiusKm: number;
+  /**
+   * Catégories demandées, triées et jointes. Dimension de clé à part entière : sans elle,
+   * cocher « Camping » puis relancer retomberait sur l'entrée de la recherche « Hôtel seul »,
+   * sans émettre de requête.
+   */
+  categories: string;
 }
 
 /**
@@ -211,6 +217,13 @@ export interface UsePoisParams {
   /** Plage **adventure-cumulée** (résolue par segment via `resolveSegmentRanges`). */
   fromKm: number;
   toKm: number;
+  /**
+   * Sous-types d'hébergement cochés. Seuls ceux-ci sont demandés au serveur : envoyer tout le
+   * calque faisait interroger les 16 types Google d'`accommodations` pour une demande qui en
+   * justifiait 6, et faisait remonter des compteurs sur des types non cherchés.
+   * Par défaut, toutes les catégories du calque (comportement historique).
+   */
+  activeAccommodationTypes?: Set<PoiCategory>;
   overpassEnabled?: boolean;
   /** Rayon de recherche autour de la trace (km). Pilote la collecte ET l'affichage. */
   radiusKm?: number;
@@ -231,6 +244,7 @@ export function usePois({
   adventureId,
   segments,
   visibleLayers,
+  activeAccommodationTypes,
   fromKm,
   toKm,
   overpassEnabled = false,
@@ -248,12 +262,24 @@ export function usePois({
   // Triplets (segment couvert × calque visible × source), ordre stable (ALL_MAP_LAYERS).
   // Sans l'option étendue, une seule source → une seule requête, comme avant.
   const combos = useMemo(() => {
-    const layers = ALL_MAP_LAYERS.filter((l) => visibleLayers.has(l));
+    const layers = ALL_MAP_LAYERS.filter((l) => visibleLayers.has(l))
+      .map((layer) => {
+        const cats = LAYER_CATEGORIES[layer] as readonly PoiCategory[];
+        const categories =
+          layer === 'accommodations' && activeAccommodationTypes
+            ? cats.filter((c) => activeAccommodationTypes.has(c))
+            : [...cats];
+        return { layer, categories, categoryKey: [...categories].sort().join(',') };
+      })
+      // Un calque dont aucun sous-type n'est coché n'est pas interrogé du tout.
+      .filter(({ categories }) => categories.length > 0);
     const sources: readonly PoiSource[] = overpassEnabled ? POI_SOURCES : ['google'];
     return segmentRanges.flatMap((r) =>
-      layers.flatMap((layer) => sources.map((source) => ({ ...r, layer, source }))),
+      layers.flatMap(({ layer, categories, categoryKey }) =>
+        sources.map((source) => ({ ...r, layer, categories, categoryKey, source })),
+      ),
     );
-  }, [segmentRanges, visibleLayers, overpassEnabled]);
+  }, [segmentRanges, visibleLayers, activeAccommodationTypes, overpassEnabled]);
 
   const isExtended = useMemo(() => combos.map((c) => c.source === 'overpass'), [combos]);
 
@@ -263,12 +289,13 @@ export function usePois({
   );
 
   const combined = useQueries({
-    queries: combos.map(({ segmentId, fromKm: localFrom, toKm: localTo, layer, source }) => ({
+    queries: combos.map(({ segmentId, fromKm: localFrom, toKm: localTo, layer, categories, categoryKey, source }) => ({
       queryKey: buildPoiQueryKey({
         segmentId,
         fromKm: localFrom,
         toKm: localTo,
         layer,
+        categories: categoryKey,
         overpassEnabled,
         source,
         radiusKm,
@@ -278,7 +305,7 @@ export function usePois({
           segmentId,
           fromKm: localFrom,
           toKm: localTo,
-          categories: [...LAYER_CATEGORIES[layer]] as PoiCategory[],
+          categories,
           overpassEnabled,
           source,
           radiusKm,

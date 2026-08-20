@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react-native';
-import { LAYER_CATEGORIES, type MapLayer, type Poi } from '@ridenrest/shared';
+import { LAYER_CATEGORIES, type MapLayer, type Poi, type PoiCategory } from '@ridenrest/shared';
 import { createElement, type ReactNode } from 'react';
 
 import * as poisApi from '@/lib/api/pois';
@@ -54,7 +54,13 @@ function makePoi(id: string, category: Poi['category']): Poi {
 async function mountUsePois(
   qc: QueryClient,
   visibleLayers: Set<MapLayer>,
-  opts: { enabled?: boolean; fromKm?: number; toKm?: number; overpassEnabled?: boolean } = {},
+  opts: {
+    enabled?: boolean;
+    fromKm?: number;
+    toKm?: number;
+    overpassEnabled?: boolean;
+    activeAccommodationTypes?: Set<PoiCategory>;
+  } = {},
 ): Promise<{ current: UsePoisResult }> {
   const ref = { current: undefined as unknown as UsePoisResult };
   function Probe() {
@@ -62,6 +68,7 @@ async function mountUsePois(
       adventureId: 'adv-1',
       segments: [{ id: 'seg1', cumulativeStartKm: 0, distanceKm: 50 }],
       visibleLayers,
+      activeAccommodationTypes: opts.activeAccommodationTypes,
       fromKm: opts.fromKm ?? 0,
       toKm: opts.toKm ?? 15,
       enabled: opts.enabled,
@@ -162,35 +169,43 @@ describe('groupPoisByLayer (T4)', () => {
 });
 
 describe('buildPoiQueryKey (T4 — parité web)', () => {
-  it('clé stricte `[pois, { segmentId, fromKm, toKm, layer, overpassEnabled, source, radiusKm }]`', () => {
+  it('clé stricte `[pois, { segmentId, fromKm, toKm, layer, categories, overpassEnabled, source, radiusKm }]`', () => {
     // `source` est une dimension de clé à part entière depuis le découplage : les deux flux
     // d'une même recherche sont deux requêtes indépendantes, chacune avec son cache.
-    expect(
-      buildPoiQueryKey({
-        segmentId: 's',
-        fromKm: 0,
-        toKm: 15,
-        layer: 'accommodations',
-        overpassEnabled: false,
-        source: 'google',
-        radiusKm: 3,
-      }),
-    ).toEqual([
-      'pois',
-      {
-        segmentId: 's',
-        fromKm: 0,
-        toKm: 15,
-        layer: 'accommodations',
-        overpassEnabled: false,
-        source: 'google',
-        radiusKm: 3,
-      },
-    ]);
+    // `categories` en est une aussi : sans elle, cocher « Camping » puis relancer retomberait
+    // sur l'entrée de cache de la recherche « Hôtel seul », sans émettre de requête.
+    const params = {
+      segmentId: 's',
+      fromKm: 0,
+      toKm: 15,
+      layer: 'accommodations',
+      categories: 'hotel',
+      overpassEnabled: false,
+      source: 'google',
+      radiusKm: 3,
+    } as const;
+    expect(buildPoiQueryKey(params)).toEqual(['pois', params]);
   });
 });
 
 describe('usePois (intégration)', () => {
+  it('ne demande que les sous-types d’hébergement cochés', async () => {
+    // Envoyer tout le calque faisait interroger les 16 types Google d'`accommodations` pour
+    // une demande qui en justifiait 6, et remontait des compteurs sur des types non cherchés.
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    mockFindPois.mockResolvedValue([]);
+    const qc = makeClient();
+
+    await mountUsePois(qc, new Set(['accommodations']), {
+      activeAccommodationTypes: new Set(['hotel'] as PoiCategory[]),
+    });
+
+    await waitFor(() => expect(mockFindPois).toHaveBeenCalled());
+    expect(mockFindPois).toHaveBeenCalledWith(
+      expect.objectContaining({ categories: ['hotel'] }),
+    );
+  });
+
   it('dérive `categories` de LAYER_CATEGORIES et écrit le cache au succès', async () => {
     mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
     const hotel = makePoi('1', 'hotel');
@@ -220,6 +235,7 @@ describe('usePois (intégration)', () => {
         fromKm: 0,
         toKm: 15,
         layer: 'accommodations',
+        categories: [...LAYER_CATEGORIES.accommodations].sort().join(','),
         overpassEnabled: false,
         source: 'google',
         radiusKm: 3,

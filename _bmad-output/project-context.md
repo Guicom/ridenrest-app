@@ -137,7 +137,7 @@ src/{feature}/
 ['adventures']                              // list
 ['adventures', adventureId]                 // single item
 ['adventures', adventureId, 'segments']     // sub-resource
-['pois', { segmentId, fromKm, toKm, layer, overpassEnabled, source }]  // per-layer ET per-source
+['pois', { segmentId, fromKm, toKm, layer, categories, overpassEnabled, source, radiusKm }]  // per-layer, per-source, per-selection
 ['weather', segmentId]
 ['density', adventureId]
 ```
@@ -712,6 +712,17 @@ D'où la règle : **n'interroger que les types des catégories demandées**
 (`googleTypesForCategories`, story 17.17). `CATEGORY_GOOGLE_TYPES` est la source de vérité ;
 `LAYER_GOOGLE_TYPES` en est dérivée et un test verrouille la partition — les deux tables ont
 déjà coexisté et divergé en silence.
+
+⚠️ **Une optimisation serveur ne vaut que si le client en profite.** Le premier jet de 17.17 n'a
+rien économisé : en planning, web et mobile envoyaient `LAYER_CATEGORIES[layer]` en entier, les
+puces de sous-types n'étant qu'un filtre d'affichage. Le serveur recevait donc toujours les 5
+catégories, et le test « n'interroge que les types demandés » passait en appelant le service avec
+`categories: ['hotel']` — une situation qu'aucun client ne produisait. Les deux côtés manipulent
+`PoiCategory[]` : aucun type ne garde cette frontière, seule la valeur diffère. **Quand un
+changement serveur dépend de ce que le client envoie, le vérifier dans le code client fait partie
+du changement**, pas de la validation. Corollaire d'UI : les catégories demandées entrent dans la
+clé TanStack Query, une puce non cochée n'affiche pas « (0) » (`onlyCountActive`), et changer la
+sélection dégage `searchCommitted`.
 
 **Les résultats vides sont mis en cache, les échecs non.** Le marqueur de couverture est posé
 au grain **type** (`pois:google:seg:{segmentId}:type:{googleType}:bbox:{bboxKey}`, TTL 7 j), et

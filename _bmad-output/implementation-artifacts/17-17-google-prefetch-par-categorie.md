@@ -80,6 +80,37 @@ couvert 7 jours, avec le symptôme « 0 résultat » figé sur une zone qui en c
 résiduelle (7 j max) comme « tous les types de ce calque ont été interrogés », pour ne pas
 re-payer un prefetch complet sur toutes les zones déjà couvertes. On n'en écrit plus.
 
+## Lot 2 — le client demandait tout le calque (2026-08-20, même jour)
+
+Le lot 1 n'a produit **aucune économie réelle** : en planning, web et mobile envoyaient
+`categories: LAYER_CATEGORIES[layer]`, c'est-à-dire les 5 catégories d'hébergement quelles que
+soient les puces cochées. Le serveur recevait donc toujours les 5 catégories →
+`googleTypesForCategories` renvoyait les 16 types → 16 appels facturés, comme avant.
+
+**Comment c'est passé** : le test « n'interroge que les types des catégories demandées » appelle
+le service avec `categories: ['hotel']` — une situation qu'aucun client ne produisait. J'ai
+vérifié le contrat serveur et jamais ce que le client envoie. Aucun type ne garde cette
+frontière : les deux côtés manipulent `PoiCategory[]`, seule la *valeur* différait.
+
+**Symptôme rapporté par Guillaume** : « Chambre d'hôte (1) » affiché alors que seuls Hôtel et
+Camping étaient cochés — le compteur portait sur tout ce que l'API avait renvoyé, les puces
+n'étant qu'un filtre d'affichage.
+
+Correctifs (parité web + mobile, les 2 points de planning de la règle 10) :
+
+1. `categories` = `visibleLayers` × `activeAccommodationTypes`, comme le fait déjà le live.
+   Un calque dont aucun sous-type n'est coché n'est plus interrogé du tout.
+2. `categories` entre dans la **clé de cache** (signature triée, ex. `camp_site,hotel`). Sans
+   elle, cocher « Camping » puis relancer retomberait sur l'entrée de la recherche « Hôtel
+   seul » et afficherait l'ancien jeu sans émettre de requête.
+3. Les puces passent en `onlyCountActive` en planning : une puce non cochée n'affiche plus
+   « (0) », qui laissait croire qu'on avait cherché sans rien trouver.
+4. `toggleAccommodationType` et `resetAccommodationTypes` dégagent `searchCommitted`, comme
+   `setSearchRange` et `setSearchRadius`. **Conséquence visible** : cocher un type après une
+   recherche ne filtre plus instantanément, il faut recliquer sur « Rechercher ». Arbitrage
+   validé par Guillaume — c'est le prix de l'économie, et c'est cohérent avec la règle du
+   déclenchement explicite.
+
 ## Tâches
 
 - [x] T1 — `CATEGORY_GOOGLE_TYPES` source de vérité ; `LAYER_GOOGLE_TYPES` dérivée
@@ -89,16 +120,24 @@ re-payer un prefetch complet sur toutes les zones déjà couvertes. On n'en écr
 - [x] T5 — marqueurs par type + shim de lecture des marqueurs de calque hérités
 - [x] T6 — tests : partition verrouillée, un appel par type, `shelter` → 0 appel, marquage
       par type, échec isolé retentable, shim hérité (12 tests ajoutés/réécrits)
-- [ ] T7 — **validation Guillaume** : sur une zone neuve, vérifier dans les logs
+- [x] T7 — lot 2 : `categories` = sous-types cochés (web + mobile), signature dans la clé,
+      `onlyCountActive` en planning, reset de `searchCommitted`, 5 tests ajoutés
+- [ ] T8 — **validation Guillaume** : sur une zone neuve, vérifier dans les logs
       `[Google prefetch] ... types: lodging,hotel,motel,inn,extended_stay_hotel,resort_hotel`
       (6 types, pas 16) ; puis cocher « camping » et vérifier qu'un nouveau prefetch part avec
       les 4 types de `camp_site` au lieu de rien.
 
 ## Vérifications
 
-- `tsc --noEmit` : 0 erreur
-- `eslint src/pois/` : 0 issue
-- `jest` (API complet) : **481 tests, 39 suites, 0 échec**
+| | résultat |
+|---|---|
+| api `jest` | 481 / 481, 39 suites |
+| web `vitest` | 1182 / 1182 |
+| mobile `jest` | 657 / 657, 96 suites |
+| `packages/shared` | 41 / 41 |
+| `tsc` api + mobile | 0 erreur |
+| `tsc` web | 86 erreurs — **identique avant/après**, vérifié par `git stash` (dette préexistante) |
+| `eslint` | 0 erreur (web 6 warnings, mobile 1, tous préexistants — vérifiés par `git stash`) |
 
 ## Signature de log
 

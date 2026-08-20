@@ -7,6 +7,8 @@ import type { Poi } from '@ridenrest/shared'
 
 // Mock useMapStore
 let mockVisibleLayers = new Set<string>()
+// Par défaut tous les sous-types : les tests historiques attendent le calque complet.
+let mockAccommodationTypes = new Set<string>(['hotel', 'hostel', 'camp_site', 'shelter', 'guesthouse'])
 let mockFromKm = 0
 let mockToKm = 30
 let mockSearchCommitted = true  // default true so existing tests are unaffected
@@ -14,6 +16,7 @@ let mockSearchCommitted = true  // default true so existing tests are unaffected
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
     visibleLayers: mockVisibleLayers,
+    activeAccommodationTypes: mockAccommodationTypes,
     fromKm: mockFromKm,
     toKm: mockToKm,
     searchCommitted: mockSearchCommitted,
@@ -213,6 +216,45 @@ describe('usePois', () => {
     expect(result.current.poisByLayer.accommodations.map((p) => p.id)).toEqual(['o1', 'g1'])
   })
 
+  it('ne demande que les sous-types d’hébergement cochés', () => {
+    // Envoyer tout le calque faisait interroger les 16 types Google d'`accommodations` pour une
+    // demande qui en justifiait 6, et remontait des compteurs sur des types non cherchés
+    // (« Chambre d'hôte (1) » alors que seuls Hôtel et Camping étaient cochés).
+    mockVisibleLayers = new Set(['accommodations'])
+    mockAccommodationTypes = new Set(['hotel'])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    const { queries } = poiCall()![0]
+    expect(queries).toHaveLength(1)
+    expect(queries[0].queryKey[1].categories).toBe('hotel')
+  })
+
+  it('n’émet aucune requête pour un calque dont aucun sous-type n’est coché', () => {
+    mockVisibleLayers = new Set(['accommodations'])
+    mockAccommodationTypes = new Set([])
+
+    renderHook(() => usePois([makeSegment()]))
+
+    expect(poiCall()![0].queries).toHaveLength(0)
+  })
+
+  it('les catégories font partie de la clé de cache', () => {
+    // Sans cette dimension, cocher « Camping » puis relancer retomberait sur l'entrée de la
+    // recherche « Hôtel seul », donc afficherait l'ancien jeu sans émettre de requête.
+    mockVisibleLayers = new Set(['accommodations'])
+    mockAccommodationTypes = new Set(['hotel'])
+    renderHook(() => usePois([makeSegment()]))
+    const keyHotel = poiCall()![0].queries[0].queryKey[1].categories
+
+    mockAccommodationTypes = new Set(['hotel', 'camp_site'])
+    renderHook(() => usePois([makeSegment()]))
+    const keyBoth = poiCall()![0].queries[0].queryKey[1].categories
+
+    expect(keyHotel).not.toBe(keyBoth)
+    expect(keyBoth).toBe('camp_site,hotel')  // trié → stable quel que soit l'ordre de clic
+  })
+
   it('fires queries when visibleLayers has active layers', () => {
     // With per-layer queries: 1 segment × 2 active layers = 2 independent queries
     mockVisibleLayers = new Set(['accommodations', 'restaurants'])
@@ -329,9 +371,10 @@ describe('usePois', () => {
     expect(queries).toHaveLength(1)
     expect(queries[0].queryKey[1].fromKm).toBe(10)
     expect(queries[0].queryKey[1].toKm).toBe(30)
-    // Per-layer key: uses `layer` field, not `categories` array
+    // Clé par calque, plus une signature de catégories : les catégories demandées dépendent
+    // désormais des sous-types cochés, donc deux sélections doivent avoir deux caches.
     expect(queries[0].queryKey[1].layer).toBe('accommodations')
-    expect(queries[0].queryKey[1]).not.toHaveProperty('categories')
+    expect(typeof queries[0].queryKey[1].categories).toBe('string')
   })
 
   it('fires queries for multiple segments overlapping the range', () => {

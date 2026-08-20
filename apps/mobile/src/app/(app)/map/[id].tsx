@@ -146,6 +146,7 @@ export default function MapScreen() {
     adventureId: id,
     segments,
     visibleLayers,
+    activeAccommodationTypes,
     fromKm,
     toKm,
     overpassEnabled,
