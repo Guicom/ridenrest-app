@@ -33,7 +33,7 @@ const POI_SOURCES = ['google', 'overpass'] as const
 const DEBOUNCE_MS = 400
 
 export function usePois(segments: MapSegmentData[]): UsePoisResult {
-  const { visibleLayers, fromKm: storeFromKm, toKm: storeToKm, searchCommitted } = useMapStore()
+  const { visibleLayers, fromKm: storeFromKm, toKm: storeToKm, searchCommitted, searchRadiusKm } = useMapStore()
   // `ready` gate obligatoire : sans elle, la 1re requête part en OFF pendant le chargement du
   // profil, puis une 2e part en ON → travail serveur doublé et résultat OFF affiché d'abord.
   const { overpassEnabled, ready: profileReady } = useOverpassEnabled()
@@ -93,6 +93,8 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
           layer,
           overpassEnabled,
           source,
+          // Le rayon fait partie de la clé : deux rayons donnent deux jeux de résultats.
+          radiusKm: searchRadiusKm,
         }] as const,
         queryFn: () => getPois({
           segmentId: segment.id,
@@ -101,6 +103,7 @@ export function usePois(segments: MapSegmentData[]): UsePoisResult {
           categories: LAYER_CATEGORIES[layer] ?? [],
           overpassEnabled,
           source,
+          radiusKm: searchRadiusKm,
         }),
         staleTime: POI_BBOX_CACHE_TTL * 1000,  // 30 days — aligned with Redis TTL
         gcTime: POI_BBOX_CACHE_TTL * 1000,    // 30 days — prevents GC eviction before staleTime expires

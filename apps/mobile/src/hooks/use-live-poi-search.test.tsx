@@ -118,6 +118,8 @@ describe('useLivePoiSearch — recherche explicite (AC2)', () => {
         radiusKm: 5,
         overpassEnabled: false,
         categories: ['hotel'],
+        // Découplage : la source primaire est explicite dans la requête.
+        source: 'google',
       }),
     );
     const liveKey = qc
@@ -133,12 +135,79 @@ describe('useLivePoiSearch — recherche explicite (AC2)', () => {
       'targetKm',
       'radiusKm',
       'overpassEnabled',
+      // `source` : dimension de clé à part entière, les deux flux ont des caches distincts.
+      'source',
     ]);
     expect(liveKey![2]).not.toHaveProperty('categories');
 
     await waitFor(() =>
       expect(mockSetCached).toHaveBeenCalledWith('adv-1-live', [makePoi('1')]),
     );
+  });
+});
+
+describe('useLivePoiSearch — flux découplés Google / Overpass', () => {
+  // En Live, le découplage est plus critique qu'en planning : l'utilisateur roule. Overpass
+  // a été mesuré entre 1 s et 31 s sur les instances publiques — inacceptable en attente
+  // bloquante devant un guidon.
+
+  it('refetch() déclenche les DEUX sources quand la recherche étendue est active', async () => {
+    mockOverpassEnabled.mockReturnValue({ overpassEnabled: true, ready: true });
+    mockGetLivePois.mockResolvedValue([]);
+    const hook = await mountHook(makeClient());
+
+    await act(async () => {
+      await hook.current.refetch();
+    });
+
+    await waitFor(() => expect(mockGetLivePois).toHaveBeenCalledTimes(2));
+    const sources = mockGetLivePois.mock.calls.map((c) => (c[0] as { source?: string }).source);
+    expect(new Set(sources)).toEqual(new Set(['google', 'overpass']));
+  });
+
+  it('n’interroge que Google quand la recherche étendue est coupée', async () => {
+    mockOverpassEnabled.mockReturnValue({ overpassEnabled: false, ready: true });
+    mockGetLivePois.mockResolvedValue([]);
+    const hook = await mountHook(makeClient());
+
+    await act(async () => {
+      await hook.current.refetch();
+    });
+
+    expect(mockGetLivePois).toHaveBeenCalledTimes(1);
+    expect((mockGetLivePois.mock.calls[0][0] as { source?: string }).source).toBe('google');
+  });
+
+  it('fusionne les POI des deux sources', async () => {
+    mockOverpassEnabled.mockReturnValue({ overpassEnabled: true, ready: true });
+    mockGetLivePois.mockImplementation((p: { source?: string }) =>
+      Promise.resolve(p.source === 'overpass' ? [makePoi('o1')] : [makePoi('g1')]),
+    );
+    const hook = await mountHook(makeClient());
+
+    await act(async () => {
+      await hook.current.refetch();
+    });
+
+    await waitFor(() => expect(hook.current.pois).toHaveLength(2));
+  });
+
+  it('un échec Overpass laisse la recherche en succès avec des résultats partiels', async () => {
+    mockOverpassEnabled.mockReturnValue({ overpassEnabled: true, ready: true });
+    mockGetLivePois.mockImplementation((p: { source?: string }) =>
+      p.source === 'overpass'
+        ? Promise.reject(new Error('Overpass 504'))
+        : Promise.resolve([makePoi('g1')]),
+    );
+    const hook = await mountHook(makeClient());
+
+    await act(async () => {
+      await hook.current.refetch();
+    });
+
+    await waitFor(() => expect(hook.current.overpassError).toBe(true));
+    expect(hook.current.isError).toBe(false);
+    expect(hook.current.pois).toHaveLength(1);
   });
 });
 

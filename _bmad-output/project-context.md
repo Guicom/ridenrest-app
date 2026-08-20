@@ -680,13 +680,169 @@ Règle : exposer un helper `useOverpassEnabled(): { overpassEnabled, ready }` et
 
 Vaut pour tout futur flag de profil (unités, devise, tier) consommé par une requête.
 
-#### 11. Google Places : SKU Essentials pour la carte, Pro seulement à l'ouverture d'une fiche
+#### 11. Google Places : le SKU se décide dans le field mask, et un appel Text Search amortit 20 POI
 
-Google facture **au SKU le plus élevé des champs demandés**. Réclamer note, horaires, téléphone et site web pour *chaque* POI inséré fait basculer tout l'appel en **Place Details Pro** (5 000 gratuits/mois puis ~17 $/1000) alors que poser un pin ne demande que nom, position et types (**Essentials**, 10 000 gratuits/mois).
+Google facture **au SKU le plus élevé des champs demandés**. Deux conséquences structurantes.
 
-- `getPlaceDetails(placeId, tier)` : `'essentials'` pour le prefetch (`ESSENTIALS_FIELDS`), `'pro'` pour la fiche POI (`PRO_FIELDS`).
-- **Clés Redis distinctes** : `google_place_basic:{placeId}` (Essentials, écrite par le prefetch) et `google_place_details:{placeId}` (Pro, écrite par `getPoiGoogleDetails`). Écrire une charge Essentials sous la clé Pro priverait la fiche de ses champs riches pendant 7 jours. Le prefetch réutilise une charge Pro déjà en cache — elle contient les champs Essentials.
-- Rappel de volumétrie (mesuré) : une recherche froide produit ~37 `place_id`, dont ~14 nouveaux → 14 appels facturés. Le prefetch couvre **les 4 calques** (le marqueur de couverture est par bbox, pas par calque), donc environ la moitié partait dans des calques que l'utilisateur n'avait pas activés. Text Search reste gratuit (`places.id` seul = Essentials IDs Only, illimité) : ce ne sont **jamais** les 20 Text Search qui coûtent, ce sont les Place Details.
+**Le prefetch carte n'appelle plus Place Details du tout.** `searchLayerPlaces` demande `places.id,places.displayName,places.location,places.types,nextPageToken` — SKU **Text Search Pro** (32 $/1000, 5 000 gratuits/mois) — soit exactement les quatre champs nécessaires à un pin, pour 20 POI par appel facturé. Un Place Details, lui, n'en amortit qu'un. Mesuré sur une bbox froide réelle :
+
+| | appels facturés | coût | POI | coût/POI | bboxes froides gratuites/mois |
+|---|---|---|---|---|---|
+| avant (IDs Only + un Place Details par POI) | 32 | 0,16 $ | 32 | 0,0050 $ | ~312 |
+| après (Text Search Pro paginé) | 10 | 0,32 $ | 114 | **0,0028 $** | **~500** |
+
+`getPlaceDetails` (SKU **Place Details Pro**) ne sert plus qu'à **l'ouverture d'une fiche POI** : note, horaires, téléphone, site. Clé Redis `google_place_details:{placeId}`.
+
+**⚠️ Le chemin « comptage » doit rester en IDs Only, gratuit.** `searchLayerPlaceIds` (masque `places.id,nextPageToken`) est consommé par l'analyse de densité, qui découpe l'aventure en tronçons de 10 km et appelle une fois par tronçon **et par type** : une aventure de 837 km = 84 tronçons × 16 types = **1 344 requêtes pour une seule analyse**. Basculer cette méthode sur le masque Pro coûterait ~43 $ et 27 % du quota gratuit mensuel par analyse — pour une donnée dont le processeur ne lit que « 0, 1, ou ≥ 2 ». Ne jamais ajouter `location`, `displayName` ou `types` à ce masque, et ne pas y activer la pagination.
+
+#### 11b. `includedType` ne filtre pas — le `textQuery` décide, et il se calibre par type
+
+Google score d'abord par **pertinence textuelle** : un `textQuery` qui ne colle pas au `includedType` écrase le résultat, silencieusement. Avec l'ancien `textQuery` unique par calque (`"accommodation"`), mesuré sur une bbox Alsace/Vosges :
+
+| `includedType` | avec `"accommodation"` | avec une requête adaptée |
+|---|---|---|
+| `campground` | **0** | **10** (`"camping"`) |
+| `motel` | **0** | **3** (`"motel"`) |
+| `hostel` | 1 | 2 (`"auberge de jeunesse"`) |
+
+Zéro camping et zéro motel sur 50 km, pour une app de bikepacking — et le même défaut faussait l'**analyse de densité**, qui signalait « gap critique » un tronçon ne contenant que des campings. Source de vérité : `TYPE_TEXT_QUERY` dans `google-places.provider.ts`.
+
+L'inverse est vrai aussi : **trop spécifique tue le résultat** (`"camping caravaneige"` → 0). Il faut une requête courte et naturelle, proche de ce qu'un humain taperait. Avant d'ajouter un type, mesurer sa réponse réelle sur une bbox représentative — le Text Search en IDs Only est gratuit et illimité, donc la sonde ne coûte rien.
+
+**Suivre le `nextPageToken`** sur le chemin d'affichage : `lodging` sature à 20 résultats en renvoyant un token, ignoré pendant 5 mois. Union des 16 types sur une page = 32 `place_id` ; avec pagination = 114. Plafond Google : 20 par page, 60 par type, et `maxResultCount` est plafonné à 20 côté serveur quoi qu'on demande.
+
+#### 13. Avant de conclure qu'un correctif ne marche pas, vérifier que c'est bien lui qui tourne
+
+Le 2026-08-20, une régression a été diagnostiquée à tort : « le nouveau code trouve moins de
+campings que l'ancien ». En réalité le serveur local exécutait le code de la veille —
+`nest start --watch` n'avait pas repris les modifications et le process tournait depuis 16 h.
+Le test ne mesurait donc rien du correctif, et la conclusion était inversée.
+
+Trois signaux, à vérifier **avant** d'ouvrir un RCA, et non après :
+
+1. **Une signature de log propre au nouveau code.** Ici l'ancien loguait `layer=X → N place_ids`,
+   le nouveau `layer=X → N lieux (Text Search Pro, paginé)`. Écrire cette différence
+   intentionnellement dans tout changement de chemin critique rend la vérification triviale.
+2. **Un effet de bord observable côté état.** Le format des marqueurs Redis avait changé
+   (`:layer:` ajouté) : `0` clé au nouveau format prouvait qu'aucun prefetch récent n'était passé
+   par le nouveau code.
+3. **L'ancienneté du process** (`ps -eo pid,etime`). Un uptime antérieur à la modification
+   suffit à invalider le test.
+
+Corollaire : les mesures faites dans le navigateur ou l'app ne valent que si l'on sait quel
+binaire répond. Sur ce projet, `pnpm sim` (mobile) et le redémarrage explicite de l'API sont
+plus fiables que le rechargement à chaud.
+
+---
+
+#### 12. Un réglage que l'utilisateur possède déjà ailleurs ne doit pas être une constante en dur
+
+Le corridor de planning valait **3 km, en dur et invisible**, alors que le mode live laissait
+choisir son rayon depuis MOB-5.3 (défaut 5 km, jusqu'à 20). L'app était plus généreuse sur le
+vélo qu'au bureau, et ne laissait ajuster que là où c'est le moins pratique. Corrigé le
+2026-08-20 : `radiusKm` de bout en bout, `MAX_SEARCH_RADIUS_KM = 20` partagé par les deux modes.
+
+Le défaut planning reste à **3 km** (`DEFAULT_SEARCH_RADIUS_KM`), pas aligné sur les 5 km du
+live : les marqueurs de couverture Google sont indexés sur la bbox, donc changer le défaut
+relancerait un prefetch sur toutes les zones déjà cherchées. Une fois le réglage donné à
+l'utilisateur, lui imposer ce coût n'a plus de justification. L'ajout est ainsi strictement
+additif.
+
+Symptôme qui l'a révélé : un camping à **3 263 m** de la trace, écarté pour 263 m, avec
+« Camping (0) » à l'écran — indiscernable d'une absence réelle. Le premier correctif comptait
+les exclus et l'annonçait ; **approche abandonnée** — un message qui dit qu'un résultat existe
+puis refuse de le montrer est plus frustrant que le silence, surtout quand la donnée est déjà en
+base et que l'afficher ne coûte **aucun appel externe** (le filtre est une clause `WHERE`).
+
+**Une constante par décision.** Trois désormais, dans `packages/shared/src/constants/gpx.constants.ts` :
+
+| constante | décision | où |
+|---|---|---|
+| `POI_BBOX_BUFFER_M` | largeur par défaut de la zone **interrogée** | `pois.service.ts` |
+| `CORRIDOR_WIDTH_M` | seuil d'**affichage** par défaut | `pois.repository.ts` |
+| `DEFAULT_SEARCH_RADIUS_KM` / `MAX_SEARCH_RADIUS_KM` | ce que l'utilisateur **choisit** | stores web et mobile |
+
+**Le rayon pilote collecte ET affichage, jamais l'un sans l'autre.** Les découpler afficherait un
+sous-ensemble arbitraire : la bbox est un rectangle, sa couverture lointaine dépend de la forme
+de la trace et pas d'un couloir régulier. Mesuré : 228 POI entre 3 et 4 km, 29 entre 7 et 8 —
+la décroissance traduit une recherche moins bonne au loin, pas une absence d'hébergements.
+Depuis la story 17.15 cet élargissement est quasi gratuit (un appel Text Search Pro amortit
+20 POI), donc le principal argument contre a disparu.
+
+**Changer le rayon dégage `searchCommitted`.** Sinon on afficherait le jeu de l'ancien rayon en
+laissant croire qu'il correspond au nouveau.
+
+⚠️ **`findPoisNearPoint` (live) garde sa sémantique de rayon autour d'un point** — pas un couloir
+le long d'une trace. Ne pas y transposer la logique corridor.
+
+**Corollaire d'API** : le `ResponseInterceptor` place la charge utile **directement** dans `data`.
+Ajouter un champ à une réponse existante transforme donc `data` d'un tableau en objet et casse
+les **binaires mobiles déjà distribués**, qui parlent à l'API de prod. Tout nouveau besoin
+d'information passe par un **endpoint séparé** ou un **paramètre optionnel** — jamais par un
+enrichissement en place. C'est pourquoi `radiusKm` est optionnel et retombe sur 3 km.
+
+---
+
+#### 13. Avant de conclure qu'un correctif ne marche pas, vérifier que c'est bien lui qui tourne
+
+Le 2026-08-20, une régression a été diagnostiquée à tort : « le nouveau code trouve moins de
+campings que l'ancien ». En réalité le serveur local exécutait le code de la veille —
+`nest start --watch` n'avait pas repris les modifications et le process tournait depuis 16 h.
+Le test ne mesurait donc rien du correctif, et la conclusion était inversée.
+
+Trois signaux, à vérifier **avant** d'ouvrir un RCA, et non après :
+
+1. **Une signature de log propre au nouveau code.** Ici l'ancien loguait `layer=X → N place_ids`,
+   le nouveau `layer=X → N lieux (Text Search Pro, paginé)`. Écrire cette différence
+   intentionnellement dans tout changement de chemin critique rend la vérification triviale.
+2. **Un effet de bord observable côté état.** Le format des marqueurs Redis avait changé
+   (`:layer:` ajouté) : `0` clé au nouveau format prouvait qu'aucun prefetch récent n'était passé
+   par le nouveau code.
+3. **L'ancienneté du process** (`ps -eo pid,etime`). Un uptime antérieur à la modification
+   suffit à invalider le test.
+
+Corollaire : les mesures faites dans le navigateur ou l'app ne valent que si l'on sait quel
+binaire répond. Sur ce projet, `pnpm sim` (mobile) et le redémarrage explicite de l'API sont
+plus fiables que le rechargement à chaud.
+
+---
+
+#### 12. Un filtre qui exclut doit le dire, et une constante ne doit gouverner qu'une décision
+
+Deux règles issues du même incident : un camping à **3 263 m** de la trace, écarté par le filtre
+corridor à 3 000 m — pour 263 mètres — avec « Camping (0) » à l'écran, indiscernable d'une
+absence réelle.
+
+**Une exclusion silencieuse est un défaut, pas une optimisation.** C'est la même forme que la
+panne Overpass restée invisible cinq mois : l'utilisateur ne peut pas distinguer « il n'y a
+rien » de « quelque chose a été écarté juste au-delà de la limite ». Volumétrie mesurée :
+**599 POI** en base au-delà de 3 000 m (469 Google, 130 Overpass), collectés puis masqués sans
+un mot. `GET /pois/near-miss-count` + `NearMissNotice` (web et mobile) le disent désormais.
+Toute future règle de filtrage à la lecture doit prévoir comment elle se rend visible.
+
+**Une constante par décision.** `CORRIDOR_WIDTH_M` gouvernait à la fois le tampon de la bbox
+envoyée aux fournisseurs externes et le seuil d'affichage — donc impossible d'élargir l'un sans
+l'autre. Trois constantes désormais, dans `packages/shared/src/constants/gpx.constants.ts` :
+
+| constante | décision | où |
+|---|---|---|
+| `POI_BBOX_BUFFER_M` | largeur de la zone **interrogée** chez Google/Overpass | `pois.service.ts` |
+| `CORRIDOR_WIDTH_M` | seuil d'**affichage** d'un POI | `pois.repository.ts` (`findCachedPois`) |
+| `POI_NEAR_MISS_MAX_M` | borne du **signalement** des masqués | `countNearMissPois` |
+
+Les trois valent 3 000 / 3 000 / 6 000 : la séparation n'a rien changé au comportement, elle a
+rendu les leviers indépendants.
+
+⚠️ **`findPoisNearPoint` (live) n'est PAS concerné** : sa sémantique est un **rayon autour d'un
+point**, pas un couloir le long d'une trace. La notion de quasi-manqué corridor n'y a pas de
+sens, et y appliquer le filtre supprimerait des POI que le live veut légitimement.
+
+**Corollaire d'API** : le `ResponseInterceptor` place la charge utile **directement** dans `data`.
+Ajouter un champ à une réponse existante transforme donc `data` d'un tableau en objet et casse
+les **binaires mobiles déjà distribués**, qui parlent à l'API de prod. Un nouveau besoin
+d'information passe par un **endpoint séparé**, jamais par un enrichissement en place.
+
+---
 
 #### 10. Deux sources de latences incomparables ⇒ deux flux, jamais une attente commune
 
@@ -694,7 +850,14 @@ Google Places répond en ~200 ms (bbox déjà prefetchée) à ~2 s (froide) ; Ov
 
 - L'API accepte `source=google|overpass` : une requête par source, `resolveSourcePlan()` décide de ce qu'on interroge **et** de ce qu'on masque à la lecture. Sans le paramètre, comportement combiné historique (contrat du mobile, non découplé).
 - Côté client, **`isPending` ne suit que la source primaire**. Overpass ne doit retenir ni le premier affichage, ni l'auto-zoom, ni les squelettes de calque. Idem `hasError` : un échec Overpass donne des résultats *partiels*, pas une recherche en erreur.
-- **Parité planning / live obligatoire.** Les deux écrans consomment les mêmes sources : le live a exactement le même découplage (`useLivePoisSearch` émet deux `useQuery`, `refetch()` déclenche les deux). En live c'est même plus critique — l'utilisateur est sur son vélo et n'attendra pas 30 s devant un écran figé.
+- **Parité sur les 4 points, nommés.** Une règle qui dit « parité obligatoire » se contourne sans que personne le remarque : c'est exactement ce qui est arrivé le 2026-08-19, où le découplage a été livré web-only alors que cette règle existait déjà. Les points d'application sont donc listés, et se vérifient en une commande :
+
+| plateforme | planning | live |
+|---|---|---|
+| web | `apps/web/src/hooks/use-pois.ts` | `apps/web/src/hooks/use-live-poi-search.ts` |
+| mobile | `apps/mobile/src/hooks/use-pois.ts` | `apps/mobile/src/hooks/use-live-poi-search.ts` |
+
+  Les quatre émettent une requête par source, exposent `overpassPending` / `overpassError`, et montent `ExtendedSearchStatus` (`apps/web/src/app/(app)/map/[id]/_components/extended-search-status.tsx`, `apps/mobile/src/components/map/extended-search-status.tsx`). En live c'est le plus critique — l'utilisateur est sur son vélo et n'attendra pas 30 s devant un écran figé.
 - Corollaires à ne pas oublier quand on touche à cette zone :
   - l'**auto-zoom** se déclenche sur la source primaire uniquement — le rejouer à l'arrivée d'Overpass ferait sauter la carte sous les doigts de l'utilisateur ;
   - la bannière **« Aucun résultat »** exige `!overpassPending` : Google peut renvoyer 0 alors qu'Overpass va en ramener 50 ;

@@ -1,6 +1,7 @@
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   CATEGORY_TO_LAYER,
+  DEFAULT_SEARCH_RADIUS_KM,
   LAYER_CATEGORIES,
   type GooglePlaceDetails,
   type MapLayer,
@@ -8,7 +9,7 @@ import {
   type Poi,
   type PoiCategory,
 } from '@ridenrest/shared';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { ALL_MAP_LAYERS } from '@/hooks/use-poi-layers';
@@ -17,6 +18,7 @@ import {
   findPois,
   getPoiGoogleDetails,
   reverseCity,
+  type PoiSource,
   type ReverseCityResult,
 } from '@/lib/api/pois';
 
@@ -50,7 +52,20 @@ export interface PoiQueryKeyParams {
   toKm: number;
   layer: MapLayer;
   overpassEnabled: boolean;
+  /** Dimension de clé à part entière : chaque source a son entrée de cache et son état. */
+  source: PoiSource;
+  /** Rayon de recherche : deux rayons donnent deux jeux de résultats, donc deux caches. */
+  radiusKm: number;
 }
+
+/**
+ * Deux flux pour une même recherche (parité web, story 17.14 — portée au mobile 2026-08-20).
+ *
+ * Google répond en ~200 ms sur une bbox déjà prefetchée, ~2 s à froid ; Overpass a été mesuré
+ * entre 1 s et 31 s sur les instances publiques. Les attendre ensemble fait payer à chaque
+ * utilisateur le pire des deux — inacceptable en mode Live, où l'on est sur un vélo.
+ */
+export const POI_SOURCES: readonly PoiSource[] = ['google', 'overpass'];
 
 /** Query key POI canonique (parité web `use-pois.ts`). */
 export function buildPoiQueryKey(
@@ -143,6 +158,10 @@ export interface CombinedPoiResult {
   isFetching: boolean;
   isError: boolean;
   isSuccess: boolean;
+  /** Recherche étendue (Overpass) en vol — ses POI s'ajouteront à ceux déjà affichés. */
+  overpassPending: boolean;
+  /** La recherche étendue a échoué : les résultats affichés sont partiels, pas en erreur. */
+  overpassError: boolean;
 }
 
 type CombineInput = Pick<
@@ -150,17 +169,37 @@ type CombineInput = Pick<
   'data' | 'isLoading' | 'isError' | 'isSuccess'
 > & { isFetching?: boolean };
 
-/** Agrège les résultats `useQueries` (dédoublonné). Pur → testable hors React. */
-export function combinePoiResults(results: CombineInput[]): CombinedPoiResult {
+/**
+ * Agrège les résultats `useQueries` (dédoublonné). Pur → testable hors React.
+ *
+ * `isExtended[i]` indique si le résultat `i` vient de la recherche étendue (Overpass).
+ * `useQueries` garantit l'ordre entrée/sortie, c'est la seule façon fiable de redistinguer
+ * les deux flux mêlés dans `results`. Omis → tout est considéré comme source primaire
+ * (comportement d'avant le découplage).
+ *
+ * ⚠️ Les états primaires (`isPending`, `isFetching`, `isError`, `isSuccess`) ne suivent QUE
+ * la source primaire : Overpass ne doit retenir ni le premier affichage, ni l'auto-zoom, ni
+ * faire tourner un indicateur pendant 30 s. Un échec Overpass donne des résultats *partiels*,
+ * pas une recherche en erreur.
+ */
+export function combinePoiResults(
+  results: CombineInput[],
+  isExtended: readonly boolean[] = [],
+): CombinedPoiResult {
+  const primary = results.filter((_, i) => !isExtended[i]);
+  const extended = results.filter((_, i) => isExtended[i]);
   return {
+    // Les POI des DEUX flux s'affichent : Overpass complète Google.
     pois: dedupePois(results.flatMap((r) => r.data ?? [])),
     // `isLoading` = `isPending && isFetching` → vrai seulement si un fetch réel est
     // en vol (faux quand `enabled:false` hors-ligne → pas de skeleton infini, AC5).
-    isPending: results.some((r) => r.isLoading),
+    isPending: primary.some((r) => r.isLoading),
     // `isFetching` couvre aussi un refetch sur données déjà présentes → overlay AC2.
-    isFetching: results.some((r) => r.isFetching ?? false),
-    isError: results.some((r) => r.isError),
-    isSuccess: results.length > 0 && results.every((r) => r.isSuccess),
+    isFetching: primary.some((r) => r.isFetching ?? false),
+    isError: primary.some((r) => r.isError),
+    isSuccess: primary.length > 0 && primary.every((r) => r.isSuccess),
+    overpassPending: extended.some((r) => r.isLoading || (r.isFetching ?? false)),
+    overpassError: extended.some((r) => r.isError),
   };
 }
 
@@ -173,6 +212,8 @@ export interface UsePoisParams {
   fromKm: number;
   toKm: number;
   overpassEnabled?: boolean;
+  /** Rayon de recherche autour de la trace (km). Pilote la collecte ET l'affichage. */
+  radiusKm?: number;
   /** Gate de déclenchement (route → `searchCommitted`) : la requête ne part que committée. */
   enabled?: boolean;
 }
@@ -193,6 +234,7 @@ export function usePois({
   fromKm,
   toKm,
   overpassEnabled = false,
+  radiusKm = DEFAULT_SEARCH_RADIUS_KM,
   enabled = true,
 }: UsePoisParams): UsePoisResult {
   const { isOnline } = useNetworkStatus();
@@ -203,22 +245,33 @@ export function usePois({
     [segments, fromKm, toKm],
   );
 
-  // Couples (segment couvert × calque visible), ordre stable (ALL_MAP_LAYERS).
+  // Triplets (segment couvert × calque visible × source), ordre stable (ALL_MAP_LAYERS).
+  // Sans l'option étendue, une seule source → une seule requête, comme avant.
   const combos = useMemo(() => {
     const layers = ALL_MAP_LAYERS.filter((l) => visibleLayers.has(l));
+    const sources: readonly PoiSource[] = overpassEnabled ? POI_SOURCES : ['google'];
     return segmentRanges.flatMap((r) =>
-      layers.map((layer) => ({ ...r, layer })),
+      layers.flatMap((layer) => sources.map((source) => ({ ...r, layer, source }))),
     );
-  }, [segmentRanges, visibleLayers]);
+  }, [segmentRanges, visibleLayers, overpassEnabled]);
+
+  const isExtended = useMemo(() => combos.map((c) => c.source === 'overpass'), [combos]);
+
+  const combine = useCallback(
+    (results: CombineInput[]) => combinePoiResults(results, isExtended),
+    [isExtended],
+  );
 
   const combined = useQueries({
-    queries: combos.map(({ segmentId, fromKm: localFrom, toKm: localTo, layer }) => ({
+    queries: combos.map(({ segmentId, fromKm: localFrom, toKm: localTo, layer, source }) => ({
       queryKey: buildPoiQueryKey({
         segmentId,
         fromKm: localFrom,
         toKm: localTo,
         layer,
         overpassEnabled,
+        source,
+        radiusKm,
       }),
       queryFn: () =>
         findPois({
@@ -227,12 +280,14 @@ export function usePois({
           toKm: localTo,
           categories: [...LAYER_CATEGORIES[layer]] as PoiCategory[],
           overpassEnabled,
+          source,
+          radiusKm,
         }),
       enabled: enabled && isOnline && Boolean(segmentId),
       staleTime: POI_STALE_TIME_MS,
       gcTime: POI_GC_TIME_MS,
     })),
-    combine: combinePoiResults,
+    combine,
   });
 
   // Write-through N3 (online + succès). Skippé si vide (évite d'écraser un cache offline
@@ -276,7 +331,11 @@ export function usePois({
   // Bannière « Aucun résultat » (AC3) : recherche committée terminée (succès réseau)
   // sans aucun POI. Hors-ligne (queries `enabled:false`) `isSuccess` est faux → pas de
   // bannière (on retombe sur le message offline / le cache). Distinct d'une erreur.
-  const isEmpty = Boolean(enabled && combined.isSuccess && pois.length === 0);
+  // `!overpassPending` obligatoire : Google peut renvoyer 0 alors qu'Overpass va en ramener 50.
+  // Annoncer « aucun résultat » avant la fin du second flux serait un mensonge à l'écran.
+  const isEmpty = Boolean(
+    enabled && combined.isSuccess && !combined.overpassPending && pois.length === 0,
+  );
 
   return { ...combined, pois, poisByLayer, isEmpty };
 }

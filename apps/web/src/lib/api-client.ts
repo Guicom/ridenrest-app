@@ -268,6 +268,8 @@ export interface GetPoisParams {
    * Omis = les deux sources dans une seule réponse (comportement historique).
    */
   source?: 'google' | 'overpass'
+  /** Rayon de recherche autour de la trace (km). Omis = 3 km, comportement historique. */
+  radiusKm?: number
 }
 
 export async function getPois(params: GetPoisParams): Promise<Poi[]> {
@@ -284,6 +286,9 @@ export async function getPois(params: GetPoisParams): Promise<Poi[]> {
   }
   if (params.source) {
     searchParams.set('source', params.source)
+  }
+  if (params.radiusKm !== undefined) {
+    searchParams.set('radiusKm', String(params.radiusKm))
   }
   return apiFetch<Poi[]>(`/api/pois?${searchParams.toString()}`)
 }

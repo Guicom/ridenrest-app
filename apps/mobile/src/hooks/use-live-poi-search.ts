@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { LAYER_CATEGORIES, type Poi, type PoiCategory } from '@ridenrest/shared';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useOverpassEnabled } from '@/hooks/use-profile';
-import { getLivePois } from '@/lib/api/pois';
+import { getLivePois, type PoiSource } from '@/lib/api/pois';
 import { getCachedPois, setCachedPois } from '@/lib/cache/poi-cache';
 import { useLiveStore } from '@/lib/stores/live.store';
 import { useMapStore } from '@/lib/stores/map.store';
@@ -52,6 +52,12 @@ export interface UseLivePoiSearchParams {
 
 export interface UseLivePoiSearchResult {
   pois: Poi[];
+  /** Recherche étendue (Overpass) en vol — ses POI viendront s'ajouter à la carte. */
+  overpassPending: boolean;
+  /** La recherche étendue a échoué : résultats partiels, pas une recherche en erreur. */
+  overpassError: boolean;
+  /** Une recherche étendue est attendue pour cette recherche (option active). */
+  overpassExpected: boolean;
   /** `data !== undefined` — une recherche réelle s'est terminée à cette queryKey (AC5). */
   hasFetched: boolean;
   /** Requête réseau en vol (overlay de chargement, AC2). */
@@ -92,36 +98,75 @@ export function useLivePoiSearch({
       ? Math.round((currentKmOnRoute + targetAheadKm) * 10) / 10
       : null;
 
+  // Deux flux indépendants (parité web, portée au mobile 2026-08-20). En Live c'est plus
+  // critique encore qu'en planning : l'utilisateur roule et n'attendra pas 30 s devant un
+  // écran figé pendant qu'Overpass réfléchit.
+  const liveQuery = (source: PoiSource, sourceEnabled: boolean) =>
+    ({
+      // `categories` volontairement EXCLU de la clé (recherche explicite via refetch()).
+      queryKey: [
+        'pois',
+        'live',
+        { segmentId, targetKm, radiusKm: searchRadiusKm, overpassEnabled, source },
+      ],
+      queryFn: () => {
+        if (!segmentId || targetKm === null || !sourceEnabled) return Promise.resolve([]);
+        return getLivePois({
+          segmentId,
+          targetKm,
+          radiusKm: searchRadiusKm,
+          overpassEnabled,
+          categories,
+          source,
+        });
+      },
+      enabled: false,
+      staleTime: Infinity,
+      gcTime: POI_GC_TIME_MS,
+    }) as const;
+
   const {
-    data: poisData,
+    data: googleData,
     isFetching,
     isError,
     isSuccess,
-    refetch,
-  } = useQuery<Poi[]>({
-    // `categories` volontairement EXCLU de la clé (recherche explicite via refetch()).
-    queryKey: [
-      'pois',
-      'live',
-      { segmentId, targetKm, radiusKm: searchRadiusKm, overpassEnabled },
-    ],
-    queryFn: () => {
-      if (!segmentId || targetKm === null) return Promise.resolve([]);
-      return getLivePois({
-        segmentId,
-        targetKm,
-        radiusKm: searchRadiusKm,
-        overpassEnabled,
-        categories,
-      });
-    },
-    enabled: false,
-    staleTime: Infinity,
-    gcTime: POI_GC_TIME_MS,
-  });
+    refetch: refetchGoogle,
+  } = useQuery<Poi[]>(liveQuery('google', true));
 
-  const fetchedPois = poisData ?? EMPTY_POIS;
-  const hasFetched = poisData !== undefined;
+  const {
+    data: overpassData,
+    isFetching: overpassFetching,
+    isError: overpassError,
+    refetch: refetchOverpass,
+  } = useQuery<Poi[]>(liveQuery('overpass', overpassEnabled));
+
+  // `hasFetched` et les états d'attente ne suivent que la source PRIMAIRE : Overpass ne doit
+  // ni retenir le premier affichage, ni faire clignoter la bannière « Aucun résultat ».
+  const hasFetched = googleData !== undefined;
+  const overpassPending = overpassEnabled && overpassFetching;
+  const overpassExpected = overpassEnabled;
+
+  const fetchedPois = useMemo<Poi[]>(() => {
+    const merged = [...(googleData ?? []), ...(overpassData ?? [])];
+    if (merged.length === 0) return EMPTY_POIS;
+    const seen = new Set<string>();
+    const out: Poi[] = [];
+    for (const poi of merged) {
+      const key = poi.id ?? poi.externalId;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(poi);
+    }
+    return out;
+  }, [googleData, overpassData]);
+
+  // `refetch()` déclenche les DEUX flux — Overpass seulement si l'option est active, sinon on
+  // paierait une requête serveur pour un résultat masqué à la lecture.
+  const refetch = useCallback(async () => {
+    const primary = refetchGoogle();
+    if (overpassEnabled) void refetchOverpass();
+    return primary;
+  }, [refetchGoogle, refetchOverpass, overpassEnabled]);
   // profileReady : RECHERCHER doit partir avec le bon flag Overpass, pas le défaut OFF
   const canSearch =
     isLiveModeActive && targetKm !== null && !!segmentId && isOnline && profileReady;
@@ -161,5 +206,16 @@ export function useLivePoiSearch({
         ? (offlinePois ?? EMPTY_POIS)
         : fetchedPois;
 
-  return { pois, hasFetched, isFetching, targetKm, isError, refetch, canSearch };
+  return {
+    pois,
+    hasFetched,
+    isFetching,
+    targetKm,
+    isError,
+    refetch,
+    canSearch,
+    overpassPending,
+    overpassError: overpassEnabled && overpassError,
+    overpassExpected,
+  };
 }

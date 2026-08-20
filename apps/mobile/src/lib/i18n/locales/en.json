@@ -406,7 +406,13 @@
       "searchOn": "Search on",
       "searchOnA11y": "Search on Booking.com or Airbnb",
       "bookingCom": "Search on Booking.com",
-      "airbnb": "Search on Airbnb"
+      "airbnb": "Search on Airbnb",
+      "extendedPending": "Extended search in progress…",
+      "extendedSlow": "Extended search taking longer than expected — results will be added",
+      "extendedError": "Extended search unavailable — partial results",
+      "radiusLabel": "Within a radius of",
+      "radiusDecrement": "Decrease radius",
+      "radiusIncrement": "Increase radius"
     }
   },
   "settings": {

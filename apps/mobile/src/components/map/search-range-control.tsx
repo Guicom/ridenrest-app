@@ -1,5 +1,6 @@
 import { computeElevationGain, computeElevationLoss } from '@ridenrest/gpx';
 import {
+  MAX_SEARCH_RADIUS_KM,
   MAX_SEARCH_RANGE_KM,
   type AdventureStageResponse,
   type MapWaypoint,
@@ -34,6 +35,7 @@ import { useTranslation } from '@/lib/i18n';
 // partent à l'API (jamais de GPS).
 
 const MAX_RANGE_KM = MAX_SEARCH_RANGE_KM;
+const MAX_RADIUS_KM = MAX_SEARCH_RADIUS_KM;
 
 // D+ cumulé de km 0 jusqu'à fromKm (mode normal)
 function computeElevationToStart(
@@ -189,9 +191,18 @@ export function SearchRangeControl({
   const setSelectedStageId = useMapStore((s) => s.setSelectedStageId);
   const setSearchCommitted = useMapStore((s) => s.setSearchCommitted);
   const searchCommitted = useMapStore((s) => s.searchCommitted);
+  const searchRadiusKm = useMapStore((s) => s.searchRadiusKm);
+  const setSearchRadius = useMapStore((s) => s.setSearchRadius);
 
   const [rangeKm, setRangeKm] = useState(() => toKm - fromKm);
   const [rangeInput, setRangeInput] = useState(() => String(toKm - fromKm));
+  const [radiusInput, setRadiusInput] = useState(() => String(searchRadiusKm));
+  // Le store borne la valeur (1..20) : l'input doit refléter ce qui est réellement appliqué.
+  const [lastRadius, setLastRadius] = useState(searchRadiusKm);
+  if (searchRadiusKm !== lastRadius) {
+    setLastRadius(searchRadiusKm);
+    setRadiusInput(String(searchRadiusKm));
+  }
 
   // Sync rangeKm si le store est modifié externalement (render-phase derived state).
   const storeRange = toKm - fromKm;
@@ -259,6 +270,18 @@ export function SearchRangeControl({
     const parsed = parseInt(rangeInput, 10);
     if (!isNaN(parsed) && parsed !== rangeKm) applyRange(parsed);
     else setRangeInput(String(rangeKm));
+  };
+
+  // Rayon autour de la trace — mêmes règles que la plage : bornage à la validation, saisie
+  // invalide réécrite avec la valeur courante plutôt que rejetée en silence.
+  const applyRadius = (km: number) => {
+    setSearchRadius(Math.min(MAX_RADIUS_KM, Math.max(1, Math.round(km))));
+  };
+
+  const handleRadiusInputBlur = () => {
+    const parsed = parseInt(radiusInput, 10);
+    if (!isNaN(parsed) && parsed !== searchRadiusKm) applyRadius(parsed);
+    else setRadiusInput(String(searchRadiusKm));
   };
 
   // Valeurs affichées selon le mode (normal / étape)
@@ -441,6 +464,58 @@ export function SearchRangeControl({
                 onPress={() => applyRange(rangeKm + 1)}
                 className={
                   rangeKm >= MAX_RANGE_KM
+                    ? 'h-7 w-7 items-center justify-center rounded-lg bg-muted opacity-50'
+                    : 'h-7 w-7 items-center justify-center rounded-lg bg-muted'
+                }
+              >
+                <PlusIcon size={14} className="text-text-primary" />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Rayon autour de la trace — même contrôle qu'en mode live, où il existait déjà. */}
+          <View className="flex-row items-center justify-between">
+            <Text className="text-sm font-montserrat text-text-muted">
+              {t('pois.search.radiusLabel')}
+            </Text>
+            <View className="flex-row items-center gap-2">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('pois.search.radiusDecrement')}
+                disabled={searchRadiusKm <= 1}
+                hitSlop={12}
+                onPress={() => applyRadius(searchRadiusKm - 1)}
+                className={
+                  searchRadiusKm <= 1
+                    ? 'h-7 w-7 items-center justify-center rounded-lg bg-muted opacity-50'
+                    : 'h-7 w-7 items-center justify-center rounded-lg bg-muted'
+                }
+              >
+                <MinusIcon size={14} className="text-text-primary" />
+              </Pressable>
+              <View className="flex-row items-center gap-1">
+                <TextInput
+                  value={radiusInput}
+                  onChangeText={setRadiusInput}
+                  onBlur={handleRadiusInputBlur}
+                  inputMode="numeric"
+                  keyboardType="number-pad"
+                  accessibilityLabel={t('pois.search.radiusLabel')}
+                  testID="radius-input"
+                  className="w-10 border-b border-border text-center text-sm font-montserrat-semibold text-text-primary"
+                />
+                <Text className="text-sm font-montserrat-semibold text-text-primary">
+                  km
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('pois.search.radiusIncrement')}
+                disabled={searchRadiusKm >= MAX_RADIUS_KM}
+                hitSlop={12}
+                onPress={() => applyRadius(searchRadiusKm + 1)}
+                className={
+                  searchRadiusKm >= MAX_RADIUS_KM
                     ? 'h-7 w-7 items-center justify-center rounded-lg bg-muted opacity-50'
                     : 'h-7 w-7 items-center justify-center rounded-lg bg-muted'
                 }

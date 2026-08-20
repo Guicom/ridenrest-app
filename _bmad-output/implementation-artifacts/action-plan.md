@@ -17,11 +17,21 @@ Convention de porteur : **[dev]** = agent, **[Guillaume]** = ne peut venir que d
 
 ---
 
-## A. Recherche POI — lot prêt à démarrer
+## A. Recherche POI — ✅ FAIT le 2026-08-20 (story 17.15)
+
+> Livré en **un seul lot** api+mobile, conformément à la section G. Résultats mesurés et
+> déviation assumée (pas de filtre corridor avant insertion) : voir
+> [`17-15-google-textsearch-pro-mobile-parity.md`](./17-15-google-textsearch-pro-mobile-parity.md).
+> Reste **T8** : validation par Guillaume sur une zone froide.
+>
+> Piège de coût rencontré et évité : `searchLayerPlaceIds` a un second consommateur, l'analyse
+> de densité — 84 tronçons × 16 types = **1 344 requêtes par analyse**. Le basculer en SKU Pro
+> aurait coûté ~43 $ et 27 % du quota gratuit mensuel **par analyse**. Deux méthodes distinctes
+> désormais, avec un test qui verrouille la gratuité du chemin densité.
 
 Priorité la plus haute : corrige un défaut visible par l'utilisateur, périmètre fermé, gain mesuré.
 
-### A1. Option B — Google Places [dev]
+### A1. Option B — Google Places [dev] ✅
 
 Aujourd'hui, sur une trace en Alsace, `campground` renvoie **0** résultat et `motel` **0**. Pour une app de bikepacking, ce n'est pas une lenteur, c'est un défaut fonctionnel.
 
@@ -39,7 +49,7 @@ Mesures de référence (bbox `48.197,7.536 → 48.608,7.778`, plage 0-50 km) :
 
 Tarifs : Text Search Pro 32 $/1000 (5 000 gratuits/mois) ; Place Details Essentials 5 $/1000 (10 000/mois) ; Text Search IDs Only gratuit et illimité. La fiche POI garde son Place Details **Pro** à l'ouverture — inchangé.
 
-### A2. Parité mobile du découplage [dev]
+### A2. Parité mobile du découplage [dev] ✅
 
 Écart mesuré le 2026-08-20 : **6 fichiers web** portent le découplage, **0 fichier mobile**.
 
@@ -50,11 +60,42 @@ Tarifs : Text Search Pro 32 $/1000 (5 000 gratuits/mois) ; Place Details Essenti
 
 Historique à ne pas perdre : ce travail avait été proposé en option le 2026-08-19 (« dis-moi si tu veux que je l'y applique aussi ») et la question est restée sans réponse. C'est le mécanisme exact de la divergence — voir section G.
 
-### A3. Réécrire la règle 10 [dev]
+### A3. Réécrire la règle 10 [dev] ✅
 
 `project-context.md` dit « **Parité planning / live obligatoire** ». Formulation ambiguë : elle a été lue comme « web-planning contre web-live » et n'a pas empêché la divergence web/mobile. À remplacer par les **points d'application nommés**, sur le modèle de la règle 9 qui cite ses quatre fichiers.
 
 ---
+
+## A-bis. Rayon de recherche réglable — ✅ FAIT le 2026-08-20 (story 17.16)
+
+Le planning imposait **3 km en dur et invisible**, alors que le live laissait déjà choisir
+(défaut 5, max 20). L'app était plus généreuse sur le vélo qu'au bureau.
+
+### Fait [dev] ✅
+
+- Champ **« Sur un rayon de »** sous « Rechercher sur », borné 1–20 km, web et mobile.
+- Le rayon pilote **collecte et affichage** — les découpler afficherait un sous-ensemble
+  arbitraire (la bbox est un rectangle, pas un couloir régulier).
+- Constantes séparées : `POI_BBOX_BUFFER_M` / `CORRIDOR_WIDTH_M` / `MAX_SEARCH_RADIUS_KM`.
+- `radiusKm` optionnel côté API → repli sur 3 km pour les binaires mobiles distribués.
+
+Détail et déviation de conception dans
+[`17-16-corridor-split-and-hidden-count.md`](./17-16-corridor-split-and-hidden-count.md).
+
+Défaut maintenu à **3 km** (valeur historique) : l'ajout est strictement additif, aucune zone
+déjà cherchée ne refait de prefetch tant que l'utilisateur n'élargit pas lui-même.
+
+### Reste, à ton arbitrage
+
+**Afficher la distance d'accès réelle plutôt que la perpendiculaire** [Guillaume décide] — pour
+un POI donné, « 3,3 km à vol d'oiseau » informe mal ; le détour par la route peut valoir 3,4 km
+de chemin plat ou 8 km avec 200 m de D+. L'app le calcule déjà (`access_distance_m`,
+`access_variants`, routés par BRouter dans l'epic `poi-access`) mais ne s'en sert pas pour
+l'affichage. C'est une question d'**étiquette sur la fiche**, pas de filtrage.
+
+**Un seuil par catégorie** [Guillaume décide] — la tolérance n'est pas la même pour un hôtel en
+fin de journée, une réparation de vélo à midi et un ravitaillement. Possible maintenant que le
+rayon est une valeur choisie et non une constante.
 
 ## B. Ce qui ne dépend que de Guillaume
 
@@ -158,4 +199,6 @@ Ordre de grandeur du symptôme : **64 stories** ont différé du travail, **139 
 
 | Date | Auteur | Changement |
 |---|---|---|
+| 2026-08-20 | Claude Opus 5 (dev) | Section A-bis livrée (story 17.16) : rayon de recherche réglable en planning, aligné sur le mode live. La 1re approche (compter les exclus et l'annoncer) a été remplacée par le réglage après discussion — un message sans action est un cul-de-sac. |
+| 2026-08-20 | Claude Opus 5 (dev) | Section A livrée (story 17.15) : A1, A2 et A3 faits, T8 en attente de Guillaume. |
 | 2026-08-20 | Claude Opus 5 (dev) | Fichier créé à la demande de Guillaume, pour consolider les chantiers issus des stories 17.13/17.14 et des échanges du jour, sans vider `deferred-work.md` dont une partie reste légitime. |

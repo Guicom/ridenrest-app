@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_RADIUS_KM } from '@ridenrest/shared'
 import { create } from 'zustand'
 import type { MapLayer, PoiCategory } from '@ridenrest/shared'
 import { LAYER_CATEGORIES } from '@ridenrest/shared'
@@ -17,6 +18,12 @@ interface MapState {
   // Search range
   fromKm: number
   toKm: number
+  /**
+   * Rayon de recherche autour de la trace, en km. Réglable par l'utilisateur, comme en mode
+   * live — le planning imposait 3 km en dur et invisible, alors que le live laissait déjà
+   * choisir (défaut 5 km, jusqu'à 20). L'app était plus généreuse sur le vélo qu'au bureau.
+   */
+  searchRadiusKm: number
   searchRangeInteracted: boolean
   searchCommitted: boolean
 
@@ -49,6 +56,7 @@ interface MapState {
   toggleLayer: (layer: MapLayer) => void
   setViewport: (zoom: number, center: [number, number]) => void
   setSearchRange: (fromKm: number, toKm: number) => void
+  setSearchRadius: (km: number) => void
   setSearchCommitted: (v: boolean) => void
   toggleDensityColor: () => void
   setWeatherActive: (active: boolean) => void
@@ -68,6 +76,7 @@ export const useMapStore = create<MapState>((set) => ({
   center: null,
   fromKm: 0,
   toKm: 15,
+  searchRadiusKm: DEFAULT_SEARCH_RADIUS_KM,
   searchRangeInteracted: false,
   searchCommitted: false,
   densityColorEnabled: false,
@@ -95,6 +104,9 @@ export const useMapStore = create<MapState>((set) => ({
   setViewport: (zoom, center) => set({ zoom, center }),
 
   setSearchRange: (fromKm, toKm) => set({ fromKm, toKm, searchRangeInteracted: true, searchCommitted: false }),
+  // Comme un déplacement de plage : changer le rayon dégage la recherche committée, sinon on
+  // afficherait le jeu de l'ancien rayon en laissant croire qu'il correspond au nouveau.
+  setSearchRadius: (km) => set({ searchRadiusKm: km, searchCommitted: false }),
 
   setSearchCommitted: (v) => set(v ? { searchCommitted: true, searchRangeInteracted: true } : { searchCommitted: false }),
 

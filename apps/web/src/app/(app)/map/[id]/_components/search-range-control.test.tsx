@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { SearchRangeControl } from './search-range-control'
 import type { MapWaypoint } from '@ridenrest/shared'
+import { DEFAULT_SEARCH_RADIUS_KM } from '@ridenrest/shared'
 
 afterEach(cleanup)
 
@@ -13,6 +14,9 @@ let mockSelectedStageId: string | null = null
 let mockSearchCommitted = false
 let mockVisibleLayers = new Set<string>()
 
+let mockSearchRadiusKm = DEFAULT_SEARCH_RADIUS_KM
+const mockSetSearchRadius = vi.fn()
+
 vi.mock('@/stores/map.store', () => ({
   useMapStore: () => ({
     fromKm: mockFromKm,
@@ -23,6 +27,8 @@ vi.mock('@/stores/map.store', () => ({
     setSelectedStageId: mockSetSelectedStageId,
     searchCommitted: mockSearchCommitted,
     setSearchCommitted: mockSetSearchCommitted,
+    searchRadiusKm: mockSearchRadiusKm,
+    setSearchRadius: mockSetSearchRadius,
   }),
 }))
 
@@ -81,6 +87,8 @@ const makeStage = (overrides = {}) => ({
 
 describe('SearchRangeControl', () => {
   beforeEach(() => {
+    mockSearchRadiusKm = DEFAULT_SEARCH_RADIUS_KM
+    mockSetSearchRadius.mockClear()
     mockSetSearchRange.mockClear()
     mockSetSelectedStageId.mockClear()
     mockSetSearchCommitted.mockClear()
@@ -407,4 +415,60 @@ describe('SearchRangeControl', () => {
     expect(el.getAttribute('data-city')).toBe('Toulouse')
     expect(el.getAttribute('data-postcode')).toBeNull()
   })
+
+  describe('« Sur un rayon de » — rayon autour de la trace', () => {
+    it('affiche le rayon courant, sous le champ « Rechercher sur »', () => {
+      render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+
+      expect(screen.getByText('Sur un rayon de')).toBeInTheDocument()
+      expect(screen.getByTestId('radius-value')).toHaveValue(String(DEFAULT_SEARCH_RADIUS_KM))
+    })
+
+    it('le + et le − ajustent le rayon d’un km', () => {
+      render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+
+      fireEvent.click(screen.getByTestId('radius-increment'))
+      expect(mockSetSearchRadius).toHaveBeenCalledWith(DEFAULT_SEARCH_RADIUS_KM + 1)
+
+      fireEvent.click(screen.getByTestId('radius-decrement'))
+      expect(mockSetSearchRadius).toHaveBeenCalledWith(DEFAULT_SEARCH_RADIUS_KM - 1)
+    })
+
+    it('plafonne à 20 km — même limite qu’en mode live', () => {
+      mockSearchRadiusKm = 20
+      render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+
+      expect(screen.getByTestId('radius-increment')).toBeDisabled()
+    })
+
+    it('ne descend pas sous 1 km', () => {
+      mockSearchRadiusKm = 1
+      render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+
+      expect(screen.getByTestId('radius-decrement')).toBeDisabled()
+    })
+
+    it('la saisie clavier est appliquée à la validation, et bornée', () => {
+      render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+      const input = screen.getByTestId('radius-value')
+
+      fireEvent.change(input, { target: { value: '42' } })
+      fireEvent.blur(input)
+
+      // Borné au plafond plutôt que rejeté en silence.
+      expect(mockSetSearchRadius).toHaveBeenCalledWith(20)
+    })
+
+    it('une saisie invalide est réécrite avec la valeur courante', () => {
+      render(<SearchRangeControl totalDistanceKm={100} waypoints={null} isPoisPending={false} />)
+      const input = screen.getByTestId('radius-value')
+
+      fireEvent.change(input, { target: { value: 'abc' } })
+      fireEvent.blur(input)
+
+      expect(mockSetSearchRadius).not.toHaveBeenCalled()
+      expect(input).toHaveValue(String(DEFAULT_SEARCH_RADIUS_KM))
+    })
+  })
+
 })

@@ -17,12 +17,23 @@ import {
 // utilisateur — uniquement `segmentId` + `fromKm/toKm`. `reverseCity` utilise les
 // coords **du POI** (renvoyées par le serveur), pas la position user → conforme.
 
+/**
+ * Source interrogée. Omettre = comportement combiné historique (les deux sources dans une
+ * seule réponse, donc l'utilisateur attend la plus lente). Préciser la source permet de
+ * découpler les deux flux : Google répond en ~200 ms, Overpass a été mesuré entre 1 et 31 s
+ * sur les instances publiques.
+ */
+export type PoiSource = 'google' | 'overpass';
+
 export interface FindPoisParams {
   segmentId: string;
   fromKm: number;
   toKm: number;
   categories?: PoiCategory[];
   overpassEnabled?: boolean;
+  source?: PoiSource;
+  /** Rayon de recherche autour de la trace (km). Omis = 3 km, comportement historique. */
+  radiusKm?: number;
 }
 
 /**
@@ -42,6 +53,12 @@ export function findPois(params: FindPoisParams): Promise<Poi[]> {
   if (params.overpassEnabled) {
     search.set('overpassEnabled', 'true');
   }
+  if (params.source) {
+    search.set('source', params.source);
+  }
+  if (params.radiusKm !== undefined) {
+    search.set('radiusKm', String(params.radiusKm));
+  }
   return apiFetch<Poi[]>(`/pois?${search.toString()}`);
 }
 
@@ -53,6 +70,7 @@ export interface GetLivePoisParams {
   radiusKm: number;
   categories?: PoiCategory[];
   overpassEnabled?: boolean;
+  source?: PoiSource;
 }
 
 /**
@@ -75,6 +93,9 @@ export function getLivePois(params: GetLivePoisParams): Promise<Poi[]> {
   }
   if (params.overpassEnabled) {
     search.set('overpassEnabled', 'true');
+  }
+  if (params.source) {
+    search.set('source', params.source);
   }
   return apiFetch<Poi[]>(`/pois?${search.toString()}`);
 }

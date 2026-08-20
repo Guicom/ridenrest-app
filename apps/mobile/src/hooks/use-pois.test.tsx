@@ -54,7 +54,7 @@ function makePoi(id: string, category: Poi['category']): Poi {
 async function mountUsePois(
   qc: QueryClient,
   visibleLayers: Set<MapLayer>,
-  opts: { enabled?: boolean; fromKm?: number; toKm?: number } = {},
+  opts: { enabled?: boolean; fromKm?: number; toKm?: number; overpassEnabled?: boolean } = {},
 ): Promise<{ current: UsePoisResult }> {
   const ref = { current: undefined as unknown as UsePoisResult };
   function Probe() {
@@ -65,6 +65,7 @@ async function mountUsePois(
       fromKm: opts.fromKm ?? 0,
       toKm: opts.toKm ?? 15,
       enabled: opts.enabled,
+      overpassEnabled: opts.overpassEnabled,
     });
     return null;
   }
@@ -84,6 +85,47 @@ beforeEach(() => {
 });
 
 describe('combinePoiResults (T4 — agrégation pure)', () => {
+  const idle = { data: undefined, isLoading: false, isError: false, isSuccess: false, isFetching: false };
+
+  it('les états primaires ignorent la source étendue', () => {
+    // Overpass ne doit retenir ni le premier affichage, ni l'auto-zoom, ni faire tourner un
+    // indicateur pendant 30 s. `isExtended[i]` redistingue les deux flux mêlés dans `results`
+    // (useQueries garantit l'ordre entrée/sortie).
+    const out = combinePoiResults(
+      [
+        { ...idle, isSuccess: true, data: [makePoi('g1', 'hotel')] },
+        { ...idle, isLoading: true, isFetching: true },
+      ],
+      [false, true],
+    );
+
+    expect(out.isPending).toBe(false);
+    expect(out.isFetching).toBe(false);
+    expect(out.isSuccess).toBe(true);
+    expect(out.overpassPending).toBe(true);
+    expect(out.pois).toHaveLength(1);
+  });
+
+  it('un échec de la source étendue n’est pas une erreur de recherche', () => {
+    const out = combinePoiResults(
+      [
+        { ...idle, isSuccess: true, data: [makePoi('g1', 'hotel')] },
+        { ...idle, isError: true },
+      ],
+      [false, true],
+    );
+
+    expect(out.isError).toBe(false);
+    expect(out.overpassError).toBe(true);
+  });
+
+  it('sans indicateur de source, tout est primaire (comportement d’avant le découplage)', () => {
+    const out = combinePoiResults([{ ...idle, isLoading: true, isFetching: true }]);
+
+    expect(out.isPending).toBe(true);
+    expect(out.overpassPending).toBe(false);
+  });
+
   it('aplati + dédoublonne par id', () => {
     const a = makePoi('1', 'hotel');
     const b = makePoi('2', 'restaurant');
@@ -120,7 +162,9 @@ describe('groupPoisByLayer (T4)', () => {
 });
 
 describe('buildPoiQueryKey (T4 — parité web)', () => {
-  it('clé stricte `[pois, { segmentId, fromKm, toKm, layer, overpassEnabled }]`', () => {
+  it('clé stricte `[pois, { segmentId, fromKm, toKm, layer, overpassEnabled, source, radiusKm }]`', () => {
+    // `source` est une dimension de clé à part entière depuis le découplage : les deux flux
+    // d'une même recherche sont deux requêtes indépendantes, chacune avec son cache.
     expect(
       buildPoiQueryKey({
         segmentId: 's',
@@ -128,10 +172,20 @@ describe('buildPoiQueryKey (T4 — parité web)', () => {
         toKm: 15,
         layer: 'accommodations',
         overpassEnabled: false,
+        source: 'google',
+        radiusKm: 3,
       }),
     ).toEqual([
       'pois',
-      { segmentId: 's', fromKm: 0, toKm: 15, layer: 'accommodations', overpassEnabled: false },
+      {
+        segmentId: 's',
+        fromKm: 0,
+        toKm: 15,
+        layer: 'accommodations',
+        overpassEnabled: false,
+        source: 'google',
+        radiusKm: 3,
+      },
     ]);
   });
 });
@@ -161,10 +215,75 @@ describe('usePois (intégration)', () => {
     const keys = qc.getQueryCache().getAll().map((q) => q.queryKey);
     expect(keys).toContainEqual([
       'pois',
-      { segmentId: 'seg1', fromKm: 0, toKm: 15, layer: 'accommodations', overpassEnabled: false },
+      {
+        segmentId: 'seg1',
+        fromKm: 0,
+        toKm: 15,
+        layer: 'accommodations',
+        overpassEnabled: false,
+        source: 'google',
+        radiusKm: 3,
+      },
     ]);
     // Write-through N3 au succès.
     await waitFor(() => expect(mockSetCached).toHaveBeenCalledWith('adv-1', [hotel]));
+  });
+
+  it('émet DEUX requêtes par calque quand la recherche étendue est active', async () => {
+    // Découplage (parité web) : Google répond en ~200 ms, Overpass a été mesuré entre 1 s et
+    // 31 s. Les attendre ensemble ferait payer à chacun le pire des deux.
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    mockFindPois.mockResolvedValue([]);
+    const qc = makeClient();
+
+    await mountUsePois(qc, new Set(['accommodations']), { overpassEnabled: true });
+
+    await waitFor(() => expect(mockFindPois).toHaveBeenCalledTimes(2));
+    const sources = mockFindPois.mock.calls.map((c) => (c[0] as { source?: string }).source);
+    expect(new Set(sources)).toEqual(new Set(['google', 'overpass']));
+  });
+
+  it('n’émet qu’une requête Google quand la recherche étendue est coupée', async () => {
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    mockFindPois.mockResolvedValue([]);
+    const qc = makeClient();
+
+    await mountUsePois(qc, new Set(['accommodations']), { overpassEnabled: false });
+
+    await waitFor(() => expect(mockFindPois).toHaveBeenCalledTimes(1));
+    expect((mockFindPois.mock.calls[0][0] as { source?: string }).source).toBe('google');
+  });
+
+  it('affiche les POI des deux sources, fusionnés', async () => {
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    const fromGoogle = makePoi('g1', 'hotel');
+    const fromOverpass = makePoi('o1', 'hotel');
+    mockFindPois.mockImplementation((p: { source?: string }) =>
+      Promise.resolve(p.source === 'overpass' ? [fromOverpass] : [fromGoogle]),
+    );
+    const qc = makeClient();
+
+    const hook = await mountUsePois(qc, new Set(['accommodations']), { overpassEnabled: true });
+
+    await waitFor(() => expect(hook.current.pois).toHaveLength(2));
+  });
+
+  it('un échec de la recherche étendue ne met PAS la recherche en erreur', async () => {
+    // Un échec Overpass donne des résultats *partiels*, pas une recherche ratée.
+    mockNetwork.mockReturnValue({ isOnline: true, isInternetReachable: true });
+    const hotel = makePoi('g1', 'hotel');
+    mockFindPois.mockImplementation((p: { source?: string }) =>
+      p.source === 'overpass'
+        ? Promise.reject(new Error('Overpass 504'))
+        : Promise.resolve([hotel]),
+    );
+    const qc = makeClient();
+
+    const hook = await mountUsePois(qc, new Set(['accommodations']), { overpassEnabled: true });
+
+    await waitFor(() => expect(hook.current.overpassError).toBe(true));
+    expect(hook.current.isError).toBe(false);
+    expect(hook.current.pois).toEqual([hotel]);
   });
 
   it('hors-ligne sans données live → fallback getCachedPois (AC5)', async () => {

@@ -12,10 +12,14 @@ export class PoisRepository {
    * km range AND corridor width.
    *
    * The corridor filter matters: the Overpass/Google search area is the *bounding box* of the
-   * requested km range (+ CORRIDOR_WIDTH_M of padding), so a rectangle always contains POIs
+   * requested km range (+ the search radius as padding), so a rectangle always contains POIs
    * far outside the corridor the UI advertises — up to 4+ km off-trace in practice. Filtering
    * on read keeps the displayed set consistent with the announced corridor, and independent
    * from the rectangle's shape (which varies with the requested window).
+   *
+   * `maxDistFromTraceM` reflète le rayon choisi par l'utilisateur (2026-08-20). Le défaut
+   * `CORRIDOR_WIDTH_M` préserve le comportement des clients qui n'envoient pas `radiusKm` —
+   * dont les binaires mobiles déjà distribués.
    */
   async findCachedPois(
     segmentId: string,
@@ -23,6 +27,7 @@ export class PoisRepository {
     fromKm: number,
     toKm: number,
     excludeSources: string[] = [],
+    maxDistFromTraceM: number = CORRIDOR_WIDTH_M,
   ): Promise<Poi[]> {
     const now = new Date()
     const rows = await db
@@ -35,7 +40,7 @@ export class PoisRepository {
           inArray(accommodationsCache.category, categories),
           gte(accommodationsCache.distAlongRouteKm, fromKm),
           lte(accommodationsCache.distAlongRouteKm, toKm),
-          lte(accommodationsCache.distFromTraceM, CORRIDOR_WIDTH_M),
+          lte(accommodationsCache.distFromTraceM, maxDistFromTraceM),
           // Le toggle « recherche étendue » masque aussi à la lecture : sans ça, les POI
           // Overpass déjà en cache (TTL 30 j) restaient visibles une fois l'option coupée.
           ...(excludeSources.length > 0
@@ -57,6 +62,18 @@ export class PoisRepository {
     }))
   }
 
+  /**
+   * POI qui satisfont TOUS les critères d'une recherche sauf le corridor, et qui restent dans
+   * la bande `]CORRIDOR_WIDTH_M, POI_NEAR_MISS_MAX_M]`.
+   *
+   * Raison d'être : le filtre corridor coupe **en silence**. Un camping à 3 263 m a été écarté
+   * pour 263 m, l'écran affichait « Camping (0) », et rien ne permettait de distinguer « il n'y
+   * a rien » de « il y a quelque chose juste au-delà de la limite ». C'est la même forme de
+   * défaut que la panne Overpass restée invisible cinq mois.
+   *
+   * La borne haute est indispensable : sans elle le message compterait des POI d'une autre
+   * vallée (le plus lointain en base est à 10 444 m) et ne voudrait plus rien dire.
+   */
   /** Insert Overpass results into accommodations_cache (upsert on conflict). */
   async insertOverpassPois(
     segmentId: string,

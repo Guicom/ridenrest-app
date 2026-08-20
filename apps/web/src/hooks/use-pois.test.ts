@@ -41,6 +41,19 @@ vi.mock('@tanstack/react-query', () => ({
   useQueries: (...args: unknown[]) => mockUseQueries(...args),
 }))
 
+/**
+ * Le hook émet DEUX `useQueries` par rendu : les POI, puis les quasi-manqués corridor.
+ * On sélectionne par le contenu de la clé plutôt que par la position — un `.at(-1)` nu
+ * renverrait la seconde et ferait échouer silencieusement les assertions sur les POI.
+ */
+type CapturedCall = [{ queries: Array<{ queryKey: readonly unknown[]; queryFn: () => unknown; staleTime?: number; gcTime?: number }> }]
+const isNearMissCall = (call: CapturedCall) =>
+  call[0].queries.some((q) => q.queryKey[1] === 'near-miss')
+const poiCall = () =>
+  (mockUseQueries.mock.calls as CapturedCall[]).filter((c) => !isNearMissCall(c)).at(-1)!
+const nearMissCall = () =>
+  (mockUseQueries.mock.calls as CapturedCall[]).filter(isNearMissCall).at(-1)
+
 const makeSegment = (
   id = 'seg-1',
   distanceKm = 50,
@@ -101,7 +114,7 @@ describe('usePois', () => {
     renderHook(() => usePois([makeSegment()]))
 
     // Use last call since React may render twice
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     expect(lastCall).toBeDefined()
     const { queries } = lastCall![0]
     // activeLayers = [] → queries array is empty, nothing passed to useQueries
@@ -119,7 +132,7 @@ describe('usePois', () => {
 
     const { result } = renderHook(() => usePois([makeSegment()]))
 
-    const { queries } = mockUseQueries.mock.calls.at(-1)![0]
+    const { queries } = poiCall()[0]
     expect(queries).toHaveLength(0)
     // …et l'écran reste en chargement plutôt que d'annoncer « aucun résultat »
     expect(result.current.isPending).toBe(true)
@@ -137,7 +150,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([makeSegment()]))
 
-    const { queries } = mockUseQueries.mock.calls.at(-1)![0]
+    const { queries } = poiCall()[0]
     expect(queries).toHaveLength(2)
     const sources = queries.map((q: { queryKey: [string, { source: string }] }) => q.queryKey[1].source)
     expect(sources).toEqual(['google', 'overpass'])
@@ -151,7 +164,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([makeSegment()]))
 
-    const { queries } = mockUseQueries.mock.calls.at(-1)![0]
+    const { queries } = poiCall()[0]
     expect(queries).toHaveLength(1)
     expect(queries[0].queryKey[1]).toMatchObject({ source: 'google' })
   })
@@ -211,7 +224,7 @@ describe('usePois', () => {
     renderHook(() => usePois([makeSegment()]))
 
     // Use last call since React may render twice
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     expect(lastCall).toBeDefined()
     const { queries } = lastCall![0]
     // One query per active layer, not one combined query
@@ -293,7 +306,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([segment]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     // No queries should be generated for out-of-range segment
     expect(queries).toHaveLength(0)
@@ -310,7 +323,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([segment]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     // 1 segment × 1 active layer = 1 query
     expect(queries).toHaveLength(1)
@@ -338,7 +351,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([seg1, seg2]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     // 2 segments × 1 layer = 2 queries
     expect(queries).toHaveLength(2)
@@ -365,7 +378,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([segment]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     expect(queries).toHaveLength(1)
     expect(queries[0].queryKey[1].fromKm).toBe(0)
@@ -382,7 +395,7 @@ describe('usePois', () => {
     renderHook(() => usePois([segment]))
 
     // On first render, debouncedFromKm = 10, debouncedToKm = 40 (from useState initializer)
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     expect(queries[0].queryKey[1].fromKm).toBe(10)
     expect(queries[0].queryKey[1].toKm).toBe(40)
@@ -406,14 +419,14 @@ describe('usePois', () => {
     // Re-render immediately — isSliding=true → queries array is EMPTY (no stale queries)
     rerender()
 
-    const callBeforeTimer = mockUseQueries.mock.calls.at(-1)![0].queries
+    const callBeforeTimer = poiCall()[0].queries
     // While sliding, no queries are fired (map clears immediately)
     expect(callBeforeTimer).toHaveLength(0)
 
     // Advance 400ms → debounce fires
     await act(async () => { vi.advanceTimersByTime(400) })
 
-    const callAfterTimer = mockUseQueries.mock.calls.at(-1)![0].queries
+    const callAfterTimer = poiCall()[0].queries
     expect(callAfterTimer[0].queryKey[1].fromKm).toBe(5)
     expect(callAfterTimer[0].queryKey[1].toKm).toBe(35)
 
@@ -430,7 +443,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([makeSegment()]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     expect(queries).toHaveLength(2)
 
@@ -452,7 +465,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([makeSegment()]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     expect(queries).toHaveLength(0)
   })
@@ -464,7 +477,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([makeSegment()]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     expect(queries).toHaveLength(1)
   })
@@ -484,7 +497,7 @@ describe('usePois', () => {
 
     renderHook(() => usePois([makeSegment()]))
 
-    const lastCall = mockUseQueries.mock.calls.at(-1)
+    const lastCall = poiCall()
     const { queries } = lastCall![0]
     expect(queries[0].staleTime).toBe(POI_BBOX_CACHE_TTL * 1000)  // 2592000000ms = 30 days
     expect(queries[0].gcTime).toBe(POI_BBOX_CACHE_TTL * 1000)     // prevents GC eviction before staleTime expires
