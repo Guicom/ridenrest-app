@@ -356,6 +356,37 @@ const pool = new Pool({
 
 ---
 
+### Strava OAuth — une seule autorisation vivante par (application, athlète)
+
+Mesuré le 2026-08-21, contre l'intuition répandue : **le refresh token Strava n'est PAS à usage
+unique**. Deux rafraîchissements successifs renvoient le *même* `refresh_token` et la *même*
+`expires_at`. Ce n'est pas un jeton qui tourne, c'est une **autorisation** — et il n'en existe
+qu'une par couple (application, athlète).
+
+Corollaire qui coûte du temps si on l'ignore : **local et prod partagent le même
+`STRAVA_CLIENT_ID`** (211853). Connecter Strava en local réautorise donc la même application pour
+le même athlète, ce qui **invalide silencieusement le jeton de prod** — et réciproquement. Le
+symptôme en prod est un 400 `{"resource":"RefreshToken","field":"refresh_token","code":"invalid"}`,
+c'est-à-dire exactement la signature d'un compte révoqué par l'utilisateur. Rien ne distingue les
+deux causes côté serveur.
+
+C'est l'incident du 2026-08-21 : jeton de prod obtenu le 05-05, jamais rafraîchi, mort après une
+connexion locale le 08-21. Le chemin de rafraîchissement, lui, répond HTTP 200 dès qu'on lui donne
+le jeton vivant — il n'a jamais été en cause.
+
+- **Remède durable : une application Strava distincte pour le développement** (client_id/secret
+  propres dans `apps/api/.env`). Tant qu'elle n'existe pas, tester Strava en local *casse* la prod,
+  et reconnecter en prod casse le local. Les deux ne peuvent pas fonctionner en même temps.
+- Ne jamais conclure « jeton révoqué par l'utilisateur » sur un 400 sans avoir vérifié qu'aucune
+  autre autorisation du même athlète n'a eu lieu ailleurs.
+- Diagnostic en une commande — comparer le `updated_at` du compte à `access_token_expires_at` :
+  un écart d'exactement 6 h (durée de vie Strava) signifie que le jeton n'a **jamais** été
+  rafraîchi depuis son obtention.
+
+⚠️ Le même piège vaut pour tout fournisseur OAuth dont l'autorisation est indexée sur
+(application, utilisateur) plutôt que sur une session : partager un `client_id` entre
+environnements y crée la même interférence silencieuse.
+
 ### Email Provider: Resend
 
 Better Auth uses **Resend** for transactional emails (password reset + email verification).

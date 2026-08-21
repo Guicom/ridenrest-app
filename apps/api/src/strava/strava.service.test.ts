@@ -283,8 +283,10 @@ describe('getValidAccessToken', () => {
   })
 
   it('révocation Strava (400) → message actionnable, pas « erreur » générique', async () => {
-    // Le refresh token Strava est a USAGE UNIQUE et definitivement revoque si l'athlete
-    // retire l'autorisation. Aucun retry n'y changera rien : le seul remede est de
+    // Strava renvoie 400 {"code":"invalid"} quand le refresh token n'est plus le jeton vivant
+    // du couple (application, athlete) : autorisation retiree, deauthorize, ou — cas de
+    // l'incident du 2026-08-21 — une nouvelle autorisation du meme athlete ailleurs (local vs
+    // prod partagent le meme client_id). Aucun retry n'y changera rien : le seul remede est de
     // reconnecter le compte, et le message doit le dire. L'ancienne implementation levait
     // « Erreur refresh token Strava » (502) en jetant le corps renvoye par Strava, ce qui
     // rendait l'incident de prod du 2026-08-21 indiagnosticable.

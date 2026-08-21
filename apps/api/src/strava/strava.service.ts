@@ -148,11 +148,23 @@ export class StravaService {
   /**
    * Rafraîchit le jeton d'accès Strava.
    *
-   * ⚠️ **Le refresh token Strava est à USAGE UNIQUE** : Strava le fait tourner à chaque
-   * rafraîchissement et invalide immédiatement l'ancien. Il est aussi révoqué définitivement
-   * si l'athlète retire l'autorisation, ou si notre propre `deauthorize` a été appelé
-   * (hooks `account.delete.before` / `user.delete.before`, MOB-2.4). Dans ces cas, aucun
-   * rafraîchissement ne peut aboutir : la seule issue est de **reconnecter Strava**.
+   * ⚠️ **Il n'existe qu'UN refresh token vivant par couple (application, athlète)** — et il
+   * n'est PAS à usage unique. Mesuré le 2026-08-21 : deux rafraîchissements successifs
+   * renvoient le *même* `refresh_token` et la *même* `expires_at`. Le code réécrit quand même
+   * `refresh_token` en base, Strava se réservant le droit de le faire tourner.
+   *
+   * Conséquence non intuitive : **une nouvelle autorisation du même athlète sur la même
+   * application invalide l'autorisation précédente**, où qu'elle vive. Local et prod partagent
+   * le `STRAVA_CLIENT_ID` 211853 : connecter Strava en local tue donc le jeton de prod, et
+   * réciproquement. C'est la cause de l'incident du 2026-08-21 (jeton de prod du 05-05 devenu
+   * `{"code":"invalid"}` après une connexion locale le 08-21), et non un défaut de ce chemin —
+   * qui répond HTTP 200 quand le jeton qu'on lui donne est bien le jeton vivant.
+   * Le remède durable est une **application Strava distincte pour le développement**.
+   *
+   * Le jeton est par ailleurs révoqué définitivement si l'athlète retire l'autorisation, ou si
+   * notre propre `deauthorize` a été appelé (hooks `account.delete.before` /
+   * `user.delete.before`, MOB-2.4). Dans tous ces cas aucun retry n'aboutit : il faut
+   * **reconnecter Strava**.
    *
    * L'ancienne implémentation levait « Erreur refresh token Strava » sur n'importe quelle
    * réponse non-OK, en jetant le statut ET le corps renvoyés par Strava. L'erreur était donc
