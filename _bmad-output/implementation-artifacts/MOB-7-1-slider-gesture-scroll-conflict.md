@@ -1,16 +1,45 @@
 # MOB-7.1 — Sliders inutilisables : le ScrollView parent vole le geste
 
-**Statut** : review — 2026-08-21
+**Statut** : done — 2026-08-21 (validé simulateur)
 **Origine** : retour utilisateur Guillaume, 2026-08-21 — « beaucoup de soucis avec les
 différents sliders, quasi inutilisables : très rapidement en glissant sur le slider, il n'y a
 plus d'action sur le slider mais sur le volet latéral. »
 
 ---
 
-## Diagnostic
+## Diagnostic — deux concurrents, pas un
 
-Les deux primitives (`Slider`, `RangeSlider`) reposent sur `PanResponder`, et vivent toutes
-deux dans un `ScrollView` :
+⚠️ **Le premier diagnostic était incomplet.** Il désignait le `ScrollView` parent, ce qui est un
+conflit réel mais **pas celui que Guillaume subissait**. Reproduit sur simulateur le 2026-08-21
+(iPhone 17 Pro, build Release) : un glissement horizontal sur la poignée **dépilait l'écran** au
+lieu de déplacer le slider — y compris en glissement strictement horizontal, loin de tout bord.
+Guillaume a confirmé : « le problème que tu rencontres est celui dont je te parle ».
+
+### Concurrent 1 (le vrai) — le geste de retour de la pile de navigation
+
+Le retour par glissement couvre **toute la largeur** de l'écran par défaut. Or les écrans carte
+et live sont bâtis autour de gestes horizontaux, et **le geste de retour a exactement la même
+direction que le geste utile**. Pire : le slider de position est au repos tout à gauche, là où
+le retour est le plus sensible. L'utilisateur ne pouvait quasiment pas bouger une poignée sans
+quitter l'écran — deux tentatives sur trois dépilaient l'écran avant que la poignée ne bouge.
+
+Vu de l'utilisateur, le panneau glisse hors de l'écran : d'où la formulation « il n'y a plus
+d'action sur le slider mais sur le volet latéral ».
+
+**Correctif** (`(app)/_layout.tsx`) :
+
+```ts
+fullScreenGestureEnabled: false,
+gestureResponseDistance: { start: 20 },   // bande de 20 pt au bord gauche
+```
+
+L'affordance iOS de retour au bord est conservée ; le reste de l'écran redevient disponible pour
+les gestes de l'app. Ne pas relâcher cette borne sans revalider les sliders sur device.
+
+### Concurrent 2 (réel, latent) — le `ScrollView` parent
+
+Indépendamment du précédent, les deux primitives (`Slider`, `RangeSlider`) reposent sur
+`PanResponder` et vivent dans un `ScrollView` :
 
 | slider | conteneur |
 |---|---|
@@ -25,7 +54,7 @@ l'obtient. Le drag bascule sur le panneau, la poignée se fige. Le symptôme est
 marqué que le geste utile est horizontal et le geste concurrent vertical — impossible de
 glisser parfaitement droit au doigt.
 
-## Correctif — deux niveaux, parce qu'un seul ne suffit pas
+#### Correctif du concurrent 2 — deux niveaux, parce qu'un seul ne suffit pas
 
 **1. Négociation JS** (`slider.tsx`, les deux primitives) :
 
@@ -56,12 +85,17 @@ Appliqué à `PlanningSidebar` et `live-filters-drawer`.
 - [x] T4 — câblage `PlanningSidebar` + `live-filters-drawer`
 - [x] T5 — 5 tests de non-régression (`slider.test.tsx`) : refus de terminaison, blocage natif,
       présence de `release` ET `terminate`, cycle verrou/déverrou observé via le provider
-- [ ] T6 — **validation simulateur** : glisser franchement en diagonale sur le slider de la
-      carte Recherche ; la poignée doit suivre et le panneau ne doit pas défiler.
+- [x] T6 — reproduction simulateur : le geste de retour était le vrai coupable (diagnostic
+      initial corrigé), borne au bord posée, 1 test de non-régression
+- [x] T7 — **validé sur simulateur** (iPhone 17 Pro, build Release, 2026-08-21) : glissement
+      franchement diagonal sur la poignée → passe de 0 à 172 km, stats suivies
+      (1955 m D+ · 1241 m D−), **écran non dépilé**, **volet non défilé**. Contre-épreuve : un
+      glissement vertical fait bien défiler le panneau (verrou non coincé).
 
 ## Vérifications
 
-- mobile `jest` : **674 / 674**, 97 suites (669 avant, +5)
+- mobile `jest` : **675 / 675**, 97 suites (669 avant, +6)
+- validation simulateur iPhone 17 Pro (iOS 26.5, build Release standalone)
 - `tsc` mobile : 0 erreur
 - `eslint` mobile : 0 erreur (2 warnings `exhaustive-deps` préexistants)
 

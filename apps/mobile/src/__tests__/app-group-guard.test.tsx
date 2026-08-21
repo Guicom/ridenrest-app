@@ -57,3 +57,22 @@ describe('Guard (app)/_layout (MOB-2.1 / AC3, AC4)', () => {
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 });
+
+
+// Conflit de gestes — reproduit sur simulateur le 2026-08-21 (iPhone 17 Pro) : un glissement
+// horizontal n'importe où sur l'ecran carte depilait l'ecran au lieu de deplacer la poignee du
+// slider. Le geste de retour et le geste utile ont la meme direction, et le slider de position
+// est au repos tout a gauche, la ou le retour est le plus sensible.
+describe('geste de retour borne au bord (MOB-7.1)', () => {
+  it('n’active pas le retour plein écran et limite la zone de réponse au bord gauche', async () => {
+    mockUseSession.mockReturnValue({ data: { user: { id: 'u1' } }, isPending: false });
+
+    await render(<AppLayout />);
+
+    const options = mockStack.mock.calls.at(-1)?.[0]?.screenOptions;
+    expect(options.fullScreenGestureEnabled).toBe(false);
+    // Relacher cette borne rend les sliders inutilisables : revalider sur device avant de la
+    // changer.
+    expect(options.gestureResponseDistance.start).toBeLessThanOrEqual(20);
+  });
+});
