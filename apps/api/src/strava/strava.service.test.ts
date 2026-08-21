@@ -282,6 +282,62 @@ describe('getValidAccessToken', () => {
     )
   })
 
+  it('révocation Strava (400) → message actionnable, pas « erreur » générique', async () => {
+    // Le refresh token Strava est a USAGE UNIQUE et definitivement revoque si l'athlete
+    // retire l'autorisation. Aucun retry n'y changera rien : le seul remede est de
+    // reconnecter le compte, et le message doit le dire. L'ancienne implementation levait
+    // « Erreur refresh token Strava » (502) en jetant le corps renvoye par Strava, ce qui
+    // rendait l'incident de prod du 2026-08-21 indiagnosticable.
+    mockDbSelectAccount([{
+      accessToken: 'expired-token',
+      accessTokenExpiresAt: new Date(Date.now() - 1000),
+      refreshToken: 'revoked-refresh-token',
+      id: 'acct-1',
+    }])
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      text: () => Promise.resolve('{"message":"Bad Request","errors":[{"field":"refresh_token","code":"invalid"}]}'),
+    } as unknown as Response)
+
+    await expect(service.listRoutes('user-1')).rejects.toThrow(/Reconnecte ton compte Strava/)
+  })
+
+  it('panne Strava (500) reste une erreur de passerelle, pas une demande de reconnexion', async () => {
+    mockDbSelectAccount([{
+      accessToken: 'expired-token',
+      accessTokenExpiresAt: new Date(Date.now() - 1000),
+      refreshToken: 'refresh-token',
+      id: 'acct-1',
+    }])
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('oops'),
+    } as unknown as Response)
+
+    await expect(service.listRoutes('user-1')).rejects.toThrow(/Erreur refresh token Strava/)
+  })
+
+  it('refresh token absent → message actionnable (l’assertion non-null le masquait)', async () => {
+    mockDbSelectAccount([{
+      accessToken: 'expired-token',
+      accessTokenExpiresAt: new Date(Date.now() - 1000),
+      refreshToken: null,
+      id: 'acct-1',
+    }])
+
+    global.fetch = jest.fn()
+
+    await expect(service.listRoutes('user-1')).rejects.toThrow(/Reconnecte ton compte Strava/)
+    // On n'appelle meme pas Strava : envoyer `null` produisait un 400 trompeur.
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
   it('3.8 — refreshes and updates DB when token expired', async () => {
     const expiredAccount = {
       accessToken: 'expired-token',

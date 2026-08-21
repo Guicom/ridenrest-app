@@ -131,12 +131,35 @@ export class StravaService {
     // Refresh if expired (or expires within 5 minutes)
     const expiresAt = acct.accessTokenExpiresAt
     if (expiresAt && expiresAt.getTime() < Date.now() + 5 * 60 * 1000) {
-      return this.refreshAccessToken(acct.id, acct.refreshToken!)
+      if (!acct.refreshToken) {
+        // `refreshToken!` masquait ce cas : on envoyait `null` à Strava, qui répondait 400,
+        // et le message générique laissait croire à une panne.
+        throw new HttpException(
+          'Autorisation Strava incomplète. Reconnecte ton compte Strava dans les paramètres.',
+          HttpStatus.UNAUTHORIZED,
+        )
+      }
+      return this.refreshAccessToken(acct.id, acct.refreshToken)
     }
 
     return acct.accessToken
   }
 
+  /**
+   * Rafraîchit le jeton d'accès Strava.
+   *
+   * ⚠️ **Le refresh token Strava est à USAGE UNIQUE** : Strava le fait tourner à chaque
+   * rafraîchissement et invalide immédiatement l'ancien. Il est aussi révoqué définitivement
+   * si l'athlète retire l'autorisation, ou si notre propre `deauthorize` a été appelé
+   * (hooks `account.delete.before` / `user.delete.before`, MOB-2.4). Dans ces cas, aucun
+   * rafraîchissement ne peut aboutir : la seule issue est de **reconnecter Strava**.
+   *
+   * L'ancienne implémentation levait « Erreur refresh token Strava » sur n'importe quelle
+   * réponse non-OK, en jetant le statut ET le corps renvoyés par Strava. L'erreur était donc
+   * indiagnosticable : impossible de distinguer un jeton révoqué (action utilisateur, rien à
+   * corriger côté code) d'identifiants d'application erronés ou d'une panne Strava. C'est ce
+   * qui a fait perdre du temps sur l'incident de prod du 2026-08-21.
+   */
   private async refreshAccessToken(accountId: string, refreshToken: string): Promise<string> {
     const res = await fetch('https://www.strava.com/oauth/token', {
       method: 'POST',
@@ -148,7 +171,24 @@ export class StravaService {
         refresh_token: refreshToken,
       }),
     })
-    if (!res.ok) throw new HttpException('Erreur refresh token Strava', HttpStatus.BAD_GATEWAY)
+
+    if (!res.ok) {
+      // Corps lu en best-effort : il porte le `errors[].code` de Strava (`invalid`,
+      // `invalid_grant`…), seule information qui distingue les causes.
+      const body = await res.text().catch(() => '')
+      this.logger.error(
+        `[Strava refresh] HTTP ${res.status} ${res.statusText} — account=${accountId} — corps: ${body.slice(0, 500)}`,
+      )
+      // 400 = `invalid_grant` : jeton révoqué ou déjà consommé. Ce n'est pas une panne, et
+      // aucun retry n'y changera rien — l'utilisateur doit reconnecter son compte.
+      if (res.status === 400 || res.status === 401) {
+        throw new HttpException(
+          'Autorisation Strava expirée ou révoquée. Reconnecte ton compte Strava dans les paramètres.',
+          HttpStatus.UNAUTHORIZED,
+        )
+      }
+      throw new HttpException('Erreur refresh token Strava', HttpStatus.BAD_GATEWAY)
+    }
 
     const data = (await res.json()) as {
       access_token: string; refresh_token: string; expires_at: number
