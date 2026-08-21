@@ -98,6 +98,12 @@ Appliqué à `PlanningSidebar` et `live-filters-drawer`.
 
       Dans les quatre cas : écran non dépilé, volet non défilé.
 
+- [x] T8 — **validé sur émulateur Android** (Pixel, API 36, build Gradle Release, 2026-08-21) :
+      glissement diagonal droite 0 → 142 km (1545 m D+ · 1144 m D−), puis diagonale gauche
+      finissant à 60 px du bord 142 → 0 km. Écran non dépilé (`topResumedActivity` reste
+      `app.ridenrest/.MainActivity`), volet non défilé. C'est la plateforme qui exerce
+      réellement `onShouldBlockNativeResponder` — iOS ne le sollicite pas.
+
       Le troisième cas est celui qui justifie de garder les **deux** correctifs : le geste de
       retour s'amorce sur le point de **départ**, mais c'est le refus de terminaison
       (`onPanResponderTerminationRequest`) qui empêche un concurrent de préempter en cours de
@@ -139,6 +145,7 @@ partout.
 
 - mobile `jest` : **676 / 676**, 98 suites (669 avant, +7)
 - validation simulateur iPhone 17 Pro (iOS 26.5, build Release standalone)
+- validation émulateur Android Pixel (API 36, build Gradle Release)
 - `tsc` mobile : 0 erreur
 - `eslint` mobile : 0 erreur (2 warnings `exhaustive-deps` préexistants)
 
