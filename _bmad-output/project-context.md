@@ -363,22 +363,31 @@ unique**. Deux rafraîchissements successifs renvoient le *même* `refresh_token
 `expires_at`. Ce n'est pas un jeton qui tourne, c'est une **autorisation** — et il n'en existe
 qu'une par couple (application, athlète).
 
-Corollaire qui coûte du temps si on l'ignore : **local et prod partagent le même
-`STRAVA_CLIENT_ID`** (211853). Connecter Strava en local réautorise donc la même application pour
-le même athlète, ce qui **invalide silencieusement le jeton de prod** — et réciproquement. Le
-symptôme en prod est un 400 `{"resource":"RefreshToken","field":"refresh_token","code":"invalid"}`,
-c'est-à-dire exactement la signature d'un compte révoqué par l'utilisateur. Rien ne distingue les
-deux causes côté serveur.
+Local et prod partagent le même `STRAVA_CLIENT_ID` (211853), donc **la même autorisation** dès
+qu'il s'agit du même athlète. Vérifié le 2026-08-21 : après reconnexion en prod, les deux bases
+portent un `refresh_token` au SHA-256 **identique** et la même `expires_at`. Se reconnecter ne crée
+donc pas une autorisation concurrente — **les environnements coexistent**, contrairement à ce que
+laissait croire une première lecture de l'incident.
 
-C'est l'incident du 2026-08-21 : jeton de prod obtenu le 05-05, jamais rafraîchi, mort après une
-connexion locale le 08-21. Le chemin de rafraîchissement, lui, répond HTTP 200 dès qu'on lui donne
-le jeton vivant — il n'a jamais été en cause.
+Ce qui casse, c'est le **`deauthorize`** : il révoque l'autorisation *partout à la fois*, quel que
+soit l'environnement d'où il part. Or il est câblé sur les hooks `account.delete.before` /
+`user.delete.before` (MOB-2.4) et sur « Déconnecter Strava » des réglages — donc **déconnecter
+Strava depuis le mobile en test tue la prod**, sans le moindre signal côté prod. Une nouvelle
+autorisation ultérieure remplace la précédente : celle qui reste en base ailleurs devient un jeton
+mort.
 
-- **Remède durable : une application Strava distincte pour le développement** (client_id/secret
-  propres dans `apps/api/.env`). Tant qu'elle n'existe pas, tester Strava en local *casse* la prod,
-  et reconnecter en prod casse le local. Les deux ne peuvent pas fonctionner en même temps.
-- Ne jamais conclure « jeton révoqué par l'utilisateur » sur un 400 sans avoir vérifié qu'aucune
-  autre autorisation du même athlète n'a eu lieu ailleurs.
+C'est l'incident du 2026-08-21 : jeton de prod obtenu le 05-05, jamais rafraîchi, devenu
+400 `{"resource":"RefreshToken","field":"refresh_token","code":"invalid"}` — signature strictement
+identique à celle d'un compte révoqué par l'utilisateur. Rien ne distingue les deux causes côté
+serveur. Le chemin de rafraîchissement, lui, répond HTTP 200 dès qu'on lui donne le jeton vivant :
+il n'a jamais été en cause.
+
+- **Après tout test du flux de déconnexion Strava, reconnecter la prod.** C'est le seul geste qui
+  la répare, et rien ne la signalera cassée avant le prochain import.
+- Une **application Strava distincte pour le développement** (client_id/secret propres dans
+  `apps/api/.env`) isole complètement les deux mondes et supprime la classe entière de problème.
+- Ne jamais conclure « jeton révoqué par l'utilisateur » sur un 400 sans avoir vérifié qu'aucun
+  `deauthorize` ni aucune réautorisation du même athlète n'a eu lieu ailleurs.
 - Diagnostic en une commande — comparer le `updated_at` du compte à `access_token_expires_at` :
   un écart d'exactement 6 h (durée de vie Strava) signifie que le jeton n'a **jamais** été
   rafraîchi depuis son obtention.
