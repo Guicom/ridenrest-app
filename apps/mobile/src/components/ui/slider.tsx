@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 
 import { cn } from '@/lib/cn';
+import { useScrollLock } from './scroll-lock';
 
 // Primitives slider (simple + double poignée) — MOB-4.3 / T1, AC1.
 //
@@ -150,6 +151,8 @@ export function RangeSlider({
   const trackRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [trackLeft, setTrackLeft] = useState(0);
+  // Coupe le défilement du conteneur pendant le drag (no-op hors conteneur scrollable).
+  const setScrollLocked = useScrollLock();
 
   // Mesure du bord gauche écran + largeur (callback, jamais en rendu → lint OK).
   const onTrackLayout = useCallback((_e: LayoutChangeEvent) => {
@@ -167,9 +170,22 @@ export function RangeSlider({
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
+        // Le slider vit dans un ScrollView (PlanningSidebar, drawer de filtres live).
+        // Sans ces deux lignes, le ScrollView RÉCLAME le responder dès la moindre dérive
+        // verticale du doigt et l'OBTIENT : le drag bascule sur le panneau après quelques
+        // pixels, et la poignée se fige. `PanResponder` accorde la terminaison par défaut.
+        //   - `onPanResponderTerminationRequest: false` → on refuse de rendre le responder
+        //     une fois le geste engagé (négociation JS, iOS + Android).
+        //   - `onShouldBlockNativeResponder: true` → on empêche le ScrollView natif Android
+        //     de préempter le geste hors de cette négociation.
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
+          setScrollLocked(true);
           onInteractStart?.();
         },
+        onPanResponderRelease: () => setScrollLocked(false),
+        onPanResponderTerminate: () => setScrollLocked(false),
         onPanResponderMove: (evt: GestureResponderEvent) => {
           if (trackWidth <= 0) return;
           const value = pageXToValue(
@@ -196,7 +212,7 @@ export function RangeSlider({
           );
         },
       }),
-    [low, high, trackLeft, trackWidth, min, max, step, maxRange, minGap, onChange, onInteractStart],
+    [low, high, trackLeft, trackWidth, min, max, step, maxRange, minGap, onChange, onInteractStart, setScrollLocked],
   );
 
   const adjust = useCallback(
@@ -312,6 +328,8 @@ export function Slider({
   className,
 }: SliderProps) {
   const [trackWidth, setTrackWidth] = useState(0);
+  // Coupe le défilement du conteneur pendant le drag (no-op hors conteneur scrollable).
+  const setScrollLocked = useScrollLock();
 
   const onTrackLayout = useCallback((e: LayoutChangeEvent) => {
     setTrackWidth(e.nativeEvent.layout.width);
@@ -323,9 +341,9 @@ export function Slider({
   // re-déclenchait à chaque `onChange`/re-rendu, remettant `dx`≈0 → la poignée rampait).
   /* eslint-disable react-hooks/refs -- refs lues/écrites uniquement hors rendu (effet +
      callbacks de geste), pattern « latest ref » pour un PanResponder stable. */
-  const latest = useRef({ value, trackWidth, min, max, step, onChange, onInteractStart });
+  const latest = useRef({ value, trackWidth, min, max, step, onChange, onInteractStart, setScrollLocked });
   useEffect(() => {
-    latest.current = { value, trackWidth, min, max, step, onChange, onInteractStart };
+    latest.current = { value, trackWidth, min, max, step, onChange, onInteractStart, setScrollLocked };
   });
   const startValueRef = useRef(0);
 
@@ -335,10 +353,23 @@ export function Slider({
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+        // Le slider vit dans un ScrollView (PlanningSidebar, drawer de filtres live).
+      // Sans ces deux lignes, le ScrollView RÉCLAME le responder dès la moindre dérive
+      // verticale du doigt et l'OBTIENT : le drag bascule sur le panneau après quelques
+      // pixels, et la poignée se fige. `PanResponder` accorde la terminaison par défaut.
+      //   - `onPanResponderTerminationRequest: false` → on refuse de rendre le responder
+      //     une fois le geste engagé (négociation JS, iOS + Android).
+      //   - `onShouldBlockNativeResponder: true` → on empêche le ScrollView natif Android
+      //     de préempter le geste hors de cette négociation.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderGrant: () => {
         startValueRef.current = latest.current.value; // valeur au début du geste
+        latest.current.setScrollLocked(true);
         latest.current.onInteractStart?.();
       },
+      onPanResponderRelease: () => latest.current.setScrollLocked(false),
+      onPanResponderTerminate: () => latest.current.setScrollLocked(false),
       onPanResponderMove: (_evt, gesture) => {
         const l = latest.current;
         const usable = Math.max(1, l.trackWidth - HANDLE_SIZE);

@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { PanResponder } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { RangeSlider, Slider, clampRange, clampValue } from './slider';
+import { ScrollLockProvider } from './scroll-lock';
 
 // Slider double poignée (MOB-4.3 / T1, T7). On teste la logique de clamp **pure**
 // (cap 30 km, écart min, bornes) + le point d'entrée a11y increment/decrement
@@ -104,5 +106,66 @@ describe('RangeSlider (a11y)', () => {
     });
     expect(onChange).toHaveBeenCalledWith({ low: 10, high: 29 });
     expect(onInteractStart).toHaveBeenCalled();
+  });
+});
+
+
+// Conflit de gestes avec le ScrollView parent — bug remonté le 2026-08-21 : « très
+// rapidement en glissant sur le slider, il n'y a plus d'action sur le slider mais sur le
+// volet latéral ». Les deux sliders vivent dans un ScrollView (PlanningSidebar, drawer de
+// filtres live) qui réclamait et obtenait le responder à la moindre dérive verticale.
+describe('rétention du geste face au ScrollView parent', () => {
+  async function configsFrom(mount: () => Promise<unknown>) {
+    const spy = jest.spyOn(PanResponder, 'create');
+    spy.mockClear();
+    await mount();
+    const configs = spy.mock.calls.map((c) => c[0]);
+    spy.mockRestore();
+    return configs;
+  }
+
+  it.each([
+    ['Slider', () => render(<Slider min={0} max={100} value={50} onChange={() => {}} />)],
+    ['RangeSlider', () => render(<RangeSlider min={0} max={100} low={10} high={40} onChange={() => {}} />)],
+  ])('%s refuse de rendre le responder et bloque le scroll natif', async (_name, mount) => {
+    const [config] = await configsFrom(mount);
+
+    // Sans ça, PanResponder ACCORDE la terminaison par défaut : le ScrollView prend la main.
+    expect(config?.onPanResponderTerminationRequest?.({} as never, {} as never)).toBe(false);
+    // Android : empêche le ScrollView natif de préempter hors de la négociation JS.
+    expect(config?.onShouldBlockNativeResponder?.({} as never, {} as never)).toBe(true);
+  });
+
+  it.each([
+    ['Slider', () => render(<Slider min={0} max={100} value={50} onChange={() => {}} />)],
+    ['RangeSlider', () => render(<RangeSlider min={0} max={100} low={10} high={40} onChange={() => {}} />)],
+  ])('%s libère le verrou de scroll au relâchement ET à la terminaison', async (_name, mount) => {
+    const [config] = await configsFrom(mount);
+
+    // Oublier `onPanResponderTerminate` laisserait le panneau non défilable après un geste
+    // interrompu (appel entrant, multi-touch) — panneau figé, sans moyen de le débloquer.
+    expect(typeof config?.onPanResponderRelease).toBe('function');
+    expect(typeof config?.onPanResponderTerminate).toBe('function');
+  });
+
+  it('verrouille puis déverrouille le scroll du conteneur autour du geste', async () => {
+    const seen: boolean[] = [];
+    const spy = jest.spyOn(PanResponder, 'create');
+    await render(
+      <ScrollLockProvider>
+        {(scrollEnabled) => {
+          seen.push(scrollEnabled);
+          return <Slider min={0} max={100} value={50} onChange={() => {}} />;
+        }}
+      </ScrollLockProvider>,
+    );
+    const config = spy.mock.calls.at(-1)?.[0];
+    spy.mockRestore();
+
+    expect(seen.at(-1)).toBe(true);            // au repos, le panneau défile
+    await act(async () => { config?.onPanResponderGrant?.({} as never, {} as never); });
+    expect(seen.at(-1)).toBe(false);           // pendant le drag, il ne défile plus
+    await act(async () => { config?.onPanResponderRelease?.({} as never, {} as never); });
+    expect(seen.at(-1)).toBe(true);            // et il redéfile après
   });
 });

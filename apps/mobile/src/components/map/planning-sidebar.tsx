@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/ui/icon';
+import { ScrollLockProvider } from '@/components/ui/scroll-lock';
 import { useTranslation } from '@/lib/i18n';
 
 // Panneau planning coulissant (drawer) — port iso du sidebar web en viewport mobile :
@@ -73,7 +74,10 @@ export function PlanningSidebar({
         }}
       >
         <View className="flex-1 border-r border-border bg-background-page">
+          <ScrollLockProvider>
+            {(scrollEnabled) => (
           <ScrollView
+            scrollEnabled={scrollEnabled}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
               // Marge haute généreuse : la barre d'état / Dynamic Island iOS ne doit
@@ -86,6 +90,8 @@ export function PlanningSidebar({
           >
             {children}
           </ScrollView>
+            )}
+          </ScrollLockProvider>
         </View>
 
         {/* Poignée d'ouverture/fermeture — dépasse du bord droit du panneau */}

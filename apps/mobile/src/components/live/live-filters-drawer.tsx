@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from '@/components/ui/icon';
 import { Switch } from '@/components/ui/switch';
+import { ScrollLockProvider } from '@/components/ui/scroll-lock';
 import { useLiveStore } from '@/lib/stores/live.store';
 import { useMapStore, type WeatherDimension } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
@@ -293,7 +294,10 @@ export function LiveFiltersDrawer({
           </Pressable>
         </View>
 
+        <ScrollLockProvider>
+          {(scrollEnabled) => (
         <ScrollView
+          scrollEnabled={scrollEnabled}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 20 }}
           style={{ maxHeight: 420 }}
@@ -432,6 +436,8 @@ export function LiveFiltersDrawer({
             </View>
           </View>
         </ScrollView>
+          )}
+        </ScrollLockProvider>
       </Animated.View>
     </View>
   );
