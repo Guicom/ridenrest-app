@@ -87,10 +87,21 @@ Appliqué à `PlanningSidebar` et `live-filters-drawer`.
       présence de `release` ET `terminate`, cycle verrou/déverrou observé via le provider
 - [x] T6 — reproduction simulateur : le geste de retour était le vrai coupable (diagnostic
       initial corrigé), borne au bord posée, 1 test de non-régression
-- [x] T7 — **validé sur simulateur** (iPhone 17 Pro, build Release, 2026-08-21) : glissement
-      franchement diagonal sur la poignée → passe de 0 à 172 km, stats suivies
-      (1955 m D+ · 1241 m D−), **écran non dépilé**, **volet non défilé**. Contre-épreuve : un
-      glissement vertical fait bien défiler le panneau (verrou non coincé).
+- [x] T7 — **validé sur simulateur** (iPhone 17 Pro, iOS 26.5, build Release, 2026-08-21) :
+
+      | cas | résultat |
+      |---|---|
+      | diagonale vers la **droite** depuis 0 | 0 → 172 km, stats suivies (1955 m D+ · 1241 m D−) |
+      | diagonale vers la **gauche** | 172 → 20 km, stats suivies (89 m D+ · 45 m D−) |
+      | gauche **finissant à 7 pt du bord** (dans la bande de retour) | 20 → 0 km, pas de dépilage |
+      | glissement **vertical** (contre-épreuve) | le panneau défile normalement, verrou non coincé |
+
+      Dans les quatre cas : écran non dépilé, volet non défilé.
+
+      Le troisième cas est celui qui justifie de garder les **deux** correctifs : le geste de
+      retour s'amorce sur le point de **départ**, mais c'est le refus de terminaison
+      (`onPanResponderTerminationRequest`) qui empêche un concurrent de préempter en cours de
+      glissement une fois le doigt entré dans la bande de bord.
 
 ## Vérifications
 
