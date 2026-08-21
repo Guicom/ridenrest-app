@@ -153,18 +153,15 @@ export class StravaService {
    * renvoient le *même* `refresh_token` et la *même* `expires_at`. Le code réécrit quand même
    * `refresh_token` en base, Strava se réservant le droit de le faire tourner.
    *
-   * Conséquence non intuitive : **une nouvelle autorisation du même athlète sur la même
-   * application invalide l'autorisation précédente**, où qu'elle vive. Local et prod partagent
-   * le `STRAVA_CLIENT_ID` 211853 : connecter Strava en local tue donc le jeton de prod, et
-   * réciproquement. C'est la cause de l'incident du 2026-08-21 (jeton de prod du 05-05 devenu
-   * `{"code":"invalid"}` après une connexion locale le 08-21), et non un défaut de ce chemin —
-   * qui répond HTTP 200 quand le jeton qu'on lui donne est bien le jeton vivant.
-   * Le remède durable est une **application Strava distincte pour le développement**.
+   * Local et prod partageant le `STRAVA_CLIENT_ID` 211853, ils partagent aussi cette
+   * autorisation : vérifié le 2026-08-21, les deux bases portent le *même* `refresh_token`
+   * après reconnexion. Se reconnecter quelque part ne casse donc pas l'autre environnement.
    *
-   * Le jeton est par ailleurs révoqué définitivement si l'athlète retire l'autorisation, ou si
-   * notre propre `deauthorize` a été appelé (hooks `account.delete.before` /
-   * `user.delete.before`, MOB-2.4). Dans tous ces cas aucun retry n'aboutit : il faut
-   * **reconnecter Strava**.
+   * Ce qui casse, c'est le **`deauthorize`** — il révoque l'autorisation partout à la fois, et
+   * il part de « Déconnecter Strava » comme des hooks `account.delete.before` /
+   * `user.delete.before` (MOB-2.4). Tester la déconnexion depuis le mobile tue donc la prod
+   * en silence, et la réautorisation suivante rend mort le jeton resté ailleurs en base.
+   * C'est l'incident du 2026-08-21. Aucun retry n'y change rien : il faut **reconnecter**.
    *
    * L'ancienne implémentation levait « Erreur refresh token Strava » sur n'importe quelle
    * réponse non-OK, en jetant le statut ET le corps renvoyés par Strava. L'erreur était donc
