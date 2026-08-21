@@ -15,7 +15,12 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
  * Sans provider, `useScrollLock()` renvoie un no-op : la primitive reste utilisable hors
  * conteneur scrollable (Storybook, écrans simples) sans condition.
  */
-const ScrollLockContext = createContext<(locked: boolean) => void>(() => {});
+/**
+ * Exporté : un conteneur qui pilote DÉJÀ un verrou (parce que son propre geste doit couper
+ * le défilement, cf. `live-filters-drawer`) fournit sa valeur directement, plutôt que
+ * d'empiler un second mécanisme au-dessus de `ScrollLockProvider`.
+ */
+export const ScrollLockContext = createContext<(locked: boolean) => void>(() => {});
 
 export function useScrollLock(): (locked: boolean) => void {
   return useContext(ScrollLockContext);

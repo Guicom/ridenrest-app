@@ -103,9 +103,41 @@ Appliqué à `PlanningSidebar` et `live-filters-drawer`.
       (`onPanResponderTerminationRequest`) qui empêche un concurrent de préempter en cours de
       glissement une fois le doigt entré dans la bande de bord.
 
+## Audit de couverture (2026-08-21, agent dédié — demande Guillaume)
+
+Le correctif ayant été posé sur la primitive partagée, restait à vérifier qu'aucun geste ne
+lui échappait. Cinq lacunes trouvées, **toutes corrigées** :
+
+1. **`live-filters-drawer.tsx` avait son propre `PanResponder`** (glisser-fermer vertical)
+   sans aucune des trois protections, en concurrence directe avec son `ScrollView` interne —
+   et sans `onPanResponderTerminate`, donc un geste interrompu laissait le tiroir figé à
+   mi-hauteur. Même bug que celui remonté, sur un autre composant. Corrigé, avec snap-back
+   sur terminaison.
+2. **`RangeSlider` recréait son responder en plein glissement** : les deps du `useMemo`
+   incluaient `low`/`high`/`onChange`, donc l'identité changeait à chaque valeur et React
+   Native pouvait re-négocier le responder au milieu du geste. Basculé sur le même pattern
+   « latest ref » que `Slider`. Latent (composant monté nulle part) mais c'était un piège
+   pour le premier écran qui l'utiliserait.
+3. **Verrou mal placé** : le provider était sur le tiroir Live (qui ne contient aucun
+   slider) alors que le tiroir en avait besoin **pour son propre geste**. `ScrollLockContext`
+   est désormais exporté et le tiroir fournit sa propre valeur — un seul mécanisme, utilisé
+   à la fois par son geste de fermeture et par tout slider qu'on y ajouterait.
+4. **Stacks racine et `(auth)` non bornés** — aucun écran à slider en dessous aujourd'hui,
+   mais laisser un navigateur non borné, c'est laisser le piège se refermer sur le prochain
+   écran. Bornés à l'identique.
+5. **Aucun test ne verrouillait les conteneurs** : `slider.test.tsx` monte son provider à la
+   main, donc on pouvait débrancher celui de `planning-sidebar.tsx` sans faire échouer un
+   seul test. Ajout de `planning-sidebar.test.tsx`, qui vérifie que `scrollEnabled` est
+   explicitement piloté.
+
+Périmètre confirmé par l'audit : **deux** points d'appel de slider dans tout le code
+applicatif (`search-range-control.tsx:383`, `live-controls.tsx:222`), aucun slider tiers,
+aucun `Gesture.Pan`/`Swipeable`/carrousel, et `@gorhom/bottom-sheet` explicitement écarté
+partout.
+
 ## Vérifications
 
-- mobile `jest` : **675 / 675**, 97 suites (669 avant, +6)
+- mobile `jest` : **676 / 676**, 98 suites (669 avant, +7)
 - validation simulateur iPhone 17 Pro (iOS 26.5, build Release standalone)
 - `tsc` mobile : 0 erreur
 - `eslint` mobile : 0 erreur (2 warnings `exhaustive-deps` préexistants)

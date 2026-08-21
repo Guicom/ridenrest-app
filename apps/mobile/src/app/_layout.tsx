@@ -79,7 +79,7 @@ function RootLayout() {
       <SafeAreaProvider>
         <QueryProvider>
           <I18nextProvider i18n={i18n}>
-            <Stack screenOptions={{ headerShown: false }} />
+            <Stack screenOptions={SCREEN_OPTIONS} />
             {/* Bandeau « Mode hors ligne » GLOBAL (MOB-3.5) — sous I18nextProvider
                 (i18n) et au-dessus du Stack pour rester visible quel que soit
                 l'écran. Visible UNIQUEMENT offline (piloté par useNetworkStatus). */}
@@ -94,4 +94,15 @@ function RootLayout() {
 // MOB-6.1 / AC1 — `Sentry.wrap()` (recette officielle expo-router) instrumente la
 // navigation et capture les erreurs de rendu de l'arbre UI. No-op tant que Sentry n'est
 // pas initialisé (DSN absent). L'init lui-même se fait plus haut via `@/lib/observability/boot`.
+// Le retour par glissement est borné au bord gauche sur TOUS les navigateurs, pas
+// seulement `(app)`. Le geste plein écran par défaut entre en conflit avec n'importe quel
+// widget horizontal (sliders, bandeau météo défilant) — cf. MOB-7.1. Aucun écran à slider
+// ne dépend de ce navigateur aujourd'hui, mais laisser un Stack non borné, c'est laisser
+// le piège se refermer sur le prochain écran qu'on y ajoutera.
+const SCREEN_OPTIONS = {
+  headerShown: false,
+  fullScreenGestureEnabled: false,
+  gestureResponseDistance: { start: 20 },
+} as const;
+
 export default Sentry.wrap(RootLayout);

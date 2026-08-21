@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from '@/components/ui/icon';
 import { Switch } from '@/components/ui/switch';
-import { ScrollLockProvider } from '@/components/ui/scroll-lock';
+import { ScrollLockContext } from '@/components/ui/scroll-lock';
 import { useLiveStore } from '@/lib/stores/live.store';
 import { useMapStore, type WeatherDimension } from '@/lib/stores/map.store';
 import { useTranslation } from '@/lib/i18n';
@@ -213,6 +213,15 @@ export function LiveFiltersDrawer({
   const handleCloseRef = useRef(handleClose);
   useEffect(() => { handleCloseRef.current = handleClose; });
 
+  // Verrou de defilement pilote par le tiroir lui-meme : son geste de fermeture est
+  // vertical, donc en concurrence directe avec le ScrollView interne. La meme valeur est
+  // fournie par contexte, pour qu'un slider ajoute plus tard dans le tiroir en beneficie.
+  const [scrollLocked, setScrollLocked] = useState(false);
+
+  const snapBack = useCallback(() => {
+    Animated.timing(translateY, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+  }, [translateY]);
+
   // Swipe vers le bas sur la poignée → fermeture (suivi du doigt, snap-back sinon).
   const responder = useMemo(
     () =>
@@ -222,22 +231,33 @@ export function LiveFiltersDrawer({
       // eslint-disable-next-line react-hooks/refs
       PanResponder.create({
         onMoveShouldSetPanResponder: (_e, g) => g.dy > 4,
+        // Le geste de fermeture est VERTICAL, comme celui du ScrollView interne (l. ~299)
+        // qu'il chevauche. Sans ces deux lignes, `PanResponder` accorde la terminaison par
+        // defaut : le ScrollView reclame le responder en cours de glissement et le tiroir
+        // se fige a mi-hauteur. Meme cause que MOB-7.1 sur les sliders.
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => setScrollLocked(true),
         onPanResponderMove: (_e, g) => {
           if (g.dy > 0) translateY.setValue(g.dy);
         },
         onPanResponderRelease: (_e, g) => {
+          setScrollLocked(false);
           if (g.dy > SWIPE_CLOSE_THRESHOLD) {
             handleCloseRef.current();
           } else {
-            Animated.timing(translateY, {
-              toValue: 0,
-              duration: 150,
-              useNativeDriver: true,
-            }).start();
+            snapBack();
           }
         },
+        // Sans terminaison, un geste interrompu (appel entrant, multi-touch) laissait
+        // `translateY` fige a sa valeur intermediaire : tiroir a mi-hauteur, verrou de
+        // defilement non leve, et aucun moyen de le debloquer.
+        onPanResponderTerminate: () => {
+          setScrollLocked(false);
+          snapBack();
+        },
       }),
-    [translateY],
+    [translateY, snapBack, setScrollLocked],
   );
 
   const onSheetLayout = (e: LayoutChangeEvent) => {
@@ -294,10 +314,9 @@ export function LiveFiltersDrawer({
           </Pressable>
         </View>
 
-        <ScrollLockProvider>
-          {(scrollEnabled) => (
+        <ScrollLockContext.Provider value={setScrollLocked}>
         <ScrollView
-          scrollEnabled={scrollEnabled}
+          scrollEnabled={!scrollLocked}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 20 }}
           style={{ maxHeight: 420 }}
@@ -436,8 +455,7 @@ export function LiveFiltersDrawer({
             </View>
           </View>
         </ScrollView>
-          )}
-        </ScrollLockProvider>
+        </ScrollLockContext.Provider>
       </Animated.View>
     </View>
   );

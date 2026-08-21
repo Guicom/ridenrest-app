@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   PanResponder,
   View,
@@ -162,58 +162,60 @@ export function RangeSlider({
     });
   }, []);
 
-  // PanResponder sur le conteneur : `pageX − trackLeft` = toucher relatif à la piste,
-  // repère écran stable (insensible au hit-test poignée/piste et aux re-rendus). La
-  // poignée déplacée = la plus proche du toucher (pas de ref de geste).
-  const responder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        // Le slider vit dans un ScrollView (PlanningSidebar, drawer de filtres live).
-        // Sans ces deux lignes, le ScrollView RÉCLAME le responder dès la moindre dérive
-        // verticale du doigt et l'OBTIENT : le drag bascule sur le panneau après quelques
-        // pixels, et la poignée se fige. `PanResponder` accorde la terminaison par défaut.
-        //   - `onPanResponderTerminationRequest: false` → on refuse de rendre le responder
-        //     une fois le geste engagé (négociation JS, iOS + Android).
-        //   - `onShouldBlockNativeResponder: true` → on empêche le ScrollView natif Android
-        //     de préempter le geste hors de cette négociation.
-        onPanResponderTerminationRequest: () => false,
-        onShouldBlockNativeResponder: () => true,
-        onPanResponderGrant: () => {
-          setScrollLocked(true);
-          onInteractStart?.();
-        },
-        onPanResponderRelease: () => setScrollLocked(false),
-        onPanResponderTerminate: () => setScrollLocked(false),
-        onPanResponderMove: (evt: GestureResponderEvent) => {
-          if (trackWidth <= 0) return;
-          const value = pageXToValue(
-            evt.nativeEvent.pageX,
-            trackLeft,
-            trackWidth,
-            min,
-            max,
-          );
-          const handle =
-            Math.abs(value - low) <= Math.abs(value - high) ? 'low' : 'high';
-          onChange(
-            clampRange({
-              handle,
-              value,
-              low,
-              high,
-              min,
-              max,
-              step,
-              maxRange,
-              minGap,
-            }),
-          );
-        },
-      }),
-    [low, high, trackLeft, trackWidth, min, max, step, maxRange, minGap, onChange, onInteractStart, setScrollLocked],
+  // `PanResponder` créé UNE SEULE FOIS (init paresseuse `useState`), callbacks lisant
+  // `latest.current`. Avec un `useMemo` sur [low, high, onChange…], son identité changeait
+  // à CHAQUE `onChange` : React Native re-négociait le responder en plein glissement, et
+  // `onGrant` se re-déclenchait — exactement le défaut que `Slider` évite plus bas. Latent
+  // tant que `RangeSlider` n'est monté nulle part, mais c'est un piège pour le premier
+  // écran qui l'utilisera.
+  //
+  // Geste = `pageX` (X ABSOLU écran) − `trackLeft` (bord gauche mesuré via
+  // `measureInWindow`). Ni `moveX` (saute quand la piste n'est pas en x=0), ni `locationX`
+  // (repère variable selon l'enfant survolé). La poignée déplacée est la plus proche du
+  // toucher.
+  /* eslint-disable react-hooks/refs -- refs lues/écrites hors rendu (effet + callbacks de
+     geste), pattern « latest ref » pour un PanResponder stable. */
+  const latest = useRef({ low, high, trackLeft, trackWidth, min, max, step, maxRange, minGap, onChange, onInteractStart, setScrollLocked });
+  useEffect(() => {
+    latest.current = { low, high, trackLeft, trackWidth, min, max, step, maxRange, minGap, onChange, onInteractStart, setScrollLocked };
+  });
+
+  const [responder] = useState(() =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      // Cf. le commentaire équivalent sur `Slider` : le ScrollView parent réclame sinon le
+      // responder à la moindre dérive verticale et l'obtient.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: () => {
+        latest.current.setScrollLocked(true);
+        latest.current.onInteractStart?.();
+      },
+      onPanResponderRelease: () => latest.current.setScrollLocked(false),
+      onPanResponderTerminate: () => latest.current.setScrollLocked(false),
+      onPanResponderMove: (evt: GestureResponderEvent) => {
+        const l = latest.current;
+        if (l.trackWidth <= 0) return;
+        const value = pageXToValue(evt.nativeEvent.pageX, l.trackLeft, l.trackWidth, l.min, l.max);
+        const handle = Math.abs(value - l.low) <= Math.abs(value - l.high) ? 'low' : 'high';
+        l.onChange(
+          clampRange({
+            handle,
+            value,
+            low: l.low,
+            high: l.high,
+            min: l.min,
+            max: l.max,
+            step: l.step,
+            maxRange: l.maxRange,
+            minGap: l.minGap,
+          }),
+        );
+      },
+    }),
   );
+  /* eslint-enable react-hooks/refs */
 
   const adjust = useCallback(
     (handle: 'low' | 'high', delta: number) => {

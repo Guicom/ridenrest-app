@@ -77,6 +77,7 @@ export function PlanningSidebar({
           <ScrollLockProvider>
             {(scrollEnabled) => (
           <ScrollView
+            testID="planning-sidebar-scroll"
             scrollEnabled={scrollEnabled}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
