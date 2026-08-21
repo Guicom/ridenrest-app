@@ -28,6 +28,7 @@
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://eu.i.posthog.com"
